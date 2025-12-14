@@ -115,12 +115,12 @@ func (r *GitRepo) RunGitCommandAndGetOutput(args ...string) (string, error) {
 	return r.runGitCommandAndGetOutput(args...)
 }
 
-// RunCliCommand executes a Charcoal CLI command in the repository directory.
+// RunCliCommand executes a Stackit CLI command in the repository directory.
 // This will need to be updated once the CLI is built.
 func (r *GitRepo) RunCliCommand(command []string) error {
 	// TODO: Update this path once the CLI binary is built
 	// For now, this is a placeholder that will need to be updated
-	cliPath := "charcoal" // Will be the built binary path
+	cliPath := "stackit" // Will be the built binary path
 	
 	cmd := exec.Command(cliPath, command...)
 	cmd.Dir = r.Dir
@@ -145,9 +145,9 @@ func (r *GitRepo) RunCliCommand(command []string) error {
 	return nil
 }
 
-// RunCliCommandAndGetOutput executes a Charcoal CLI command and returns its output.
+// RunCliCommandAndGetOutput executes a Stackit CLI command and returns its output.
 func (r *GitRepo) RunCliCommandAndGetOutput(command []string) (string, error) {
-	cliPath := "charcoal" // Will be the built binary path
+	cliPath := "stackit" // Will be the built binary path
 	
 	cmd := exec.Command(cliPath, command...)
 	cmd.Dir = r.Dir

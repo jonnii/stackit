@@ -21,7 +21,7 @@ type SceneSetup func(*Scene) error
 // It automatically handles cleanup using t.Cleanup().
 func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "charcoal-test-*")
+	tmpDir, err := os.MkdirTemp("", "stackit-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

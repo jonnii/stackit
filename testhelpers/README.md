@@ -1,6 +1,6 @@
 # Test Helpers
 
-This package provides testing utilities for the Charcoal CLI Go port, ported from the TypeScript test infrastructure.
+This package provides testing utilities for the Stackit CLI Go port, ported from the TypeScript test infrastructure.
 
 ## Overview
 
@@ -18,7 +18,7 @@ The scene system creates isolated test environments with temporary Git repositor
 ```go
 import (
     "testing"
-    "stackit.dev/charcoal/testhelpers"
+    "stackit.dev/stackit/testhelpers"
 )
 
 func TestMyFeature(t *testing.T) {

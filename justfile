@@ -40,7 +40,7 @@ deps:
 # Clean test artifacts
 clean:
 	rm -f coverage.out coverage.html
-	find . -type d -name "charcoal-test-*" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "stackit-test-*" -exec rm -rf {} + 2>/dev/null || true
 
 # Format code
 fmt:

@@ -157,6 +157,18 @@ func GetPullRequestByBranch(ctx context.Context, client *github.Client, owner, r
 	return prs[0], nil
 }
 
+// MarkPullRequestReadyForReview marks a draft pull request as ready for review using gh CLI
+// This follows the same pattern as charcoal, which uses gh CLI for PR operations
+func MarkPullRequestReadyForReview(ctx context.Context, client *github.Client, owner, repo string, prNumber int) error {
+	// Use gh CLI to mark PR as ready, similar to how charcoal does it
+	cmd := exec.CommandContext(ctx, "gh", "pr", "ready", fmt.Sprintf("%d", prNumber))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to mark PR as ready: %s: %w", string(output), err)
+	}
+	return nil
+}
+
 // GetGitHubClient creates a GitHub client with authentication
 func GetGitHubClient(ctx context.Context) (*github.Client, string, string, error) {
 	token, err := getGitHubToken()

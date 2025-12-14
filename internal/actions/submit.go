@@ -231,15 +231,29 @@ func SubmitAction(opts SubmitOptions) error {
 				RerequestReview: opts.RerequestReview,
 			}
 			
-			// Only update draft status if it's explicitly set via flags
-			if opts.Draft || opts.Publish {
-				updateOpts.Draft = &submissionInfo.Metadata.IsDraft
+			// Handle draft status changes - GitHub REST API doesn't support changing draft status
+			// So we need to use gh CLI for this, similar to how charcoal does it
+			if opts.Publish {
+				// Check current draft status from GitHub to be sure
+				currentPR, err := git.GetPullRequestByBranch(githubCtx, githubClient, repoOwner, repoName, submissionInfo.BranchName)
+				if err == nil && currentPR != nil && currentPR.Draft != nil && *currentPR.Draft {
+					// PR is draft and we want to publish it - use gh pr ready
+					if err := git.MarkPullRequestReadyForReview(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber); err != nil {
+						return fmt.Errorf("failed to mark PR as ready for review: %w", err)
+					}
+				}
+			} else if opts.Draft {
+				// PR is published and we want to mark as draft - set draft flag in update
+				// Note: This might not work via REST API, but we'll try
+				draftTrue := true
+				updateOpts.Draft = &draftTrue
 			}
-			if baseChanged {
-				updateOpts.Base = &submissionInfo.Base
-			}
-			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
-				return fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
+			
+			// Only update via REST API if there are other changes or we're marking as draft
+			if baseChanged || updateOpts.Title != nil || updateOpts.Body != nil || updateOpts.Draft != nil || len(updateOpts.Reviewers) > 0 || len(updateOpts.TeamReviewers) > 0 {
+				if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
+					return fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
+				}
 			}
 
 			// Update PR info - prInfo already declared above
@@ -350,15 +364,8 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			baseChanged := prInfo.Base != parentBranchName
 			branchChanged, _ := eng.BranchMatchesRemote(branchName)
 			
-			// Check if draft status needs to change
-			draftStatusNeedsChange := false
-			if opts.Draft && !prInfo.IsDraft {
-				// Want to mark as draft, but it's not draft
-				draftStatusNeedsChange = true
-			} else if opts.Publish && prInfo.IsDraft {
-				// Want to publish, but it's currently draft
-				draftStatusNeedsChange = true
-			}
+			// If publish/draft flags are set, we always need to update (don't trust stored value)
+			draftStatusNeedsChange := opts.Draft || opts.Publish
 			
 			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always || draftStatusNeedsChange
 

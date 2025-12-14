@@ -6,6 +6,8 @@ type PrInfo struct {
 	Title   string
 	Body    string
 	IsDraft bool
+	State   string // MERGED, CLOSED, OPEN
+	Base    string // Base branch name
 }
 
 // Scope specifies the scope for stack operations
@@ -22,4 +24,22 @@ const (
 	ValidationResultBadParentRevision
 	ValidationResultBadParentName
 	ValidationResultTrunk
+)
+
+// PullResult represents the result of pulling trunk
+type PullResult int
+
+const (
+	PullDone PullResult = iota
+	PullUnneeded
+	PullConflict
+)
+
+// RestackResult represents the result of restacking a branch
+type RestackResult int
+
+const (
+	RestackDone RestackResult = iota
+	RestackUnneeded
+	RestackConflict
 )

@@ -32,3 +32,19 @@ func (s *Splog) Page(content string) {
 func (s *Splog) Newline() {
 	fmt.Fprintln(s.writer)
 }
+
+// Warn writes a warning message
+func (s *Splog) Warn(format string, args ...interface{}) {
+	fmt.Fprintf(s.writer, "⚠️  "+format+"\n", args...)
+}
+
+// Debug writes a debug message
+func (s *Splog) Debug(format string, args ...interface{}) {
+	// Debug messages are only shown in verbose mode
+	// For now, we'll skip them
+}
+
+// Tip writes a tip message
+func (s *Splog) Tip(format string, args ...interface{}) {
+	fmt.Fprintf(s.writer, "💡 "+format+"\n", args...)
+}

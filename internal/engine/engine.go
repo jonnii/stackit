@@ -36,4 +36,14 @@ type Engine interface {
 
 	// Branch tracking
 	TrackBranch(branchName string, parentBranchName string) error
+
+	// Sync operations
+	PullTrunk() (PullResult, error)
+	ResetTrunkToRemote() error
+	RestackBranch(branchName string) (RestackResult, error)
+	IsMergedIntoTrunk(branchName string) (bool, error)
+	IsBranchEmpty(branchName string) (bool, error)
+	DeleteBranch(branchName string) error
+	SetParent(branchName string, parentBranchName string) error
+	GetRelativeStackUpstack(branchName string) []string
 }

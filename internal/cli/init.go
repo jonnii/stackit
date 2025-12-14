@@ -53,7 +53,7 @@ func selectTrunkBranch(branchNames []string, inferredTrunk string, interactive b
 	}
 
 	// For now, if we have an inferred trunk, use it
-	// TODO: Add proper interactive prompt with survey library for full branch selection
+	// TODO: Add proper interactive prompt with bubbletea for full branch selection
 	if inferredTrunk != "" {
 		return inferredTrunk, nil
 	}

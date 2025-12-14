@@ -8,6 +8,7 @@ type PrInfo struct {
 	IsDraft bool
 	State   string // MERGED, CLOSED, OPEN
 	Base    string // Base branch name
+	URL     string // PR URL
 }
 
 // Scope specifies the scope for stack operations

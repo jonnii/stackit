@@ -12,6 +12,7 @@ type Engine interface {
 	CurrentBranch() string
 	Trunk() string
 	GetParent(branchName string) string // Returns empty string if no parent
+	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)
 	GetChildren(branchName string) []string
 	GetRelativeStack(branchName string, scope Scope) []string
 	IsTrunk(branchName string) bool
@@ -25,6 +26,7 @@ type Engine interface {
 
 	// PR information
 	GetPrInfo(branchName string) (*PrInfo, error)
+	UpsertPrInfo(branchName string, prInfo *PrInfo) error
 
 	// Remote operations
 	BranchMatchesRemote(branchName string) (bool, error)

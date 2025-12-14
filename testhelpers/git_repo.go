@@ -107,7 +107,9 @@ func (r *GitRepo) runGitCommandAndGetOutput(args ...string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git command failed: %w", err)
 	}
-	return string(output), nil
+	// Trim trailing newlines from output
+	result := strings.TrimRight(string(output), "\n\r")
+	return result, nil
 }
 
 // RunGitCommandAndGetOutput executes a git command and returns its output.
@@ -261,6 +263,7 @@ func (r *GitRepo) CurrentBranchName() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Additional trim to ensure no whitespace
 	return strings.TrimSpace(output), nil
 }
 

@@ -82,10 +82,13 @@ func SubmitAction(opts SubmitOptions) error {
 		allBranches := eng.GetRelativeStack(branchName, scope)
 		// Add the current branch itself
 		allBranches = append(allBranches, branchName)
-		// Also get descendants
+		// Also get descendants recursively
 		children := eng.GetChildren(branchName)
 		for _, child := range children {
-			descendants := eng.GetRelativeStack(child, engine.Scope{RecursiveParents: false})
+			// Add the child itself
+			allBranches = append(allBranches, child)
+			// Get all descendants of this child recursively
+			descendants := getRecursiveDescendants(eng, child)
 			allBranches = append(allBranches, descendants...)
 		}
 		// Remove duplicates and trunk
@@ -361,7 +364,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			Draft:           opts.Draft,
 			Publish:         opts.Publish,
 			Reviewers:       opts.Reviewers,
-			ReviewersPrompt: opts.Reviewers == "" && (opts.Edit || opts.Reviewers == ""),
+			ReviewersPrompt: opts.Reviewers == "" && opts.Edit,
 		}
 
 		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, ctx)
@@ -419,6 +422,19 @@ func shouldAbortSubmit(opts SubmitOptions, hasAnyPRs bool, ctx *stackitcontext.C
 	}
 
 	return false, nil
+}
+
+// getRecursiveDescendants gets all descendants of a branch recursively
+func getRecursiveDescendants(eng engine.Engine, branchName string) []string {
+	var descendants []string
+	children := eng.GetChildren(branchName)
+	for _, child := range children {
+		descendants = append(descendants, child)
+		// Recursively get descendants of this child
+		childDescendants := getRecursiveDescendants(eng, child)
+		descendants = append(descendants, childDescendants...)
+	}
+	return descendants
 }
 
 // openBrowser opens a URL in the default browser

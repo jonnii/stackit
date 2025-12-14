@@ -112,6 +112,18 @@ func editPRBodyInEditor(initialBody string, ctx *stackitcontext.Context) (string
 // GetReviewers gets reviewers from flag or prompts user
 func GetReviewers(reviewersFlag string, ctx *stackitcontext.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
+		// Don't prompt by default - return empty
+		return nil, nil, nil
+	}
+
+	// Parse reviewers
+	reviewers, teamReviewers := git.ParseReviewers(reviewersFlag)
+	return reviewers, teamReviewers, nil
+}
+
+// GetReviewersWithPrompt gets reviewers, prompting if flag is empty
+func GetReviewersWithPrompt(reviewersFlag string, ctx *stackitcontext.Context) ([]string, []string, error) {
+	if reviewersFlag == "" {
 		// Prompt for reviewers
 		result, err := promptTextInput("Reviewers (comma-separated GitHub usernames):", "")
 		if err != nil {
@@ -181,7 +193,14 @@ func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine
 	}
 
 	// Get reviewers
-	if opts.Reviewers != "" || opts.ReviewersPrompt {
+	if opts.ReviewersPrompt {
+		reviewers, teamReviewers, err := GetReviewersWithPrompt(opts.Reviewers, ctx)
+		if err != nil {
+			return nil, err
+		}
+		metadata.Reviewers = reviewers
+		metadata.TeamReviewers = teamReviewers
+	} else if opts.Reviewers != "" {
 		reviewers, teamReviewers, err := GetReviewers(opts.Reviewers, ctx)
 		if err != nil {
 			return nil, err

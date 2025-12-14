@@ -60,33 +60,7 @@ func NewEngine(repoRoot string) (Engine, error) {
 func (e *engineImpl) rebuild() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-
-	// Get all branch names
-	branches, err := git.GetAllBranchNames()
-	if err != nil {
-		return fmt.Errorf("failed to get branches: %w", err)
-	}
-	e.branches = branches
-
-	// Reset maps
-	e.parentMap = make(map[string]string)
-	e.childrenMap = make(map[string][]string)
-
-	// Load metadata for each branch
-	for _, branchName := range branches {
-		meta, err := git.ReadMetadataRef(branchName)
-		if err != nil {
-			continue
-		}
-
-		if meta.ParentBranchName != nil {
-			parent := *meta.ParentBranchName
-			e.parentMap[branchName] = parent
-			e.childrenMap[parent] = append(e.childrenMap[parent], branchName)
-		}
-	}
-
-	return nil
+	return e.rebuildInternal()
 }
 
 // AllBranchNames returns all branch names
@@ -250,8 +224,8 @@ func (e *engineImpl) Reset(newTrunkName string) error {
 		}
 	}
 
-	// Rebuild cache
-	return e.rebuild()
+	// Rebuild cache (already holding lock, so call rebuildInternal)
+	return e.rebuildInternal()
 }
 
 // Rebuild reloads branch cache with new trunk
@@ -262,8 +236,38 @@ func (e *engineImpl) Rebuild(newTrunkName string) error {
 	// Update trunk
 	e.trunk = newTrunkName
 
-	// Rebuild cache
-	return e.rebuild()
+	// Rebuild cache (already holding lock, so call rebuildInternal)
+	return e.rebuildInternal()
+}
+
+// rebuildInternal is the internal rebuild logic without locking
+func (e *engineImpl) rebuildInternal() error {
+	// Get all branch names
+	branches, err := git.GetAllBranchNames()
+	if err != nil {
+		return fmt.Errorf("failed to get branches: %w", err)
+	}
+	e.branches = branches
+
+	// Reset maps
+	e.parentMap = make(map[string]string)
+	e.childrenMap = make(map[string][]string)
+
+	// Load metadata for each branch
+	for _, branchName := range branches {
+		meta, err := git.ReadMetadataRef(branchName)
+		if err != nil {
+			continue
+		}
+
+		if meta.ParentBranchName != nil {
+			parent := *meta.ParentBranchName
+			e.parentMap[branchName] = parent
+			e.childrenMap[parent] = append(e.childrenMap[parent], branchName)
+		}
+	}
+
+	return nil
 }
 
 // Helper functions

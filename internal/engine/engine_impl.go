@@ -229,6 +229,43 @@ func (e *engineImpl) PopulateRemoteShas() error {
 	return nil
 }
 
+// Reset clears all branch metadata and rebuilds with new trunk
+func (e *engineImpl) Reset(newTrunkName string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Update trunk
+	e.trunk = newTrunkName
+
+	// Delete all metadata refs
+	metadataRefs, err := git.GetMetadataRefList()
+	if err != nil {
+		return fmt.Errorf("failed to get metadata refs: %w", err)
+	}
+
+	for branchName := range metadataRefs {
+		if err := git.DeleteMetadataRef(branchName); err != nil {
+			// Ignore errors for non-existent refs
+			continue
+		}
+	}
+
+	// Rebuild cache
+	return e.rebuild()
+}
+
+// Rebuild reloads branch cache with new trunk
+func (e *engineImpl) Rebuild(newTrunkName string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Update trunk
+	e.trunk = newTrunkName
+
+	// Rebuild cache
+	return e.rebuild()
+}
+
 // Helper functions
 func getStringValue(s *string) string {
 	if s == nil {

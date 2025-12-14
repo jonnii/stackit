@@ -45,3 +45,35 @@ func GetTrunk(repoRoot string) (string, error) {
 	// Default to "main"
 	return "main", nil
 }
+
+// IsInitialized checks if Stackit has been initialized
+func IsInitialized(repoRoot string) bool {
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		return false
+	}
+	return config.Trunk != nil && *config.Trunk != ""
+}
+
+// SetTrunk updates the trunk branch in the config
+func SetTrunk(repoRoot string, trunkName string) error {
+	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
+	
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		config = &RepoConfig{}
+	}
+	
+	config.Trunk = &trunkName
+	if config.IsGithubIntegrationEnabled == nil {
+		enabled := false
+		config.IsGithubIntegrationEnabled = &enabled
+	}
+	
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	
+	return os.WriteFile(configPath, configJSON, 0644)
+}

@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strings"
 )
 
 var defaultRepo *Repository
@@ -50,4 +51,59 @@ func GetCurrentBranch() (string, error) {
 		return "", err
 	}
 	return repo.GetCurrentBranch()
+}
+
+// FindRemoteBranch finds the branch that tracks a remote branch
+// Returns the local branch name if found, empty string otherwise
+func FindRemoteBranch(remote string) (string, error) {
+	// Get all branch configs that have this remote
+	// Format: "branch.<name>.remote <remote>"
+	output, err := RunGitCommand("config", "--get-regexp", "^branch\\..*\\.remote$")
+	if err != nil {
+		return "", nil // No remote branches configured
+	}
+
+	if output == "" {
+		return "", nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		// Line format: "branch.<name>.remote <remote>"
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			remoteValue := parts[1]
+			if remoteValue == remote {
+				// Extract branch name from "branch.<name>.remote"
+				branchPart := parts[0]
+				if strings.HasPrefix(branchPart, "branch.") && strings.HasSuffix(branchPart, ".remote") {
+					// Remove "branch." prefix and ".remote" suffix
+					branchName := branchPart[7 : len(branchPart)-7]
+					return branchName, nil
+				}
+			}
+		}
+	}
+	return "", nil
+}
+
+// FindCommonlyNamedTrunk checks for common trunk branch names
+// Returns the branch name if exactly one is found, empty string otherwise
+func FindCommonlyNamedTrunk(branchNames []string) string {
+	commonNames := []string{"main", "master", "development", "develop"}
+	var found []string
+
+	for _, name := range branchNames {
+		for _, common := range commonNames {
+			if name == common {
+				found = append(found, name)
+				break
+			}
+		}
+	}
+
+	if len(found) == 1 {
+		return found[0]
+	}
+	return ""
 }

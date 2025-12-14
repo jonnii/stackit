@@ -29,4 +29,8 @@ type Engine interface {
 	// Remote operations
 	BranchMatchesRemote(branchName string) (bool, error)
 	PopulateRemoteShas() error
+
+	// Initialization operations
+	Reset(newTrunkName string) error
+	Rebuild(newTrunkName string) error
 }

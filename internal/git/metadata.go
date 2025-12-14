@@ -101,3 +101,14 @@ func GetMetadataRefList() (map[string]string, error) {
 
 	return result, err
 }
+
+// DeleteMetadataRef deletes a metadata ref for a branch
+func DeleteMetadataRef(branchName string) error {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return err
+	}
+
+	refName := plumbing.ReferenceName(fmt.Sprintf("refs/branch-metadata/%s", branchName))
+	return repo.Storer.RemoveReference(refName)
+}

@@ -65,14 +65,12 @@ build:
 install: build
 	@echo "Built stackit binary in current directory"
 
-# Run stackit command (builds if needed, then runs)
+# Run stackit command (builds first, then runs)
 # Usage: just run log
 # Usage: just run init
 run cmd:
-	@if [ ! -f ./stackit ]; then \
-		echo "Building stackit..."; \
-		just build; \
-	fi
+	@echo "Building stackit..."; \
+	just build
 	./stackit {{cmd}}
 
 # Initialize stackit in this repository

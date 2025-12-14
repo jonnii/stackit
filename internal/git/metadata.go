@@ -112,3 +112,27 @@ func DeleteMetadataRef(branchName string) error {
 	refName := plumbing.ReferenceName(fmt.Sprintf("refs/branch-metadata/%s", branchName))
 	return repo.Storer.RemoveReference(refName)
 }
+
+// WriteMetadataRef writes metadata for a branch to Git refs
+func WriteMetadataRef(branchName string, meta *Meta) error {
+	// Marshal metadata to JSON
+	jsonData, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	// Create blob using git hash-object
+	sha, err := RunGitCommandWithInput(string(jsonData), "hash-object", "-w", "--stdin")
+	if err != nil {
+		return fmt.Errorf("failed to create metadata blob: %w", err)
+	}
+
+	// Create or update the ref using git update-ref
+	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
+	_, err = RunGitCommand("update-ref", refName, sha)
+	if err != nil {
+		return fmt.Errorf("failed to write metadata ref: %w", err)
+	}
+
+	return nil
+}

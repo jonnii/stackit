@@ -27,3 +27,14 @@ func RunGitCommandLines(args ...string) ([]string, error) {
 	}
 	return strings.Split(output, "\n"), nil
 }
+
+// RunGitCommandWithInput executes a git command with input and returns the output
+func RunGitCommandWithInput(input string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Stdin = strings.NewReader(input)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git command failed: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}

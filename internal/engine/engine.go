@@ -33,4 +33,7 @@ type Engine interface {
 	// Initialization operations
 	Reset(newTrunkName string) error
 	Rebuild(newTrunkName string) error
+
+	// Branch tracking
+	TrackBranch(branchName string, parentBranchName string) error
 }

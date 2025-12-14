@@ -270,6 +270,76 @@ func (e *engineImpl) rebuildInternal() error {
 	return nil
 }
 
+// TrackBranch tracks a branch with a parent branch
+func (e *engineImpl) TrackBranch(branchName string, parentBranchName string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Validate branch exists
+	branchExists := false
+	for _, name := range e.branches {
+		if name == branchName {
+			branchExists = true
+			break
+		}
+	}
+	if !branchExists {
+		// Refresh branches list
+		branches, err := git.GetAllBranchNames()
+		if err != nil {
+			return fmt.Errorf("failed to get branches: %w", err)
+		}
+		e.branches = branches
+		branchExists = false
+		for _, name := range e.branches {
+			if name == branchName {
+				branchExists = true
+				break
+			}
+		}
+		if !branchExists {
+			return fmt.Errorf("branch %s does not exist", branchName)
+		}
+	}
+
+	// Validate parent exists (or is trunk)
+	if parentBranchName != e.trunk {
+		parentExists := false
+		for _, name := range e.branches {
+			if name == parentBranchName {
+				parentExists = true
+				break
+			}
+		}
+		if !parentExists {
+			return fmt.Errorf("parent branch %s does not exist", parentBranchName)
+		}
+	}
+
+	// Get merge base (parent revision)
+	parentRevision, err := git.GetMergeBase(branchName, parentBranchName)
+	if err != nil {
+		return fmt.Errorf("failed to get merge base: %w", err)
+	}
+
+	// Create metadata
+	meta := &git.Meta{
+		ParentBranchName:     &parentBranchName,
+		ParentBranchRevision: &parentRevision,
+	}
+
+	// Write metadata ref
+	if err := git.WriteMetadataRef(branchName, meta); err != nil {
+		return fmt.Errorf("failed to write metadata ref: %w", err)
+	}
+
+	// Update in-memory cache
+	e.parentMap[branchName] = parentBranchName
+	e.childrenMap[parentBranchName] = append(e.childrenMap[parentBranchName], branchName)
+
+	return nil
+}
+
 // Helper functions
 func getStringValue(s *string) string {
 	if s == nil {

@@ -23,7 +23,7 @@ type GitRepo struct {
 func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 	repo := &GitRepo{
 		Dir:            dir,
-		UserConfigPath: filepath.Join(dir, ".git", ".graphite_user_config"),
+		UserConfigPath: filepath.Join(dir, ".git", ".stackit_user_config"),
 	}
 
 	options := &gitRepoOptions{}
@@ -126,11 +126,11 @@ func (r *GitRepo) RunCliCommand(command []string) error {
 	cmd.Dir = r.Dir
 	
 	env := os.Environ()
-	env = append(env, "GRAPHITE_USER_CONFIG_PATH="+r.UserConfigPath)
-	env = append(env, "GRAPHITE_DISABLE_TELEMETRY=1")
-	env = append(env, "GRAPHITE_DISABLE_UPGRADE_PROMPT=1")
-	env = append(env, "GRAPHITE_DISABLE_SURVEY=1")
-	env = append(env, "GRAPHITE_PROFILE=")
+	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
+	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
+	env = append(env, "STACKIT_DISABLE_UPGRADE_PROMPT=1")
+	env = append(env, "STACKIT_DISABLE_SURVEY=1")
+	env = append(env, "STACKIT_PROFILE=")
 	cmd.Env = env
 	
 	if os.Getenv("DEBUG") == "" {
@@ -153,10 +153,10 @@ func (r *GitRepo) RunCliCommandAndGetOutput(command []string) (string, error) {
 	cmd.Dir = r.Dir
 	
 	env := os.Environ()
-	env = append(env, "GRAPHITE_USER_CONFIG_PATH="+r.UserConfigPath)
-	env = append(env, "GRAPHITE_DISABLE_TELEMETRY=1")
-	env = append(env, "GRAPHITE_DISABLE_UPGRADE_PROMPT=1")
-	env = append(env, "GRAPHITE_DISABLE_SURVEY=1")
+	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
+	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
+	env = append(env, "STACKIT_DISABLE_UPGRADE_PROMPT=1")
+	env = append(env, "STACKIT_DISABLE_SURVEY=1")
 	cmd.Env = env
 	
 	output, err := cmd.Output()

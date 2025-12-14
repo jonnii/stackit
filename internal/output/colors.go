@@ -1,8 +1,8 @@
 package output
 
-// GRAPHITE_COLORS defines the color palette for branch visualization
+// STACKIT_COLORS defines the color palette for branch visualization
 // Matching the TypeScript version
-var GRAPHITE_COLORS = [][]int{
+var STACKIT_COLORS = [][]int{
 	{76, 203, 241},  // Light blue
 	{77, 202, 125},  // Green
 	{110, 173, 38},  // Dark green

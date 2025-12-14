@@ -11,11 +11,12 @@ func NewRootCmd() *cobra.Command {
 		Short: "Stackit is a command line tool that makes working with stacked changes fast & intuitive",
 		Long: `Stackit is a command line tool that makes working with stacked changes fast & intuitive.
 
-https://docs.graphite.dev/guides/graphite-cli`,
+https://github.com/jonnii/stackit`,
 	}
 
 	// Add subcommands
 	rootCmd.AddCommand(newLogCmd())
+	rootCmd.AddCommand(newInitCmd())
 
 	return rootCmd
 }

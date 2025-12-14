@@ -56,3 +56,29 @@ lint:
 
 # Run all checks (format, lint, test)
 check: fmt lint test
+
+# Build the stackit binary
+build:
+	go build -o stackit ./cmd/stackit
+
+# Install stackit binary (builds and copies to current directory)
+install: build
+	@echo "Built stackit binary in current directory"
+
+# Run stackit command (builds if needed, then runs)
+# Usage: just run log
+# Usage: just run init
+run cmd:
+	@if [ ! -f ./stackit ]; then \
+		echo "Building stackit..."; \
+		just build; \
+	fi
+	./stackit {{cmd}}
+
+# Initialize stackit in this repository
+init:
+	@if [ ! -f ./stackit ]; then \
+		echo "Building stackit..."; \
+		just build; \
+	fi
+	./stackit init

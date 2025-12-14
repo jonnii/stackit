@@ -15,7 +15,7 @@ type RepoConfig struct {
 
 // GetRepoConfig reads the repository configuration
 func GetRepoConfig(repoRoot string) (*RepoConfig, error) {
-	configPath := filepath.Join(repoRoot, ".git", ".graphite_repo_config")
+	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
 	
 	data, err := os.ReadFile(configPath)
 	if err != nil {

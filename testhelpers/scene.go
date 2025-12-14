@@ -78,10 +78,10 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	return scene
 }
 
-// writeDefaultConfigs writes the default Graphite configuration files.
+// writeDefaultConfigs writes the default Stackit configuration files.
 func (s *Scene) writeDefaultConfigs() error {
 	// Write repo config (JSON format, matching cuteString output)
-	repoConfigPath := filepath.Join(s.Dir, ".git", ".graphite_repo_config")
+	repoConfigPath := filepath.Join(s.Dir, ".git", ".stackit_config")
 	repoConfig := `{
   "trunk": "main",
   "isGithubIntegrationEnabled": false
@@ -92,7 +92,7 @@ func (s *Scene) writeDefaultConfigs() error {
 	}
 
 	// Write user config (JSON format)
-	userConfigPath := filepath.Join(s.Dir, ".git", ".graphite_user_config")
+	userConfigPath := filepath.Join(s.Dir, ".git", ".stackit_user_config")
 	userConfig := `{
   "tips": false
 }
@@ -102,8 +102,8 @@ func (s *Scene) writeDefaultConfigs() error {
 	}
 
 	// Set environment variable for user config path
-	os.Setenv("GRAPHITE_USER_CONFIG_PATH", userConfigPath)
-	os.Setenv("GRAPHITE_PROFILE", "")
+	os.Setenv("STACKIT_USER_CONFIG_PATH", userConfigPath)
+	os.Setenv("STACKIT_PROFILE", "")
 
 	return nil
 }

@@ -7,14 +7,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// GetLogShortColor returns a styled string with the color from GRAPHITE_COLORS
+// GetLogShortColor returns a styled string with the color from STACKIT_COLORS
 func GetLogShortColor(text string, index int) string {
-	if len(GRAPHITE_COLORS) == 0 {
+	if len(STACKIT_COLORS) == 0 {
 		return text
 	}
 
-	colorIndex := (index / 2) % len(GRAPHITE_COLORS)
-	color := GRAPHITE_COLORS[colorIndex]
+	colorIndex := (index / 2) % len(STACKIT_COLORS)
+	color := STACKIT_COLORS[colorIndex]
 
 	// Convert RGB to hex color
 	hexColor := lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", color[0], color[1], color[2]))

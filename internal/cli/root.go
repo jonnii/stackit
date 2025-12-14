@@ -18,6 +18,8 @@ https://github.com/jonnii/stackit`,
 	rootCmd.AddCommand(newLogCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newCreateCmd())
+	rootCmd.AddCommand(newBottomCmd())
+	rootCmd.AddCommand(newTopCmd())
 
 	return rootCmd
 }

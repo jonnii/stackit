@@ -225,11 +225,15 @@ func SubmitAction(opts SubmitOptions) error {
 			updateOpts := git.UpdatePROptions{
 				Title:         &submissionInfo.Metadata.Title,
 				Body:          &submissionInfo.Metadata.Body,
-				Draft:         &submissionInfo.Metadata.IsDraft,
 				Reviewers:     submissionInfo.Metadata.Reviewers,
 				TeamReviewers: submissionInfo.Metadata.TeamReviewers,
 				MergeWhenReady: &opts.MergeWhenReady,
 				RerequestReview: opts.RerequestReview,
+			}
+			
+			// Only update draft status if it's explicitly set via flags
+			if opts.Draft || opts.Publish {
+				updateOpts.Draft = &submissionInfo.Metadata.IsDraft
 			}
 			if baseChanged {
 				updateOpts.Base = &submissionInfo.Base
@@ -345,7 +349,18 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 		if action == "update" {
 			baseChanged := prInfo.Base != parentBranchName
 			branchChanged, _ := eng.BranchMatchesRemote(branchName)
-			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always
+			
+			// Check if draft status needs to change
+			draftStatusNeedsChange := false
+			if opts.Draft && !prInfo.IsDraft {
+				// Want to mark as draft, but it's not draft
+				draftStatusNeedsChange = true
+			} else if opts.Publish && prInfo.IsDraft {
+				// Want to publish, but it's currently draft
+				draftStatusNeedsChange = true
+			}
+			
+			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always || draftStatusNeedsChange
 
 			if !needsUpdate && !opts.Draft && !opts.Publish {
 				ctx.Splog.Info("▸ %s (No-op)", output.ColorDim(branchName))

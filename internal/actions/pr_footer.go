@@ -102,13 +102,25 @@ func buildLeaf(eng engine.Engine, branch string, depth int, prBranch string) str
 
 // isParentOrChild checks if branch1 is a parent or child of branch2
 func isParentOrChild(eng engine.Engine, branch1, branch2 string) bool {
+	visited := make(map[string]bool)
+	return isParentOrChildRecursive(eng, branch1, branch2, visited)
+}
+
+// isParentOrChildRecursive is the recursive helper with cycle detection
+func isParentOrChildRecursive(eng engine.Engine, branch1, branch2 string, visited map[string]bool) bool {
+	// Prevent infinite recursion
+	if visited[branch1] {
+		return false
+	}
+	visited[branch1] = true
+
 	// Check if branch1 is parent of branch2
 	children := eng.GetChildren(branch1)
 	for _, child := range children {
 		if child == branch2 {
 			return true
 		}
-		if isParentOrChild(eng, child, branch2) {
+		if isParentOrChildRecursive(eng, child, branch2, visited) {
 			return true
 		}
 	}
@@ -119,7 +131,7 @@ func isParentOrChild(eng engine.Engine, branch1, branch2 string) bool {
 		return true
 	}
 	if parent != "" {
-		return isParentOrChild(eng, parent, branch2)
+		return isParentOrChildRecursive(eng, parent, branch2, visited)
 	}
 
 	return false

@@ -23,7 +23,7 @@ var gitCommandAllowlist = []string{
 	"format-patch",
 	"fsck",
 	"grep",
-	"merge",
+	// "merge" removed - stackit has its own merge command
 	"mv",
 	"notes",
 	"pull",

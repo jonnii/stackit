@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"github.com/google/go-github/v62/github"
@@ -206,4 +207,15 @@ func ParseReviewers(reviewersStr string) ([]string, []string) {
 	}
 
 	return reviewers, teamReviewers
+}
+
+// MergePullRequest merges a pull request using GitHub CLI
+func MergePullRequest(branchName string) error {
+	// Use gh CLI to merge the PR
+	cmd := exec.Command("gh", "pr", "merge", branchName, "--merge")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to merge PR for branch %s: %w (output: %s)", branchName, err, string(output))
+	}
+	return nil
 }

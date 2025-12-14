@@ -6,6 +6,7 @@ import (
 
 	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/output"
 )
 
 // LogOptions specifies options for the log command
@@ -314,38 +315,64 @@ func getBranchingLine(numChildren int, reverse bool, indentLevel int) string {
 func getInfoLines(args printStackArgs, ctx *context.Context) []string {
 	isCurrent := args.branchName == ctx.Engine.CurrentBranch()
 	
-	// Get branch info (simplified for now)
-	branchInfo := []string{args.branchName}
+	// Get branch info with colors
+	branchName := args.branchName
+	coloredBranchName := output.ColorBranchName(branchName, isCurrent)
 	
-	var result []string
-	for i, line := range branchInfo {
-		prefix := strings.Repeat("│  ", args.indentLevel)
-		
-		var symbol string
-		if i == 0 {
-			if isCurrent {
-				symbol = "◉"
-			} else {
-				symbol = "◯"
-			}
-		} else {
-			symbol = "│"
-		}
-		
-		result = append(result, prefix+symbol+" "+line)
+	// Add restack indicator if needed
+	if !ctx.Engine.IsBranchFixed(branchName) {
+		coloredBranchName += " " + output.ColorNeedsRestack("(needs restack)")
 	}
 	
-	// Add trailing line
+	var result []string
 	prefix := strings.Repeat("│  ", args.indentLevel)
+	
+	var symbol string
+	if isCurrent {
+		symbol = "◉"
+	} else {
+		symbol = "◯"
+	}
+	
+	result = append(result, prefix+symbol+" "+coloredBranchName)
+	
+	// Add trailing line
 	result = append(result, prefix+"│")
 	
 	return result
 }
 
 func formatShortLines(lines []string, args printStackArgs, ctx *context.Context) []string {
-	// For now, return lines as-is
-	// TODO: Add color formatting
-	return lines
+	var result []string
+	currentBranch := ctx.Engine.CurrentBranch()
+
+	for _, line := range lines {
+		circleIndex := strings.Index(line, "◯")
+		arrowIndex := strings.Index(line, "▸")
+
+		if circleIndex == -1 {
+			circleIndex = strings.Index(line, "◉")
+		}
+
+		if circleIndex != -1 && arrowIndex != -1 {
+			// Extract branch name to check if it's current
+			branchNameAndDetails := line[arrowIndex+1:]
+			branchName := strings.Fields(branchNameAndDetails)[0]
+			isCurrent := !args.noStyleBranchName && currentBranch != "" && branchName == currentBranch
+
+			overallIndent := 0
+			if args.overallIndent != nil {
+				overallIndent = *args.overallIndent
+			}
+
+			formatted := output.FormatShortLine(line, circleIndex, arrowIndex, isCurrent, overallIndent)
+			result = append(result, formatted)
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return result
 }
 
 func getUntrackedBranchNames(ctx *context.Context) []string {

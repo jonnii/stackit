@@ -80,18 +80,22 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 
 // writeDefaultConfigs writes the default Graphite configuration files.
 func (s *Scene) writeDefaultConfigs() error {
-	// Write repo config
+	// Write repo config (JSON format, matching cuteString output)
 	repoConfigPath := filepath.Join(s.Dir, ".git", ".graphite_repo_config")
-	repoConfig := `trunk: main
-isGithubIntegrationEnabled: false
+	repoConfig := `{
+  "trunk": "main",
+  "isGithubIntegrationEnabled": false
+}
 `
 	if err := os.WriteFile(repoConfigPath, []byte(repoConfig), 0644); err != nil {
 		return err
 	}
 
-	// Write user config
+	// Write user config (JSON format)
 	userConfigPath := filepath.Join(s.Dir, ".git", ".graphite_user_config")
-	userConfig := `tips: false
+	userConfig := `{
+  "tips": false
+}
 `
 	if err := os.WriteFile(userConfigPath, []byte(userConfig), 0644); err != nil {
 		return err

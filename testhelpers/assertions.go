@@ -1,0 +1,116 @@
+package testhelpers
+
+import (
+	"os/exec"
+	"sort"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+// ExpectBranches asserts that the repository has the expected branches.
+// It filters out scene-related branches (prod, x2) and compares sorted lists.
+func ExpectBranches(t *testing.T, repo *GitRepo, expected []string) {
+	t.Helper()
+	
+	cmd := exec.Command("git", "-C", repo.Dir,
+		"for-each-ref", "refs/heads/", "--format=%(refname:short)")
+	output, err := cmd.Output()
+	require.NoError(t, err, "Failed to list branches")
+	
+	branches := strings.Split(strings.TrimSpace(string(output)), "\n")
+	
+	// Filter out empty strings and scene-related branches
+	filtered := []string{}
+	for _, b := range branches {
+		b = strings.TrimSpace(b)
+		if b != "" && b != "prod" && b != "x2" {
+			filtered = append(filtered, b)
+		}
+	}
+	
+	// Sort both slices for comparison
+	sort.Strings(filtered)
+	sort.Strings(expected)
+	
+	require.Equal(t, expected, filtered, "Branches do not match")
+}
+
+// ExpectBranchesString asserts that the repository has the expected branches
+// as a comma-separated sorted string (matching TypeScript API).
+func ExpectBranchesString(t *testing.T, repo *GitRepo, expected string) {
+	t.Helper()
+	
+	cmd := exec.Command("git", "-C", repo.Dir,
+		"for-each-ref", "refs/heads/", "--format=%(refname:short)")
+	output, err := cmd.Output()
+	require.NoError(t, err, "Failed to list branches")
+	
+	branches := strings.Split(strings.TrimSpace(string(output)), "\n")
+	
+	// Filter out empty strings and scene-related branches
+	filtered := []string{}
+	for _, b := range branches {
+		b = strings.TrimSpace(b)
+		if b != "" && b != "prod" && b != "x2" {
+			filtered = append(filtered, b)
+		}
+	}
+	
+	// Sort and join
+	sort.Strings(filtered)
+	actual := strings.Join(filtered, ", ")
+	
+	require.Equal(t, expected, actual, "Branches do not match")
+}
+
+// ExpectCommits asserts that the repository has the expected commit messages
+// on the current branch.
+func ExpectCommits(t *testing.T, repo *GitRepo, branch string, expected []string) {
+	t.Helper()
+	
+	cmd := exec.Command("git", "-C", repo.Dir,
+		"log", "--oneline", "--format=%s", branch)
+	output, err := cmd.Output()
+	require.NoError(t, err, "Failed to list commits")
+	
+	commits := strings.Split(strings.TrimSpace(string(output)), "\n")
+	
+	// Filter out empty strings
+	filtered := []string{}
+	for _, c := range commits {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			filtered = append(filtered, c)
+		}
+	}
+	
+	// Compare only the first N commits where N is the length of expected
+	if len(filtered) < len(expected) {
+		require.Fail(t, "Not enough commits", "Expected %d commits, got %d", len(expected), len(filtered))
+		return
+	}
+	
+	actual := filtered[:len(expected)]
+	require.Equal(t, expected, actual, "Commits do not match")
+}
+
+// ExpectCommitsString asserts that the repository has the expected commit messages
+// as a comma-separated string (matching TypeScript API).
+func ExpectCommitsString(t *testing.T, repo *GitRepo, expected string) {
+	t.Helper()
+	
+	messages, err := repo.ListCurrentBranchCommitMessages()
+	require.NoError(t, err, "Failed to list commit messages")
+	
+	// Take only the first N commits where N is the number in expected
+	expectedCount := len(strings.Split(expected, ","))
+	if len(messages) < expectedCount {
+		require.Fail(t, "Not enough commits", "Expected %d commits, got %d", expectedCount, len(messages))
+		return
+	}
+	
+	actual := strings.Join(messages[:expectedCount], ", ")
+	require.Equal(t, expected, actual, "Commits do not match")
+}

@@ -80,6 +80,8 @@ func SubmitAction(opts SubmitOptions) error {
 	if opts.Stack {
 		// Include descendants
 		allBranches := eng.GetRelativeStack(branchName, scope)
+		// Add the current branch itself
+		allBranches = append(allBranches, branchName)
 		// Also get descendants
 		children := eng.GetChildren(branchName)
 		for _, child := range children {
@@ -95,8 +97,10 @@ func SubmitAction(opts SubmitOptions) error {
 			}
 		}
 	} else {
-		// Just ancestors
+		// Just ancestors (including current branch)
 		allBranches := eng.GetRelativeStack(branchName, scope)
+		// Add the current branch itself
+		allBranches = append(allBranches, branchName)
 		// Filter out trunk
 		for _, b := range allBranches {
 			if !eng.IsTrunk(b) {

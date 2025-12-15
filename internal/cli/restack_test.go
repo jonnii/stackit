@@ -14,7 +14,8 @@ func TestRestackCommand(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
 	t.Run("restack single branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -38,7 +39,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack with downstack flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -70,7 +72,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack with upstack flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -106,7 +109,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack with --branch flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -133,7 +137,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack errors when multiple scope flags specified", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
@@ -147,7 +152,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack errors when not on a branch and --branch not specified", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
@@ -165,7 +171,8 @@ func TestRestackCommand(t *testing.T) {
 	})
 
 	t.Run("restack handles conflict and persists continuation state", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err

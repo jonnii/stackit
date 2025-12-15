@@ -10,11 +10,13 @@ import (
 )
 
 func TestSubmitCommand(t *testing.T) {
+	t.Parallel()
 	// Build the stackit binary first
 	binaryPath := getStackitBinary(t)
 
 	t.Run("submit includes current branch in list", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -73,7 +75,8 @@ func TestSubmitCommand(t *testing.T) {
 	})
 
 	t.Run("submit with --stack includes descendants", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")

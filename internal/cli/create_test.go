@@ -9,11 +9,13 @@ import (
 )
 
 func TestCreateCommand(t *testing.T) {
+	t.Parallel()
 	// Build the stackit binary first
 	binaryPath := getStackitBinary(t)
 
 	t.Run("create branch with name", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -38,7 +40,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create branch with staged changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -72,7 +75,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create empty branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -98,7 +102,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create branch with --all flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -132,7 +137,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create branch from commit message", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -162,7 +168,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create branch with --update flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err
@@ -194,7 +201,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create branch tracks parent relationship", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -225,7 +233,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create fails when not on a branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -250,7 +259,8 @@ func TestCreateCommand(t *testing.T) {
 	})
 
 	t.Run("create fails when branch already exists", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})

@@ -21,6 +21,8 @@ type SceneSetup func(*Scene) error
 
 // NewScene creates a new test scene with a temporary directory and Git repository.
 // It automatically handles cleanup using t.Cleanup().
+// NOTE: This function uses os.Chdir() and is NOT safe for parallel tests.
+// Use NewSceneParallel for tests that can run in parallel.
 func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Reset the default git repository to ensure this test gets a fresh one.
 	// This is necessary because the git package uses a package-level global
@@ -77,6 +79,55 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Register cleanup
 	t.Cleanup(func() {
 		os.Chdir(oldDir)
+		if os.Getenv("DEBUG") == "" {
+			os.RemoveAll(tmpDir)
+		}
+	})
+
+	return scene
+}
+
+// NewSceneParallel creates a new test scene that is safe for parallel tests.
+// Unlike NewScene, this does NOT change the working directory.
+// Tests using this must ensure all git operations use explicit directory paths
+// (e.g., via scene.Repo methods or cmd.Dir = scene.Dir).
+func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
+	t.Helper()
+
+	// Create temporary directory
+	tmpDir, err := os.MkdirTemp("", "stackit-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// Initialize Git repository
+	repo, err := NewGitRepo(tmpDir)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to create Git repo: %v", err)
+	}
+
+	scene := &Scene{
+		Dir:  tmpDir,
+		Repo: repo,
+	}
+
+	// Write default config files
+	if err := scene.writeDefaultConfigs(); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Failed to write config files: %v", err)
+	}
+
+	// Run custom setup if provided
+	if setup != nil {
+		if err := setup(scene); err != nil {
+			os.RemoveAll(tmpDir)
+			t.Fatalf("Setup failed: %v", err)
+		}
+	}
+
+	// Register cleanup
+	t.Cleanup(func() {
 		if os.Getenv("DEBUG") == "" {
 			os.RemoveAll(tmpDir)
 		}

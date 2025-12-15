@@ -9,11 +9,13 @@ import (
 )
 
 func TestLogCommand(t *testing.T) {
+	t.Parallel()
 	// Build the stackit binary first
 	binaryPath := getStackitBinary(t)
 
 	t.Run("log in empty repo", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -30,7 +32,8 @@ func TestLogCommand(t *testing.T) {
 	})
 
 	t.Run("log with branches", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -57,7 +60,8 @@ func TestLogCommand(t *testing.T) {
 	})
 
 	t.Run("log with --reverse flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -73,7 +77,8 @@ func TestLogCommand(t *testing.T) {
 	})
 
 	t.Run("log with --stack flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")

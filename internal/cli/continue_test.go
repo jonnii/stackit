@@ -16,7 +16,8 @@ func TestContinueCommand(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
 	t.Run("continue errors when no rebase in progress", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
@@ -33,7 +34,8 @@ func TestContinueCommand(t *testing.T) {
 	})
 
 	t.Run("continue works without continuation state", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -84,7 +86,8 @@ func TestContinueCommand(t *testing.T) {
 	})
 
 	t.Run("continue with --all flag stages changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err
@@ -164,7 +167,8 @@ func TestContinueCommand(t *testing.T) {
 	})
 
 	t.Run("continue resumes restacking after conflict resolution", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err
@@ -248,7 +252,8 @@ func TestContinueCommand(t *testing.T) {
 	})
 
 	t.Run("continue clears continuation state on success", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err
@@ -328,7 +333,8 @@ func TestContinueCommand(t *testing.T) {
 	})
 
 	t.Run("continue handles another conflict", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit with a file
 			if err := s.Repo.CreateChange("initial", "test", false); err != nil {
 				return err

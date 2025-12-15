@@ -13,11 +13,13 @@ import (
 )
 
 func TestInitCommand(t *testing.T) {
+	t.Parallel()
 	// Build the stackit binary first
 	binaryPath := getStackitBinary(t)
 
 	t.Run("can run init", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit (needed for init)
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -41,7 +43,8 @@ func TestInitCommand(t *testing.T) {
 	})
 
 	t.Run("errors on invalid trunk when explicitly provided", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -62,7 +65,8 @@ func TestInitCommand(t *testing.T) {
 	})
 
 	t.Run("errors on invalid trunk when cannot infer", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit first
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -86,7 +90,8 @@ func TestInitCommand(t *testing.T) {
 	})
 
 	t.Run("infers trunk when not provided", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -123,4 +128,3 @@ func readRepoConfig(t *testing.T, repoDir string) *config.RepoConfig {
 
 	return &cfg
 }
-

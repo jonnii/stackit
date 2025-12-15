@@ -13,7 +13,8 @@ func TestBottomCommand(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
 	t.Run("bottom from middle of stack", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -58,7 +59,8 @@ func TestBottomCommand(t *testing.T) {
 	})
 
 	t.Run("bottom from first branch from trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -88,7 +90,8 @@ func TestBottomCommand(t *testing.T) {
 	})
 
 	t.Run("bottom from trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -108,7 +111,8 @@ func TestBottomCommand(t *testing.T) {
 	})
 
 	t.Run("bottom with single branch stack", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -141,7 +145,8 @@ func TestTopCommand(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
 	t.Run("top from middle of stack", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -189,7 +194,8 @@ func TestTopCommand(t *testing.T) {
 	})
 
 	t.Run("top from tip of stack", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -219,7 +225,8 @@ func TestTopCommand(t *testing.T) {
 	})
 
 	t.Run("top from trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -251,7 +258,8 @@ func TestTopCommand(t *testing.T) {
 	})
 
 	t.Run("top with single branch stack", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")
@@ -280,7 +288,8 @@ func TestTopCommand(t *testing.T) {
 	})
 
 	t.Run("top with multiple children fails in non-interactive mode", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
 
 		// Create initial commit
 		err := scene.Repo.CreateChangeAndCommit("initial", "init")

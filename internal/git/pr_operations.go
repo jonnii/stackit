@@ -23,13 +23,13 @@ type CreatePROptions struct {
 
 // UpdatePROptions contains options for updating a pull request
 type UpdatePROptions struct {
-	Title         *string
-	Body          *string
-	Base          *string
-	Draft         *bool
-	Reviewers     []string
-	TeamReviewers []string
-	MergeWhenReady *bool
+	Title           *string
+	Body            *string
+	Base            *string
+	Draft           *bool
+	Reviewers       []string
+	TeamReviewers   []string
+	MergeWhenReady  *bool
 	RerequestReview bool
 }
 
@@ -68,6 +68,36 @@ func CreatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 
 // UpdatePullRequest updates an existing pull request
 func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo string, prNumber int, opts UpdatePROptions) error {
+	// Handle draft status changes separately using GitHub CLI, as the REST API
+	// doesn't support updating draft status. We need to use GraphQL mutation
+	// markPullRequestReadyForReview, which is easier via gh CLI.
+	if opts.Draft != nil {
+		// Get current PR to check if draft status actually needs to change
+		pr, _, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
+		if err == nil && pr.Draft != nil {
+			currentDraft := *pr.Draft
+			desiredDraft := *opts.Draft
+
+			// Only change draft status if it's different
+			if currentDraft != desiredDraft {
+				if desiredDraft {
+					// Mark as draft (convert ready PR to draft)
+					cmd := exec.Command("gh", "pr", "ready", fmt.Sprintf("%d", prNumber), "--undo")
+					if output, err := cmd.CombinedOutput(); err != nil {
+						return fmt.Errorf("failed to mark PR %d as draft: %w (output: %s)", prNumber, err, string(output))
+					}
+				} else {
+					// Mark as ready for review (publish draft PR)
+					cmd := exec.Command("gh", "pr", "ready", fmt.Sprintf("%d", prNumber))
+					if output, err := cmd.CombinedOutput(); err != nil {
+						return fmt.Errorf("failed to mark PR %d as ready for review: %w (output: %s)", prNumber, err, string(output))
+					}
+				}
+			}
+		}
+	}
+
+	// Update other fields via REST API
 	update := &github.PullRequest{}
 
 	if opts.Title != nil {
@@ -81,9 +111,7 @@ func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 			Ref: opts.Base,
 		}
 	}
-	if opts.Draft != nil {
-		update.Draft = opts.Draft
-	}
+	// Note: We don't set update.Draft here because the REST API doesn't support it
 
 	_, _, err := client.PullRequests.Edit(ctx, owner, repo, prNumber, update)
 	if err != nil {
@@ -219,4 +247,3 @@ func MergePullRequest(branchName string) error {
 	}
 	return nil
 }
-

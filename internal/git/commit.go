@@ -43,8 +43,11 @@ func CommitWithOptions(opts CommitOptions) error {
 	if opts.NoEdit {
 		args = append(args, "--no-edit")
 	} else if opts.Edit {
+		// Only add -e if explicitly requested (git opens editor by default if no message)
 		args = append(args, "-e")
 	}
+	// If neither NoEdit nor Edit is set, and no message is provided,
+	// git will open the editor by default (no flag needed)
 
 	// Use exec.Command directly to allow for interactive commit if needed
 	cmd := exec.Command("git", args...)

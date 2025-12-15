@@ -15,7 +15,7 @@ func HardReset(sha string) error {
 
 // SoftReset performs a soft reset to a specific SHA
 func SoftReset(sha string) error {
-	_, err := RunGitCommand("reset", "--soft", sha)
+	_, err := RunGitCommand("reset", "-q", "--soft", sha)
 	if err != nil {
 		return fmt.Errorf("failed to soft reset to %s: %w", sha, err)
 	}

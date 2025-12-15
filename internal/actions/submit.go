@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/google/go-github/v62/github"
 	stackitcontext "stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -41,6 +42,11 @@ type SubmitOptions struct {
 	IgnoreOutOfSyncTrunk bool
 	Engine              engine.Engine
 	Splog               *output.Splog
+	// For testing: optional GitHub client, owner, and repo
+	// If nil, will use GetGitHubClient()
+	GitHubClient        *github.Client
+	GitHubOwner         string
+	GitHubRepo          string
 }
 
 // SubmissionInfo contains information about a branch to submit
@@ -157,20 +163,37 @@ func SubmitAction(opts SubmitOptions) error {
 	// Push branches and create/update PRs
 	splog.Info("Pushing to remote and creating/updating PRs...")
 	githubCtx := context.Background()
-	githubClient, repoOwner, repoName, err := git.GetGitHubClient(githubCtx)
-	if err != nil {
-		return fmt.Errorf("failed to get GitHub client: %w", err)
+	
+	var githubClient *github.Client
+	var repoOwner, repoName string
+	
+	// Use injected client for testing, otherwise get real client
+	if opts.GitHubClient != nil {
+		githubClient = opts.GitHubClient
+		repoOwner = opts.GitHubOwner
+		repoName = opts.GitHubRepo
+		if repoOwner == "" || repoName == "" {
+			return fmt.Errorf("GitHubOwner and GitHubRepo must be provided when using GitHubClient")
+		}
+	} else {
+		var err error
+		githubClient, repoOwner, repoName, err = git.GetGitHubClient(githubCtx)
+		if err != nil {
+			return fmt.Errorf("failed to get GitHub client: %w", err)
+		}
 	}
 
 	remote := "origin" // TODO: Get from config
 	for _, submissionInfo := range submissionInfos {
-		// Push branch
-		forceWithLease := !opts.Force
-		if err := git.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
-			if strings.Contains(err.Error(), "stale info") {
-				return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
+		// Push branch (skip if using mocked client for testing)
+		if opts.GitHubClient == nil && !opts.DryRun {
+			forceWithLease := !opts.Force
+			if err := git.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
+				if strings.Contains(err.Error(), "stale info") {
+					return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
+				}
+				return fmt.Errorf("failed to push branch %s: %w", submissionInfo.BranchName, err)
 			}
-			return fmt.Errorf("failed to push branch %s: %w", submissionInfo.BranchName, err)
 		}
 
 		// Create or update PR

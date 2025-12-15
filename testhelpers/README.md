@@ -138,3 +138,138 @@ This package is a direct port of the TypeScript test infrastructure:
 - `expectCommits` → `ExpectCommits` / `ExpectCommitsString`
 
 The API is designed to be as similar as possible to the TypeScript version while following Go idioms.
+
+## GitHub API Mocking
+
+The testhelpers package provides utilities for testing commands that interact with the GitHub API without making real API calls.
+
+### Mock GitHub Server
+
+The `NewMockGitHubServer` and `NewMockGitHubClient` functions create a mock GitHub API server using Go's `httptest` package. This allows you to test GitHub API interactions locally without requiring authentication or hitting rate limits.
+
+### Basic Usage
+
+```go
+import (
+    "testing"
+    "stackit.dev/stackit/testhelpers"
+    "stackit.dev/stackit/internal/actions"
+    "stackit.dev/stackit/internal/engine"
+    "stackit.dev/stackit/internal/output"
+)
+
+func TestSubmitWithMockedGitHub(t *testing.T) {
+    scene := testhelpers.NewScene(t, nil)
+    
+    // Set up your test scenario...
+    scene.Repo.CreateChangeAndCommit("initial", "init")
+    scene.Repo.RunGitCommand("config", "--local", "stackit.trunk", "main")
+    scene.Repo.CreateAndCheckoutBranch("feature")
+    scene.Repo.CreateChangeAndCommit("feature change", "feat")
+    
+    // Create engine and track branch
+    eng, err := engine.NewEngine(scene.Dir)
+    require.NoError(t, err)
+    err = eng.TrackBranch("feature", "main")
+    require.NoError(t, err)
+    
+    // Create mocked GitHub client
+    config := testhelpers.NewMockGitHubServerConfig()
+    githubClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+    
+    // Use mocked client in submit options
+    opts := actions.SubmitOptions{
+        Engine:       eng,
+        Splog:        output.NewSplog(),
+        DryRun:       false,
+        NoEdit:       true,
+        GitHubClient: githubClient,  // Inject mocked client
+        GitHubOwner:  owner,
+        GitHubRepo:   repo,
+    }
+    
+    // Submit will use mocked client (push is automatically skipped)
+    err = actions.SubmitAction(opts)
+    require.NoError(t, err)
+    
+    // Verify PR was created in mock
+    require.Greater(t, len(config.CreatedPRs), 0)
+}
+```
+
+### Mock Server Configuration
+
+The `MockGitHubServerConfig` allows you to customize the mock server's behavior:
+
+```go
+config := testhelpers.NewMockGitHubServerConfig()
+config.Owner = "myorg"
+config.Repo = "myrepo"
+
+// Pre-populate existing PRs
+prData := testhelpers.DefaultPRData()
+prData.Head = "feature-branch"
+prData.Number = 123
+pr := testhelpers.NewSamplePullRequest(prData)
+config.PRs["feature-branch"] = pr
+config.UpdatedPRs[123] = pr
+
+githubClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+```
+
+### Testing PR Operations
+
+You can test individual PR operations using the mocked client:
+
+```go
+func TestCreatePullRequest(t *testing.T) {
+    config := testhelpers.NewMockGitHubServerConfig()
+    client, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+    
+    opts := git.CreatePROptions{
+        Title: "Test PR",
+        Head:  "feature",
+        Base:  "main",
+    }
+    
+    pr, err := git.CreatePullRequest(context.Background(), client, owner, repo, opts)
+    require.NoError(t, err)
+    require.NotNil(t, pr)
+    require.Equal(t, 1, *pr.Number)
+    
+    // Verify in mock
+    require.Greater(t, len(config.CreatedPRs), 0)
+}
+```
+
+### Test Fixtures
+
+The `github_fixtures.go` file provides helper functions for creating test data:
+
+- `DefaultPRData()` - Creates a standard PR data structure
+- `DraftPRData()` - Creates a draft PR
+- `PRWithReviewersData()` - Creates a PR with reviewers
+- `NewSamplePullRequest()` - Converts PR data to a `github.PullRequest`
+
+### How It Works
+
+1. **Mock Server**: `NewMockGitHubServer` creates an `httptest.Server` that handles GitHub API endpoints
+2. **Client Configuration**: `NewMockGitHubClient` configures a `github.Client` to use the mock server's URL
+3. **Automatic Cleanup**: The mock server is automatically closed when the test completes via `t.Cleanup()`
+4. **Push Skipping**: When a mocked GitHub client is provided to `SubmitAction`, git push operations are automatically skipped
+
+### Supported Endpoints
+
+The mock server currently supports:
+- `POST /repos/{owner}/{repo}/pulls` - Create pull request
+- `PATCH /repos/{owner}/{repo}/pulls/{number}` - Update pull request
+- `GET /repos/{owner}/{repo}/pulls/{number}` - Get pull request
+- `GET /repos/{owner}/{repo}/pulls` - List pull requests (with head filter)
+- `POST /repos/{owner}/{repo}/pulls/{number}/requested_reviewers` - Request reviewers
+- `DELETE /repos/{owner}/{repo}/pulls/{number}/requested_reviewers` - Remove reviewers
+
+### Limitations
+
+- The mock server is simplified and may not handle all edge cases
+- Some GitHub API features may not be fully implemented
+- For complex scenarios, consider using integration tests with a real GitHub repository

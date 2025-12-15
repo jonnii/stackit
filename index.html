@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stackit - Make stacked changes fast & intuitive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --border: #30363d;
+            --success: #3fb950;
+            --code-bg: #161b22;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        header {
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .github-link:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-secondary);
+        }
+
+        /* Hero */
+        .hero {
+            padding: 6rem 0 4rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--success) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Sections */
+        section {
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        section:last-of-type {
+            border-bottom: none;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        /* Installation */
+        .install-methods {
+            display: grid;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .install-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .install-card h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: var(--accent);
+            color: var(--bg-primary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+        }
+
+        .badge.coming-soon {
+            background: var(--text-secondary);
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .inline-code {
+            background: var(--bg-tertiary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        /* Commands Grid */
+        .commands-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .command-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+
+        .command-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .command-card h4 {
+            color: var(--accent);
+            font-family: monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .command-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Workflow Example */
+        .workflow {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        .workflow-step {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            align-items: start;
+        }
+
+        .workflow-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            min-width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .step-content h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Features */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .feature {
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Footer */
+        footer {
+            padding: 3rem 0;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .commands-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="#" class="logo">🥞 Stackit</a>
+                <a href="https://github.com/jonnii/stackit" class="github-link" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Make Stacked Changes Fast & Intuitive</h1>
+                <p>A powerful CLI tool for managing stacked Git branches and pull requests. Work faster with better code organization.</p>
+            </div>
+        </section>
+
+        <section id="installation">
+            <div class="container">
+                <h2>Installation</h2>
+                
+                <div class="install-methods">
+                    <div class="install-card">
+                        <h3>
+                            Build from Source
+                            <span class="badge">Recommended</span>
+                        </h3>
+                        <p>Clone the repository and build using Go or Just:</p>
+                        <pre><code># Using Go
+git clone https://github.com/jonnii/stackit.git
+cd stackit
+go build -o stackit ./cmd/stackit
+
+# Or using Just (if installed)
+just build</code></pre>
+                    </div>
+
+                    <div class="install-card">
+                        <h3>
+                            Homebrew
+                            <span class="badge coming-soon">Coming Soon</span>
+                        </h3>
+                        <p>Install via Homebrew (macOS and Linux):</p>
+                        <pre><code>brew install stackit</code></pre>
+                    </div>
+
+                    <div class="install-card">
+                        <h3>
+                            Binary Release
+                            <span class="badge coming-soon">Coming Soon</span>
+                        </h3>
+                        <p>Download pre-built binaries from GitHub releases:</p>
+                        <pre><code># Download for your platform
+curl -L https://github.com/jonnii/stackit/releases/latest/download/stackit-[platform] -o stackit
+chmod +x stackit</code></pre>
+                    </div>
+                </div>
+
+                <h3>System Requirements</h3>
+                <ul style="color: var(--text-secondary); margin-left: 2rem; margin-top: 1rem;">
+                    <li>Go 1.25+ (for building from source)</li>
+                    <li>Git 2.23+</li>
+                    <li>GitHub CLI (optional, for enhanced PR features)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="quick-start">
+            <div class="container">
+                <h2>Quick Start</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Get up and running with Stackit in minutes. Here's a typical workflow:
+                </p>
+
+                <div class="workflow">
+                    <div class="workflow-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Initialize Stackit</h4>
+                            <p>Set up Stackit in your repository:</p>
+                            <pre><code>cd your-repo
+stackit init</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Create a Stacked Branch</h4>
+                            <p>Create a new branch on top of your current branch:</p>
+                            <pre><code>stackit create feature-part-1
+# Make your changes
+git add .
+stackit create feature-part-2</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>View Your Stack</h4>
+                            <p>Visualize your stacked branches:</p>
+                            <pre><code>stackit log</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Submit Pull Requests</h4>
+                            <p>Push all branches in the stack and create/update PRs:</p>
+                            <pre><code>stackit submit</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h4>Restack After Changes</h4>
+                            <p>Automatically rebase branches when the base changes:</p>
+                            <pre><code>stackit restack</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="commands">
+            <div class="container">
+                <h2>Core Commands</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Stackit provides a comprehensive set of commands for managing your stacked workflow:
+                </p>
+
+                <div class="commands-grid">
+                    <div class="command-card">
+                        <h4>stackit init</h4>
+                        <p>Initialize Stackit in your repository and configure the trunk branch.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit create [name]</h4>
+                        <p>Create a new branch stacked on top of the current branch with your staged changes.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit log</h4>
+                        <p>Display a visual representation of your stacked branches and their relationships.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit submit</h4>
+                        <p>Push branches and create/update pull requests for the entire stack.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit restack</h4>
+                        <p>Rebase branches in the stack to ensure each has its parent in history.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit sync</h4>
+                        <p>Sync your local branches with remote changes and update your stack.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit checkout [branch]</h4>
+                        <p>Switch between branches in your stack with autocomplete support.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit merge</h4>
+                        <p>Merge approved pull requests and clean up merged branches.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit squash</h4>
+                        <p>Squash commits in the current branch while maintaining the stack.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit split</h4>
+                        <p>Split commits into separate branches for better organization.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit absorb</h4>
+                        <p>Automatically absorb uncommitted changes into the appropriate commits.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>stackit info</h4>
+                        <p>Show detailed information about the current branch and its position in the stack.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="features">
+            <div class="container">
+                <h2>Why Stackit?</h2>
+                
+                <div class="features">
+                    <div class="feature">
+                        <div class="feature-icon">🚀</div>
+                        <h3>Ship Faster</h3>
+                        <p>Break large changes into smaller, reviewable PRs without waiting for sequential approval.</p>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Better Reviews</h3>
+                        <p>Reviewers can focus on smaller, logical changes rather than massive diffs.</p>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-icon">🔄</div>
+                        <h3>Easy Rebasing</h3>
+                        <p>Automatically restack branches when the base changes. No manual rebasing headaches.</p>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-icon">🎨</div>
+                        <h3>Visual Clarity</h3>
+                        <p>See your entire stack at a glance with beautiful terminal visualizations.</p>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Intuitive CLI</h3>
+                        <p>Simple commands that feel natural. Built for developer productivity.</p>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-icon">🔧</div>
+                        <h3>GitHub Integration</h3>
+                        <p>Seamlessly create and update PRs with proper dependencies and metadata.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="documentation">
+            <div class="container">
+                <h2>Documentation</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                    Learn more about Stackit's features and advanced workflows:
+                </p>
+
+                <div class="commands-grid">
+                    <div class="command-card">
+                        <h4>📖 Getting Started Guide</h4>
+                        <p>Complete walkthrough for new users including installation, setup, and your first stack.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>🎓 Advanced Workflows</h4>
+                        <p>Learn advanced patterns like insert mode, patch staging, and complex stack management.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>⚙️ Configuration</h4>
+                        <p>Customize Stackit's behavior with repository and global configuration options.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>🤝 Contributing</h4>
+                        <p>Want to contribute? Learn about the project structure and development workflow.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>❓ FAQ</h4>
+                        <p>Common questions and troubleshooting tips for working with stacked changes.</p>
+                    </div>
+
+                    <div class="command-card">
+                        <h4>📝 Changelog</h4>
+                        <p>See what's new in recent releases and upcoming features on the roadmap.</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 3rem; padding: 2rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;">
+                    <h3>Need Help?</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Run <code class="inline-code">stackit --help</code> or <code class="inline-code">stackit [command] --help</code> to see detailed command information.
+                    </p>
+                    <p style="color: var(--text-secondary);">
+                        Found a bug or have a feature request? 
+                        <a href="https://github.com/jonnii/stackit/issues" style="color: var(--accent);">Open an issue on GitHub</a>.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>
+                Built with ❤️ by the Stackit community &nbsp;•&nbsp; 
+                <a href="https://github.com/jonnii/stackit">GitHub</a> &nbsp;•&nbsp; 
+                <a href="https://github.com/jonnii/stackit/blob/main/LICENSE">License</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

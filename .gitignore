@@ -23,3 +23,7 @@ go.work
 .DS_Store
 Thumbs.db
 stackit
+
+# Website server binary
+website/server
+website/tmp/

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // Scene represents a test scene with a temporary directory and Git repository.
@@ -20,6 +22,11 @@ type SceneSetup func(*Scene) error
 // NewScene creates a new test scene with a temporary directory and Git repository.
 // It automatically handles cleanup using t.Cleanup().
 func NewScene(t *testing.T, setup SceneSetup) *Scene {
+	// Reset the default git repository to ensure this test gets a fresh one.
+	// This is necessary because the git package uses a package-level global
+	// for the repository, which would otherwise persist across tests.
+	git.ResetDefaultRepo()
+
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "stackit-test-*")
 	if err != nil {

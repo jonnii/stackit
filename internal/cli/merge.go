@@ -21,8 +21,8 @@ func newMergeCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "merge",
-		Short: "Merge the pull requests associated with all branches from trunk to the current branch via Graphite",
-		Long: `Merge the pull requests associated with all branches from trunk to the current branch via Graphite.
+		Short: "Merge the pull requests associated with all branches from trunk to the current branch via Stackit",
+		Long: `Merge the pull requests associated with all branches from trunk to the current branch via Stackit.
 This command merges PRs for all branches in the stack from trunk up to (and including) the current branch.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize git repository
@@ -65,4 +65,3 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 
 	return cmd
 }
-

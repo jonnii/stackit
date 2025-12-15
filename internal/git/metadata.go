@@ -3,10 +3,7 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"strings"
 )
 
 // Meta represents branch metadata stored in Git refs
@@ -29,44 +26,24 @@ type PrInfo struct {
 
 // ReadMetadataRef reads metadata for a branch from Git refs
 func ReadMetadataRef(branchName string) (*Meta, error) {
-	repo, err := GetDefaultRepo()
-	if err != nil {
-		return nil, err
-	}
+	// Use shell git commands for consistency with WriteMetadataRef and DeleteMetadataRef
+	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
 
-	refName := plumbing.ReferenceName(fmt.Sprintf("refs/branch-metadata/%s", branchName))
-	ref, err := repo.Reference(refName, false)
+	// Get the SHA of the ref
+	sha, err := RunGitCommand("rev-parse", "--verify", refName)
 	if err != nil {
-		// Metadata ref doesn't exist - return empty meta
+		// Ref doesn't exist - return empty meta
 		return &Meta{}, nil
 	}
 
-	// Get the object content
-	obj, err := repo.Object(plumbing.AnyObject, ref.Hash())
+	// Get the content of the blob
+	content, err := RunGitCommand("cat-file", "-p", sha)
 	if err != nil {
-		return &Meta{}, nil
-	}
-
-	// Read the content
-	var content []byte
-	switch obj := obj.(type) {
-	case *object.Blob:
-		reader, err := obj.Reader()
-		if err != nil {
-			return &Meta{}, nil
-		}
-		defer reader.Close()
-
-		content, err = io.ReadAll(reader)
-		if err != nil {
-			return &Meta{}, nil
-		}
-	default:
 		return &Meta{}, nil
 	}
 
 	var meta Meta
-	if err := json.Unmarshal(content, &meta); err != nil {
+	if err := json.Unmarshal([]byte(content), &meta); err != nil {
 		return &Meta{}, nil
 	}
 
@@ -75,42 +52,45 @@ func ReadMetadataRef(branchName string) (*Meta, error) {
 
 // GetMetadataRefList returns all metadata refs
 func GetMetadataRefList() (map[string]string, error) {
-	repo, err := GetDefaultRepo()
+	// Use shell git to list refs (consistent with WriteMetadataRef which uses shell git)
+	output, err := RunGitCommand("for-each-ref", "--format=%(refname) %(objectname)", "refs/branch-metadata/")
 	if err != nil {
-		return nil, err
-	}
-
-	refs, err := repo.References()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get references: %w", err)
+		return nil, fmt.Errorf("failed to get metadata refs: %w", err)
 	}
 
 	result := make(map[string]string)
-	err = refs.ForEach(func(ref *plumbing.Reference) error {
-		if ref.Name().IsTag() {
-			return nil
-		}
+	if output == "" {
+		return result, nil
+	}
 
-		name := ref.Name().String()
-		if len(name) > 20 && name[:20] == "refs/branch-metadata/" {
-			branchName := name[20:]
-			result[branchName] = ref.Hash().String()
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
 		}
-		return nil
-	})
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		refName := parts[0]
+		sha := parts[1]
 
-	return result, err
+		// Extract branch name from refs/branch-metadata/<branch>
+		const prefix = "refs/branch-metadata/"
+		if strings.HasPrefix(refName, prefix) {
+			branchName := refName[len(prefix):]
+			result[branchName] = sha
+		}
+	}
+
+	return result, nil
 }
 
 // DeleteMetadataRef deletes a metadata ref for a branch
 func DeleteMetadataRef(branchName string) error {
-	repo, err := GetDefaultRepo()
-	if err != nil {
-		return err
-	}
-
-	refName := plumbing.ReferenceName(fmt.Sprintf("refs/branch-metadata/%s", branchName))
-	return repo.Storer.RemoveReference(refName)
+	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
+	_, err := RunGitCommand("update-ref", "-d", refName)
+	return err
 }
 
 // WriteMetadataRef writes metadata for a branch to Git refs
@@ -136,4 +116,3 @@ func WriteMetadataRef(branchName string, meta *Meta) error {
 
 	return nil
 }
-

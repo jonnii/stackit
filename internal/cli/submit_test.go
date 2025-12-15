@@ -44,20 +44,21 @@ func TestSubmitCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "branch2", currentBranch)
 
-		// Run submit command with --dry-run and --no-edit to avoid interactive prompts
-		cmd = exec.Command(binaryPath, "submit", "--dry-run", "--no-edit")
+		// Run submit command with --dry-run, --no-edit, and --draft to avoid interactive prompts
+		cmd = exec.Command(binaryPath, "submit", "--dry-run", "--no-edit", "--draft")
 		cmd.Dir = scene.Dir
+		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
 		output, err := cmd.CombinedOutput()
-		
+
 		// Should succeed
 		require.NoError(t, err, "submit command failed: %s", string(output))
-		
+
 		outputStr := string(output)
-		
+
 		// Verify all branches are in the output
 		require.Contains(t, outputStr, "branch1", "should include parent branch")
 		require.Contains(t, outputStr, "branch2", "should include current branch")
-		
+
 		// Verify the current branch (branch2) appears in the list
 		// The output should show branch2 being prepared for submit
 		lines := strings.Split(outputStr, "\n")
@@ -107,20 +108,20 @@ func TestSubmitCommand(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("branch2")
 		require.NoError(t, err)
 
-		// Run submit command with --stack and --dry-run and --no-edit to avoid interactive prompts
-		cmd = exec.Command(binaryPath, "submit", "--stack", "--dry-run", "--no-edit")
+		// Run submit command with --stack, --dry-run, --no-edit, and --draft to avoid interactive prompts
+		cmd = exec.Command(binaryPath, "submit", "--stack", "--dry-run", "--no-edit", "--draft")
 		cmd.Dir = scene.Dir
+		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
 		output, err := cmd.CombinedOutput()
-		
+
 		// Should succeed
 		require.NoError(t, err, "submit command failed: %s", string(output))
-		
+
 		outputStr := string(output)
-		
+
 		// Verify all branches are in the output (ancestors, current, and descendants)
 		require.Contains(t, outputStr, "branch1", "should include parent branch")
 		require.Contains(t, outputStr, "branch2", "should include current branch")
 		require.Contains(t, outputStr, "branch3", "should include descendant branch with --stack")
 	})
 }
-

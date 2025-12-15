@@ -61,14 +61,28 @@ func Rebase(branchName, onto, from string) (RebaseResult, error) {
 
 // IsRebaseInProgress checks if a rebase is currently in progress
 func IsRebaseInProgress() bool {
-	// Check if REBASE_HEAD exists (not just the path)
-	_, err := RunGitCommand("rev-parse", "--verify", "REBASE_HEAD")
-	return err == nil
+	// Check for .git/rebase-merge or .git/rebase-apply directories
+	// This is more reliable than checking REBASE_HEAD which can persist after rebase
+	output, err := RunGitCommand("rev-parse", "--git-dir")
+	if err != nil {
+		return false
+	}
+
+	gitDir := output
+	// Check for interactive rebase
+	if _, err := os.Stat(gitDir + "/rebase-merge"); err == nil {
+		return true
+	}
+	// Check for non-interactive rebase
+	if _, err := os.Stat(gitDir + "/rebase-apply"); err == nil {
+		return true
+	}
+	return false
 }
 
 // RebaseContinue continues an in-progress rebase
 func RebaseContinue() (RebaseResult, error) {
-	// Set GIT_EDITOR to 'true' to skip editor (like Charcoal does)
+	// Set GIT_EDITOR to 'true' to skip editor (like Stackit does)
 	env := os.Environ()
 	env = append(env, "GIT_EDITOR=true")
 

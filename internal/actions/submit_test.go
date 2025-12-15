@@ -46,6 +46,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 			Splog:        splog,
 			DryRun:       false, // We want to test actual PR creation
 			NoEdit:       true,  // Skip interactive prompts
+			Draft:        true,  // Set draft status explicitly to skip prompt
 			GitHubClient: githubClient,
 			GitHubOwner:  owner,
 			GitHubRepo:   repo,
@@ -54,7 +55,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		// With mocked client, push is skipped, so this should succeed
 		err = actions.SubmitAction(opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
-		
+
 		// Verify that PR was created in the mock
 		require.Greater(t, len(config.CreatedPRs), 0, "Should have created at least one PR")
 		require.Equal(t, "feature", *config.CreatedPRs[0].Head.Ref, "PR should be for feature branch")
@@ -63,7 +64,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 	t.Run("updates existing PR", func(t *testing.T) {
 		// Skip this test for now - branch tracking issue needs to be resolved separately
 		t.Skip("Skipping due to branch tracking issue in test setup")
-		
+
 		scene := testhelpers.NewScene(t, nil)
 
 		// Create initial commit
@@ -134,4 +135,3 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		require.NotNil(t, updatedPR, "Updated PR should not be nil")
 	})
 }
-

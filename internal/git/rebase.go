@@ -61,7 +61,8 @@ func Rebase(branchName, onto, from string) (RebaseResult, error) {
 
 // IsRebaseInProgress checks if a rebase is currently in progress
 func IsRebaseInProgress() bool {
-	_, err := RunGitCommand("rev-parse", "--git-path", "REBASE_HEAD")
+	// Check if REBASE_HEAD exists (not just the path)
+	_, err := RunGitCommand("rev-parse", "--verify", "REBASE_HEAD")
 	return err == nil
 }
 

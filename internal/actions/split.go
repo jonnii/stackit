@@ -434,6 +434,11 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, sp
 		newBranchName = newBranchName + "_split"
 	}
 
+	// First checkout the parent branch so the new branch starts from there
+	if err := git.CheckoutBranch(parentBranchName); err != nil {
+		return nil, fmt.Errorf("failed to checkout parent branch: %w", err)
+	}
+
 	// Create new branch from parent
 	if err := git.CreateAndCheckoutBranch(newBranchName); err != nil {
 		return nil, fmt.Errorf("failed to create branch: %w", err)

@@ -286,7 +286,7 @@ func TestSplitCommand(t *testing.T) {
 				return err
 			}
 
-			// Create a feature branch
+			// Create a feature branch with a file
 			if err := s.Repo.CreateChange("feature change 1", "test1", false); err != nil {
 				return err
 			}
@@ -296,12 +296,13 @@ func TestSplitCommand(t *testing.T) {
 				return err
 			}
 
-			// Add uncommitted change
-			return s.Repo.CreateChange("uncommitted change", "uncommitted", true)
+			// Modify the tracked file to create uncommitted changes
+			// (test1_test.txt is tracked from the previous commit)
+			return s.Repo.CreateChange("modified content", "test1", true)
 		})
 
 		// Try to run split with uncommitted changes
-		cmd := exec.Command(binaryPath, "split", "--by-file", "file1_test.txt")
+		cmd := exec.Command(binaryPath, "split", "--by-file", "test1_test.txt")
 		cmd.Dir = scene.Dir
 		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
 		output, err := cmd.CombinedOutput()

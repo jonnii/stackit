@@ -186,8 +186,17 @@ func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine
 	} else if opts.Publish {
 		metadata.IsDraft = false
 	} else if prInfo == nil {
-		// New PR - default to draft unless publish is set
-		metadata.IsDraft = true
+		// New PR - prompt user if interactive, otherwise default to draft
+		if isInteractive() {
+			draftStatus, err := GetPRDraftStatus(ctx)
+			if err != nil {
+				return nil, err
+			}
+			metadata.IsDraft = draftStatus
+		} else {
+			// Non-interactive mode - default to draft
+			metadata.IsDraft = true
+		}
 	} else {
 		metadata.IsDraft = prInfo.IsDraft
 	}
@@ -223,16 +232,16 @@ func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine
 
 // SubmitMetadataOptions contains options for PR metadata collection
 type SubmitMetadataOptions struct {
-	Edit             bool
-	EditTitle        bool
-	EditDescription  bool
-	NoEdit           bool
-	NoEditTitle      bool
+	Edit              bool
+	EditTitle         bool
+	EditDescription   bool
+	NoEdit            bool
+	NoEditTitle       bool
 	NoEditDescription bool
-	Draft            bool
-	Publish          bool
-	Reviewers        string
-	ReviewersPrompt  bool
+	Draft             bool
+	Publish           bool
+	Reviewers         string
+	ReviewersPrompt   bool
 }
 
 // PRMetadata contains PR metadata
@@ -262,4 +271,3 @@ func getStringValue(prInfo *engine.PrInfo, field string) string {
 		return ""
 	}
 }
-

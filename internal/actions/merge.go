@@ -41,7 +41,7 @@ func MergeAction(opts MergeOptions) error {
 	// Get all branches from trunk to current branch
 	scope := engine.Scope{RecursiveParents: true}
 	parentBranches := eng.GetRelativeStack(currentBranch, scope)
-	
+
 	// Build full list: parent branches + current branch
 	allBranches := make([]string, 0, len(parentBranches)+1)
 	allBranches = append(allBranches, parentBranches...)
@@ -152,7 +152,7 @@ func MergeAction(opts MergeOptions) error {
 	// Merge each PR
 	for _, pr := range prsToMerge {
 		splog.Info("Merging PR #%d for %s...", pr.prNumber, output.ColorBranchName(pr.branchName, false))
-		
+
 		if err := git.MergePullRequest(pr.branchName); err != nil {
 			splog.Warn("Failed to merge PR #%d for %s: %v", pr.prNumber, pr.branchName, err)
 			// Continue with other PRs
@@ -164,4 +164,3 @@ func MergeAction(opts MergeOptions) error {
 
 	return nil
 }
-

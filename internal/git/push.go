@@ -34,4 +34,3 @@ func PushBranch(branchName string, remote string, force bool, forceWithLease boo
 
 	return nil
 }
-

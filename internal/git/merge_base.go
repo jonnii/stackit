@@ -48,4 +48,3 @@ func GetMergeBase(branch1, branch2 string) (string, error) {
 
 	return mergeBases[0].Hash.String(), nil
 }
-

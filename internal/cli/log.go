@@ -16,15 +16,15 @@ import (
 // newLogCmd creates the log command
 func newLogCmd() *cobra.Command {
 	var (
-		reverse      bool
-		stack        bool
-		steps        int
+		reverse       bool
+		stack         bool
+		steps         int
 		showUntracked bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "log",
-		Short: "Log all branches tracked by Stackit, showing dependencies and info for each",
+		Use:     "log",
+		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
 		Aliases: []string{"l"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize git repository
@@ -42,17 +42,17 @@ func newLogCmd() *cobra.Command {
 			if !config.IsInitialized(repoRoot) {
 				splog := output.NewSplog()
 				splog.Info("Stackit has not been initialized, attempting to setup now...")
-				
+
 				// Run init logic
 				branchNames, err := git.GetAllBranchNames()
 				if err != nil {
 					return fmt.Errorf("failed to get branches: %w", err)
 				}
-				
+
 				if len(branchNames) == 0 {
 					return fmt.Errorf("no branches found in current repo; cannot initialize Stackit.\nPlease create your first commit and then re-run stackit init")
 				}
-				
+
 				// Infer trunk
 				trunkName := InferTrunk(branchNames)
 				if trunkName == "" {
@@ -69,7 +69,7 @@ func newLogCmd() *cobra.Command {
 						trunkName = branchNames[0]
 					}
 				}
-				
+
 				if err := config.SetTrunk(repoRoot, trunkName); err != nil {
 					return fmt.Errorf("failed to initialize: %w", err)
 				}
@@ -96,9 +96,9 @@ func newLogCmd() *cobra.Command {
 
 			// Prepare options
 			opts := actions.LogOptions{
-				Style:        "FULL",
-				Reverse:      reverse,
-				BranchName:   branchName,
+				Style:         "FULL",
+				Reverse:       reverse,
+				BranchName:    branchName,
 				ShowUntracked: showUntracked,
 			}
 
@@ -119,4 +119,3 @@ func newLogCmd() *cobra.Command {
 
 	return cmd
 }
-

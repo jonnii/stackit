@@ -6,15 +6,15 @@ import (
 
 // SamplePRData provides common PR data for testing
 type SamplePRData struct {
-	Number      int
-	Title       string
-	Body        string
-	Head        string
-	Base        string
-	HTMLURL     string
-	Draft       bool
-	State       string
-	Reviewers   []string
+	Number        int
+	Title         string
+	Body          string
+	Head          string
+	Base          string
+	HTMLURL       string
+	Draft         bool
+	State         string
+	Reviewers     []string
 	TeamReviewers []string
 }
 
@@ -95,4 +95,3 @@ func ClosedPRData() SamplePRData {
 	data.State = "closed"
 	return data
 }
-

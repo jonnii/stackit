@@ -87,4 +87,3 @@ it reaches the first branch that has trunk as its parent (or trunk itself).`,
 
 	return cmd
 }
-

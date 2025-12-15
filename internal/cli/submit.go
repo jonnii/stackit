@@ -15,32 +15,32 @@ import (
 // newSubmitCmd creates the submit command
 func newSubmitCmd() *cobra.Command {
 	var (
-		branch              string
-		stack               bool
-		force               bool
-		dryRun              bool
-		confirm             bool
-		updateOnly          bool
-		always              bool
-		restack             bool
-		draft               bool
-		publish             bool
-		edit                bool
-		editTitle           bool
-		editDescription     bool
-		noEdit              bool
-		noEditTitle         bool
-		noEditDescription   bool
-		reviewers           string
-		teamReviewers       string
-		mergeWhenReady      bool
-		rerequestReview     bool
-		view                bool
-		web                 bool
-		comment             string
-		targetTrunk         string
+		branch               string
+		stack                bool
+		force                bool
+		dryRun               bool
+		confirm              bool
+		updateOnly           bool
+		always               bool
+		restack              bool
+		draft                bool
+		publish              bool
+		edit                 bool
+		editTitle            bool
+		editDescription      bool
+		noEdit               bool
+		noEditTitle          bool
+		noEditDescription    bool
+		reviewers            string
+		teamReviewers        string
+		mergeWhenReady       bool
+		rerequestReview      bool
+		view                 bool
+		web                  bool
+		comment              string
+		targetTrunk          string
 		ignoreOutOfSyncTrunk bool
-		cli                 bool
+		cli                  bool
 	)
 
 	cmd := &cobra.Command{
@@ -78,33 +78,33 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 
 			// Run submit action
 			return actions.SubmitAction(actions.SubmitOptions{
-				Branch:              branch,
-				Stack:               stack,
-				Force:               force,
-				DryRun:              dryRun,
-				Confirm:             confirm,
-				UpdateOnly:          updateOnly,
-				Always:              always,
-				Restack:             restack,
-				Draft:               draft,
-				Publish:             publish,
-				Edit:                edit,
-				EditTitle:           editTitle,
-				EditDescription:     editDescription,
-				NoEdit:              noEdit,
-				NoEditTitle:         noEditTitle,
-				NoEditDescription:   noEditDescription,
-				Reviewers:           reviewers,
-				TeamReviewers:       teamReviewers,
-				MergeWhenReady:      mergeWhenReady,
-				RerequestReview:     rerequestReview,
-				View:                view,
-				Web:                 web,
-				Comment:             comment,
-				TargetTrunk:         targetTrunk,
+				Branch:               branch,
+				Stack:                stack,
+				Force:                force,
+				DryRun:               dryRun,
+				Confirm:              confirm,
+				UpdateOnly:           updateOnly,
+				Always:               always,
+				Restack:              restack,
+				Draft:                draft,
+				Publish:              publish,
+				Edit:                 edit,
+				EditTitle:            editTitle,
+				EditDescription:      editDescription,
+				NoEdit:               noEdit,
+				NoEditTitle:          noEditTitle,
+				NoEditDescription:    noEditDescription,
+				Reviewers:            reviewers,
+				TeamReviewers:        teamReviewers,
+				MergeWhenReady:       mergeWhenReady,
+				RerequestReview:      rerequestReview,
+				View:                 view,
+				Web:                  web,
+				Comment:              comment,
+				TargetTrunk:          targetTrunk,
 				IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
-				Engine:              eng,
-				Splog:               ctx.Splog,
+				Engine:               eng,
+				Splog:                ctx.Splog,
 			})
 		},
 	}
@@ -143,4 +143,3 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 
 	return cmd
 }
-

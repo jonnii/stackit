@@ -31,4 +31,3 @@ func GetRepoRoot() (string, error) {
 
 	return worktree.Filesystem.Root(), nil
 }
-

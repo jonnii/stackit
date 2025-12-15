@@ -13,17 +13,23 @@ import (
 	"stackit.dev/stackit/internal/output"
 )
 
-// newTopCmd creates the top command
-func newTopCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "top",
-		Short: "Switch to the tip branch of the current stack",
-		Long: `Switch to the tip branch of the current stack. Prompts if ambiguous.
+// newCheckoutCmd creates the checkout command
+func newCheckoutCmd() *cobra.Command {
+	var (
+		all           bool
+		showUntracked bool
+		stack         bool
+		trunk         bool
+	)
 
-This command navigates up the children chain from the current branch until
-it reaches a branch with no children (the tip of the stack). If multiple
-children exist at any level, you will be prompted to select which branch
-to follow.`,
+	cmd := &cobra.Command{
+		Use:     "checkout [branch]",
+		Aliases: []string{"co"},
+		Short:   "Switch to a branch. If no branch is provided, opens an interactive selector.",
+		Long: `Switch to a branch. If no branch is provided, opens an interactive selector.
+
+The interactive selector allows you to navigate branches using arrow keys and filter
+by typing. Use flags to customize which branches are shown.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
@@ -82,10 +88,31 @@ to follow.`,
 			// Create context
 			ctx := context.NewContext(eng)
 
-			// Execute top action
-			return actions.SwitchBranchAction(actions.DirectionTop, ctx)
+			// Get branch name from args
+			branchName := ""
+			if len(args) > 0 {
+				branchName = args[0]
+			}
+
+			// Prepare options
+			opts := actions.CheckoutOptions{
+				BranchName:    branchName,
+				ShowUntracked: showUntracked,
+				All:           all,
+				StackOnly:     stack,
+				CheckoutTrunk: trunk,
+			}
+
+			// Execute checkout action
+			return actions.CheckoutAction(opts, ctx)
 		},
 	}
+
+	// Add flags
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Show branches across all configured trunks in interactive selection")
+	cmd.Flags().BoolVarP(&showUntracked, "show-untracked", "u", false, "Include untracked branches in interactive selection")
+	cmd.Flags().BoolVarP(&stack, "stack", "s", false, "Only show ancestors and descendants of the current branch in interactive selection")
+	cmd.Flags().BoolVarP(&trunk, "trunk", "t", false, "Checkout the current trunk")
 
 	return cmd
 }

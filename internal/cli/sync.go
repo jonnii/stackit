@@ -76,7 +76,7 @@ If trunk cannot be fast-forwarded to match remote, overwrites trunk with the rem
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Don't prompt for confirmation before overwriting or deleting a branch")
 	cmd.Flags().BoolVar(&restack, "restack", true, "Restack any branches that can be restacked without conflicts")
 	cmd.Flags().BoolVar(&noRestack, "no-restack", false, "Skip restacking branches")
-	
+
 	// Apply --no-restack flag
 	cmd.PreRun = func(cmd *cobra.Command, args []string) {
 		if noRestack {

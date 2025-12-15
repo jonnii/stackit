@@ -22,6 +22,7 @@ https://github.com/jonnii/stackit`,
 	rootCmd.AddCommand(newCreateCmd())
 	rootCmd.AddCommand(newBottomCmd())
 	rootCmd.AddCommand(newTopCmd())
+	rootCmd.AddCommand(newCheckoutCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newSubmitCmd())
 	rootCmd.AddCommand(newMergeCmd())

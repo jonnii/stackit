@@ -150,3 +150,167 @@ func promptConfirm(prompt string, defaultValue bool) (bool, error) {
 	return m.choice, nil
 }
 
+// branchSelectModel is a branch selection prompt model with filtering
+type branchSelectModel struct {
+	choices  []branchChoice
+	filtered []branchChoice
+	filter   string
+	cursor   int
+	selected string
+	done     bool
+	err      error
+	message  string
+}
+
+type branchChoice struct {
+	display string // What to show (may include tree visualization)
+	value   string // Actual branch name
+}
+
+func (m branchSelectModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
+				m.selected = m.filtered[m.cursor].value
+				m.done = true
+				return m, tea.Quit
+			}
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = fmt.Errorf("cancelled")
+			m.done = true
+			return m, tea.Quit
+		case tea.KeyUp:
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.filtered) - 1
+			}
+			return m, nil
+		case tea.KeyDown:
+			if m.cursor < len(m.filtered)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+			return m, nil
+		case tea.KeyBackspace:
+			if len(m.filter) > 0 {
+				m.filter = m.filter[:len(m.filter)-1]
+				m.updateFiltered()
+				if m.cursor >= len(m.filtered) {
+					m.cursor = len(m.filtered) - 1
+				}
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+			}
+			return m, nil
+		case tea.KeyRunes:
+			m.filter += string(msg.Runes)
+			m.updateFiltered()
+			if m.cursor >= len(m.filtered) {
+				m.cursor = len(m.filtered) - 1
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m *branchSelectModel) updateFiltered() {
+	if m.filter == "" {
+		m.filtered = m.choices
+		return
+	}
+
+	filterLower := strings.ToLower(m.filter)
+	m.filtered = []branchChoice{}
+	for _, choice := range m.choices {
+		if strings.Contains(strings.ToLower(choice.display), filterLower) ||
+			strings.Contains(strings.ToLower(choice.value), filterLower) {
+			m.filtered = append(m.filtered, choice)
+		}
+	}
+}
+
+func (m branchSelectModel) View() string {
+	if m.done {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%s\n", m.message))
+
+	if m.filter != "" {
+		b.WriteString(fmt.Sprintf("Filter: %s\n\n", m.filter))
+	}
+
+	if len(m.filtered) == 0 {
+		b.WriteString("No branches match the filter.\n")
+	} else {
+		for i, choice := range m.filtered {
+			cursor := " "
+			if i == m.cursor {
+				cursor = ">"
+			}
+			b.WriteString(fmt.Sprintf("%s %s\n", cursor, choice.display))
+		}
+	}
+
+	b.WriteString("\n(Press Enter to select, Ctrl+C to cancel, type to filter)")
+
+	style := lipgloss.NewStyle().Margin(1, 0)
+	return style.Render(b.String())
+}
+
+// promptBranchSelection prompts the user to select a branch
+func promptBranchSelection(message string, choices []branchChoice, initialIndex int) (string, error) {
+	m := branchSelectModel{
+		choices: choices,
+		filter:  "",
+		cursor:  initialIndex,
+		message: message,
+	}
+	m.updateFiltered()
+
+	// Adjust cursor to initial index in filtered list
+	if initialIndex >= 0 && initialIndex < len(choices) {
+		initialChoice := choices[initialIndex]
+		for i, filtered := range m.filtered {
+			if filtered.value == initialChoice.value {
+				m.cursor = i
+				break
+			}
+		}
+	}
+
+	if m.cursor < 0 || m.cursor >= len(m.filtered) {
+		if len(m.filtered) > 0 {
+			m.cursor = 0
+		}
+	}
+
+	p := tea.NewProgram(m, tea.WithOutput(nil))
+	model, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+
+	if m, ok := model.(branchSelectModel); ok {
+		if m.err != nil {
+			return "", m.err
+		}
+		return m.selected, nil
+	}
+
+	return "", fmt.Errorf("unexpected model type")
+}

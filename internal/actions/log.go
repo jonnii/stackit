@@ -11,10 +11,10 @@ import (
 
 // LogOptions specifies options for the log command
 type LogOptions struct {
-	Style        string // "SHORT" or "FULL"
-	Reverse      bool
-	Steps        *int
-	BranchName   string
+	Style         string // "SHORT" or "FULL"
+	Reverse       bool
+	Steps         *int
+	BranchName    string
 	ShowUntracked bool
 }
 
@@ -27,11 +27,11 @@ func LogAction(opts LogOptions, ctx *context.Context) error {
 
 	// Get stack lines
 	stackLines := getStackLines(printStackArgs{
-		short:         opts.Style == "SHORT",
-		reverse:       opts.Reverse,
-		branchName:    opts.BranchName,
-		indentLevel:   0,
-		steps:         opts.Steps,
+		short:             opts.Style == "SHORT",
+		reverse:           opts.Reverse,
+		branchName:        opts.BranchName,
+		indentLevel:       0,
+		steps:             opts.Steps,
 		omitCurrentBranch: false,
 		noStyleBranchName: false,
 	}, ctx)
@@ -54,15 +54,15 @@ func LogAction(opts LogOptions, ctx *context.Context) error {
 }
 
 type printStackArgs struct {
-	short            bool
-	reverse          bool
-	branchName       string
-	indentLevel      int
-	steps            *int
+	short             bool
+	reverse           bool
+	branchName        string
+	indentLevel       int
+	steps             *int
 	omitCurrentBranch bool
 	noStyleBranchName bool
 	skipBranchingLine bool
-	overallIndent    *int
+	overallIndent     *int
 }
 
 func getStackLines(args printStackArgs, ctx *context.Context) []string {
@@ -73,14 +73,14 @@ func getStackLines(args printStackArgs, ctx *context.Context) []string {
 
 	outputDeep := [][]string{
 		getUpstackExclusiveLines(printStackArgs{
-			short:         args.short,
-			reverse:       args.reverse,
-			branchName:    args.branchName,
-			indentLevel:   args.indentLevel,
-			steps:         args.steps,
+			short:             args.short,
+			reverse:           args.reverse,
+			branchName:        args.branchName,
+			indentLevel:       args.indentLevel,
+			steps:             args.steps,
 			omitCurrentBranch: args.omitCurrentBranch,
 			noStyleBranchName: args.noStyleBranchName,
-			overallIndent: args.overallIndent,
+			overallIndent:     args.overallIndent,
 		}, ctx),
 		getBranchLines(args, ctx),
 		getDownstackExclusiveLines(args, ctx),
@@ -114,7 +114,7 @@ func getUpstackExclusiveLines(args printStackArgs, ctx *context.Context) []strin
 	}
 
 	children := ctx.Engine.GetChildren(args.branchName)
-	
+
 	// Filter out current branch if needed
 	filteredChildren := []string{}
 	for _, child := range children {
@@ -141,14 +141,14 @@ func getUpstackExclusiveLines(args printStackArgs, ctx *context.Context) []strin
 		}
 
 		childLines := getUpstackInclusiveLines(printStackArgs{
-			short:         args.short,
-			reverse:       args.reverse,
-			branchName:    child,
-			indentLevel:   childIndent,
-			steps:         childSteps,
+			short:             args.short,
+			reverse:           args.reverse,
+			branchName:        child,
+			indentLevel:       childIndent,
+			steps:             childSteps,
 			omitCurrentBranch: args.omitCurrentBranch,
 			noStyleBranchName: args.noStyleBranchName,
-			overallIndent: args.overallIndent,
+			overallIndent:     args.overallIndent,
 		}, ctx)
 
 		result = append(result, childLines...)
@@ -201,10 +201,10 @@ func getDownstackExclusiveLines(args printStackArgs, ctx *context.Context) []str
 	var result []string
 	for _, branchName := range fullStack {
 		branchLines := getBranchLines(printStackArgs{
-			short:            args.short,
-			reverse:          args.reverse,
-			branchName:       branchName,
-			indentLevel:      args.indentLevel,
+			short:             args.short,
+			reverse:           args.reverse,
+			branchName:        branchName,
+			indentLevel:       args.indentLevel,
 			skipBranchingLine: true,
 		}, ctx)
 		result = append(result, branchLines...)
@@ -233,7 +233,7 @@ func getBranchLines(args printStackArgs, ctx *context.Context) []string {
 	// Short format
 	if args.short {
 		line := strings.Repeat("│ ", args.indentLevel)
-		
+
 		// Add branching characters
 		if !args.skipBranchingLine && numChildren > 1 {
 			if args.reverse {
@@ -293,7 +293,7 @@ func getBranchingLine(numChildren int, reverse bool, indentLevel int) string {
 	}
 
 	prefix := strings.Repeat("│  ", indentLevel)
-	
+
 	var middle, last string
 	if reverse {
 		middle = "──┬"
@@ -314,31 +314,31 @@ func getBranchingLine(numChildren int, reverse bool, indentLevel int) string {
 
 func getInfoLines(args printStackArgs, ctx *context.Context) []string {
 	isCurrent := args.branchName == ctx.Engine.CurrentBranch()
-	
+
 	// Get branch info with colors
 	branchName := args.branchName
 	coloredBranchName := output.ColorBranchName(branchName, isCurrent)
-	
+
 	// Add restack indicator if needed
 	if !ctx.Engine.IsBranchFixed(branchName) {
 		coloredBranchName += " " + output.ColorNeedsRestack("(needs restack)")
 	}
-	
+
 	var result []string
 	prefix := strings.Repeat("│  ", args.indentLevel)
-	
+
 	var symbol string
 	if isCurrent {
 		symbol = "◉"
 	} else {
 		symbol = "◯"
 	}
-	
+
 	result = append(result, prefix+symbol+" "+coloredBranchName)
-	
+
 	// Add trailing line
 	result = append(result, prefix+"│")
-	
+
 	return result
 }
 
@@ -384,4 +384,3 @@ func getUntrackedBranchNames(ctx *context.Context) []string {
 	}
 	return untracked
 }
-

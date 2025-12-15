@@ -108,7 +108,7 @@ func newInitCmd() *cobra.Command {
 			if trunkName == "" {
 				// Try to infer trunk
 				inferredTrunk := InferTrunk(branchNames)
-				
+
 				// Select trunk (with interactive prompt if needed)
 				interactive := !noInteractive && isInteractive()
 				selected, err := selectTrunkBranch(branchNames, inferredTrunk, interactive)
@@ -178,4 +178,3 @@ func newInitCmd() *cobra.Command {
 
 	return cmd
 }
-

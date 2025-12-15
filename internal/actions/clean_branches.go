@@ -179,4 +179,3 @@ func shouldDeleteBranch(branchName string, eng engine.Engine, force bool, splog 
 	// In a full implementation, we would prompt here
 	return false, ""
 }
-

@@ -136,3 +136,4 @@ func isParentOrChildRecursive(eng engine.Engine, branch1, branch2 string, visite
 
 	return false
 }
+

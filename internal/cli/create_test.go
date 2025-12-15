@@ -276,3 +276,4 @@ func TestCreateCommand(t *testing.T) {
 		require.Contains(t, string(output), "already exists")
 	})
 }
+

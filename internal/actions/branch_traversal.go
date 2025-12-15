@@ -137,3 +137,4 @@ func formatBranchList(branches []string) string {
 	}
 	return result
 }
+

@@ -235,3 +235,4 @@ func TestGetPullRequestByBranch(t *testing.T) {
 		require.Nil(t, pr)
 	})
 }
+

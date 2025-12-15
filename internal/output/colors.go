@@ -13,3 +13,4 @@ var STACKIT_COLORS = [][]int{
 	{159, 131, 228}, // Purple
 	{80, 132, 243},  // Blue
 }
+

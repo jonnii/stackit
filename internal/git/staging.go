@@ -75,3 +75,4 @@ func HasUntrackedFiles() (bool, error) {
 	}
 	return strings.TrimSpace(output) != "", nil
 }
+

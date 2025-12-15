@@ -164,3 +164,4 @@ func MergeAction(opts MergeOptions) error {
 
 	return nil
 }
+

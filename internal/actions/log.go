@@ -384,3 +384,4 @@ func getUntrackedBranchNames(ctx *context.Context) []string {
 	}
 	return untracked
 }
+

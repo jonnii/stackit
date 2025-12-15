@@ -80,3 +80,4 @@ init:
 		just build; \
 	fi
 	./stackit init
+

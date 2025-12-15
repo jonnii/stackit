@@ -30,3 +30,4 @@ func DeleteBranch(branchName string) error {
 	}
 	return nil
 }
+

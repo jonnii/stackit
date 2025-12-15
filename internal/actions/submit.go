@@ -484,3 +484,4 @@ func openBrowser(url string) {
 		exec.Command("start", url).Run()    // Windows
 	}
 }
+

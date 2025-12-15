@@ -215,3 +215,4 @@ func getCommitMessage() string {
 	// For now, return empty and let git handle it
 	return ""
 }
+

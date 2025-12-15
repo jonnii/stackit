@@ -337,3 +337,4 @@ func TestTopCommand(t *testing.T) {
 		require.Contains(t, string(output), "Error")
 	})
 }
+

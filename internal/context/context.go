@@ -18,3 +18,4 @@ func NewContext(eng engine.Engine) *Context {
 		Splog:  output.NewSplog(),
 	}
 }
+

@@ -126,3 +126,4 @@ func GetCommitSubject(branchName string) (string, error) {
 
 	return strings.TrimSpace(subject), nil
 }
+

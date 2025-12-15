@@ -219,3 +219,4 @@ func MergePullRequest(branchName string) error {
 	}
 	return nil
 }
+

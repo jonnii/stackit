@@ -91,3 +91,4 @@ func (r *Repository) GetCurrentBranch() (string, error) {
 
 	return head.Name().Short(), nil
 }
+

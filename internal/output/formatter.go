@@ -90,3 +90,4 @@ func ColorMagenta(text string) string {
 		Foreground(lipgloss.Color("5")).
 		Render(text)
 }
+

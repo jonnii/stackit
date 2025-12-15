@@ -65,3 +65,4 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 
 	return cmd
 }
+

@@ -123,3 +123,4 @@ func readRepoConfig(t *testing.T, repoDir string) *config.RepoConfig {
 
 	return &cfg
 }
+

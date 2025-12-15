@@ -61,3 +61,4 @@ func GenerateBranchNameFromMessage(message string) string {
 	// Sanitize and return
 	return SanitizeBranchName(subject)
 }
+

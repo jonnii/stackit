@@ -118,3 +118,4 @@ func buildStackitBinary(t *testing.T) string {
 
 	return binaryPath
 }
+

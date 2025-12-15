@@ -38,3 +38,4 @@ func RunGitCommandWithInput(input string, args ...string) (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+

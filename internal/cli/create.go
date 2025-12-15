@@ -122,3 +122,4 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 
 	return cmd
 }
+

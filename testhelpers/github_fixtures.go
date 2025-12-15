@@ -95,3 +95,4 @@ func ClosedPRData() SamplePRData {
 	data.State = "closed"
 	return data
 }
+

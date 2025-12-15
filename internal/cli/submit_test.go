@@ -123,3 +123,4 @@ func TestSubmitCommand(t *testing.T) {
 		require.Contains(t, outputStr, "branch3", "should include descendant branch with --stack")
 	})
 }
+

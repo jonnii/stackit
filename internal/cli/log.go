@@ -119,3 +119,4 @@ func newLogCmd() *cobra.Command {
 
 	return cmd
 }
+

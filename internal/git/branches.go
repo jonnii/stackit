@@ -107,3 +107,4 @@ func FindCommonlyNamedTrunk(branchNames []string) string {
 	}
 	return ""
 }
+

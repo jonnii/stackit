@@ -134,3 +134,4 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		require.NotNil(t, updatedPR, "Updated PR should not be nil")
 	})
 }
+

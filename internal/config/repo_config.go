@@ -77,3 +77,4 @@ func SetTrunk(repoRoot string, trunkName string) error {
 	
 	return os.WriteFile(configPath, configJSON, 0644)
 }
+

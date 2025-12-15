@@ -46,7 +46,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 	}
 
 	mux := http.NewServeMux()
-
+	
 	// Combined handler for /repos/{owner}/{repo}/pulls and /repos/{owner}/{repo}/pulls/{number}
 	basePath := "/repos/" + config.Owner + "/" + config.Repo + "/pulls"
 	basePathWithSlash := basePath + "/"
@@ -56,73 +56,9 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 		originalPath := r.URL.Path
 		path := originalPath
 		
-		// Handle all paths that start with basePath
-		// First check for exact basePath matches (list/create)
-		if path == basePath {
-			// Handle POST /repos/{owner}/{repo}/pulls (create PR)
-			if r.Method == "POST" {
-				// Parse request body
-				var newPR github.NewPullRequest
-				if err := json.NewDecoder(r.Body).Decode(&newPR); err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
-
-				// Create a mock PR response
-				prNumber := len(config.CreatedPRs) + 1
-				pr := &github.PullRequest{
-					Number:  github.Int(prNumber),
-					Title:   newPR.Title,
-					Body:    newPR.Body,
-					Head:    &github.PullRequestBranch{Ref: newPR.Head},
-					Base:    &github.PullRequestBranch{Ref: newPR.Base},
-					Draft:   newPR.Draft,
-					HTMLURL: github.String("https://github.com/" + config.Owner + "/" + config.Repo + "/pull/" + fmt.Sprintf("%d", prNumber)),
-				}
-
-				config.CreatedPRs = append(config.CreatedPRs, pr)
-				config.PRs[*newPR.Head] = pr
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(pr)
-				return
-			}
-			
-			// Handle GET /repos/{owner}/{repo}/pulls (list PRs)
-			if r.Method == "GET" {
-				// Parse query parameters for head filter
-				head := r.URL.Query().Get("head")
-				if head != "" {
-					// Extract branch name from "owner:branch" format
-					branchName := head
-					if idx := len(config.Owner) + 1; len(head) > idx && head[:idx] == config.Owner+":" {
-						branchName = head[idx:]
-					}
-
-					pr, exists := config.PRs[branchName]
-					if !exists {
-						// Return empty list
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(http.StatusOK)
-						json.NewEncoder(w).Encode([]*github.PullRequest{})
-						return
-					}
-
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode([]*github.PullRequest{pr})
-					return
-				}
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-		}
-		
-		// Handle paths like /repos/{owner}/{repo}/pulls/{number} or /repos/{owner}/{repo}/pulls/{number}/requested_reviewers
-		// This matches paths that start with basePath and have more content after it
-		// Check if path starts with basePathWithSlash OR if it's longer than basePath (to catch /pulls/1)
-		if strings.HasPrefix(path, basePathWithSlash) || (len(path) > len(basePath) && strings.HasPrefix(path, basePath+"/")) {
+		// Handle PR number paths (paths starting with basePathWithSlash like /pulls/1)
+		// This must be checked before exact basePath match
+		if strings.HasPrefix(path, basePathWithSlash) {
 			// Check if this is a reviewers endpoint
 			if len(path) >= len("/requested_reviewers") && path[len(path)-len("/requested_reviewers"):] == "/requested_reviewers" {
 				if r.Method == "POST" {
@@ -285,6 +221,68 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 			}
 		}
 		
+		// Handle exact basePath matches (list/create)
+		if path == basePath {
+			// Handle POST /repos/{owner}/{repo}/pulls (create PR)
+			if r.Method == "POST" {
+				// Parse request body
+				var newPR github.NewPullRequest
+				if err := json.NewDecoder(r.Body).Decode(&newPR); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+
+				// Create a mock PR response
+				prNumber := len(config.CreatedPRs) + 1
+				pr := &github.PullRequest{
+					Number:  github.Int(prNumber),
+					Title:   newPR.Title,
+					Body:    newPR.Body,
+					Head:    &github.PullRequestBranch{Ref: newPR.Head},
+					Base:    &github.PullRequestBranch{Ref: newPR.Base},
+					Draft:   newPR.Draft,
+					HTMLURL: github.String("https://github.com/" + config.Owner + "/" + config.Repo + "/pull/" + fmt.Sprintf("%d", prNumber)),
+				}
+
+				config.CreatedPRs = append(config.CreatedPRs, pr)
+				config.PRs[*newPR.Head] = pr
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				json.NewEncoder(w).Encode(pr)
+				return
+			}
+			
+			// Handle GET /repos/{owner}/{repo}/pulls (list PRs)
+			if r.Method == "GET" {
+				// Parse query parameters for head filter
+				head := r.URL.Query().Get("head")
+				if head != "" {
+					// Extract branch name from "owner:branch" format
+					branchName := head
+					if idx := len(config.Owner) + 1; len(head) > idx && head[:idx] == config.Owner+":" {
+						branchName = head[idx:]
+					}
+
+					pr, exists := config.PRs[branchName]
+					if !exists {
+						// Return empty list
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						json.NewEncoder(w).Encode([]*github.PullRequest{})
+						return
+					}
+
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					json.NewEncoder(w).Encode([]*github.PullRequest{pr})
+					return
+				}
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+		}
+		
 		// If we get here, the path didn't match any handler
 		// Check if it's a PR number path that we should handle
 		if strings.HasPrefix(path, basePath) {
@@ -294,11 +292,12 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 		http.Error(w, fmt.Sprintf("Unhandled path: %s (method: %s)", path, r.Method), http.StatusNotFound)
 	}
 	
-	// Register handler for base path - exact match
-	mux.HandleFunc(basePath, handler)
-	// Register handler for paths with trailing slash - prefix match for /pulls/{anything}
-	// Note: Go's ServeMux matches /pulls/ pattern to /pulls/1, /pulls/2, etc.
+	// Register a single catch-all handler for all paths starting with basePath
+	// We'll handle exact vs prefix matching inside the handler
+	// Register basePathWithSlash first (prefix match) so it takes precedence
 	mux.HandleFunc(basePathWithSlash, handler)
+	// Then register basePath for exact matches
+	mux.HandleFunc(basePath, handler)
 
 
 
@@ -359,3 +358,4 @@ func extractPRNumber(path string) int {
 	}
 	return number
 }
+

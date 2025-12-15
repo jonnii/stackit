@@ -149,3 +149,4 @@ func promptConfirm(prompt string, defaultValue bool) (bool, error) {
 
 	return m.choice, nil
 }
+

@@ -43,8 +43,12 @@ func TestMergeAction(t *testing.T) {
 		err := scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
+		// Create engine (will see we're on main)
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
+
+		// Verify we're on trunk
+		require.True(t, eng.IsTrunk(eng.CurrentBranch()))
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
@@ -71,6 +75,18 @@ func TestMergeAction(t *testing.T) {
 		// Create engine (will see branch1 but not track it)
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
+
+		// Switch to branch1
+		err = scene.Repo.CheckoutBranch("branch1")
+		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		// Note: The branch won't be tracked in the new engine since we didn't track it
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Verify branch is not tracked
+		require.False(t, eng.IsBranchTracked("branch1"))
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
@@ -102,6 +118,18 @@ func TestMergeAction(t *testing.T) {
 
 		err = eng.TrackBranch("branch1", "main")
 		require.NoError(t, err)
+
+		// Switch to branch1
+		err = scene.Repo.CheckoutBranch("branch1")
+		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		// The engine will rebuild and should see the tracked branch from metadata
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Verify branch is tracked (metadata should persist)
+		require.True(t, eng.IsBranchTracked("branch1"))
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
@@ -143,6 +171,21 @@ func TestMergeAction(t *testing.T) {
 		}
 		err = eng.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
+
+		// Switch to branch1
+		err = scene.Repo.CheckoutBranch("branch1")
+		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		// The engine will rebuild and should see the tracked branch and PR info from metadata
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Verify branch is tracked and has PR info
+		require.True(t, eng.IsBranchTracked("branch1"))
+		prInfo, err = eng.GetPrInfo("branch1")
+		require.NoError(t, err)
+		require.NotNil(t, prInfo)
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{

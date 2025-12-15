@@ -18,6 +18,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		})
 
 		// Create: main -> branch1 -> branch2
+		// Create all branches first
 		err := scene.Repo.CreateAndCheckoutBranch("branch1")
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
@@ -27,8 +28,10 @@ func TestSwitchBranchAction(t *testing.T) {
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
 		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
 
-		// Create engine and track branches
+		// Create engine (will see both branches)
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
@@ -47,6 +50,17 @@ func TestSwitchBranchAction(t *testing.T) {
 		// Switch to branch2 (top of stack)
 		err = scene.Repo.CheckoutBranch("branch2")
 		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Update context with new engine
+		ctx.Engine = eng
+
+		// Verify parent relationships are correct
+		require.Equal(t, "main", eng.GetParent("branch1"), "branch1 should have main as parent")
+		require.Equal(t, "branch1", eng.GetParent("branch2"), "branch2 should have branch1 as parent")
 
 		// Traverse downward should go to branch1 (first branch from trunk)
 		err = actions.SwitchBranchAction(actions.DirectionBottom, ctx)
@@ -104,6 +118,13 @@ func TestSwitchBranchAction(t *testing.T) {
 		// Switch to branch1
 		err = scene.Repo.CheckoutBranch("branch1")
 		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Update context with new engine
+		ctx.Engine = eng
 
 		// Traverse upward should go to branch2 (top of stack)
 		err = actions.SwitchBranchAction(actions.DirectionTop, ctx)
@@ -163,6 +184,17 @@ func TestSwitchBranchAction(t *testing.T) {
 			Splog:  splog,
 		}
 
+		// Switch to branch1 (bottom of stack)
+		err = scene.Repo.CheckoutBranch("branch1")
+		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Update context with new engine
+		ctx.Engine = eng
+
 		// Already on branch1 (bottom of stack)
 		err = actions.SwitchBranchAction(actions.DirectionBottom, ctx)
 		require.NoError(t, err)
@@ -178,6 +210,7 @@ func TestSwitchBranchAction(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
+		// Create branch before engine
 		err := scene.Repo.CreateAndCheckoutBranch("branch1")
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
@@ -185,10 +218,19 @@ func TestSwitchBranchAction(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
+		// Create engine (will see branch1)
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
 		err = eng.TrackBranch("branch1", "main")
+		require.NoError(t, err)
+
+		// Switch to branch1 (top of stack)
+		err = scene.Repo.CheckoutBranch("branch1")
+		require.NoError(t, err)
+
+		// Create new engine to get updated current branch
+		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
 		splog := output.NewSplog()
@@ -196,10 +238,6 @@ func TestSwitchBranchAction(t *testing.T) {
 			Engine: eng,
 			Splog:  splog,
 		}
-
-		// Switch to branch1 (top of stack)
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
 
 		// Already at top
 		err = actions.SwitchBranchAction(actions.DirectionTop, ctx)

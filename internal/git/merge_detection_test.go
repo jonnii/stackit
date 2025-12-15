@@ -22,6 +22,10 @@ func TestIsMerged(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
+		// Initialize git repo
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		// Branch is not merged
 		merged, err := git.IsMerged("branch1", "main")
 		require.NoError(t, err)
@@ -43,6 +47,10 @@ func TestIsMerged(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 		err = scene.Repo.MergeBranch("main", "branch1")
+		require.NoError(t, err)
+
+		// Initialize git repo
+		err = git.InitDefaultRepo()
 		require.NoError(t, err)
 
 		// Branch should be merged

@@ -68,7 +68,7 @@ func IsRebaseInProgress() bool {
 
 // RebaseContinue continues an in-progress rebase
 func RebaseContinue() (RebaseResult, error) {
-	// Set GIT_EDITOR to 'true' to skip editor (like Charcoal does)
+	// Set GIT_EDITOR to 'true' to skip editor (like Stackit does)
 	env := os.Environ()
 	env = append(env, "GIT_EDITOR=true")
 

@@ -1,8 +1,12 @@
 package git
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os/exec"
 	"strings"
 
@@ -68,9 +72,9 @@ func CreatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 
 // UpdatePullRequest updates an existing pull request
 func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo string, prNumber int, opts UpdatePROptions) error {
-	// Handle draft status changes separately using GitHub CLI, as the REST API
+	// Handle draft status changes separately using GraphQL API, as the REST API
 	// doesn't support updating draft status. We need to use GraphQL mutation
-	// markPullRequestReadyForReview, which is easier via gh CLI.
+	// markPullRequestReadyForReview or convertPullRequestToDraft.
 	if opts.Draft != nil {
 		// Get current PR to check if draft status actually needs to change
 		pr, _, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
@@ -80,18 +84,13 @@ func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 
 			// Only change draft status if it's different
 			if currentDraft != desiredDraft {
-				if desiredDraft {
-					// Mark as draft (convert ready PR to draft)
-					cmd := exec.Command("gh", "pr", "ready", fmt.Sprintf("%d", prNumber), "--undo")
-					if output, err := cmd.CombinedOutput(); err != nil {
-						return fmt.Errorf("failed to mark PR %d as draft: %w (output: %s)", prNumber, err, string(output))
-					}
-				} else {
-					// Mark as ready for review (publish draft PR)
-					cmd := exec.Command("gh", "pr", "ready", fmt.Sprintf("%d", prNumber))
-					if output, err := cmd.CombinedOutput(); err != nil {
-						return fmt.Errorf("failed to mark PR %d as ready for review: %w (output: %s)", prNumber, err, string(output))
-					}
+				// Get the PR's Node ID (required for GraphQL)
+				if pr.NodeID == nil {
+					return fmt.Errorf("PR %d does not have a Node ID", prNumber)
+				}
+
+				if err := updatePRDraftStatus(ctx, *pr.NodeID, desiredDraft); err != nil {
+					return fmt.Errorf("failed to update draft status for PR %d: %w", prNumber, err)
 				}
 			}
 		}
@@ -245,5 +244,106 @@ func MergePullRequest(branchName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to merge PR for branch %s: %w (output: %s)", branchName, err, string(output))
 	}
+	return nil
+}
+
+// updatePRDraftStatus updates the draft status of a PR using GitHub's GraphQL API
+func updatePRDraftStatus(ctx context.Context, pullRequestID string, isDraft bool) error {
+	// Get GitHub token
+	token, err := getGitHubToken()
+	if err != nil {
+		return fmt.Errorf("failed to get GitHub token: %w", err)
+	}
+
+	// Create authenticated HTTP client
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	httpClient := oauth2.NewClient(ctx, ts)
+
+	// Determine which mutation to use
+	var mutation string
+	var mutationName string
+	if isDraft {
+		mutationName = "convertPullRequestToDraft"
+		mutation = `mutation ConvertPullRequestToDraft($pullRequestId: ID!) {
+			convertPullRequestToDraft(input: {pullRequestId: $pullRequestId}) {
+				pullRequest {
+					id
+					isDraft
+				}
+			}
+		}`
+	} else {
+		mutationName = "markPullRequestReadyForReview"
+		mutation = `mutation MarkPullRequestReadyForReview($pullRequestId: ID!) {
+			markPullRequestReadyForReview(input: {pullRequestId: $pullRequestId}) {
+				pullRequest {
+					id
+					isDraft
+				}
+			}
+		}`
+	}
+
+	// Prepare GraphQL request
+	requestBody := map[string]interface{}{
+		"query": mutation,
+		"variables": map[string]interface{}{
+			"pullRequestId": pullRequestID,
+		},
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal GraphQL request: %w", err)
+	}
+
+	// Make GraphQL request
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.github.com/graphql", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create GraphQL request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute GraphQL request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read GraphQL response: %w", err)
+	}
+
+	// Check for errors
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GraphQL request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response to check for GraphQL errors
+	var graphqlResponse struct {
+		Data   interface{} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.Unmarshal(body, &graphqlResponse); err != nil {
+		return fmt.Errorf("failed to parse GraphQL response: %w", err)
+	}
+
+	if len(graphqlResponse.Errors) > 0 {
+		errorMessages := make([]string, len(graphqlResponse.Errors))
+		for i, err := range graphqlResponse.Errors {
+			errorMessages[i] = err.Message
+		}
+		return fmt.Errorf("GraphQL %s mutation failed: %s", mutationName, strings.Join(errorMessages, "; "))
+	}
+
 	return nil
 }

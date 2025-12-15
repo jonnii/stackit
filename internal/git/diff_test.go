@@ -14,6 +14,10 @@ func TestIsDiffEmpty(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
+		// Initialize git repo
+		err := git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		// Get main revision
 		mainRev, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
@@ -28,6 +32,10 @@ func TestIsDiffEmpty(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
+
+		// Initialize git repo
+		err := git.InitDefaultRepo()
+		require.NoError(t, err)
 
 		// Get main revision
 		mainRev, err := scene.Repo.GetRef("main")
@@ -49,6 +57,10 @@ func TestIsDiffEmpty(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
+
+		// Initialize git repo
+		err := git.InitDefaultRepo()
+		require.NoError(t, err)
 
 		// Get main revision
 		mainRev, err := scene.Repo.GetRef("main")

@@ -21,10 +21,15 @@ func TestReadMetadataRef(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
-		// No metadata exists yet
+		// Initialize git repo
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
+		// No metadata exists yet - ReadMetadataRef returns empty meta, not error
 		meta, err := git.ReadMetadataRef("branch1")
-		require.Error(t, err)
-		require.Nil(t, meta)
+		require.NoError(t, err)
+		require.NotNil(t, meta)
+		require.Nil(t, meta.ParentBranchName) // Should be empty
 	})
 
 	t.Run("reads existing metadata", func(t *testing.T) {
@@ -39,12 +44,19 @@ func TestReadMetadataRef(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
+		// Initialize git repo
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
+		// Get actual parent revision
+		mainRev, err := scene.Repo.GetRef("main")
+		require.NoError(t, err)
+
 		// Write metadata
 		parentName := "main"
-		parentRev := "abc123"
 		meta := &git.Meta{
 			ParentBranchName:     &parentName,
-			ParentBranchRevision: &parentRev,
+			ParentBranchRevision: &mainRev,
 		}
 		err = git.WriteMetadataRef("branch1", meta)
 		require.NoError(t, err)
@@ -56,7 +68,7 @@ func TestReadMetadataRef(t *testing.T) {
 		require.NotNil(t, readMeta.ParentBranchName)
 		require.Equal(t, "main", *readMeta.ParentBranchName)
 		require.NotNil(t, readMeta.ParentBranchRevision)
-		require.Equal(t, "abc123", *readMeta.ParentBranchRevision)
+		require.Equal(t, mainRev, *readMeta.ParentBranchRevision)
 	})
 }
 
@@ -71,6 +83,10 @@ func TestWriteMetadataRef(t *testing.T) {
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
 		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		// Initialize git repo
+		err = git.InitDefaultRepo()
 		require.NoError(t, err)
 
 		// Get actual parent revision
@@ -90,6 +106,7 @@ func TestWriteMetadataRef(t *testing.T) {
 		readMeta, err := git.ReadMetadataRef("branch1")
 		require.NoError(t, err)
 		require.NotNil(t, readMeta)
+		require.NotNil(t, readMeta.ParentBranchName, "ParentBranchName should not be nil")
 		require.Equal(t, "main", *readMeta.ParentBranchName)
 	})
 }
@@ -107,6 +124,10 @@ func TestDeleteMetadataRef(t *testing.T) {
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
 
+		// Initialize git repo
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		// Write metadata
 		parentName := "main"
 		meta := &git.Meta{
@@ -119,10 +140,11 @@ func TestDeleteMetadataRef(t *testing.T) {
 		err = git.DeleteMetadataRef("branch1")
 		require.NoError(t, err)
 
-		// Verify metadata is gone
+		// Verify metadata is gone - ReadMetadataRef returns empty meta, not error
 		readMeta, err := git.ReadMetadataRef("branch1")
-		require.Error(t, err)
-		require.Nil(t, readMeta)
+		require.NoError(t, err)
+		require.NotNil(t, readMeta)
+		require.Nil(t, readMeta.ParentBranchName) // Should be empty after deletion
 	})
 }
 
@@ -143,6 +165,10 @@ func TestGetMetadataRefList(t *testing.T) {
 		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
 		require.NoError(t, err)
 		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		// Initialize git repo
+		err = git.InitDefaultRepo()
 		require.NoError(t, err)
 
 		// Write metadata for both branches

@@ -63,8 +63,8 @@ func TestSplitCommand(t *testing.T) {
 		require.Contains(t, string(output), "file2_test.txt")
 		require.Contains(t, string(output), "file3_test.txt")
 
-		// Run split --by-file to extract file1 and file2
-		cmd = exec.Command(binaryPath, "split", "--by-file", "file1_test.txt", "file2_test.txt")
+		// Run split --by-file to extract file1 and file2 (comma-separated for StringSlice flag)
+		cmd = exec.Command(binaryPath, "split", "--by-file", "file1_test.txt,file2_test.txt")
 		cmd.Dir = scene.Dir
 		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
 		output, err = cmd.CombinedOutput()

@@ -110,7 +110,25 @@ func SplitAction(opts SplitOptions) error {
 		if len(opts.Pathspecs) == 0 {
 			return fmt.Errorf("--by-file requires pathspecs")
 		}
-		result, err = splitByFile(currentBranch, opts.Pathspecs, opts.Engine, opts.Splog)
+		// splitByFile handles everything internally (creating branches, tracking, etc.)
+		// and updates the parent relationship, so we just need to restack upstack branches
+		_, err = splitByFile(currentBranch, opts.Pathspecs, opts.Engine, opts.Splog)
+		if err != nil {
+			return err
+		}
+		// Restack upstack branches if any
+		scope := engine.Scope{
+			RecursiveParents:  false,
+			IncludeCurrent:    false,
+			RecursiveChildren: true,
+		}
+		upstackBranches := opts.Engine.GetRelativeStack(currentBranch, scope)
+		if len(upstackBranches) > 0 {
+			if err := RestackBranches(upstackBranches, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+				return fmt.Errorf("failed to restack upstack branches: %w", err)
+			}
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown split style: %s", style)
 	}
@@ -476,8 +494,8 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, sp
 		return nil, fmt.Errorf("failed to checkout original branch: %w", err)
 	}
 
-	// Remove the files from the original branch
-	args = append([]string{"rm", "--cached"}, pathspecs...)
+	// Remove the files from the original branch (both index and working directory)
+	args = append([]string{"rm"}, pathspecs...)
 	if _, err := git.RunGitCommand(args...); err != nil {
 		return nil, fmt.Errorf("failed to remove files: %w", err)
 	}
@@ -486,6 +504,12 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, sp
 	commitMessage = fmt.Sprintf("Remove %s (moved to %s)", strings.Join(pathspecs, ", "), newBranchName)
 	if err := git.Commit(commitMessage, 0); err != nil {
 		return nil, fmt.Errorf("failed to commit removal: %w", err)
+	}
+
+	// Update original branch's parent to be the new split branch
+	// This creates the hierarchy: parent -> newBranch -> originalBranch
+	if err := eng.SetParent(branchToSplit, newBranchName); err != nil {
+		return nil, fmt.Errorf("failed to update parent: %w", err)
 	}
 
 	return &SplitResult{

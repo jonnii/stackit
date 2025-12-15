@@ -49,27 +49,15 @@ func HasStagedChanges() (bool, error) {
 	return strings.TrimSpace(output) != "", nil
 }
 
-// HasUnstagedChanges checks if there are unstaged changes
+// HasUnstagedChanges checks if there are unstaged changes to tracked files
 func HasUnstagedChanges() (bool, error) {
-	output, err := RunGitCommand("status", "--porcelain")
+	// Use git diff to check for unstaged changes to tracked files
+	// This is more reliable than parsing porcelain output which gets trimmed
+	output, err := RunGitCommand("diff", "--name-only")
 	if err != nil {
 		return false, fmt.Errorf("failed to check unstaged changes: %w", err)
 	}
-
-	// Parse porcelain output - if any line doesn't start with space-space, there are unstaged changes
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		// Porcelain format: XY filename
-		// If X is not space, there are staged changes
-		// If Y is not space, there are unstaged changes
-		if len(line) >= 2 && line[1] != ' ' {
-			return true, nil
-		}
-	}
-	return false, nil
+	return strings.TrimSpace(output) != "", nil
 }
 
 // HasUntrackedFiles checks if there are untracked files

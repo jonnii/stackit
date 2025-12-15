@@ -47,15 +47,9 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 	})
 
 	t.Run("new PR in non-interactive mode defaults to draft", func(t *testing.T) {
-		// Redirect stdin to simulate non-interactive mode
-		oldStdin := os.Stdin
-		defer func() { os.Stdin = oldStdin }()
-
-		// Open /dev/null to simulate non-interactive terminal
-		nullFile, err := os.Open(os.DevNull)
-		require.NoError(t, err)
-		defer nullFile.Close()
-		os.Stdin = nullFile
+		// Set environment variable to force non-interactive mode
+		os.Setenv("STACKIT_NON_INTERACTIVE", "1")
+		defer os.Unsetenv("STACKIT_NON_INTERACTIVE")
 
 		scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
 		eng, err := engine.NewEngine(scene.Dir)
@@ -163,14 +157,9 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 
 func TestPreparePRMetadata_NoEdit(t *testing.T) {
 	t.Run("no-edit skips title and body editing", func(t *testing.T) {
-		// Redirect stdin to simulate non-interactive mode
-		oldStdin := os.Stdin
-		defer func() { os.Stdin = oldStdin }()
-
-		nullFile, err := os.Open(os.DevNull)
-		require.NoError(t, err)
-		defer nullFile.Close()
-		os.Stdin = nullFile
+		// Set environment variable to force non-interactive mode
+		os.Setenv("STACKIT_NON_INTERACTIVE", "1")
+		defer os.Unsetenv("STACKIT_NON_INTERACTIVE")
 
 		scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
 		eng, err := engine.NewEngine(scene.Dir)
@@ -182,7 +171,8 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		// Create a commit with a subject
 		err = scene.Repo.CreateAndCheckoutBranch(branchName)
 		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("change", "feat: test feature")
+		// CreateChangeAndCommit(textValue, prefix) - textValue is used as commit message
+		err = scene.Repo.CreateChangeAndCommit("feat: test feature", "change")
 		require.NoError(t, err)
 
 		opts := actions.SubmitMetadataOptions{

@@ -204,6 +204,13 @@ func handleInsert(newBranch, currentBranch string, ctx *context.Context) error {
 
 // isInteractive checks if we're in an interactive terminal
 func isInteractive() bool {
+	// Allow forcing non-interactive mode via environment variable
+	// This is useful for tests and CI environments
+	if os.Getenv("STACKIT_NON_INTERACTIVE") != "" {
+		return false
+	}
+
+	// Check if stdin is a terminal
 	fileInfo, err := os.Stdin.Stat()
 	if err != nil {
 		return false

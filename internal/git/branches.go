@@ -27,6 +27,12 @@ func InitDefaultRepo() error {
 	return nil
 }
 
+// ResetDefaultRepo clears the default repository.
+// This should be called in tests to ensure each test gets a fresh repository.
+func ResetDefaultRepo() {
+	defaultRepo = nil
+}
+
 // GetDefaultRepo returns the default repository (must call InitDefaultRepo first)
 func GetDefaultRepo() (*Repository, error) {
 	if defaultRepo == nil {
@@ -107,4 +113,3 @@ func FindCommonlyNamedTrunk(branchNames []string) string {
 	}
 	return ""
 }
-

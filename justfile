@@ -4,7 +4,8 @@ default: test
 # Run all tests (ensures dependencies are up to date)
 test:
 	go mod tidy
-	go test ./...
+	@echo "Running tests..."
+	go test ./... -count=1
 
 # Run tests with verbose output
 test-verbose:

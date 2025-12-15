@@ -52,32 +52,32 @@ func TestRebase(t *testing.T) {
 
 	t.Run("handles rebase conflict", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			// Create initial file
-			return s.Repo.CreateChangeAndCommit("initial", "init")
+			// Create initial file that will be modified to create conflict
+			return s.Repo.CreateChangeAndCommit("initial content", "conflict")
 		})
 
-		// Create branch1 with change to test file
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		// Get the fork point (main's current SHA before branching)
+		forkPoint, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("branch1 change", "test", false)
+
+		// Create branch1 with change to the SAME file
+		err = scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChange("branch1 modification", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
 
-		// Get base revision
-		branch1Rev, err := scene.Repo.GetRef("branch1")
-		require.NoError(t, err)
-
-		// Create conflicting change in main
+		// Create conflicting change in main (modifying the same file)
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("main conflicting change", "test", false)
+		err = scene.Repo.CreateChange("main conflicting modification", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("main conflicting change", "main")
 		require.NoError(t, err)
 
-		// Rebase should result in conflict
-		result, err := git.Rebase("branch1", "main", branch1Rev)
+		// Rebase should result in conflict (using fork point, not branch tip)
+		result, err := git.Rebase("branch1", "main", forkPoint)
 		require.NoError(t, err)
 		require.Equal(t, git.RebaseConflict, result)
 
@@ -97,29 +97,31 @@ func TestIsRebaseInProgress(t *testing.T) {
 
 	t.Run("returns true when rebase in progress", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
+			// Create initial file that will be modified to create conflict
+			return s.Repo.CreateChangeAndCommit("initial content", "conflict")
 		})
 
-		// Create branch and conflict scenario
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		// Get the fork point before branching
+		forkPoint, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("branch1 change", "test", false)
+
+		// Create branch and conflict scenario
+		err = scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChange("branch1 change", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
 
-		branch1Rev, err := scene.Repo.GetRef("branch1")
-		require.NoError(t, err)
-
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("main conflicting", "test", false)
+		err = scene.Repo.CreateChange("main conflicting", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("main conflicting", "main")
 		require.NoError(t, err)
 
 		// Start rebase (will conflict)
-		_, err = git.Rebase("branch1", "main", branch1Rev)
+		_, err = git.Rebase("branch1", "main", forkPoint)
 		require.NoError(t, err)
 
 		// Rebase should be in progress
@@ -130,29 +132,31 @@ func TestIsRebaseInProgress(t *testing.T) {
 func TestRebaseContinue(t *testing.T) {
 	t.Run("continues rebase after resolving conflict", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
+			// Create initial file that will be modified to create conflict
+			return s.Repo.CreateChangeAndCommit("initial content", "conflict")
 		})
 
-		// Create branch with conflict
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		// Get the fork point before branching
+		forkPoint, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("branch1 change", "test", false)
+
+		// Create branch with conflict
+		err = scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChange("branch1 change", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
 
-		branch1Rev, err := scene.Repo.GetRef("branch1")
-		require.NoError(t, err)
-
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("main conflicting", "test", false)
+		err = scene.Repo.CreateChange("main conflicting", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("main conflicting", "main")
 		require.NoError(t, err)
 
 		// Start rebase (will conflict)
-		_, err = git.Rebase("branch1", "main", branch1Rev)
+		_, err = git.Rebase("branch1", "main", forkPoint)
 		require.NoError(t, err)
 		require.True(t, git.IsRebaseInProgress())
 
@@ -175,30 +179,35 @@ func TestRebaseContinue(t *testing.T) {
 func TestGetRebaseHead(t *testing.T) {
 	t.Run("returns rebase head when rebase in progress", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
+			// Create initial file that will be modified to create conflict
+			return s.Repo.CreateChangeAndCommit("initial content", "conflict")
 		})
 
-		// Create conflict scenario
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		// Get the fork point before branching
+		forkPoint, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("branch1 change", "test", false)
+
+		// Create conflict scenario
+		err = scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChange("branch1 change", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
 
-		branch1Rev, err := scene.Repo.GetRef("branch1")
-		require.NoError(t, err)
-
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("main conflicting", "test", false)
+		err = scene.Repo.CreateChange("main conflicting", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("main conflicting", "main")
 		require.NoError(t, err)
 
-		// Start rebase
-		_, err = git.Rebase("branch1", "main", branch1Rev)
+		// Start rebase (will conflict)
+		_, err = git.Rebase("branch1", "main", forkPoint)
 		require.NoError(t, err)
+
+		// Verify we're in a conflict state
+		require.True(t, git.IsRebaseInProgress())
 
 		// Get rebase head
 		rebaseHead, err := git.GetRebaseHead()

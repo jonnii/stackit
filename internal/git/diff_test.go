@@ -92,14 +92,18 @@ func TestGetUnmergedFiles(t *testing.T) {
 
 	t.Run("returns unmerged files during conflict", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			// Create initial file
-			return s.Repo.CreateChangeAndCommit("initial", "test")
+			// Create initial file that will be modified to create conflict
+			return s.Repo.CreateChangeAndCommit("initial content", "conflict")
 		})
 
-		// Create branch with change to test file
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		// Get the fork point before branching
+		forkPoint, err := scene.Repo.GetRef("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("branch1 change", "test", false)
+
+		// Create branch with change to conflict file
+		err = scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChange("branch1 change", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
 		require.NoError(t, err)
@@ -107,21 +111,19 @@ func TestGetUnmergedFiles(t *testing.T) {
 		// Create conflicting change in main
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChange("main conflicting", "test", false)
+		err = scene.Repo.CreateChange("main conflicting", "conflict", false)
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("main conflicting", "main")
 		require.NoError(t, err)
 
 		// Start rebase (will conflict)
-		branch1Rev, err := scene.Repo.GetRef("branch1")
-		require.NoError(t, err)
-		_, err = git.Rebase("branch1", "main", branch1Rev)
+		_, err = git.Rebase("branch1", "main", forkPoint)
 		require.NoError(t, err)
 
 		// Should have unmerged files
 		files, err := git.GetUnmergedFiles()
 		require.NoError(t, err)
 		require.NotEmpty(t, files)
-		require.Contains(t, files, "test_test.txt")
+		require.Contains(t, files, "conflict_test.txt")
 	})
 }

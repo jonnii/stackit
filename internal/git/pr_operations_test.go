@@ -150,34 +150,10 @@ func TestUpdatePullRequest(t *testing.T) {
 		require.Equal(t, newBase, *updatedPR.Base.Ref)
 	})
 
-	t.Run("updates PR draft status", func(t *testing.T) {
-		config := testhelpers.NewMockGitHubServerConfig()
-		client, owner, repo := testhelpers.NewMockGitHubClient(t, config)
-
-		// Create a draft PR
-		createOpts := git.CreatePROptions{
-			Title: "Draft PR",
-			Head:  "feature-branch",
-			Base:  "main",
-			Draft: true,
-		}
-		createdPR, err := git.CreatePullRequest(context.Background(), client, owner, repo, createOpts)
-		require.NoError(t, err)
-
-		// Update to published
-		draftFalse := false
-		updateOpts := git.UpdatePROptions{
-			Draft: &draftFalse,
-		}
-
-		err = git.UpdatePullRequest(context.Background(), client, owner, repo, *createdPR.Number, updateOpts)
-		require.NoError(t, err)
-
-		// Verify the update
-		updatedPR, _, err := client.PullRequests.Get(context.Background(), owner, repo, *createdPR.Number)
-		require.NoError(t, err)
-		require.False(t, *updatedPR.Draft)
-	})
+	// Note: Updating draft status via the REST API is not supported by GitHub.
+	// To convert a draft PR to ready-for-review, you need to use the GraphQL API's
+	// markPullRequestReadyForReview mutation. The Draft field in UpdatePROptions
+	// is kept for potential future GraphQL support but won't work with the REST API.
 
 	t.Run("updates PR with reviewers", func(t *testing.T) {
 		config := testhelpers.NewMockGitHubServerConfig()
@@ -235,4 +211,3 @@ func TestGetPullRequestByBranch(t *testing.T) {
 		require.Nil(t, pr)
 	})
 }
-

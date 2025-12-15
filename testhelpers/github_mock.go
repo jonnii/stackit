@@ -3,6 +3,7 @@ package testhelpers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,16 +47,16 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 	}
 
 	mux := http.NewServeMux()
-	
+
 	// Combined handler for /repos/{owner}/{repo}/pulls and /repos/{owner}/{repo}/pulls/{number}
 	basePath := "/repos/" + config.Owner + "/" + config.Repo + "/pulls"
 	basePathWithSlash := basePath + "/"
-	
+
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		// Use original path for all operations
 		originalPath := r.URL.Path
 		path := originalPath
-		
+
 		// Handle PR number paths (paths starting with basePathWithSlash like /pulls/1)
 		// This must be checked before exact basePath match
 		if strings.HasPrefix(path, basePathWithSlash) {
@@ -92,10 +93,20 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 					}
 				}
 
-				// Parse request body
-				var update github.PullRequest
-				if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-					http.Error(w, fmt.Sprintf("Failed to decode request body: %v (path: %s)", err, originalPath), http.StatusBadRequest)
+				// Parse request body - first read the raw bytes
+				bodyBytes, _ := io.ReadAll(r.Body)
+
+				// Parse request body using a flexible struct that matches GitHub API format
+				// The API sends simple fields like {"base": "branch-name"} not {"base": {"ref": "branch-name"}}
+				var update struct {
+					Title *string `json:"title,omitempty"`
+					Body  *string `json:"body,omitempty"`
+					Base  *string `json:"base,omitempty"`
+					State *string `json:"state,omitempty"`
+					Draft *bool   `json:"draft,omitempty"`
+				}
+				if err := json.Unmarshal(bodyBytes, &update); err != nil {
+					http.Error(w, fmt.Sprintf("Failed to decode request body: %v (path: %s, body: %s)", err, originalPath, string(bodyBytes)), http.StatusBadRequest)
 					return
 				}
 
@@ -145,12 +156,12 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 				if update.Body != nil {
 					pr.Body = update.Body
 				}
-				if update.Base != nil && update.Base.Ref != nil {
-					// Update base branch ref
+				if update.Base != nil {
+					// Update base branch ref - the API sends base as a string, not an object
 					if pr.Base == nil {
 						pr.Base = &github.PullRequestBranch{}
 					}
-					pr.Base.Ref = update.Base.Ref
+					pr.Base.Ref = update.Base
 				}
 				if update.Draft != nil {
 					pr.Draft = update.Draft
@@ -163,7 +174,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 				json.NewEncoder(w).Encode(pr)
 				return
 			}
-			
+
 			// Handle GET /repos/{owner}/{repo}/pulls/{number}
 			if r.Method == "GET" {
 				prNumber := extractPRNumber(originalPath)
@@ -220,7 +231,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 				return
 			}
 		}
-		
+
 		// Handle exact basePath matches (list/create)
 		if path == basePath {
 			// Handle POST /repos/{owner}/{repo}/pulls (create PR)
@@ -252,7 +263,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 				json.NewEncoder(w).Encode(pr)
 				return
 			}
-			
+
 			// Handle GET /repos/{owner}/{repo}/pulls (list PRs)
 			if r.Method == "GET" {
 				// Parse query parameters for head filter
@@ -282,7 +293,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 				return
 			}
 		}
-		
+
 		// If we get here, the path didn't match any handler
 		// Check if it's a PR number path that we should handle
 		if strings.HasPrefix(path, basePath) {
@@ -291,15 +302,13 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 		}
 		http.Error(w, fmt.Sprintf("Unhandled path: %s (method: %s)", path, r.Method), http.StatusNotFound)
 	}
-	
+
 	// Register a single catch-all handler for all paths starting with basePath
 	// We'll handle exact vs prefix matching inside the handler
 	// Register basePathWithSlash first (prefix match) so it takes precedence
 	mux.HandleFunc(basePathWithSlash, handler)
 	// Then register basePath for exact matches
 	mux.HandleFunc(basePath, handler)
-
-
 
 	server := httptest.NewServer(mux)
 	t.Cleanup(func() { server.Close() })
@@ -358,4 +367,3 @@ func extractPRNumber(path string) int {
 	}
 	return number
 }
-

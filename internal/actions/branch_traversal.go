@@ -12,7 +12,7 @@ type Direction string
 
 const (
 	DirectionBottom Direction = "BOTTOM"
-	DirectionTop   Direction = "TOP"
+	DirectionTop    Direction = "TOP"
 )
 
 // SwitchBranchAction switches to a branch based on the given direction
@@ -22,7 +22,7 @@ func SwitchBranchAction(direction Direction, ctx *context.Context) error {
 		return fmt.Errorf("not on a branch")
 	}
 
-	ctx.Splog.Info(currentBranch)
+	ctx.Splog.Info("%s", currentBranch)
 
 	var targetBranch string
 	var err error
@@ -137,4 +137,3 @@ func formatBranchList(branches []string) string {
 	}
 	return result
 }
-

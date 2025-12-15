@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"strings"
 )
 
 // IsDiffEmpty checks if there are no differences between a branch and a base revision
@@ -26,4 +27,17 @@ func IsDiffEmpty(branchName, baseRevision string) (bool, error) {
 
 	// If diff --quiet succeeds, there are no differences
 	return diffOutput == "", nil
+}
+
+// GetUnmergedFiles returns list of files with merge conflicts
+func GetUnmergedFiles() ([]string, error) {
+	output, err := RunGitCommand("diff", "--name-only", "--diff-filter=U")
+	if err != nil {
+		// If there are no unmerged files, return empty list
+		return []string{}, nil
+	}
+	if output == "" {
+		return []string{}, nil
+	}
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
 }

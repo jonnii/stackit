@@ -23,6 +23,8 @@ https://github.com/jonnii/stackit`,
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newSubmitCmd())
 	rootCmd.AddCommand(newMergeCmd())
+	rootCmd.AddCommand(newRestackCmd())
+	rootCmd.AddCommand(newContinueCmd())
 
 	return rootCmd
 }

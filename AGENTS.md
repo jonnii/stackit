@@ -1,7 +1,5 @@
 # AGENTS.md - Stackit Project Guide
 
-This document provides high-level instructions for working with the Stackit project, focusing on build and testing workflows.
-
 ## Project Overview
 
 Stackit is a Go-based CLI tool for managing stacked changes in Git repositories. The project uses:
@@ -38,7 +36,7 @@ go mod tidy
 
 ## Testing Instructions
 
-### Running Tests
+You should run tests after each set of changes to validate your change.
 
 **Run all tests (default):**
 ```bash

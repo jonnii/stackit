@@ -1,5 +1,7 @@
 package output
 
+import "github.com/charmbracelet/lipgloss"
+
 // STACKIT_COLORS defines the color palette for branch visualization
 // Matching the TypeScript version
 var STACKIT_COLORS = [][]int{
@@ -14,3 +16,23 @@ var STACKIT_COLORS = [][]int{
 	{80, 132, 243},  // Blue
 }
 
+// ColorRed colors text red
+func ColorRed(text string) string {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("1")).
+		Render(text)
+}
+
+// ColorYellow colors text yellow
+func ColorYellow(text string) string {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3")).
+		Render(text)
+}
+
+// ColorCyan colors text cyan
+func ColorCyan(text string) string {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("6")).
+		Render(text)
+}

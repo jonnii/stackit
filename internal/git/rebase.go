@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 )
 
 // RebaseResult represents the result of a rebase operation
@@ -61,4 +63,32 @@ func Rebase(branchName, onto, from string) (RebaseResult, error) {
 func IsRebaseInProgress() bool {
 	_, err := RunGitCommand("rev-parse", "--git-path", "REBASE_HEAD")
 	return err == nil
+}
+
+// RebaseContinue continues an in-progress rebase
+func RebaseContinue() (RebaseResult, error) {
+	// Set GIT_EDITOR to 'true' to skip editor (like Charcoal does)
+	env := os.Environ()
+	env = append(env, "GIT_EDITOR=true")
+
+	cmd := exec.Command("git", "rebase", "--continue")
+	cmd.Env = env
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	err := cmd.Run()
+	if err != nil {
+		// Check if rebase is still in progress (another conflict)
+		if IsRebaseInProgress() {
+			return RebaseConflict, nil
+		}
+		return RebaseConflict, fmt.Errorf("rebase continue failed: %w", err)
+	}
+
+	return RebaseDone, nil
+}
+
+// GetRebaseHead returns the commit being rebased (REBASE_HEAD)
+func GetRebaseHead() (string, error) {
+	return RunGitCommand("rev-parse", "REBASE_HEAD")
 }

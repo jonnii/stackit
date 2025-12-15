@@ -15,7 +15,7 @@ type engineImpl struct {
 	trunk         string
 	currentBranch string
 	branches      []string
-	parentMap     map[string]string // branch -> parent
+	parentMap     map[string]string   // branch -> parent
 	childrenMap   map[string][]string // branch -> children
 	mu            sync.RWMutex
 }
@@ -86,7 +86,7 @@ func (e *engineImpl) Trunk() string {
 func (e *engineImpl) GetParent(branchName string) string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	if parent, ok := e.parentMap[branchName]; ok {
 		return parent
 	}
@@ -97,7 +97,7 @@ func (e *engineImpl) GetParent(branchName string) string {
 func (e *engineImpl) GetChildren(branchName string) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	if children, ok := e.childrenMap[branchName]; ok {
 		return children
 	}
@@ -105,31 +105,69 @@ func (e *engineImpl) GetChildren(branchName string) []string {
 }
 
 // GetRelativeStack returns the stack relative to a branch
-// If RecursiveParents is true, returns all ancestors up to trunk
-// Otherwise, returns just the immediate parent
+// Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
 func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	result := []string{}
-	current := branchName
 
-	// Walk up the parent chain
-	for {
-		if current == e.trunk {
-			break
+	// Add ancestors if RecursiveParents is true
+	if scope.RecursiveParents {
+		current := branchName
+		ancestors := []string{}
+		for {
+			if current == e.trunk {
+				break
+			}
+			parent, ok := e.parentMap[current]
+			if !ok {
+				break
+			}
+			ancestors = append([]string{parent}, ancestors...)
+			current = parent
 		}
-		parent, ok := e.parentMap[current]
-		if !ok {
-			break
+		result = append(result, ancestors...)
+	}
+
+	// Add current branch if IncludeCurrent is true
+	if scope.IncludeCurrent {
+		result = append(result, branchName)
+	}
+
+	// Add descendants if RecursiveChildren is true
+	if scope.RecursiveChildren {
+		descendants := e.getRelativeStackUpstackInternal(branchName)
+		result = append(result, descendants...)
+	}
+
+	return result
+}
+
+// getRelativeStackUpstackInternal is the internal implementation without lock
+func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []string {
+	result := []string{}
+	visited := make(map[string]bool)
+
+	var collectDescendants func(string)
+	collectDescendants = func(branch string) {
+		if visited[branch] {
+			return
 		}
-		result = append([]string{parent}, result...)
-		current = parent
-		if !scope.RecursiveParents {
-			break
+		visited[branch] = true
+
+		// Don't include the starting branch
+		if branch != branchName {
+			result = append(result, branch)
+		}
+
+		children := e.childrenMap[branch]
+		for _, child := range children {
+			collectDescendants(child)
 		}
 	}
 
+	collectDescendants(branchName)
 	return result
 }
 
@@ -152,31 +190,31 @@ func (e *engineImpl) IsBranchFixed(branchName string) bool {
 	if e.IsTrunk(branchName) {
 		return true
 	}
-	
+
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	e.mu.RUnlock()
-	
+
 	if !ok {
 		return true // Not tracked, consider it fixed
 	}
-	
+
 	// Get current parent revision
 	parentRev, err := e.GetRevision(parent)
 	if err != nil {
 		return false // Can't determine, assume needs restack
 	}
-	
+
 	// Get stored parent revision from metadata
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		return false // No metadata, assume needs restack
 	}
-	
+
 	if meta.ParentBranchRevision == nil {
 		return false // No stored revision, needs restack
 	}
-	
+
 	// Branch is fixed if stored revision matches current parent revision
 	return *meta.ParentBranchRevision == parentRev
 }
@@ -423,7 +461,7 @@ func (e *engineImpl) PullTrunk() (PullResult, error) {
 	if err != nil {
 		return PullConflict, err
 	}
-	
+
 	// Convert git.PullResult to engine.PullResult
 	var result PullResult
 	switch gitResult {
@@ -436,33 +474,33 @@ func (e *engineImpl) PullTrunk() (PullResult, error) {
 	default:
 		result = PullConflict
 	}
-	
+
 	// Rebuild to refresh branch cache
 	if err := e.rebuild(); err != nil {
 		return result, fmt.Errorf("failed to rebuild after pull: %w", err)
 	}
-	
+
 	return result, nil
 }
 
 // ResetTrunkToRemote resets trunk to match remote
 func (e *engineImpl) ResetTrunkToRemote() error {
 	remote := git.GetRemote()
-	
+
 	// Get remote SHA
 	remoteSha, err := git.GetRemoteSha(remote, e.trunk)
 	if err != nil {
 		return fmt.Errorf("failed to get remote SHA: %w", err)
 	}
-	
+
 	// Save current branch
 	currentBranch := e.currentBranch
-	
+
 	// Checkout trunk
 	if err := git.CheckoutBranch(e.trunk); err != nil {
 		return fmt.Errorf("failed to checkout trunk: %w", err)
 	}
-	
+
 	// Hard reset to remote
 	if err := git.HardReset(remoteSha); err != nil {
 		// Try to switch back
@@ -471,81 +509,121 @@ func (e *engineImpl) ResetTrunkToRemote() error {
 		}
 		return fmt.Errorf("failed to reset trunk: %w", err)
 	}
-	
+
 	// Switch back to original branch
 	if currentBranch != "" && currentBranch != e.trunk {
 		if err := git.CheckoutBranch(currentBranch); err != nil {
 			return fmt.Errorf("failed to switch back: %w", err)
 		}
 	}
-	
+
 	// Rebuild to refresh branch cache
 	if err := e.rebuild(); err != nil {
 		return fmt.Errorf("failed to rebuild after reset: %w", err)
 	}
-	
+
 	return nil
 }
 
 // RestackBranch rebases a branch onto its parent
-func (e *engineImpl) RestackBranch(branchName string) (RestackResult, error) {
+func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	e.mu.RUnlock()
-	
+
 	if !ok {
-		return RestackUnneeded, fmt.Errorf("branch %s is not tracked", branchName)
+		return RestackBranchResult{Result: RestackUnneeded}, fmt.Errorf("branch %s is not tracked", branchName)
 	}
-	
-	// Check if branch needs restacking
-	if e.IsBranchFixed(branchName) {
-		return RestackUnneeded, nil
-	}
-	
-	// Get parent revision
+
+	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
 	parentRev, err := e.GetRevision(parent)
 	if err != nil {
-		return RestackConflict, fmt.Errorf("failed to get parent revision: %w", err)
+		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
 	}
-	
+
+	// Check if branch needs restacking
+	if e.IsBranchFixed(branchName) {
+		return RestackBranchResult{Result: RestackUnneeded, RebasedBranchBase: parentRev}, nil
+	}
+
 	// Get old parent revision from metadata
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
-		return RestackConflict, fmt.Errorf("failed to read metadata: %w", err)
+		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
 	}
-	
+
 	oldParentRev := parentRev
 	if meta.ParentBranchRevision != nil {
 		oldParentRev = *meta.ParentBranchRevision
 	}
-	
+
 	// If parent hasn't changed, no need to restack
 	if parentRev == oldParentRev {
-		return RestackUnneeded, nil
+		return RestackBranchResult{Result: RestackUnneeded, RebasedBranchBase: parentRev}, nil
 	}
-	
+
 	// Perform rebase
 	gitResult, err := git.Rebase(branchName, parent, oldParentRev)
 	if err != nil {
-		return RestackConflict, err
+		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, err
 	}
-	
+
 	if gitResult == git.RebaseConflict {
-		return RestackConflict, nil
+		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, nil
 	}
-	
+
 	// Update metadata with new parent revision
 	meta.ParentBranchRevision = &parentRev
 	if err := git.WriteMetadataRef(branchName, meta); err != nil {
-		return RestackDone, fmt.Errorf("failed to update metadata: %w", err)
+		return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, fmt.Errorf("failed to update metadata: %w", err)
 	}
-	
+
 	// Rebuild to refresh cache
 	if err := e.rebuild(); err != nil {
-		return RestackDone, fmt.Errorf("failed to rebuild after restack: %w", err)
+		return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, fmt.Errorf("failed to rebuild after restack: %w", err)
 	}
-	
-	return RestackDone, nil
+
+	return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, nil
+}
+
+// ContinueRebase continues an in-progress rebase
+func (e *engineImpl) ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error) {
+	// Call git rebase --continue
+	result, err := git.RebaseContinue()
+	if err != nil {
+		return ContinueRebaseResult{Result: int(git.RebaseConflict)}, err
+	}
+
+	if result == git.RebaseConflict {
+		return ContinueRebaseResult{Result: int(git.RebaseConflict)}, nil
+	}
+
+	// Get current branch after successful rebase
+	branchName, err := git.GetCurrentBranch()
+	if err != nil {
+		return ContinueRebaseResult{}, fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	// Update metadata for the rebased branch
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return ContinueRebaseResult{}, fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	meta.ParentBranchRevision = &rebasedBranchBase
+	if err := git.WriteMetadataRef(branchName, meta); err != nil {
+		return ContinueRebaseResult{}, fmt.Errorf("failed to update metadata: %w", err)
+	}
+
+	// Rebuild to refresh cache
+	if err := e.rebuild(); err != nil {
+		return ContinueRebaseResult{}, fmt.Errorf("failed to rebuild after continue: %w", err)
+	}
+
+	return ContinueRebaseResult{
+		Result:     int(git.RebaseDone),
+		BranchName: branchName,
+	}, nil
 }
 
 // IsMergedIntoTrunk checks if a branch is merged into trunk
@@ -558,18 +636,18 @@ func (e *engineImpl) IsBranchEmpty(branchName string) (bool, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	e.mu.RUnlock()
-	
+
 	if !ok {
 		// If not tracked, compare to trunk
 		parent = e.trunk
 	}
-	
+
 	// Get parent revision
 	parentRev, err := e.GetRevision(parent)
 	if err != nil {
 		return false, fmt.Errorf("failed to get parent revision: %w", err)
 	}
-	
+
 	return git.IsDiffEmpty(branchName, parentRev)
 }
 
@@ -578,29 +656,29 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 	if e.IsTrunk(branchName) {
 		return fmt.Errorf("cannot delete trunk branch")
 	}
-	
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	// Get children before deletion
 	children := e.childrenMap[branchName]
-	
+
 	// Get parent
 	parent, ok := e.parentMap[branchName]
 	if !ok {
 		parent = e.trunk
 	}
-	
+
 	// Delete git branch
 	if err := git.DeleteBranch(branchName); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
-	
+
 	// Delete metadata
 	if err := git.DeleteMetadataRef(branchName); err != nil {
 		// Non-fatal, continue
 	}
-	
+
 	// Update children to point to parent
 	for _, child := range children {
 		if err := e.setParentInternal(child, parent); err != nil {
@@ -608,11 +686,11 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 			continue
 		}
 	}
-	
+
 	// Remove from maps
 	delete(e.parentMap, branchName)
 	delete(e.childrenMap, branchName)
-	
+
 	// Remove from branches list
 	for i, b := range e.branches {
 		if b == branchName {
@@ -620,7 +698,7 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 			break
 		}
 	}
-	
+
 	// Update children map for parent
 	if parent != "" {
 		parentChildren := e.childrenMap[parent]
@@ -633,7 +711,7 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 		// Add children to parent
 		e.childrenMap[parent] = append(e.childrenMap[parent], children...)
 	}
-	
+
 	return nil
 }
 
@@ -651,27 +729,27 @@ func (e *engineImpl) setParentInternal(branchName string, parentBranchName strin
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}
-	
+
 	// Read existing metadata
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		meta = &git.Meta{}
 	}
-	
+
 	// Update parent
 	oldParent := ""
 	if meta.ParentBranchName != nil {
 		oldParent = *meta.ParentBranchName
 	}
-	
+
 	meta.ParentBranchName = &parentBranchName
 	meta.ParentBranchRevision = &parentRev
-	
+
 	// Write metadata
 	if err := git.WriteMetadataRef(branchName, meta); err != nil {
 		return fmt.Errorf("failed to write metadata: %w", err)
 	}
-	
+
 	// Update in-memory maps
 	if oldParent != "" {
 		// Remove from old parent's children
@@ -683,13 +761,13 @@ func (e *engineImpl) setParentInternal(branchName string, parentBranchName strin
 			}
 		}
 	}
-	
+
 	// Add to new parent's children
 	e.parentMap[branchName] = parentBranchName
 	if e.childrenMap[parentBranchName] == nil {
 		e.childrenMap[parentBranchName] = []string{}
 	}
-	
+
 	// Check if already in children list
 	found := false
 	for _, c := range e.childrenMap[parentBranchName] {
@@ -701,7 +779,7 @@ func (e *engineImpl) setParentInternal(branchName string, parentBranchName strin
 	if !found {
 		e.childrenMap[parentBranchName] = append(e.childrenMap[parentBranchName], branchName)
 	}
-	
+
 	return nil
 }
 
@@ -709,30 +787,30 @@ func (e *engineImpl) setParentInternal(branchName string, parentBranchName strin
 func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	result := []string{}
 	visited := make(map[string]bool)
-	
+
 	var collectDescendants func(string)
 	collectDescendants = func(branch string) {
 		if visited[branch] {
 			return
 		}
 		visited[branch] = true
-		
+
 		// Don't include the starting branch
 		if branch != branchName {
 			result = append(result, branch)
 		}
-		
+
 		children := e.childrenMap[branch]
 		for _, child := range children {
 			collectDescendants(child)
 		}
 	}
-	
+
 	collectDescendants(branchName)
-	
+
 	return result
 }
 

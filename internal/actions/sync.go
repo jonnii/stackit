@@ -42,14 +42,14 @@ func SyncAction(opts SyncOptions) error {
 		if len(rev) > 7 {
 			revShort = rev[:7]
 		}
-		splog.Info("%s fast-forwarded to %s.", 
+		splog.Info("%s fast-forwarded to %s.",
 			output.ColorBranchName(eng.Trunk(), true),
 			output.ColorDim(revShort))
 	case engine.PullUnneeded:
 		splog.Info("%s is up to date.", output.ColorBranchName(eng.Trunk(), true))
 	case engine.PullConflict:
 		splog.Warn("%s could not be fast-forwarded.", output.ColorBranchName(eng.Trunk(), false))
-		
+
 		// Prompt to overwrite (or use force flag)
 		shouldReset := opts.Force
 		if !shouldReset {
@@ -67,7 +67,7 @@ func SyncAction(opts SyncOptions) error {
 			if len(rev) > 7 {
 				revShort = rev[:7]
 			}
-			splog.Info("%s set to %s.", 
+			splog.Info("%s set to %s.",
 				output.ColorBranchName(eng.Trunk(), true),
 				output.ColorDim(revShort))
 		}
@@ -85,7 +85,7 @@ func SyncAction(opts SyncOptions) error {
 
 	// Clean branches (delete merged/closed)
 	branchesToRestack := []string{}
-	
+
 	splog.Info("Checking if any branches have been merged/closed and can be deleted...")
 	cleanResult, err := CleanBranches(CleanBranchesOptions{
 		Force:  opts.Force,
@@ -139,7 +139,11 @@ func SyncAction(opts SyncOptions) error {
 
 	// Restack branches
 	if len(uniqueBranches) > 0 {
-		if err := RestackBranches(uniqueBranches, eng, splog); err != nil {
+		repoRoot, err := git.GetRepoRoot()
+		if err != nil {
+			return fmt.Errorf("failed to get repo root: %w", err)
+		}
+		if err := RestackBranches(uniqueBranches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}

@@ -13,7 +13,9 @@ type PrInfo struct {
 
 // Scope specifies the scope for stack operations
 type Scope struct {
-	RecursiveParents bool
+	RecursiveParents  bool
+	IncludeCurrent    bool
+	RecursiveChildren bool
 }
 
 // ValidationResult represents the validation state of a branch
@@ -44,3 +46,15 @@ const (
 	RestackUnneeded
 	RestackConflict
 )
+
+// RestackBranchResult represents the result of restacking a branch, including the rebased branch base
+type RestackBranchResult struct {
+	Result            RestackResult
+	RebasedBranchBase string // The new parent revision after successful rebase (only set if Result is RestackDone or RestackConflict)
+}
+
+// ContinueRebaseResult represents the result of continuing a rebase
+type ContinueRebaseResult struct {
+	Result     int    // git.RebaseResult value (0 = RebaseDone, 1 = RebaseConflict)
+	BranchName string // Only set if Result is RebaseDone
+}

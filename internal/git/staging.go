@@ -14,6 +14,11 @@ func StageAll() error {
 	return nil
 }
 
+// AddAll is an alias for StageAll (for compatibility with continue command)
+func AddAll() error {
+	return StageAll()
+}
+
 // StageTracked stages updates to tracked files only
 func StageTracked() error {
 	_, err := RunGitCommand("add", "-u")
@@ -50,7 +55,7 @@ func HasUnstagedChanges() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to check unstaged changes: %w", err)
 	}
-	
+
 	// Parse porcelain output - if any line doesn't start with space-space, there are unstaged changes
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for _, line := range lines {
@@ -75,4 +80,3 @@ func HasUntrackedFiles() (bool, error) {
 	}
 	return strings.TrimSpace(output) != "", nil
 }
-

@@ -15,38 +15,38 @@ import (
 
 // SubmitOptions contains options for the submit command
 type SubmitOptions struct {
-	Branch              string
-	Stack               bool
-	Force               bool
-	DryRun              bool
-	Confirm             bool
-	UpdateOnly          bool
-	Always              bool
-	Restack             bool
-	Draft               bool
-	Publish             bool
-	Edit                bool
-	EditTitle           bool
-	EditDescription     bool
-	NoEdit              bool
-	NoEditTitle         bool
-	NoEditDescription   bool
-	Reviewers           string
-	TeamReviewers       string
-	MergeWhenReady      bool
-	RerequestReview     bool
-	View                bool
-	Web                 bool
-	Comment             string
-	TargetTrunk         string
+	Branch               string
+	Stack                bool
+	Force                bool
+	DryRun               bool
+	Confirm              bool
+	UpdateOnly           bool
+	Always               bool
+	Restack              bool
+	Draft                bool
+	Publish              bool
+	Edit                 bool
+	EditTitle            bool
+	EditDescription      bool
+	NoEdit               bool
+	NoEditTitle          bool
+	NoEditDescription    bool
+	Reviewers            string
+	TeamReviewers        string
+	MergeWhenReady       bool
+	RerequestReview      bool
+	View                 bool
+	Web                  bool
+	Comment              string
+	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
-	Engine              engine.Engine
-	Splog               *output.Splog
+	Engine               engine.Engine
+	Splog                *output.Splog
 	// For testing: optional GitHub client, owner, and repo
 	// If nil, will use GetGitHubClient()
-	GitHubClient        *github.Client
-	GitHubOwner         string
-	GitHubRepo          string
+	GitHubClient *github.Client
+	GitHubOwner  string
+	GitHubRepo   string
 }
 
 // SubmissionInfo contains information about a branch to submit
@@ -126,7 +126,11 @@ func SubmitAction(opts SubmitOptions) error {
 	// Restack if requested
 	if opts.Restack {
 		splog.Info("Restacking branches before submitting...")
-		if err := RestackBranches(branches, eng, splog); err != nil {
+		repoRoot, err := git.GetRepoRoot()
+		if err != nil {
+			return fmt.Errorf("failed to get repo root: %w", err)
+		}
+		if err := RestackBranches(branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
@@ -163,10 +167,10 @@ func SubmitAction(opts SubmitOptions) error {
 	// Push branches and create/update PRs
 	splog.Info("Pushing to remote and creating/updating PRs...")
 	githubCtx := context.Background()
-	
+
 	var githubClient *github.Client
 	var repoOwner, repoName string
-	
+
 	// Use injected client for testing, otherwise get real client
 	if opts.GitHubClient != nil {
 		githubClient = opts.GitHubClient
@@ -228,7 +232,7 @@ func SubmitAction(opts SubmitOptions) error {
 				URL:     prURL,
 			})
 
-			splog.Info("%s: %s (%s)", 
+			splog.Info("%s: %s (%s)",
 				output.ColorBranchName(submissionInfo.BranchName, true),
 				prURL,
 				output.ColorDim("created"))
@@ -246,14 +250,14 @@ func SubmitAction(opts SubmitOptions) error {
 			}
 
 			updateOpts := git.UpdatePROptions{
-				Title:         &submissionInfo.Metadata.Title,
-				Body:          &submissionInfo.Metadata.Body,
-				Reviewers:     submissionInfo.Metadata.Reviewers,
-				TeamReviewers: submissionInfo.Metadata.TeamReviewers,
-				MergeWhenReady: &opts.MergeWhenReady,
+				Title:           &submissionInfo.Metadata.Title,
+				Body:            &submissionInfo.Metadata.Body,
+				Reviewers:       submissionInfo.Metadata.Reviewers,
+				TeamReviewers:   submissionInfo.Metadata.TeamReviewers,
+				MergeWhenReady:  &opts.MergeWhenReady,
 				RerequestReview: opts.RerequestReview,
 			}
-			
+
 			// Only update draft status if it's explicitly set via flags
 			if opts.Draft || opts.Publish {
 				updateOpts.Draft = &submissionInfo.Metadata.IsDraft
@@ -300,7 +304,7 @@ func SubmitAction(opts SubmitOptions) error {
 				}
 			}
 
-			splog.Info("%s: %s (%s)", 
+			splog.Info("%s: %s (%s)",
 				output.ColorBranchName(submissionInfo.BranchName, true),
 				prURL,
 				output.ColorDim("updated"))
@@ -336,7 +340,7 @@ func SubmitAction(opts SubmitOptions) error {
 			if prInfo.URL != "" {
 				prURL = prInfo.URL
 			}
-			splog.Info("%s: %s (%s)", 
+			splog.Info("%s: %s (%s)",
 				output.ColorBranchName(branchName, true),
 				prURL,
 				output.ColorDim("updated"))
@@ -372,7 +376,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 		if action == "update" {
 			baseChanged := prInfo.Base != parentBranchName
 			branchChanged, _ := eng.BranchMatchesRemote(branchName)
-			
+
 			// Check if draft status needs to change
 			draftStatusNeedsChange := false
 			if opts.Draft && !prInfo.IsDraft {
@@ -382,7 +386,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 				// Want to publish, but it's currently draft
 				draftStatusNeedsChange = true
 			}
-			
+
 			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always || draftStatusNeedsChange
 
 			if !needsUpdate && !opts.Draft && !opts.Publish {
@@ -393,16 +397,16 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 
 		// Prepare metadata
 		metadataOpts := SubmitMetadataOptions{
-			Edit:            opts.Edit && !opts.NoEdit,
-			EditTitle:       opts.EditTitle && !opts.NoEditTitle,
-			EditDescription: opts.EditDescription && !opts.NoEditDescription,
-			NoEdit:          opts.NoEdit,
-			NoEditTitle:     opts.NoEditTitle,
+			Edit:              opts.Edit && !opts.NoEdit,
+			EditTitle:         opts.EditTitle && !opts.NoEditTitle,
+			EditDescription:   opts.EditDescription && !opts.NoEditDescription,
+			NoEdit:            opts.NoEdit,
+			NoEditTitle:       opts.NoEditTitle,
 			NoEditDescription: opts.NoEditDescription,
-			Draft:           opts.Draft,
-			Publish:         opts.Publish,
-			Reviewers:       opts.Reviewers,
-			ReviewersPrompt: opts.Reviewers == "" && opts.Edit,
+			Draft:             opts.Draft,
+			Publish:           opts.Publish,
+			Reviewers:         opts.Reviewers,
+			ReviewersPrompt:   opts.Reviewers == "" && opts.Edit,
 		}
 
 		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, ctx)
@@ -432,7 +436,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 		} else {
 			status = "Create"
 		}
-		ctx.Splog.Info("▸ %s (%s)", 
+		ctx.Splog.Info("▸ %s (%s)",
 			output.ColorBranchName(branchName, true),
 			output.ColorDim(status))
 
@@ -484,4 +488,3 @@ func openBrowser(url string) {
 		exec.Command("start", url).Run()    // Windows
 	}
 }
-

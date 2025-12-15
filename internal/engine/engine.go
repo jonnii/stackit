@@ -11,7 +11,7 @@ type Engine interface {
 	AllBranchNames() []string
 	CurrentBranch() string
 	Trunk() string
-	GetParent(branchName string) string // Returns empty string if no parent
+	GetParent(branchName string) string             // Returns empty string if no parent
 	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)
 	GetChildren(branchName string) []string
 	GetRelativeStack(branchName string, scope Scope) []string
@@ -42,7 +42,8 @@ type Engine interface {
 	// Sync operations
 	PullTrunk() (PullResult, error)
 	ResetTrunkToRemote() error
-	RestackBranch(branchName string) (RestackResult, error)
+	RestackBranch(branchName string) (RestackBranchResult, error)
+	ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error)
 	IsMergedIntoTrunk(branchName string) (bool, error)
 	IsBranchEmpty(branchName string) (bool, error)
 	DeleteBranch(branchName string) error

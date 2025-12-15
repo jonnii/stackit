@@ -53,6 +53,7 @@ func ShowDiff(left, right string, stat bool) (string, error) {
 }
 
 // ShowCommits returns commit log with optional patches/stat
+// base can be empty string for trunk (will use head~), or a revision for regular branches
 func ShowCommits(base, head string, patch, stat bool) (string, error) {
 	args := []string{"-c", "color.ui=always", "--no-pager", "log"}
 	if patch && stat {
@@ -63,12 +64,14 @@ func ShowCommits(base, head string, patch, stat bool) (string, error) {
 		// Default to oneline format if no patch
 		args = append(args, "--pretty=format:%h - %s")
 	}
-	if base != "" {
-		args = append(args, fmt.Sprintf("%s..%s", base, head))
-	} else {
-		// For trunk, show just the one commit
-		args = append(args, "-1", head)
+
+	// Always use base..head format (matching charcoal)
+	// If base is empty, use head~ (parent commit) for trunk
+	baseRef := base
+	if base == "" {
+		baseRef = head + "~"
 	}
+	args = append(args, fmt.Sprintf("%s..%s", baseRef, head))
 	args = append(args, "--")
 	return RunGitCommand(args...)
 }

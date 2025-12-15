@@ -111,7 +111,10 @@ func InfoAction(opts InfoOptions) error {
 	if effectivePatch {
 		// Show commits with patches
 		baseRevision := ""
-		if !isTrunk {
+		if isTrunk {
+			// For trunk, use parent commit (branchName~)
+			baseRevision = branchName + "~"
+		} else {
 			meta, err := git.ReadMetadataRef(branchName)
 			if err == nil && meta.ParentBranchRevision != nil {
 				baseRevision = *meta.ParentBranchRevision

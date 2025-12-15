@@ -13,6 +13,15 @@ func HardReset(sha string) error {
 	return nil
 }
 
+// SoftReset performs a soft reset to a specific SHA
+func SoftReset(sha string) error {
+	_, err := RunGitCommand("reset", "--soft", sha)
+	if err != nil {
+		return fmt.Errorf("failed to soft reset to %s: %w", sha, err)
+	}
+	return nil
+}
+
 // GetRemoteSha returns the SHA of a remote branch
 func GetRemoteSha(remote, branchName string) (string, error) {
 	sha, err := RunGitCommand("rev-parse", fmt.Sprintf("%s/%s", remote, branchName))

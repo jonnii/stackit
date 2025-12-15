@@ -67,8 +67,14 @@ type SyncManager interface {
 	ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error)
 }
 
+// SquashManager provides operations for squashing commits
+// Thread-safe: All methods are safe for concurrent use
+type SquashManager interface {
+	SquashCurrentBranch(opts SquashOptions) error
+}
+
 // Engine is the core interface for branch state management
-// It composes BranchReader, BranchWriter, PRManager, and SyncManager
+// It composes BranchReader, BranchWriter, PRManager, SyncManager, and SquashManager
 // for backward compatibility. New code should prefer using the smaller interfaces.
 // Thread-safe: All methods are safe for concurrent use
 type Engine interface {
@@ -76,4 +82,5 @@ type Engine interface {
 	BranchWriter
 	PRManager
 	SyncManager
+	SquashManager
 }

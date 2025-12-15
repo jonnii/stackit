@@ -827,6 +827,85 @@ func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
 	return result
 }
 
+// SquashCurrentBranch squashes all commits in the current branch into a single commit
+func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Get current branch
+	branchName := e.currentBranch
+	if branchName == "" {
+		return fmt.Errorf("not on a branch")
+	}
+
+	// Check if branch is trunk (check directly since we hold the lock)
+	if branchName == e.trunk {
+		return fmt.Errorf("cannot squash trunk branch")
+	}
+
+	// Read metadata to get parent branch revision
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	if meta.ParentBranchRevision == nil {
+		return fmt.Errorf("branch has no parent revision")
+	}
+
+	parentBranchRevision := *meta.ParentBranchRevision
+
+	// Get current branch revision
+	branchRevision, err := git.GetRevision(branchName)
+	if err != nil {
+		return fmt.Errorf("failed to get branch revision: %w", err)
+	}
+
+	// Get commit range SHAs from parent to current branch
+	commitSHAs, err := git.GetCommitRangeSHAs(parentBranchRevision, branchRevision)
+	if err != nil {
+		return fmt.Errorf("failed to get commit range: %w", err)
+	}
+
+	// Check if there are commits to squash
+	if len(commitSHAs) == 0 {
+		return fmt.Errorf("no commits to squash")
+	}
+
+	// Get the first (oldest) commit SHA from the range
+	// The list is already in chronological order (oldest first)
+	oldestCommitSHA := commitSHAs[0]
+
+	// Soft reset to the oldest commit (keeps all changes staged)
+	if err := git.SoftReset(oldestCommitSHA); err != nil {
+		return fmt.Errorf("failed to soft reset: %w", err)
+	}
+
+	// Commit with amend flag and provided options
+	commitOpts := git.CommitOptions{
+		Amend:   true,
+		Message: opts.Message,
+		NoEdit:  opts.NoEdit,
+		Edit:    !opts.NoEdit && opts.Message == "", // Edit if not noEdit and no message provided
+	}
+
+	if err := git.CommitWithOptions(commitOpts); err != nil {
+		// Try to rollback on error
+		if rollbackErr := git.SoftReset(branchRevision); rollbackErr != nil {
+			// Log rollback error but return original error
+			return fmt.Errorf("failed to commit and failed to rollback: commit error: %w, rollback error: %v", err, rollbackErr)
+		}
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Rebuild to refresh cache (parent/children relationships remain the same)
+	if err := e.rebuildInternal(); err != nil {
+		return fmt.Errorf("failed to rebuild after squash: %w", err)
+	}
+
+	return nil
+}
+
 // Helper functions
 func getStringValue(s *string) string {
 	if s == nil {

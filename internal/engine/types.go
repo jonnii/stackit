@@ -58,3 +58,9 @@ type ContinueRebaseResult struct {
 	Result     int    // git.RebaseResult value (0 = RebaseDone, 1 = RebaseConflict)
 	BranchName string // Only set if Result is RebaseDone
 }
+
+// SquashOptions contains options for squashing commits
+type SquashOptions struct {
+	Message string
+	NoEdit  bool
+}

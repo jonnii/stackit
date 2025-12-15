@@ -10,7 +10,7 @@ import (
 
 func TestCreateCommand(t *testing.T) {
 	// Build the stackit binary first
-	binaryPath := buildStackitBinary(t)
+	binaryPath := getStackitBinary(t)
 
 	t.Run("create branch with name", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {

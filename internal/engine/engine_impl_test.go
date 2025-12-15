@@ -866,6 +866,230 @@ func TestConcurrentAccess(t *testing.T) {
 	})
 }
 
+func TestBranchMatchesRemote(t *testing.T) {
+	t.Run("returns true when branch matches remote", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Push main first
+		err = scene.Repo.PushBranch("origin", "main")
+		require.NoError(t, err)
+
+		// Create and push a branch
+		err = scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
+		require.NoError(t, err)
+		err = scene.Repo.PushBranch("origin", "feature")
+		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate remote SHAs
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// Branch should match remote
+		matches, err := eng.BranchMatchesRemote("feature")
+		require.NoError(t, err)
+		require.True(t, matches, "branch should match remote after push")
+	})
+
+	t.Run("returns false when branch has local changes", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Push main first
+		err = scene.Repo.PushBranch("origin", "main")
+		require.NoError(t, err)
+
+		// Create and push a branch
+		err = scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
+		require.NoError(t, err)
+		err = scene.Repo.PushBranch("origin", "feature")
+		require.NoError(t, err)
+
+		// Make local change (not pushed)
+		err = scene.Repo.CreateChangeAndCommit("local change", "local")
+		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate remote SHAs
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// Branch should NOT match remote (local has extra commit)
+		matches, err := eng.BranchMatchesRemote("feature")
+		require.NoError(t, err)
+		require.False(t, matches, "branch should not match remote with local changes")
+	})
+
+	t.Run("returns false when branch does not exist on remote", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Push main (but not feature)
+		err = scene.Repo.PushBranch("origin", "main")
+		require.NoError(t, err)
+
+		// Create a branch locally but don't push it
+		err = scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
+		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate remote SHAs
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// Branch should NOT match remote (doesn't exist on remote)
+		matches, err := eng.BranchMatchesRemote("feature")
+		require.NoError(t, err)
+		require.False(t, matches, "branch should not match when it doesn't exist on remote")
+	})
+
+	t.Run("returns false after amend (branch diverged)", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Push main first
+		err = scene.Repo.PushBranch("origin", "main")
+		require.NoError(t, err)
+
+		// Create and push a branch
+		err = scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
+		require.NoError(t, err)
+		err = scene.Repo.PushBranch("origin", "feature")
+		require.NoError(t, err)
+
+		// Amend the commit locally (simulates squash or rebase)
+		err = scene.Repo.CreateChangeAndAmend("amended change", "amended")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate remote SHAs
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// Branch should NOT match remote (local was amended)
+		matches, err := eng.BranchMatchesRemote("feature")
+		require.NoError(t, err)
+		require.False(t, matches, "branch should not match remote after amend")
+	})
+}
+
+func TestPopulateRemoteShas(t *testing.T) {
+	t.Run("populates SHAs for all remote branches", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Push main
+		err = scene.Repo.PushBranch("origin", "main")
+		require.NoError(t, err)
+
+		// Create and push multiple branches - checkout main between each
+		err = scene.Repo.CreateAndCheckoutBranch("feature1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature1 change", "f1")
+		require.NoError(t, err)
+		err = scene.Repo.PushBranch("origin", "feature1")
+		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("feature2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature2 change", "f2")
+		require.NoError(t, err)
+		err = scene.Repo.PushBranch("origin", "feature2")
+		require.NoError(t, err)
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate remote SHAs
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// All branches should match remote
+		for _, branch := range []string{"main", "feature1", "feature2"} {
+			matches, err := eng.BranchMatchesRemote(branch)
+			require.NoError(t, err)
+			require.True(t, matches, "branch %s should match remote", branch)
+		}
+	})
+
+	t.Run("handles empty remote gracefully", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create a bare remote but don't push anything
+		_, err := scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Populate should not fail
+		err = eng.PopulateRemoteShas()
+		require.NoError(t, err)
+
+		// Branches should not match (nothing on remote)
+		matches, err := eng.BranchMatchesRemote("main")
+		require.NoError(t, err)
+		require.False(t, matches, "main should not match empty remote")
+	})
+}
+
 func TestEdgeCases(t *testing.T) {
 	t.Run("handles branch with no parent gracefully", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {

@@ -28,6 +28,7 @@ https://github.com/jonnii/stackit`,
 	rootCmd.AddCommand(newRestackCmd())
 	rootCmd.AddCommand(newContinueCmd())
 	rootCmd.AddCommand(newSquashCmd())
+	rootCmd.AddCommand(newSplitCmd())
 
 	return rootCmd
 }

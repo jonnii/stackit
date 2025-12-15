@@ -17,6 +17,7 @@ type engineImpl struct {
 	branches      []string
 	parentMap     map[string]string   // branch -> parent
 	childrenMap   map[string][]string // branch -> children
+	remoteShas    map[string]string   // branch -> remote SHA (populated by PopulateRemoteShas)
 	mu            sync.RWMutex
 }
 
@@ -31,6 +32,7 @@ func NewEngine(repoRoot string) (Engine, error) {
 		repoRoot:    repoRoot,
 		parentMap:   make(map[string]string),
 		childrenMap: make(map[string][]string),
+		remoteShas:  make(map[string]string),
 	}
 
 	// Get trunk from config
@@ -310,14 +312,42 @@ func (e *engineImpl) GetParentPrecondition(branchName string) string {
 // BranchMatchesRemote checks if a branch matches its remote
 // For now, always return true (simplified)
 func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
-	// TODO: Implement proper remote comparison
-	return true, nil
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Get local branch SHA
+	localSha, err := git.GetRevision(branchName)
+	if err != nil {
+		return false, fmt.Errorf("failed to get local revision for %s: %w", branchName, err)
+	}
+
+	// Get remote SHA from cache
+	remoteSha, exists := e.remoteShas[branchName]
+	if !exists {
+		// No remote branch exists - branch doesn't match remote
+		return false, nil
+	}
+
+	return localSha == remoteSha, nil
 }
 
-// PopulateRemoteShas populates remote branch information
-// For now, no-op (simplified)
+// PopulateRemoteShas populates remote branch information by fetching SHAs from remote
 func (e *engineImpl) PopulateRemoteShas() error {
-	// TODO: Implement remote SHA population
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Clear existing remote SHAs
+	e.remoteShas = make(map[string]string)
+
+	// Fetch remote SHAs using git ls-remote
+	remote := "origin" // TODO: Get from config
+	remoteShas, err := git.FetchRemoteShas(remote)
+	if err != nil {
+		// Don't fail if we can't fetch remote SHAs (e.g., offline)
+		return nil
+	}
+
+	e.remoteShas = remoteShas
 	return nil
 }
 
@@ -872,21 +902,25 @@ func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
 		return fmt.Errorf("no commits to squash")
 	}
 
-	// Get the first (oldest) commit SHA from the range
-	// The list is already in chronological order (oldest first)
-	oldestCommitSHA := commitSHAs[0]
+	// Get the last (oldest) commit SHA from the range
+	// git log returns commits in reverse chronological order (newest first)
+	// So the last element is the oldest commit
+	oldestCommitSHA := commitSHAs[len(commitSHAs)-1]
 
 	// Soft reset to the oldest commit (keeps all changes staged)
+	// This moves HEAD to the oldest commit, staging all changes from newer commits
 	if err := git.SoftReset(oldestCommitSHA); err != nil {
 		return fmt.Errorf("failed to soft reset: %w", err)
 	}
 
-	// Commit with amend flag and provided options
+	// Commit with amend flag to modify the oldest commit to include all changes
+	// This is correct: we reset to the oldest commit, then amend it to include all subsequent changes
+	// Match charcoal behavior: only pass noEdit and message, let git handle editor by default
 	commitOpts := git.CommitOptions{
 		Amend:   true,
 		Message: opts.Message,
 		NoEdit:  opts.NoEdit,
-		Edit:    !opts.NoEdit && opts.Message == "", // Edit if not noEdit and no message provided
+		// Don't set Edit - git will open editor by default if no message and no noEdit
 	}
 
 	if err := git.CommitWithOptions(commitOpts); err != nil {
@@ -919,4 +953,226 @@ func getBoolValue(b *bool) bool {
 		return false
 	}
 	return *b
+}
+
+// GetAllCommits returns commits for a branch in various formats
+func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Check if branch is trunk
+	if branchName == e.trunk {
+		// For trunk, get just the one commit
+		branchRevision, err := git.GetRevision(branchName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get branch revision: %w", err)
+		}
+		return git.GetCommitRange("", branchRevision, string(format))
+	}
+
+	// Get metadata to find parent revision
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	// Get branch revision
+	branchRevision, err := git.GetRevision(branchName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get branch revision: %w", err)
+	}
+
+	// Get parent revision (base)
+	var baseRevision string
+	if meta.ParentBranchRevision != nil {
+		baseRevision = *meta.ParentBranchRevision
+	}
+
+	return git.GetCommitRange(baseRevision, branchRevision, string(format))
+}
+
+// ApplySplitToCommits creates branches at specified commit points
+func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if len(opts.BranchNames) != len(opts.BranchPoints) {
+		return fmt.Errorf("invalid number of branch names: got %d names but %d branch points", len(opts.BranchNames), len(opts.BranchPoints))
+	}
+
+	// Get metadata for the branch being split
+	meta, err := git.ReadMetadataRef(opts.BranchToSplit)
+	if err != nil {
+		return fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	if meta.ParentBranchName == nil {
+		return fmt.Errorf("branch %s has no parent", opts.BranchToSplit)
+	}
+
+	parentBranchName := *meta.ParentBranchName
+	parentRevision := *meta.ParentBranchRevision
+	children := e.childrenMap[opts.BranchToSplit]
+
+	// Reverse branch points (newest to oldest -> oldest to newest)
+	reversedBranchPoints := make([]int, len(opts.BranchPoints))
+	for i, point := range opts.BranchPoints {
+		reversedBranchPoints[len(opts.BranchPoints)-1-i] = point
+	}
+
+	// Keep track of the last branch's name + SHA for metadata
+	lastBranchName := parentBranchName
+	lastBranchRevision := parentRevision
+
+	// Create each branch
+	for idx, branchName := range opts.BranchNames {
+		// Get commit SHA at the offset
+		branchRevision, err := git.GetCommitSHA(opts.BranchToSplit, reversedBranchPoints[idx])
+		if err != nil {
+			return fmt.Errorf("failed to get commit SHA at offset %d: %w", reversedBranchPoints[idx], err)
+		}
+
+		// Create branch at that SHA
+		_, err = git.RunGitCommand("branch", "-f", branchName, branchRevision)
+		if err != nil {
+			return fmt.Errorf("failed to create branch %s: %w", branchName, err)
+		}
+
+		// Preserve PR info if branch name matches original
+		var prInfo *PrInfo
+		if branchName == opts.BranchToSplit {
+			prInfo, _ = e.GetPrInfo(opts.BranchToSplit)
+		}
+
+		// Track branch with parent
+		newMeta := &git.Meta{
+			ParentBranchName:     &lastBranchName,
+			ParentBranchRevision: &lastBranchRevision,
+		}
+
+		// Preserve PR info if applicable
+		if prInfo != nil {
+			newMeta.PrInfo = &git.PrInfo{
+				Number:  prInfo.Number,
+				Title:   stringPtr(prInfo.Title),
+				Body:    stringPtr(prInfo.Body),
+				IsDraft: boolPtr(prInfo.IsDraft),
+				State:   stringPtr(prInfo.State),
+				Base:    stringPtr(prInfo.Base),
+				URL:     stringPtr(prInfo.URL),
+			}
+		}
+
+		if err := git.WriteMetadataRef(branchName, newMeta); err != nil {
+			return fmt.Errorf("failed to write metadata for %s: %w", branchName, err)
+		}
+
+		// Update in-memory cache
+		e.parentMap[branchName] = lastBranchName
+		e.childrenMap[lastBranchName] = append(e.childrenMap[lastBranchName], branchName)
+
+		// Update last branch info
+		lastBranchName = branchName
+		lastBranchRevision = branchRevision
+	}
+
+	// Update children to point to last branch
+	if lastBranchName != opts.BranchToSplit {
+		for _, childBranchName := range children {
+			if err := e.SetParent(childBranchName, lastBranchName); err != nil {
+				return fmt.Errorf("failed to update parent for %s: %w", childBranchName, err)
+			}
+		}
+	}
+
+	// Delete original branch if not in branchNames
+	if !contains(opts.BranchNames, opts.BranchToSplit) {
+		if err := e.DeleteBranch(opts.BranchToSplit); err != nil {
+			return fmt.Errorf("failed to delete original branch: %w", err)
+		}
+	}
+
+	// Checkout last branch
+	e.currentBranch = lastBranchName
+	if err := git.CheckoutBranch(lastBranchName); err != nil {
+		return fmt.Errorf("failed to checkout branch %s: %w", lastBranchName, err)
+	}
+
+	return nil
+}
+
+// Detach detaches HEAD to a specific revision
+func (e *engineImpl) Detach(revision string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Checkout the revision in detached HEAD state
+	_, err := git.RunGitCommand("checkout", "--detach", revision)
+	if err != nil {
+		return fmt.Errorf("failed to detach HEAD: %w", err)
+	}
+
+	e.currentBranch = ""
+	return nil
+}
+
+// DetachAndResetBranchChanges detaches and resets branch changes
+func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Get branch revision
+	branchRevision, err := git.GetRevision(branchName)
+	if err != nil {
+		return fmt.Errorf("failed to get branch revision: %w", err)
+	}
+
+	// Detach and reset
+	_, err = git.RunGitCommand("checkout", "--detach", branchRevision)
+	if err != nil {
+		return fmt.Errorf("failed to detach HEAD: %w", err)
+	}
+
+	// Reset to discard any changes
+	if err := git.HardReset(branchRevision); err != nil {
+		return fmt.Errorf("failed to reset: %w", err)
+	}
+
+	e.currentBranch = ""
+	return nil
+}
+
+// ForceCheckoutBranch force checks out a branch
+func (e *engineImpl) ForceCheckoutBranch(branchName string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	_, err := git.RunGitCommand("checkout", "-f", branchName)
+	if err != nil {
+		return fmt.Errorf("failed to force checkout branch: %w", err)
+	}
+
+	e.currentBranch = branchName
+	return nil
+}
+
+// Helper functions
+func stringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

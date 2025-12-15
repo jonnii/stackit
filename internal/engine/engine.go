@@ -73,8 +73,44 @@ type SquashManager interface {
 	SquashCurrentBranch(opts SquashOptions) error
 }
 
+// SplitManager provides operations for splitting branches
+// Thread-safe: All methods are safe for concurrent use
+type SplitManager interface {
+	// GetAllCommits returns commits for a branch in various formats
+	GetAllCommits(branchName string, format CommitFormat) ([]string, error)
+
+	// ApplySplitToCommits creates branches at specified commit points
+	ApplySplitToCommits(opts ApplySplitOptions) error
+
+	// Detach detaches HEAD to a specific revision
+	Detach(revision string) error
+
+	// DetachAndResetBranchChanges detaches and resets branch changes
+	DetachAndResetBranchChanges(branchName string) error
+
+	// ForceCheckoutBranch force checks out a branch
+	ForceCheckoutBranch(branchName string) error
+}
+
+// CommitFormat specifies the format for commit output
+type CommitFormat string
+
+const (
+	CommitFormatSHA      CommitFormat = "SHA"      // Full SHA
+	CommitFormatReadable CommitFormat = "READABLE" // Oneline format: "abc123 Commit message"
+	CommitFormatMessage  CommitFormat = "MESSAGE"  // Full commit message
+	CommitFormatSubject  CommitFormat = "SUBJECT"  // First line of commit message
+)
+
+// ApplySplitOptions contains options for applying a split
+type ApplySplitOptions struct {
+	BranchToSplit string   // The branch being split
+	BranchNames   []string // Branch names from oldest to newest
+	BranchPoints  []int    // Commit indices (0 = HEAD, 1 = HEAD~1, etc.)
+}
+
 // Engine is the core interface for branch state management
-// It composes BranchReader, BranchWriter, PRManager, SyncManager, and SquashManager
+// It composes BranchReader, BranchWriter, PRManager, SyncManager, SquashManager, and SplitManager
 // for backward compatibility. New code should prefer using the smaller interfaces.
 // Thread-safe: All methods are safe for concurrent use
 type Engine interface {
@@ -83,4 +119,5 @@ type Engine interface {
 	PRManager
 	SyncManager
 	SquashManager
+	SplitManager
 }

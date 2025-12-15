@@ -123,10 +123,10 @@ func (r *GitRepo) RunCliCommand(command []string) error {
 	// TODO: Update this path once the CLI binary is built
 	// For now, this is a placeholder that will need to be updated
 	cliPath := "stackit" // Will be the built binary path
-	
+
 	cmd := exec.Command(cliPath, command...)
 	cmd.Dir = r.Dir
-	
+
 	env := os.Environ()
 	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
 	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
@@ -134,38 +134,38 @@ func (r *GitRepo) RunCliCommand(command []string) error {
 	env = append(env, "STACKIT_DISABLE_SURVEY=1")
 	env = append(env, "STACKIT_PROFILE=")
 	cmd.Env = env
-	
+
 	if os.Getenv("DEBUG") == "" {
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 	}
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("CLI command failed: %w", err)
 	}
-	
+
 	return nil
 }
 
 // RunCliCommandAndGetOutput executes a Stackit CLI command and returns its output.
 func (r *GitRepo) RunCliCommandAndGetOutput(command []string) (string, error) {
 	cliPath := "stackit" // Will be the built binary path
-	
+
 	cmd := exec.Command(cliPath, command...)
 	cmd.Dir = r.Dir
-	
+
 	env := os.Environ()
 	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
 	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
 	env = append(env, "STACKIT_DISABLE_UPGRADE_PROMPT=1")
 	env = append(env, "STACKIT_DISABLE_SURVEY=1")
 	cmd.Env = env
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("CLI command failed: %w", err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -176,15 +176,15 @@ func (r *GitRepo) CreateChange(textValue string, prefix string, unstaged bool) e
 		fileName = prefix + "_" + fileName
 	}
 	filePath := filepath.Join(r.Dir, fileName)
-	
+
 	if err := os.WriteFile(filePath, []byte(textValue), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
-	
+
 	if !unstaged {
 		return r.runGitCommand("add", filePath)
 	}
-	
+
 	return nil
 }
 
@@ -221,12 +221,12 @@ func (r *GitRepo) CreatePrecommitHook(contents string) error {
 	if err := os.MkdirAll(hookDir, 0755); err != nil {
 		return fmt.Errorf("failed to create hooks directory: %w", err)
 	}
-	
+
 	hookPath := filepath.Join(hookDir, "pre-commit")
 	if err := os.WriteFile(hookPath, []byte(contents), 0755); err != nil {
 		return fmt.Errorf("failed to write hook: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -278,14 +278,14 @@ func (r *GitRepo) ListCurrentBranchCommitMessages() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	lines := []string{}
 	for _, line := range splitLines(output) {
 		if len(line) > 0 {
 			lines = append(lines, line)
 		}
 	}
-	
+
 	return lines, nil
 }
 
@@ -314,4 +314,40 @@ func splitLines(s string) []string {
 		return []string{}
 	}
 	return strings.Split(s, "\n")
+}
+
+// CreateBareRemote creates a bare git repository to act as a remote.
+// Returns the path to the bare repository.
+func (r *GitRepo) CreateBareRemote(name string) (string, error) {
+	// Create bare repo as a sibling directory with a unique name based on the repo dir
+	// This ensures each test gets its own unique remote
+	bareDir := r.Dir + "-" + name + ".git"
+
+	cmd := exec.Command("git", "init", "--bare", bareDir)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to create bare repo: %w", err)
+	}
+
+	// Add as remote
+	if err := r.runGitCommand("remote", "add", name, bareDir); err != nil {
+		return "", fmt.Errorf("failed to add remote: %w", err)
+	}
+
+	return bareDir, nil
+}
+
+// PushBranch pushes a branch to a remote.
+func (r *GitRepo) PushBranch(remote, branch string) error {
+	cmd := exec.Command("git", "push", "-u", remote, branch)
+	cmd.Dir = r.Dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("push failed: %w, output: %s", err, string(output))
+	}
+	return nil
+}
+
+// ForcePushBranch force pushes a branch to a remote.
+func (r *GitRepo) ForcePushBranch(remote, branch string) error {
+	return r.runGitCommand("push", "-f", remote, branch)
 }

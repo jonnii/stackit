@@ -1,5 +1,7 @@
 package git
 
+import "strings"
+
 // PruneRemote prunes stale remote-tracking branches
 func PruneRemote(remote string) error {
 	_, err := RunGitCommand("remote", "prune", remote)
@@ -20,4 +22,44 @@ func GetRemote() string {
 
 	// Fallback to origin
 	return "origin"
+}
+
+// FetchRemoteShas fetches the SHAs of all branches on the remote.
+// Returns a map of branch name -> SHA.
+// Sample git ls-remote output:
+// 7edb7094e4c66892d783c1effdd106df277a860e        refs/heads/main
+func FetchRemoteShas(remote string) (map[string]string, error) {
+	output, err := RunGitCommand("ls-remote", "--heads", remote)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteShas := make(map[string]string)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		// Split on whitespace
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			continue
+		}
+
+		sha := parts[0]
+		ref := parts[1]
+
+		// Only process refs/heads/* (branches)
+		const prefix = "refs/heads/"
+		if !strings.HasPrefix(ref, prefix) {
+			continue
+		}
+
+		branchName := ref[len(prefix):]
+		remoteShas[branchName] = sha
+	}
+
+	return remoteShas, nil
 }

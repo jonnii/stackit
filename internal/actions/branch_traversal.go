@@ -2,8 +2,10 @@ package actions
 
 import (
 	"fmt"
+	"strings"
 
 	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 )
 
@@ -19,7 +21,7 @@ const (
 func SwitchBranchAction(direction Direction, ctx *context.Context) error {
 	currentBranch := ctx.Engine.CurrentBranch()
 	if currentBranch == "" {
-		return fmt.Errorf("not on a branch")
+		return errors.ErrNotOnBranch
 	}
 
 	ctx.Splog.Info("%s", currentBranch)
@@ -131,9 +133,10 @@ func handleMultipleChildren(children []string, ctx *context.Context) (string, er
 
 // formatBranchList formats a list of branches for error messages
 func formatBranchList(branches []string) string {
-	result := ""
+	var builder strings.Builder
 	for _, branch := range branches {
-		result += branch + "\n"
+		builder.WriteString(branch)
+		builder.WriteString("\n")
 	}
-	return result
+	return builder.String()
 }

@@ -1,3 +1,6 @@
+// Package git provides low-level Git operations, including repository access,
+// branch operations, commit information, PR operations, and metadata management.
+// It wraps go-git and provides a higher-level API for stackit's needs.
 package git
 
 import (
@@ -91,4 +94,3 @@ func (r *Repository) GetCurrentBranch() (string, error) {
 
 	return head.Name().Short(), nil
 }
-

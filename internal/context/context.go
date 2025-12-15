@@ -1,3 +1,5 @@
+// Package context provides a context type that holds the engine and logger
+// for use throughout the application. This avoids passing multiple parameters.
 package context
 
 import (
@@ -18,4 +20,3 @@ func NewContext(eng engine.Engine) *Context {
 		Splog:  output.NewSplog(),
 	}
 }
-

@@ -1,3 +1,5 @@
+// Package cli provides command-line interface definitions using Cobra,
+// including all subcommands and their flag definitions.
 package cli
 
 import (

@@ -1,12 +1,14 @@
+// Package actions provides high-level operations for managing stacked branches,
+// including creating branches, submitting PRs, syncing, and restacking.
 package actions
 
 import (
 	"fmt"
 	"os"
 
+	"stackit.dev/stackit/internal/branchutil"
 	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/utils"
 )
 
 // CreateOptions specifies options for the create command
@@ -34,13 +36,13 @@ func CreateAction(opts CreateOptions, ctx *context.Context) error {
 		if opts.Message == "" {
 			return fmt.Errorf("must specify either a branch name or commit message")
 		}
-		branchName = utils.GenerateBranchNameFromMessage(opts.Message)
+		branchName = branchutil.GenerateBranchNameFromMessage(opts.Message)
 		if branchName == "" {
 			return fmt.Errorf("failed to generate branch name from commit message")
 		}
 	} else {
 		// Sanitize provided branch name
-		branchName = utils.SanitizeBranchName(branchName)
+		branchName = branchutil.SanitizeBranchName(branchName)
 	}
 
 	// Check if branch already exists
@@ -215,4 +217,3 @@ func getCommitMessage() string {
 	// For now, return empty and let git handle it
 	return ""
 }
-

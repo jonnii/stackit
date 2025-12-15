@@ -1,4 +1,6 @@
-package utils
+// Package branchutil provides utilities for sanitizing and generating branch names
+// from commit messages and other sources.
+package branchutil
 
 import (
 	"regexp"
@@ -15,7 +17,7 @@ var (
 	// BranchNameReplaceRegex matches characters that are not valid in branch names
 	// Valid characters: letters, numbers, -, _, /, .
 	BranchNameReplaceRegex = regexp.MustCompile(`[^-_/.a-zA-Z0-9]+`)
-	
+
 	// BranchNameIgnoreRegex matches trailing slashes and dots that should be removed
 	BranchNameIgnoreRegex = regexp.MustCompile(`[/.]*$`)
 )
@@ -24,24 +26,24 @@ var (
 func SanitizeBranchName(name string) string {
 	// Remove trailing slashes and dots
 	name = BranchNameIgnoreRegex.ReplaceAllString(name, "")
-	
+
 	// Replace invalid characters with hyphens
 	name = BranchNameReplaceRegex.ReplaceAllString(name, "-")
-	
+
 	// Remove multiple consecutive hyphens
 	hyphenRegex := regexp.MustCompile(`-+`)
 	name = hyphenRegex.ReplaceAllString(name, "-")
-	
+
 	// Trim leading/trailing hyphens
 	name = strings.Trim(name, "-")
-	
+
 	// Limit length
 	if len(name) > MaxBranchNameByteLength {
 		name = name[:MaxBranchNameByteLength]
 		// Trim trailing hyphen if we cut at a hyphen
 		name = strings.TrimSuffix(name, "-")
 	}
-	
+
 	return name
 }
 
@@ -50,15 +52,14 @@ func GenerateBranchNameFromMessage(message string) string {
 	if message == "" {
 		return ""
 	}
-	
+
 	// Take first line of message (subject line)
 	lines := strings.Split(message, "\n")
 	subject := strings.TrimSpace(lines[0])
-	
+
 	// Remove common prefixes like "feat:", "fix:", etc. if present
 	subject = regexp.MustCompile(`^(feat|fix|chore|docs|style|refactor|perf|test|build|ci):\s*`).ReplaceAllString(subject, "")
-	
+
 	// Sanitize and return
 	return SanitizeBranchName(subject)
 }
-

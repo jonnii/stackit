@@ -1,3 +1,5 @@
+// Package config provides repository configuration management,
+// including reading and writing stackit configuration files.
 package config
 
 import (
@@ -16,7 +18,7 @@ type RepoConfig struct {
 // GetRepoConfig reads the repository configuration
 func GetRepoConfig(repoRoot string) (*RepoConfig, error) {
 	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Config doesn't exist - return default
@@ -58,23 +60,22 @@ func IsInitialized(repoRoot string) bool {
 // SetTrunk updates the trunk branch in the config
 func SetTrunk(repoRoot string, trunkName string) error {
 	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
-	
+
 	config, err := GetRepoConfig(repoRoot)
 	if err != nil {
 		config = &RepoConfig{}
 	}
-	
+
 	config.Trunk = &trunkName
 	if config.IsGithubIntegrationEnabled == nil {
 		enabled := false
 		config.IsGithubIntegrationEnabled = &enabled
 	}
-	
+
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	
+
 	return os.WriteFile(configPath, configJSON, 0644)
 }
-

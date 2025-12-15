@@ -29,8 +29,28 @@ func ContinueAction(opts ContinueOptions) error {
 	// Load continuation state
 	continuation, err := config.GetContinuationState(opts.RepoRoot)
 	if err != nil {
-		// No continuation state - just continue the rebase
-		return fmt.Errorf("no continuation state found. Use 'git rebase --continue' directly")
+		// No continuation state - this is okay, we can still continue the rebase
+		// but we won't be able to resume restacking
+		opts.Splog.Info("No continuation state found. Continuing rebase only.")
+		// Try to continue the rebase anyway (user might have started it manually)
+		// But we need a rebasedBranchBase - try to get it from current branch's parent
+		currentBranch := opts.Engine.CurrentBranch()
+		if currentBranch == "" {
+			return fmt.Errorf("not on a branch")
+		}
+		parent := opts.Engine.GetParent(currentBranch)
+		if parent == "" {
+			parent = opts.Engine.Trunk()
+		}
+		parentRev, err := opts.Engine.GetRevision(parent)
+		if err != nil {
+			return fmt.Errorf("failed to get parent revision: %w", err)
+		}
+		continuation = &config.ContinuationState{
+			RebasedBranchBase:     parentRev,
+			BranchesToRestack:     []string{},
+			CurrentBranchOverride: currentBranch,
+		}
 	}
 
 	// Stage all changes if --all flag is set

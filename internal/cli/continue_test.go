@@ -13,7 +13,7 @@ import (
 )
 
 func TestContinueCommand(t *testing.T) {
-	binaryPath := buildStackitBinary(t)
+	binaryPath := getStackitBinary(t)
 
 	t.Run("continue errors when no rebase in progress", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {

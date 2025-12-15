@@ -6,28 +6,52 @@ import (
 	"os/exec"
 )
 
+// CommitOptions contains options for creating a commit
+type CommitOptions struct {
+	Message string
+	Amend   bool
+	NoEdit  bool
+	Edit    bool
+	Verbose int
+}
+
 // Commit creates a commit with the given message
 // If verbose > 0, shows unified diff in commit message template
 func Commit(message string, verbose int) error {
-	// If verbose > 0, we need to use git commit with -v flag
-	// For verbose > 1, we'd need -vv but git commit only supports single -v
+	return CommitWithOptions(CommitOptions{
+		Message: message,
+		Verbose: verbose,
+	})
+}
+
+// CommitWithOptions creates a commit with the given options
+func CommitWithOptions(opts CommitOptions) error {
 	args := []string{"commit"}
-	
-	if verbose > 0 {
+
+	if opts.Amend {
+		args = append(args, "--amend")
+	}
+
+	if opts.Verbose > 0 {
 		args = append(args, "-v")
 	}
-	
-	if message != "" {
-		args = append(args, "-m", message)
+
+	if opts.Message != "" {
+		args = append(args, "-m", opts.Message)
 	}
-	// If no message provided, git will open editor (interactive)
-	
+
+	if opts.NoEdit {
+		args = append(args, "--no-edit")
+	} else if opts.Edit {
+		args = append(args, "-e")
+	}
+
 	// Use exec.Command directly to allow for interactive commit if needed
 	cmd := exec.Command("git", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("failed to commit: %w", err)
@@ -52,4 +76,3 @@ func GetUnstagedDiff() (string, error) {
 	}
 	return output, nil
 }
-

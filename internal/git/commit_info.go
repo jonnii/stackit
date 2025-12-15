@@ -127,3 +127,15 @@ func GetCommitSubject(branchName string) (string, error) {
 	return strings.TrimSpace(subject), nil
 }
 
+// GetCommitRangeSHAs returns the commit SHAs between two revisions (base..head)
+func GetCommitRangeSHAs(base, head string) ([]string, error) {
+	args := []string{"log", "--format=%H", fmt.Sprintf("%s..%s", base, head)}
+	output, err := RunGitCommand(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit range: %w", err)
+	}
+	if output == "" {
+		return []string{}, nil
+	}
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
+}

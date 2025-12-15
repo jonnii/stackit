@@ -11,7 +11,7 @@ import (
 
 func TestSubmitCommand(t *testing.T) {
 	// Build the stackit binary first
-	binaryPath := buildStackitBinary(t)
+	binaryPath := getStackitBinary(t)
 
 	t.Run("submit includes current branch in list", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, nil)

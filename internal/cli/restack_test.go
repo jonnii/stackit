@@ -11,7 +11,7 @@ import (
 )
 
 func TestRestackCommand(t *testing.T) {
-	binaryPath := buildStackitBinary(t)
+	binaryPath := getStackitBinary(t)
 
 	t.Run("restack single branch", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {

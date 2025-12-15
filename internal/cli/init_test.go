@@ -14,7 +14,7 @@ import (
 
 func TestInitCommand(t *testing.T) {
 	// Build the stackit binary first
-	binaryPath := buildStackitBinary(t)
+	binaryPath := getStackitBinary(t)
 
 	t.Run("can run init", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, nil)

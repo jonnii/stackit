@@ -10,10 +10,12 @@ import (
 )
 
 func TestSquashCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("squash branch with multiple commits", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -74,7 +76,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash with --message flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -110,7 +113,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash and restack child branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -161,7 +165,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash errors on trunk branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
@@ -175,7 +180,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash errors when not on a branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
@@ -192,6 +198,7 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash errors when stackit not initialized", func(t *testing.T) {
+		t.Parallel()
 		// Create a temporary directory without stackit initialization
 		tmpDir := t.TempDir()
 		cmd := exec.Command("git", "init", tmpDir, "-b", "main")
@@ -211,7 +218,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash with single commit", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -241,7 +249,8 @@ func TestSquashCommand(t *testing.T) {
 	})
 
 	t.Run("squash restacks multiple upstack branches", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err

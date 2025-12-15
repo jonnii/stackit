@@ -11,10 +11,12 @@ import (
 )
 
 func TestAbsorbCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("absorb basic - single hunk to single commit", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -69,7 +71,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb with --dry-run", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -113,7 +116,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb with --all flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -156,7 +160,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb error - no staged changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -177,6 +182,7 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb error - not initialized", func(t *testing.T) {
+		t.Parallel()
 		// Create a temporary directory without initializing stackit
 		tmpDir := t.TempDir()
 
@@ -210,7 +216,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb multiple hunks to same commit", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -251,7 +258,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb restacks upstack branches", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err
@@ -320,7 +328,8 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb with hunk that commutes with all commits", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
 			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
 				return err

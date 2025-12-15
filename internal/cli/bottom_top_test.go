@@ -25,7 +25,6 @@ func TestBottomCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -33,7 +32,6 @@ func TestBottomCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "b", "-m", "b")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -41,14 +39,12 @@ func TestBottomCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "c", "-m", "c")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
 		// Now we're on branch 'c', run bottom command
 		cmd = exec.Command(binaryPath, "bottom")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "bottom command failed: %s", string(output))
 
@@ -71,14 +67,12 @@ func TestBottomCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
 		// Run bottom from 'a' (already at bottom)
 		cmd = exec.Command(binaryPath, "bottom")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "bottom command failed: %s", string(output))
 
@@ -100,7 +94,6 @@ func TestBottomCommand(t *testing.T) {
 		// Run bottom from trunk
 		cmd := exec.Command(binaryPath, "bottom")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "bottom command failed: %s", string(output))
 
@@ -123,14 +116,12 @@ func TestBottomCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "feature", "-m", "feature")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
 		// Run bottom from feature
 		cmd = exec.Command(binaryPath, "bottom")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "bottom command failed: %s", string(output))
 
@@ -157,7 +148,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -165,7 +155,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "b", "-m", "b")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -173,7 +162,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "c", "-m", "c")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -183,7 +171,6 @@ func TestTopCommand(t *testing.T) {
 
 		cmd = exec.Command(binaryPath, "top")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "top command failed: %s", string(output))
 
@@ -206,14 +193,12 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
 		// Run top from 'a' (already at top)
 		cmd = exec.Command(binaryPath, "top")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "top command failed: %s", string(output))
 
@@ -237,7 +222,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -247,7 +231,6 @@ func TestTopCommand(t *testing.T) {
 
 		cmd = exec.Command(binaryPath, "top")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "top command failed: %s", string(output))
 
@@ -270,14 +253,12 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "feature", "-m", "feature")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
 		// Run top from feature
 		cmd = exec.Command(binaryPath, "top")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "top command failed: %s", string(output))
 
@@ -300,7 +281,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd := exec.Command(binaryPath, "create", "a", "-m", "a")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -309,7 +289,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "b", "-m", "b")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -320,7 +299,6 @@ func TestTopCommand(t *testing.T) {
 		require.NoError(t, err)
 		cmd = exec.Command(binaryPath, "create", "c", "-m", "c")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		err = cmd.Run()
 		require.NoError(t, err)
 
@@ -330,7 +308,6 @@ func TestTopCommand(t *testing.T) {
 
 		cmd = exec.Command(binaryPath, "top")
 		cmd.Dir = scene.Dir
-		cmd.Env = append(os.Environ(), "STACKIT_DISABLE_TELEMETRY=1")
 		// Redirect stdin to /dev/null to simulate non-interactive mode
 		nullFile, err := os.OpenFile(os.DevNull, os.O_RDONLY, 0)
 		require.NoError(t, err)
@@ -346,4 +323,3 @@ func TestTopCommand(t *testing.T) {
 		require.Contains(t, string(output), "Error")
 	})
 }
-

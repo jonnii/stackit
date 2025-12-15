@@ -1,10 +1,16 @@
 # Default recipe
 default: test
 
-# Run all tests (ensures dependencies are up to date)
+# Run all tests (with caching for faster repeated runs)
 test:
 	go mod tidy
 	@echo "Running tests..."
+	go test ./...
+
+# Run all tests without caching (for CI or debugging flaky tests)
+test-fresh:
+	go mod tidy
+	@echo "Running tests (no cache)..."
 	go test ./... -count=1
 
 # Run tests with verbose output

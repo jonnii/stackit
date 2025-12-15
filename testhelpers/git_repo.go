@@ -129,9 +129,6 @@ func (r *GitRepo) RunCliCommand(command []string) error {
 
 	env := os.Environ()
 	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
-	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
-	env = append(env, "STACKIT_DISABLE_UPGRADE_PROMPT=1")
-	env = append(env, "STACKIT_DISABLE_SURVEY=1")
 	env = append(env, "STACKIT_PROFILE=")
 	cmd.Env = env
 
@@ -156,9 +153,6 @@ func (r *GitRepo) RunCliCommandAndGetOutput(command []string) (string, error) {
 
 	env := os.Environ()
 	env = append(env, "STACKIT_USER_CONFIG_PATH="+r.UserConfigPath)
-	env = append(env, "STACKIT_DISABLE_TELEMETRY=1")
-	env = append(env, "STACKIT_DISABLE_UPGRADE_PROMPT=1")
-	env = append(env, "STACKIT_DISABLE_SURVEY=1")
 	cmd.Env = env
 
 	output, err := cmd.Output()

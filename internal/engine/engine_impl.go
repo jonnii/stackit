@@ -79,6 +79,8 @@ func (e *engineImpl) CurrentBranch() string {
 
 // Trunk returns the trunk branch name
 func (e *engineImpl) Trunk() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.trunk
 }
 
@@ -173,6 +175,8 @@ func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []string
 
 // IsTrunk checks if a branch is the trunk
 func (e *engineImpl) IsTrunk(branchName string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return branchName == e.trunk
 }
 
@@ -457,7 +461,10 @@ func (e *engineImpl) TrackBranch(branchName string, parentBranchName string) err
 // PullTrunk pulls the trunk branch from remote
 func (e *engineImpl) PullTrunk() (PullResult, error) {
 	remote := git.GetRemote()
-	gitResult, err := git.PullBranch(remote, e.trunk)
+	e.mu.RLock()
+	trunk := e.trunk
+	e.mu.RUnlock()
+	gitResult, err := git.PullBranch(remote, trunk)
 	if err != nil {
 		return PullConflict, err
 	}
@@ -487,17 +494,19 @@ func (e *engineImpl) PullTrunk() (PullResult, error) {
 func (e *engineImpl) ResetTrunkToRemote() error {
 	remote := git.GetRemote()
 
+	e.mu.RLock()
+	trunk := e.trunk
+	currentBranch := e.currentBranch
+	e.mu.RUnlock()
+
 	// Get remote SHA
-	remoteSha, err := git.GetRemoteSha(remote, e.trunk)
+	remoteSha, err := git.GetRemoteSha(remote, trunk)
 	if err != nil {
 		return fmt.Errorf("failed to get remote SHA: %w", err)
 	}
 
-	// Save current branch
-	currentBranch := e.currentBranch
-
 	// Checkout trunk
-	if err := git.CheckoutBranch(e.trunk); err != nil {
+	if err := git.CheckoutBranch(trunk); err != nil {
 		return fmt.Errorf("failed to checkout trunk: %w", err)
 	}
 
@@ -511,7 +520,7 @@ func (e *engineImpl) ResetTrunkToRemote() error {
 	}
 
 	// Switch back to original branch
-	if currentBranch != "" && currentBranch != e.trunk {
+	if currentBranch != "" && currentBranch != trunk {
 		if err := git.CheckoutBranch(currentBranch); err != nil {
 			return fmt.Errorf("failed to switch back: %w", err)
 		}
@@ -628,18 +637,22 @@ func (e *engineImpl) ContinueRebase(rebasedBranchBase string) (ContinueRebaseRes
 
 // IsMergedIntoTrunk checks if a branch is merged into trunk
 func (e *engineImpl) IsMergedIntoTrunk(branchName string) (bool, error) {
-	return git.IsMerged(branchName, e.trunk)
+	e.mu.RLock()
+	trunk := e.trunk
+	e.mu.RUnlock()
+	return git.IsMerged(branchName, trunk)
 }
 
 // IsBranchEmpty checks if a branch has no changes compared to its parent
 func (e *engineImpl) IsBranchEmpty(branchName string) (bool, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
+	trunk := e.trunk
 	e.mu.RUnlock()
 
 	if !ok {
 		// If not tracked, compare to trunk
-		parent = e.trunk
+		parent = trunk
 	}
 
 	// Get parent revision

@@ -1,3 +1,5 @@
+// Package output provides structured logging and output formatting for stackit.
+// It includes a custom slog handler and color formatting utilities.
 package output
 
 import (

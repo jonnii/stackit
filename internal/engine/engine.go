@@ -1,12 +1,15 @@
+// Package engine provides the core branch state management interface and implementation.
+// It tracks branch relationships, metadata, and provides operations for querying
+// and manipulating the branch stack.
 package engine
 
 import (
 	"time"
 )
 
-// Engine is the core interface for branch state management
-// This interface defines the methods needed for the log command
-type Engine interface {
+// BranchReader provides read-only access to branch information
+// Thread-safe: All methods are safe for concurrent use
+type BranchReader interface {
 	// State queries
 	AllBranchNames() []string
 	CurrentBranch() string
@@ -24,29 +27,53 @@ type Engine interface {
 	GetCommitAuthor(branchName string) (string, error)
 	GetRevision(branchName string) (string, error)
 
-	// PR information
-	GetPrInfo(branchName string) (*PrInfo, error)
-	UpsertPrInfo(branchName string, prInfo *PrInfo) error
+	// Stack queries
+	GetRelativeStackUpstack(branchName string) []string
+	IsMergedIntoTrunk(branchName string) (bool, error)
+	IsBranchEmpty(branchName string) (bool, error)
+}
 
-	// Remote operations
-	BranchMatchesRemote(branchName string) (bool, error)
-	PopulateRemoteShas() error
+// BranchWriter provides write operations for branch management
+// Thread-safe: All methods are safe for concurrent use
+type BranchWriter interface {
+	// Branch tracking
+	TrackBranch(branchName string, parentBranchName string) error
+	SetParent(branchName string, parentBranchName string) error
+	DeleteBranch(branchName string) error
 
 	// Initialization operations
 	Reset(newTrunkName string) error
 	Rebuild(newTrunkName string) error
+}
 
-	// Branch tracking
-	TrackBranch(branchName string, parentBranchName string) error
+// PRManager provides operations for managing pull request information
+// Thread-safe: All methods are safe for concurrent use
+type PRManager interface {
+	GetPrInfo(branchName string) (*PrInfo, error)
+	UpsertPrInfo(branchName string, prInfo *PrInfo) error
+}
+
+// SyncManager provides operations for syncing and restacking branches
+// Thread-safe: All methods are safe for concurrent use
+type SyncManager interface {
+	// Remote operations
+	BranchMatchesRemote(branchName string) (bool, error)
+	PopulateRemoteShas() error
 
 	// Sync operations
 	PullTrunk() (PullResult, error)
 	ResetTrunkToRemote() error
 	RestackBranch(branchName string) (RestackBranchResult, error)
 	ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error)
-	IsMergedIntoTrunk(branchName string) (bool, error)
-	IsBranchEmpty(branchName string) (bool, error)
-	DeleteBranch(branchName string) error
-	SetParent(branchName string, parentBranchName string) error
-	GetRelativeStackUpstack(branchName string) []string
+}
+
+// Engine is the core interface for branch state management
+// It composes BranchReader, BranchWriter, PRManager, and SyncManager
+// for backward compatibility. New code should prefer using the smaller interfaces.
+// Thread-safe: All methods are safe for concurrent use
+type Engine interface {
+	BranchReader
+	BranchWriter
+	PRManager
+	SyncManager
 }

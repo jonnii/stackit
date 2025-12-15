@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/google/go-github/v62/github"
@@ -71,53 +70,11 @@ func SubmitAction(opts SubmitOptions) error {
 		return fmt.Errorf("can't use both --publish and --draft flags in one command")
 	}
 
-	// Get branch scope
-	branchName := opts.Branch
-	if branchName == "" {
-		branchName = eng.CurrentBranch()
+	// Get branches to submit
+	branches, err := getBranchesToSubmit(opts, eng)
+	if err != nil {
+		return err
 	}
-	if branchName == "" {
-		return fmt.Errorf("not on a branch and no branch specified")
-	}
-
-	// Get stack of branches to submit
-	scope := engine.Scope{RecursiveParents: true}
-	var branches []string
-	if opts.Stack {
-		// Include descendants
-		allBranches := eng.GetRelativeStack(branchName, scope)
-		// Add the current branch itself
-		allBranches = append(allBranches, branchName)
-		// Also get descendants recursively
-		children := eng.GetChildren(branchName)
-		for _, child := range children {
-			// Add the child itself
-			allBranches = append(allBranches, child)
-			// Get all descendants of this child recursively
-			descendants := getRecursiveDescendants(eng, child)
-			allBranches = append(allBranches, descendants...)
-		}
-		// Remove duplicates and trunk
-		branchSet := make(map[string]bool)
-		for _, b := range allBranches {
-			if !eng.IsTrunk(b) && !branchSet[b] {
-				branches = append(branches, b)
-				branchSet[b] = true
-			}
-		}
-	} else {
-		// Just ancestors (including current branch)
-		allBranches := eng.GetRelativeStack(branchName, scope)
-		// Add the current branch itself
-		allBranches = append(allBranches, branchName)
-		// Filter out trunk
-		for _, b := range allBranches {
-			if !eng.IsTrunk(b) {
-				branches = append(branches, b)
-			}
-		}
-	}
-
 	if len(branches) == 0 {
 		splog.Info("No branches to submit.")
 		return nil
@@ -168,183 +125,42 @@ func SubmitAction(opts SubmitOptions) error {
 	splog.Info("Pushing to remote and creating/updating PRs...")
 	githubCtx := context.Background()
 
-	var githubClient *github.Client
-	var repoOwner, repoName string
-
-	// Use injected client for testing, otherwise get real client
-	if opts.GitHubClient != nil {
-		githubClient = opts.GitHubClient
-		repoOwner = opts.GitHubOwner
-		repoName = opts.GitHubRepo
-		if repoOwner == "" || repoName == "" {
-			return fmt.Errorf("GitHubOwner and GitHubRepo must be provided when using GitHubClient")
-		}
-	} else {
-		var err error
-		githubClient, repoOwner, repoName, err = git.GetGitHubClient(githubCtx)
-		if err != nil {
-			return fmt.Errorf("failed to get GitHub client: %w", err)
-		}
+	githubClient, repoOwner, repoName, err := getGitHubClient(opts, githubCtx)
+	if err != nil {
+		return err
 	}
 
 	remote := "origin" // TODO: Get from config
 	for _, submissionInfo := range submissionInfos {
-		// Push branch (skip if using mocked client for testing)
-		if opts.GitHubClient == nil && !opts.DryRun {
-			forceWithLease := !opts.Force
-			if err := git.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
-				if strings.Contains(err.Error(), "stale info") {
-					return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
-				}
-				return fmt.Errorf("failed to push branch %s: %w", submissionInfo.BranchName, err)
+		if err := pushBranchIfNeeded(submissionInfo, opts, remote); err != nil {
+			return err
+		}
+
+		var prURL string
+		if submissionInfo.Action == "create" {
+			prURL, err = createPullRequest(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName, splog)
+			if err != nil {
+				return err
+			}
+		} else {
+			prURL, err = updatePullRequest(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName, splog)
+			if err != nil {
+				return err
 			}
 		}
 
-		// Create or update PR
-		if submissionInfo.Action == "create" {
-			createOpts := git.CreatePROptions{
-				Title:         submissionInfo.Metadata.Title,
-				Body:          submissionInfo.Metadata.Body,
-				Head:          submissionInfo.Head,
-				Base:          submissionInfo.Base,
-				Draft:         submissionInfo.Metadata.IsDraft,
-				Reviewers:     submissionInfo.Metadata.Reviewers,
-				TeamReviewers: submissionInfo.Metadata.TeamReviewers,
-			}
-			pr, err := git.CreatePullRequest(githubCtx, githubClient, repoOwner, repoName, createOpts)
-			if err != nil {
-				return fmt.Errorf("failed to create PR for %s: %w", submissionInfo.BranchName, err)
-			}
-
-			// Update PR info
-			prNumber := pr.Number
-			prURL := ""
-			if pr.HTMLURL != nil {
-				prURL = *pr.HTMLURL
-			}
-			eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
-				Number:  prNumber,
-				Title:   submissionInfo.Metadata.Title,
-				Body:    submissionInfo.Metadata.Body,
-				IsDraft: submissionInfo.Metadata.IsDraft,
-				State:   "OPEN",
-				Base:    submissionInfo.Base,
-				URL:     prURL,
-			})
-
-			splog.Info("%s: %s (%s)",
-				output.ColorBranchName(submissionInfo.BranchName, true),
-				prURL,
-				output.ColorDim("created"))
-
-			// Open in browser if requested
-			if opts.View {
-				openBrowser(prURL)
-			}
-		} else {
-			// Update PR - check if base changed
-			prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
-			baseChanged := false
-			if prInfo != nil && prInfo.Base != submissionInfo.Base {
-				baseChanged = true
-			}
-
-			updateOpts := git.UpdatePROptions{
-				Title:           &submissionInfo.Metadata.Title,
-				Body:            &submissionInfo.Metadata.Body,
-				Reviewers:       submissionInfo.Metadata.Reviewers,
-				TeamReviewers:   submissionInfo.Metadata.TeamReviewers,
-				MergeWhenReady:  &opts.MergeWhenReady,
-				RerequestReview: opts.RerequestReview,
-			}
-
-			// Only update draft status if it's explicitly set via flags
-			if opts.Draft || opts.Publish {
-				updateOpts.Draft = &submissionInfo.Metadata.IsDraft
-			}
-			if baseChanged {
-				updateOpts.Base = &submissionInfo.Base
-			}
-			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
-				return fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
-			}
-
-			// Update PR info - prInfo already declared above
-			prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
-			var prURL string
-			if prInfo != nil {
-				prURL = prInfo.URL
-			}
-			if prURL == "" {
-				// Get from GitHub
-				pr, err := git.GetPullRequestByBranch(githubCtx, githubClient, repoOwner, repoName, submissionInfo.BranchName)
-				if err == nil && pr != nil && pr.HTMLURL != nil {
-					prURL = *pr.HTMLURL
-				}
-			}
-			eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
-				Number:  submissionInfo.PRNumber,
-				Title:   submissionInfo.Metadata.Title,
-				Body:    submissionInfo.Metadata.Body,
-				IsDraft: submissionInfo.Metadata.IsDraft,
-				State:   "OPEN",
-				Base:    submissionInfo.Base,
-				URL:     prURL,
-			})
-
-			// Get PR URL
-			prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
-			if prInfo != nil && prInfo.URL != "" {
-				prURL = prInfo.URL
-			} else {
-				// Get from GitHub
-				pr, err := git.GetPullRequestByBranch(githubCtx, githubClient, repoOwner, repoName, submissionInfo.BranchName)
-				if err == nil && pr != nil && pr.HTMLURL != nil {
-					prURL = *pr.HTMLURL
-				}
-			}
-
-			splog.Info("%s: %s (%s)",
-				output.ColorBranchName(submissionInfo.BranchName, true),
-				prURL,
-				output.ColorDim("updated"))
-
-			// Open in browser if requested
-			if opts.View && prURL != "" {
-				openBrowser(prURL)
+		// Open in browser if requested
+		if opts.View && prURL != "" {
+			if err := openBrowser(prURL); err != nil {
+				// Log error but don't fail the operation
+				splog.Debug("Failed to open browser: %v", err)
 			}
 		}
 	}
 
 	// Update PR body footers
-	splog.Info("Updating dependency trees in PR bodies...")
-	for _, branchName := range branches {
-		prInfo, err := eng.GetPrInfo(branchName)
-		if err != nil || prInfo == nil || prInfo.Number == nil {
-			continue
-		}
-
-		footer := CreatePRBodyFooter(branchName, eng)
-		updatedBody := UpdatePRBodyFooter(prInfo.Body, footer)
-
-		if updatedBody != prInfo.Body {
-			updateOpts := git.UpdatePROptions{
-				Body: &updatedBody,
-			}
-			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
-				splog.Debug("Failed to update PR footer for %s: %v", branchName, err)
-				continue
-			}
-
-			prURL := ""
-			if prInfo.URL != "" {
-				prURL = prInfo.URL
-			}
-			splog.Info("%s: %s (%s)",
-				output.ColorBranchName(branchName, true),
-				prURL,
-				output.ColorDim("updated"))
-		}
+	if err := updatePRFooters(branches, eng, githubCtx, githubClient, repoOwner, repoName, splog); err != nil {
+		return err
 	}
 
 	return nil
@@ -479,12 +295,221 @@ func getRecursiveDescendants(eng engine.Engine, branchName string) []string {
 	return descendants
 }
 
-// openBrowser opens a URL in the default browser
-func openBrowser(url string) {
-	cmd := exec.Command("open", url) // macOS
-	if err := cmd.Run(); err != nil {
-		// Try other commands for different OS
-		exec.Command("xdg-open", url).Run() // Linux
-		exec.Command("start", url).Run()    // Windows
+// getBranchesToSubmit returns the list of branches to submit based on options
+func getBranchesToSubmit(opts SubmitOptions, eng engine.Engine) ([]string, error) {
+	// Get branch scope
+	branchName := opts.Branch
+	if branchName == "" {
+		branchName = eng.CurrentBranch()
 	}
+	if branchName == "" {
+		return nil, fmt.Errorf("not on a branch and no branch specified")
+	}
+
+	// Get stack of branches to submit
+	scope := engine.Scope{RecursiveParents: true}
+	var branches []string
+	if opts.Stack {
+		// Include descendants
+		allBranches := eng.GetRelativeStack(branchName, scope)
+		// Add the current branch itself
+		allBranches = append(allBranches, branchName)
+		// Also get descendants recursively
+		children := eng.GetChildren(branchName)
+		for _, child := range children {
+			// Add the child itself
+			allBranches = append(allBranches, child)
+			// Get all descendants of this child recursively
+			descendants := getRecursiveDescendants(eng, child)
+			allBranches = append(allBranches, descendants...)
+		}
+		// Remove duplicates and trunk
+		branchSet := make(map[string]bool)
+		for _, b := range allBranches {
+			if !eng.IsTrunk(b) && !branchSet[b] {
+				branches = append(branches, b)
+				branchSet[b] = true
+			}
+		}
+	} else {
+		// Just ancestors (including current branch)
+		allBranches := eng.GetRelativeStack(branchName, scope)
+		// Add the current branch itself
+		allBranches = append(allBranches, branchName)
+		// Filter out trunk
+		for _, b := range allBranches {
+			if !eng.IsTrunk(b) {
+				branches = append(branches, b)
+			}
+		}
+	}
+
+	return branches, nil
+}
+
+// getGitHubClient returns the GitHub client and repository information
+func getGitHubClient(opts SubmitOptions, ctx context.Context) (*github.Client, string, string, error) {
+	if opts.GitHubClient != nil {
+		if opts.GitHubOwner == "" || opts.GitHubRepo == "" {
+			return nil, "", "", fmt.Errorf("GitHubOwner and GitHubRepo must be provided when using GitHubClient")
+		}
+		return opts.GitHubClient, opts.GitHubOwner, opts.GitHubRepo, nil
+	}
+
+	githubClient, repoOwner, repoName, err := git.GetGitHubClient(ctx)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to get GitHub client: %w", err)
+	}
+	return githubClient, repoOwner, repoName, nil
+}
+
+// pushBranchIfNeeded pushes a branch to remote if needed
+func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remote string) error {
+	// Skip if using mocked client for testing or dry run
+	if opts.GitHubClient != nil || opts.DryRun {
+		return nil
+	}
+
+	forceWithLease := !opts.Force
+	if err := git.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
+		if strings.Contains(err.Error(), "stale info") {
+			return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
+		}
+		return fmt.Errorf("failed to push branch %s: %w", submissionInfo.BranchName, err)
+	}
+	return nil
+}
+
+// createPullRequest creates a new pull request
+func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) (string, error) {
+	createOpts := git.CreatePROptions{
+		Title:         submissionInfo.Metadata.Title,
+		Body:          submissionInfo.Metadata.Body,
+		Head:          submissionInfo.Head,
+		Base:          submissionInfo.Base,
+		Draft:         submissionInfo.Metadata.IsDraft,
+		Reviewers:     submissionInfo.Metadata.Reviewers,
+		TeamReviewers: submissionInfo.Metadata.TeamReviewers,
+	}
+	pr, err := git.CreatePullRequest(githubCtx, githubClient, repoOwner, repoName, createOpts)
+	if err != nil {
+		return "", fmt.Errorf("failed to create PR for %s: %w", submissionInfo.BranchName, err)
+	}
+
+	// Update PR info
+	prNumber := pr.Number
+	prURL := ""
+	if pr.HTMLURL != nil {
+		prURL = *pr.HTMLURL
+	}
+	eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+		Number:  prNumber,
+		Title:   submissionInfo.Metadata.Title,
+		Body:    submissionInfo.Metadata.Body,
+		IsDraft: submissionInfo.Metadata.IsDraft,
+		State:   "OPEN",
+		Base:    submissionInfo.Base,
+		URL:     prURL,
+	})
+
+	splog.Info("%s: %s (%s)",
+		output.ColorBranchName(submissionInfo.BranchName, true),
+		prURL,
+		output.ColorDim("created"))
+
+	return prURL, nil
+}
+
+// updatePullRequest updates an existing pull request
+func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) (string, error) {
+	// Check if base changed
+	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
+	baseChanged := false
+	if prInfo != nil && prInfo.Base != submissionInfo.Base {
+		baseChanged = true
+	}
+
+	updateOpts := git.UpdatePROptions{
+		Title:           &submissionInfo.Metadata.Title,
+		Body:            &submissionInfo.Metadata.Body,
+		Reviewers:       submissionInfo.Metadata.Reviewers,
+		TeamReviewers:   submissionInfo.Metadata.TeamReviewers,
+		MergeWhenReady:  &opts.MergeWhenReady,
+		RerequestReview: opts.RerequestReview,
+	}
+
+	// Only update draft status if it's explicitly set via flags
+	if opts.Draft || opts.Publish {
+		updateOpts.Draft = &submissionInfo.Metadata.IsDraft
+	}
+	if baseChanged {
+		updateOpts.Base = &submissionInfo.Base
+	}
+	if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
+		return "", fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
+	}
+
+	// Get PR URL
+	prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
+	var prURL string
+	if prInfo != nil && prInfo.URL != "" {
+		prURL = prInfo.URL
+	} else {
+		// Get from GitHub
+		pr, err := git.GetPullRequestByBranch(githubCtx, githubClient, repoOwner, repoName, submissionInfo.BranchName)
+		if err == nil && pr != nil && pr.HTMLURL != nil {
+			prURL = *pr.HTMLURL
+		}
+	}
+
+	eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+		Number:  submissionInfo.PRNumber,
+		Title:   submissionInfo.Metadata.Title,
+		Body:    submissionInfo.Metadata.Body,
+		IsDraft: submissionInfo.Metadata.IsDraft,
+		State:   "OPEN",
+		Base:    submissionInfo.Base,
+		URL:     prURL,
+	})
+
+	splog.Info("%s: %s (%s)",
+		output.ColorBranchName(submissionInfo.BranchName, true),
+		prURL,
+		output.ColorDim("updated"))
+
+	return prURL, nil
+}
+
+// updatePRFooters updates PR body footers with dependency trees
+func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) error {
+	splog.Info("Updating dependency trees in PR bodies...")
+	for _, branchName := range branches {
+		prInfo, err := eng.GetPrInfo(branchName)
+		if err != nil || prInfo == nil || prInfo.Number == nil {
+			continue
+		}
+
+		footer := CreatePRBodyFooter(branchName, eng)
+		updatedBody := UpdatePRBodyFooter(prInfo.Body, footer)
+
+		if updatedBody != prInfo.Body {
+			updateOpts := git.UpdatePROptions{
+				Body: &updatedBody,
+			}
+			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
+				splog.Debug("Failed to update PR footer for %s: %v", branchName, err)
+				continue
+			}
+
+			prURL := ""
+			if prInfo.URL != "" {
+				prURL = prInfo.URL
+			}
+			splog.Info("%s: %s (%s)",
+				output.ColorBranchName(branchName, true),
+				prURL,
+				output.ColorDim("updated"))
+		}
+	}
+	return nil
 }

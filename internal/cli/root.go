@@ -18,6 +18,7 @@ https://github.com/jonnii/stackit`,
 
 	// Add subcommands
 	rootCmd.AddCommand(newLogCmd())
+	rootCmd.AddCommand(newInfoCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newCreateCmd())
 	rootCmd.AddCommand(newBottomCmd())

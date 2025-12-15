@@ -90,3 +90,31 @@ func ColorMagenta(text string) string {
 		Foreground(lipgloss.Color("5")).
 		Render(text)
 }
+
+// ColorPRNumber colors a PR number (yellow)
+func ColorPRNumber(prNumber int) string {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3")).
+		Render(fmt.Sprintf("PR #%d", prNumber))
+}
+
+// ColorPRState colors PR state text based on state and draft status
+func ColorPRState(state string, isDraft bool) string {
+	if isDraft {
+		return ColorDim("(Draft)")
+	}
+
+	switch state {
+	case "APPROVED":
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("2")).
+			Render("(Approved)")
+	case "CHANGES_REQUESTED":
+		return ColorMagenta("(Changes Requested)")
+	case "REVIEW_REQUIRED":
+		return ColorYellow("(Review Required)")
+	default:
+		// No review decision means review isn't required
+		return ""
+	}
+}

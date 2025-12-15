@@ -9,10 +9,10 @@ import (
 
 // SquashOptions are options for the squash command
 type SquashOptions struct {
-	Message string
-	NoEdit  bool
-	Engine  engine.Engine
-	Splog   *output.Splog
+	Message  string
+	NoEdit   bool
+	Engine   engine.Engine
+	Splog    *output.Splog
 	RepoRoot string
 }
 

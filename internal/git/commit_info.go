@@ -139,4 +139,3 @@ func GetCommitRangeSHAs(base, head string) ([]string, error) {
 	}
 	return strings.Split(strings.TrimSpace(output), "\n"), nil
 }
-

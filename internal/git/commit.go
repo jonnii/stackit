@@ -76,4 +76,3 @@ func GetUnstagedDiff() (string, error) {
 	}
 	return output, nil
 }
-

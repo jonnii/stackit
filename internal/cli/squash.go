@@ -53,14 +53,11 @@ all upstack branches (children) are automatically restacked.`,
 			// Create context
 			ctx := context.NewContext(eng)
 
-			// Determine noEdit flag: --no-edit takes precedence over --edit
+			// Determine noEdit flag: matches charcoal logic: noEdit = argv['no-edit'] || !argv.edit
 			// If --no-edit is set, noEdit = true
-			// If --message is provided, noEdit = true (message provided, don't edit)
-			// Otherwise, noEdit = false (default to editing)
-			noEditFlag := noEdit
-			if !noEditFlag && message != "" {
-				noEditFlag = true // Message provided, don't edit
-			}
+			// If --edit is false, noEdit = true
+			// Otherwise (edit is true, the default), noEdit = false (will edit)
+			noEditFlag := noEdit || !edit
 
 			// Run squash action
 			return actions.SquashAction(actions.SquashOptions{

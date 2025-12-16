@@ -116,7 +116,7 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 
 	result := []string{}
 
-	// Add ancestors if RecursiveParents is true
+	// Add ancestors if RecursiveParents is true (excluding trunk)
 	if scope.RecursiveParents {
 		current := branchName
 		ancestors := []string{}
@@ -125,7 +125,7 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 				break
 			}
 			parent, ok := e.parentMap[current]
-			if !ok {
+			if !ok || parent == e.trunk {
 				break
 			}
 			ancestors = append([]string{parent}, ancestors...)

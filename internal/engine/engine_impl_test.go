@@ -237,7 +237,7 @@ func TestDeleteBranch(t *testing.T) {
 }
 
 func TestGetRelativeStack(t *testing.T) {
-	t.Run("returns downstack (ancestors)", func(t *testing.T) {
+	t.Run("returns downstack (ancestors) excluding trunk", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
@@ -263,10 +263,11 @@ func TestGetRelativeStack(t *testing.T) {
 		err = eng.TrackBranch("branch2", "branch1")
 		require.NoError(t, err)
 
-		// Get downstack from branch2
+		// Get downstack from branch2 - should NOT include trunk (main)
 		scope := engine.Scope{RecursiveParents: true}
 		stack := eng.GetRelativeStack("branch2", scope)
-		require.Equal(t, []string{"main", "branch1"}, stack)
+		require.Equal(t, []string{"branch1"}, stack)
+		require.NotContains(t, stack, "main", "trunk should not be included in ancestors")
 	})
 
 	t.Run("returns upstack (descendants)", func(t *testing.T) {
@@ -335,12 +336,12 @@ func TestGetRelativeStack(t *testing.T) {
 		require.Equal(t, []string{"branch1"}, stack)
 	})
 
-	t.Run("returns full stack (downstack + current + upstack)", func(t *testing.T) {
+	t.Run("returns full stack (downstack + current + upstack) excluding trunk", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
-		// Create: main -> branch1 -> branch2
+		// Create: main -> branch1 -> branch2 -> branch3
 		err := scene.Repo.CreateAndCheckoutBranch("branch1")
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
@@ -349,6 +350,11 @@ func TestGetRelativeStack(t *testing.T) {
 		err = scene.Repo.CreateAndCheckoutBranch("branch2")
 		require.NoError(t, err)
 		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("branch3")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
 		require.NoError(t, err)
 		err = scene.Repo.CheckoutBranch("main")
 		require.NoError(t, err)
@@ -360,16 +366,21 @@ func TestGetRelativeStack(t *testing.T) {
 		require.NoError(t, err)
 		err = eng.TrackBranch("branch2", "branch1")
 		require.NoError(t, err)
+		err = eng.TrackBranch("branch3", "branch2")
+		require.NoError(t, err)
 
+		// Get full stack from branch2 - should NOT include trunk (main)
 		scope := engine.Scope{
 			RecursiveParents:  true,
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := eng.GetRelativeStack("branch1", scope)
-		require.Contains(t, stack, "main")
+		stack := eng.GetRelativeStack("branch2", scope)
+		require.NotContains(t, stack, "main", "trunk should not be included in ancestors")
 		require.Contains(t, stack, "branch1")
 		require.Contains(t, stack, "branch2")
+		require.Contains(t, stack, "branch3")
+		require.Len(t, stack, 3)
 	})
 }
 

@@ -30,10 +30,8 @@ func StageTracked() error {
 
 // StagePatch performs interactive patch staging
 func StagePatch() error {
-	// Note: This requires interactive input, so we'll use exec.Command directly
-	// For now, we'll use git add -p which requires user interaction
-	// This will be handled at the CLI level with proper stdin/stdout
-	_, err := RunGitCommand("add", "-p")
+	// Use interactive mode so stdin/stdout/stderr are connected to the terminal
+	err := RunGitCommandInteractive("add", "-p")
 	if err != nil {
 		return fmt.Errorf("failed to stage patch: %w", err)
 	}

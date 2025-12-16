@@ -8,11 +8,12 @@ import (
 
 // CommitOptions contains options for creating a commit
 type CommitOptions struct {
-	Message string
-	Amend   bool
-	NoEdit  bool
-	Edit    bool
-	Verbose int
+	Message     string
+	Amend       bool
+	NoEdit      bool
+	Edit        bool
+	Verbose     int
+	ResetAuthor bool
 }
 
 // Commit creates a commit with the given message
@@ -30,6 +31,10 @@ func CommitWithOptions(opts CommitOptions) error {
 
 	if opts.Amend {
 		args = append(args, "--amend")
+	}
+
+	if opts.ResetAuthor {
+		args = append(args, "--reset-author")
 	}
 
 	if opts.Verbose > 0 {

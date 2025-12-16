@@ -345,3 +345,26 @@ func (r *GitRepo) PushBranch(remote, branch string) error {
 func (r *GitRepo) ForcePushBranch(remote, branch string) error {
 	return r.runGitCommand("push", "-f", remote, branch)
 }
+
+// GetRevision returns the SHA of a revision (branch, tag, or commit reference).
+func (r *GitRepo) GetRevision(rev string) (string, error) {
+	return r.runGitCommandAndGetOutput("rev-parse", rev)
+}
+
+// HasUnstagedChanges checks if there are unstaged changes to tracked files.
+func (r *GitRepo) HasUnstagedChanges() (bool, error) {
+	output, err := r.runGitCommandAndGetOutput("diff", "--name-only")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(output) != "", nil
+}
+
+// HasUntrackedFiles checks if there are untracked files.
+func (r *GitRepo) HasUntrackedFiles() (bool, error) {
+	output, err := r.runGitCommandAndGetOutput("ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(output) != "", nil
+}

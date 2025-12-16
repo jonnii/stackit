@@ -4,6 +4,12 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/config"
+	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 )
 
 // newModifyCmd creates the modify command
@@ -14,6 +20,7 @@ func newModifyCmd() *cobra.Command {
 		edit              bool
 		interactiveRebase bool
 		message           string
+		noEdit            bool
 		patch             bool
 		resetAuthor       bool
 		update            bool
@@ -21,37 +28,85 @@ func newModifyCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "modify",
-		Short: "Modify the current branch by amending its commit or creating a new commit",
+		Use:     "modify",
+		Aliases: []string{"m"},
+		Short:   "Modify the current branch by amending its commit or creating a new commit",
 		Long: `Modify the current branch by amending its commit or creating a new commit.
 
 Automatically restacks descendants after the modification.
 
-If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
+Examples:
+  stackit modify -a -m "Updated feature"  # Stage all and amend with message
+  stackit modify -a                       # Stage all and amend (opens editor)
+  stackit modify -p                       # Interactive patch staging then amend
+  stackit modify -c -a -m "New commit"    # Create new commit instead of amending
+  stackit modify --interactive-rebase     # Interactive rebase on branch commits`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = all               // Will be used when implemented
-			_ = commit            // Will be used when implemented
-			_ = edit              // Will be used when implemented
-			_ = interactiveRebase // Will be used when implemented
-			_ = message           // Will be used when implemented
-			_ = patch             // Will be used when implemented
-			_ = resetAuthor       // Will be used when implemented
-			_ = update            // Will be used when implemented
-			_ = verbose           // Will be used when implemented
-			return fmt.Errorf("modify command not yet implemented")
+			// Initialize git repository
+			if err := git.InitDefaultRepo(); err != nil {
+				return fmt.Errorf("not a git repository: %w", err)
+			}
+
+			// Get repo root
+			repoRoot, err := git.GetRepoRoot()
+			if err != nil {
+				return fmt.Errorf("failed to get repo root: %w", err)
+			}
+
+			// Check if initialized
+			if !config.IsInitialized(repoRoot) {
+				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
+			}
+
+			// Create engine
+			eng, err := engine.NewEngine(repoRoot)
+			if err != nil {
+				return fmt.Errorf("failed to create engine: %w", err)
+			}
+
+			// Create context
+			ctx := context.NewContext(eng)
+
+			// Determine noEdit flag:
+			// - If --no-edit is explicitly set, use it
+			// - If message is provided, don't open editor (noEdit = true)
+			// - If --edit is set, open editor (noEdit = false)
+			// - Default: open editor when amending without message (noEdit = false)
+			noEditFlag := noEdit
+			if message != "" && !edit {
+				noEditFlag = true
+			}
+
+			// Run modify action
+			return actions.ModifyAction(actions.ModifyOptions{
+				All:               all,
+				Update:            update,
+				Patch:             patch,
+				CreateCommit:      commit,
+				Message:           message,
+				Edit:              edit,
+				NoEdit:            noEditFlag,
+				ResetAuthor:       resetAuthor,
+				Verbose:           verbose,
+				InteractiveRebase: interactiveRebase,
+				Engine:            eng,
+				Splog:             ctx.Splog,
+				RepoRoot:          repoRoot,
+			})
 		},
 	}
 
 	// Add flags
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Stage all changes before committing.")
 	cmd.Flags().BoolVarP(&commit, "commit", "c", false, "Create a new commit instead of amending the current commit. If this branch has no commits, this command always creates a new commit.")
-	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "If passed, open an editor to edit the commit message. When creating a new commit, this flag is ignored.")
+	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "If passed, open an editor to edit the commit message.")
 	cmd.Flags().BoolVar(&interactiveRebase, "interactive-rebase", false, "Ignore all other flags and start a git interactive rebase on the commits in this branch.")
 	cmd.Flags().StringVarP(&message, "message", "m", "", "The message for the new or amended commit. If passed, no editor is opened.")
+	cmd.Flags().BoolVarP(&noEdit, "no-edit", "n", false, "Don't modify the existing commit message. Takes precedence over --edit.")
 	cmd.Flags().BoolVarP(&patch, "patch", "p", false, "Pick hunks to stage before committing.")
 	cmd.Flags().BoolVar(&resetAuthor, "reset-author", false, "Set the author of the commit to the current user if amending.")
 	cmd.Flags().BoolVarP(&update, "update", "u", false, "Stage all updates to tracked files before committing.")
-	cmd.Flags().CountVarP(&verbose, "verbose", "v", "Show unified diff between the HEAD commit and what would be committed at the bottom of the commit message template. If specified twice, show in addition the unified diff between what would be committed and the worktree files, i.e. the unstaged changes to tracked files.")
+	cmd.Flags().CountVarP(&verbose, "verbose", "v", "Show unified diff between the HEAD commit and what would be committed at the bottom of the commit message template.")
 
 	return cmd
 }

@@ -75,3 +75,15 @@ func ShowCommits(base, head string, patch, stat bool) (string, error) {
 	args = append(args, "--")
 	return RunGitCommand(args...)
 }
+
+// GetChangedFiles returns the list of files changed between two refs
+func GetChangedFiles(base, head string) ([]string, error) {
+	output, err := RunGitCommand("diff", "--name-only", base, head)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files: %w", err)
+	}
+	if output == "" {
+		return []string{}, nil
+	}
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
+}

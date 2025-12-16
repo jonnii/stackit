@@ -88,3 +88,11 @@ init:
 	fi
 	./stackit init
 
+# Run the website server
+website:
+	cd website && make run
+
+# Run the website in dev mode with live reload
+website-dev:
+	cd website && make dev
+

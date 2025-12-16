@@ -156,7 +156,7 @@ func parseDiffHunks(diffOutput, targetFile string) ([]Hunk, error) {
 	var currentFile string
 	var hunkLines []string
 
-	for i, line := range lines {
+	for _, line := range lines {
 		// Check for file header
 		if strings.HasPrefix(line, "diff --git") {
 			// Save previous hunk if exists
@@ -168,21 +168,13 @@ func parseDiffHunks(diffOutput, targetFile string) ([]Hunk, error) {
 				currentHunk = nil
 				hunkLines = nil
 			}
-			// Extract file path
-			if i+1 < len(lines) && strings.HasPrefix(lines[i+1], "--- a/") {
-				fileLine := lines[i+1]
-				filePath := strings.TrimPrefix(fileLine, "--- a/")
-				if filePath == "/dev/null" {
-					if i+2 < len(lines) && strings.HasPrefix(lines[i+2], "+++ b/") {
-						filePath = strings.TrimPrefix(lines[i+2], "+++ b/")
-						if filePath == "/dev/null" {
-							continue
-						}
-					} else {
-						continue
-					}
+			// Extract file path from "diff --git a/path b/path"
+			parts := strings.Split(line, " ")
+			if len(parts) >= 4 {
+				bPath := parts[len(parts)-1]
+				if strings.HasPrefix(bPath, "b/") {
+					currentFile = strings.TrimPrefix(bPath, "b/")
 				}
-				currentFile = filePath
 			}
 			continue
 		}
@@ -522,4 +514,3 @@ func UpdateBranchRef(branchName, commitSHA string) error {
 	}
 	return nil
 }
-

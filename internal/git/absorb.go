@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // HunkTarget represents a hunk and its target commit
@@ -495,18 +493,25 @@ func GetCommitAuthorFromSHA(commitSHA string) (*CommitAuthor, error) {
 
 // GetCommitDateFromSHA returns the commit date
 func GetCommitDateFromSHA(commitSHA string) (time.Time, error) {
-	repo, err := GetDefaultRepo()
+	// Use git command to get the commit date (ISO 8601 format)
+	// This avoids using the global defaultRepo which can cause issues in parallel tests
+	output, err := RunGitCommand("log", "-1", "--format=%aI", commitSHA)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("failed to get commit date: %w", err)
 	}
 
-	hash := plumbing.NewHash(commitSHA)
-	commit, err := repo.CommitObject(hash)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get commit: %w", err)
+	dateStr := strings.TrimSpace(output)
+	if dateStr == "" {
+		return time.Time{}, fmt.Errorf("empty date for commit %s", commitSHA)
 	}
 
-	return commit.Author.When, nil
+	// Parse ISO 8601 format
+	t, err := time.Parse(time.RFC3339, dateStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse commit date %q: %w", dateStr, err)
+	}
+
+	return t, nil
 }
 
 // UpdateBranchRef updates a branch reference to point to a new commit
@@ -517,3 +522,4 @@ func UpdateBranchRef(branchName, commitSHA string) error {
 	}
 	return nil
 }
+

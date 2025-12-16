@@ -118,13 +118,10 @@ func SyncAction(opts SyncOptions) error {
 		branchesToRestack = append(branchesToRestack, currentBranch)
 		branchesToRestack = append(branchesToRestack, stack...)
 	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
-		// If on trunk, restack all branches
-		allBranches = eng.AllBranchNames()
-		for _, branchName := range allBranches {
-			if !eng.IsTrunk(branchName) && eng.IsBranchTracked(branchName) {
-				branchesToRestack = append(branchesToRestack, branchName)
-			}
-		}
+		// If on trunk, restack all branches - use GetRelativeStack which returns
+		// branches in topological order (parent before children) via DFS
+		stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveChildren: true})
+		branchesToRestack = append(branchesToRestack, stack...)
 	}
 
 	// Remove duplicates

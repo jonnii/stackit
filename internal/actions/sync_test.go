@@ -84,4 +84,50 @@ func TestSyncAction(t *testing.T) {
 		// Should succeed (even if no restacking needed)
 		require.NoError(t, err)
 	})
+
+	t.Run("restacks branches in topological order (parents before children)", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create stack: main -> branch1 -> branch2 -> branch3
+		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("branch2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("branch3")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		err = eng.TrackBranch("branch1", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch("branch2", "branch1")
+		require.NoError(t, err)
+		err = eng.TrackBranch("branch3", "branch2")
+		require.NoError(t, err)
+
+		splog := output.NewSplog()
+		err = actions.SyncAction(actions.SyncOptions{
+			All:     false,
+			Force:   false,
+			Restack: true,
+			Engine:  eng,
+			Splog:   splog,
+		})
+		// Should succeed - branches should be restacked in correct order
+		require.NoError(t, err)
+	})
 }

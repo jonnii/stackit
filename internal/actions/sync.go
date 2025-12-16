@@ -137,18 +137,73 @@ func SyncAction(opts SyncOptions) error {
 		}
 	}
 
+	// Sort branches topologically (parents before children) for correct restack order
+	sortedBranches := sortBranchesTopologically(uniqueBranches, eng)
+
 	// Restack branches
-	if len(uniqueBranches) > 0 {
+	if len(sortedBranches) > 0 {
 		repoRoot, err := git.GetRepoRoot()
 		if err != nil {
 			return fmt.Errorf("failed to get repo root: %w", err)
 		}
-		if err := RestackBranches(uniqueBranches, eng, splog, repoRoot); err != nil {
+		if err := RestackBranches(sortedBranches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
 
 	return nil
+}
+
+// sortBranchesTopologically sorts branches so parents come before children.
+// This ensures correct restack order (bottom of stack first).
+func sortBranchesTopologically(branches []string, eng engine.Engine) []string {
+	if len(branches) == 0 {
+		return branches
+	}
+
+	// Build a set for quick lookup
+	branchSet := make(map[string]bool)
+	for _, b := range branches {
+		branchSet[b] = true
+	}
+
+	// Calculate depth for each branch (distance from trunk)
+	depths := make(map[string]int)
+	var getDepth func(branch string) int
+	getDepth = func(branch string) int {
+		if depth, ok := depths[branch]; ok {
+			return depth
+		}
+		if eng.IsTrunk(branch) {
+			depths[branch] = 0
+			return 0
+		}
+		parent := eng.GetParent(branch)
+		if parent == "" || eng.IsTrunk(parent) {
+			depths[branch] = 1
+			return 1
+		}
+		depths[branch] = getDepth(parent) + 1
+		return depths[branch]
+	}
+
+	// Calculate depth for all branches
+	for _, branch := range branches {
+		getDepth(branch)
+	}
+
+	// Sort by depth (parents first, then children)
+	result := make([]string, len(branches))
+	copy(result, branches)
+	for i := 0; i < len(result)-1; i++ {
+		for j := i + 1; j < len(result); j++ {
+			if depths[result[i]] > depths[result[j]] {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+
+	return result
 }
 
 // hasUncommittedChanges checks if there are uncommitted changes

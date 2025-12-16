@@ -138,16 +138,6 @@ func GetReviewersWithPrompt(reviewersFlag string, ctx *stackitcontext.Context) (
 	return reviewers, teamReviewers, nil
 }
 
-// GetPRDraftStatus prompts user for draft status
-func GetPRDraftStatus(ctx *stackitcontext.Context) (bool, error) {
-	result, err := promptConfirm("Create as draft?", true)
-	if err != nil {
-		return false, fmt.Errorf("failed to get draft status: %w", err)
-	}
-
-	return result, nil
-}
-
 // PreparePRMetadata prepares PR metadata for a branch
 func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine.Engine, ctx *stackitcontext.Context) (*PRMetadata, error) {
 	prInfo, _ := eng.GetPrInfo(branchName)
@@ -180,23 +170,14 @@ func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine
 		metadata.Body = body
 	}
 
-	// Get draft status
+	// Get draft status - respect flags, default to published (not draft)
 	if opts.Draft {
 		metadata.IsDraft = true
 	} else if opts.Publish {
 		metadata.IsDraft = false
 	} else if prInfo == nil {
-		// New PR - prompt user if interactive, otherwise default to draft
-		if isInteractive() {
-			draftStatus, err := GetPRDraftStatus(ctx)
-			if err != nil {
-				return nil, err
-			}
-			metadata.IsDraft = draftStatus
-		} else {
-			// Non-interactive mode - default to draft
-			metadata.IsDraft = true
-		}
+		// New PR - default to published (not draft)
+		metadata.IsDraft = false
 	} else {
 		metadata.IsDraft = prInfo.IsDraft
 	}

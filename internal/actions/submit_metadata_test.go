@@ -46,11 +46,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.False(t, metadata.IsDraft, "PR should be created as non-draft when --publish flag is set")
 	})
 
-	t.Run("new PR in non-interactive mode defaults to draft", func(t *testing.T) {
-		// Set environment variable to force non-interactive mode
-		os.Setenv("STACKIT_NON_INTERACTIVE", "1")
-		defer os.Unsetenv("STACKIT_NON_INTERACTIVE")
-
+	t.Run("new PR defaults to published (not draft)", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
@@ -59,12 +55,12 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := "feature"
 
 		opts := actions.SubmitMetadataOptions{
-			// No draft or publish flag
+			// No draft or publish flag - should default to published
 		}
 
 		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
-		require.True(t, metadata.IsDraft, "PR should default to draft in non-interactive mode")
+		require.False(t, metadata.IsDraft, "PR should default to published (not draft) when no flag is specified")
 	})
 
 	t.Run("existing PR preserves draft status", func(t *testing.T) {

@@ -2,7 +2,6 @@ package actions
 
 import (
 	"fmt"
-	"strings"
 
 	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
@@ -100,66 +99,25 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *context.Context) (str
 			})
 		}
 	} else {
-		// Get all branches using stack lines for visualization
-		stackLines := getStackLines(printStackArgs{
-			short:             true,
-			reverse:           false,
-			branchName:        ctx.Engine.Trunk(),
-			indentLevel:       0,
-			omitCurrentBranch: false,
-			noStyleBranchName: true,
-		}, ctx)
+		// Get branches in stack order: trunk first, then children recursively
+		trunkName := ctx.Engine.Trunk()
+		branchOrder := collectBranchesDepthFirst(trunkName, ctx)
 
-		// Extract branch names from stack lines
-		// Stack lines format: "│ │ ◯▸branchName" or similar
-		for _, line := range stackLines {
-			// Find the branch name (after the last "▸")
-			arrowIndex := strings.LastIndex(line, "▸")
-			if arrowIndex == -1 {
-				// Skip lines without arrow (like empty lines or separators)
-				continue
-			}
-
-			// Extract branch name after arrow
-			branchNameAndDetails := line[arrowIndex+1:]
-			// Split by spaces and take first field (branch name)
-			parts := strings.Fields(branchNameAndDetails)
-			if len(parts) == 0 {
-				continue
-			}
-			branchName := parts[0]
-
-			// Skip if we've already seen this branch
+		for _, branchName := range branchOrder {
 			if seenBranches[branchName] {
 				continue
 			}
 			seenBranches[branchName] = true
 
-			display := line
-			if branchName == currentBranch {
+			isCurrent := branchName == currentBranch
+			display := output.ColorBranchName(branchName, isCurrent)
+			if isCurrent {
 				initialIndex = len(choices)
 			}
 			choices = append(choices, branchChoice{
 				display: display,
 				value:   branchName,
 			})
-		}
-
-		// Ensure trunk is always included if not already present
-		trunkName := ctx.Engine.Trunk()
-		if !seenBranches[trunkName] {
-			display := trunkName
-			if trunkName == currentBranch {
-				display = output.ColorBranchName(trunkName, true)
-				initialIndex = len(choices)
-			} else {
-				display = output.ColorBranchName(trunkName, false)
-			}
-			choices = append(choices, branchChoice{
-				display: display,
-				value:   trunkName,
-			})
-			seenBranches[trunkName] = true
 		}
 	}
 
@@ -278,4 +236,17 @@ func printBranchInfo(branchName string, ctx *context.Context) {
 			return
 		}
 	}
+}
+
+// collectBranchesDepthFirst returns branches with trunk first, then children recursively
+func collectBranchesDepthFirst(branchName string, ctx *context.Context) []string {
+	var result []string
+	result = append(result, branchName)
+
+	children := ctx.Engine.GetChildren(branchName)
+	for _, child := range children {
+		result = append(result, collectBranchesDepthFirst(child, ctx)...)
+	}
+
+	return result
 }

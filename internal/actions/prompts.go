@@ -2,12 +2,24 @@ package actions
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// ErrInteractiveDisabled is returned when interactive prompts are disabled via STACKIT_TEST_NO_INTERACTIVE
+var ErrInteractiveDisabled = fmt.Errorf("interactive prompts are disabled (STACKIT_TEST_NO_INTERACTIVE is set)")
+
+// checkInteractiveAllowed returns an error if interactive mode is disabled for testing
+func checkInteractiveAllowed() error {
+	if os.Getenv("STACKIT_TEST_NO_INTERACTIVE") != "" {
+		return ErrInteractiveDisabled
+	}
+	return nil
+}
 
 // textInputModel is a simple text input prompt model
 type textInputModel struct {
@@ -102,6 +114,10 @@ func (m confirmModel) View() string {
 
 // promptTextInput prompts the user for text input
 func promptTextInput(prompt, defaultValue string) (string, error) {
+	if err := checkInteractiveAllowed(); err != nil {
+		return "", err
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = ""
 	ti.SetValue(defaultValue)
@@ -132,6 +148,10 @@ func promptTextInput(prompt, defaultValue string) (string, error) {
 
 // promptConfirm prompts the user for yes/no confirmation
 func promptConfirm(prompt string, defaultValue bool) (bool, error) {
+	if err := checkInteractiveAllowed(); err != nil {
+		return false, err
+	}
+
 	m := confirmModel{
 		prompt: prompt,
 		choice: defaultValue,
@@ -274,6 +294,10 @@ func (m branchSelectModel) View() string {
 
 // promptBranchSelection prompts the user to select a branch
 func promptBranchSelection(message string, choices []branchChoice, initialIndex int) (string, error) {
+	if err := checkInteractiveAllowed(); err != nil {
+		return "", err
+	}
+
 	m := branchSelectModel{
 		choices: choices,
 		filter:  "",

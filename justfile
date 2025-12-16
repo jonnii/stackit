@@ -5,29 +5,29 @@ default: test
 test:
 	go mod tidy
 	@echo "Running tests..."
-	go test ./...
+	STACKIT_TEST_NO_INTERACTIVE=1 go test ./...
 
 # Run all tests without caching (for CI or debugging flaky tests)
 test-fresh:
 	go mod tidy
 	@echo "Running tests (no cache)..."
-	go test ./... -count=1
+	STACKIT_TEST_NO_INTERACTIVE=1 go test ./... -count=1
 
 # Run tests with verbose output
 test-verbose:
 	go mod tidy
-	go test -v ./...
+	STACKIT_TEST_NO_INTERACTIVE=1 go test -v ./...
 
 # Run tests with coverage
 test-coverage:
 	go mod tidy
-	go test -coverprofile=coverage.out ./...
+	STACKIT_TEST_NO_INTERACTIVE=1 go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
 # Run tests with race detection
 test-race:
 	go mod tidy
-	go test -race ./...
+	STACKIT_TEST_NO_INTERACTIVE=1 go test -race ./...
 
 # Run tests for a specific package
 # Usage: just test-pkg ./testhelpers
@@ -37,7 +37,7 @@ test-pkg pkg:
 		exit 1; \
 	fi
 	go mod tidy
-	go test -v {{pkg}}
+	STACKIT_TEST_NO_INTERACTIVE=1 go test -v {{pkg}}
 
 # Download dependencies
 deps:
@@ -95,5 +95,6 @@ website:
 # Run the website in dev mode with live reload
 website-dev:
 	cd website && make dev
+
 
 

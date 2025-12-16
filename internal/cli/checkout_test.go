@@ -224,7 +224,7 @@ func TestCheckoutCommand(t *testing.T) {
 		require.Equal(t, "a", currentBranch)
 	})
 
-	t.Run("checkout with stack flag requires branch", func(t *testing.T) {
+	t.Run("checkout with stack flag in non-interactive mode should fail", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, nil)
 
@@ -241,7 +241,7 @@ func TestCheckoutCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to checkout with --stack flag but no branch (would need interactive)
-		// In non-interactive mode, this should work if we're on a branch
+		// In non-interactive mode, this should fail with a clear error
 		cmd = exec.Command(binaryPath, "checkout", "--stack")
 		cmd.Dir = scene.Dir
 		// Redirect stdin to /dev/null to simulate non-interactive mode
@@ -251,10 +251,9 @@ func TestCheckoutCommand(t *testing.T) {
 		cmd.Stdin = nullFile
 
 		output, err := cmd.CombinedOutput()
-		// This might fail in non-interactive mode, or might work if we're on a branch
-		// The important thing is it doesn't crash
-		_ = output
-		_ = err
+		// Should fail in non-interactive mode with a clear error
+		require.Error(t, err, "checkout --stack should fail in non-interactive mode")
+		require.Contains(t, string(output), "interactive", "error should mention interactive mode")
 	})
 
 	t.Run("checkout from trunk to branch and back", func(t *testing.T) {

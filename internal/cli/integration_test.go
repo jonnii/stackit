@@ -290,4 +290,3 @@ func countNonEmptyLines(s string) int {
 	}
 	return count
 }
-

@@ -234,4 +234,3 @@ func TestGenerateBranchNameFromMessage(t *testing.T) {
 		})
 	}
 }
-

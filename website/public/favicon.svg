@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#58a6ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3fb950;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Stack of layers -->
+  <rect x="20" y="60" width="60" height="8" rx="2" fill="url(#grad)" opacity="0.6"/>
+  <rect x="20" y="45" width="60" height="8" rx="2" fill="url(#grad)" opacity="0.8"/>
+  <rect x="20" y="30" width="60" height="8" rx="2" fill="url(#grad)"/>
+  
+  <!-- Arrow pointing up -->
+  <path d="M 50 10 L 35 25 L 43 25 L 43 35 L 57 35 L 57 25 L 65 25 Z" fill="url(#grad)"/>
+</svg>

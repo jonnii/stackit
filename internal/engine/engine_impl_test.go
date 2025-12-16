@@ -382,6 +382,86 @@ func TestGetRelativeStack(t *testing.T) {
 		require.Contains(t, stack, "branch3")
 		require.Len(t, stack, 3)
 	})
+
+	t.Run("returns branching stacks in DFS order (parents before children)", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create branching structure:
+		// main
+		// ├── stackA
+		// │   └── stackA-child
+		// └── stackB
+		//     └── stackB-child
+
+		err := scene.Repo.CreateAndCheckoutBranch("stackA")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("stackA change", "sA")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("stackA-child")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("stackA-child change", "sAc")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("stackB")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("stackB change", "sB")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("stackB-child")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("stackB-child change", "sBc")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		err = eng.TrackBranch("stackA", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch("stackA-child", "stackA")
+		require.NoError(t, err)
+		err = eng.TrackBranch("stackB", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch("stackB-child", "stackB")
+		require.NoError(t, err)
+
+		// Get all descendants from trunk
+		scope := engine.Scope{RecursiveChildren: true}
+		stack := eng.GetRelativeStack("main", scope)
+
+		// Should have all 4 branches
+		require.Len(t, stack, 4)
+		require.Contains(t, stack, "stackA")
+		require.Contains(t, stack, "stackA-child")
+		require.Contains(t, stack, "stackB")
+		require.Contains(t, stack, "stackB-child")
+
+		// Verify topological order: parents must come before their children
+		stackAIdx := indexOf(stack, "stackA")
+		stackAChildIdx := indexOf(stack, "stackA-child")
+		stackBIdx := indexOf(stack, "stackB")
+		stackBChildIdx := indexOf(stack, "stackB-child")
+
+		require.Less(t, stackAIdx, stackAChildIdx, "stackA should come before stackA-child")
+		require.Less(t, stackBIdx, stackBChildIdx, "stackB should come before stackB-child")
+	})
+}
+
+// indexOf returns the index of item in slice, or -1 if not found
+func indexOf(slice []string, item string) int {
+	for i, s := range slice {
+		if s == item {
+			return i
+		}
+	}
+	return -1
 }
 
 func TestRestackBranch(t *testing.T) {

@@ -51,6 +51,9 @@ const (
 type RestackBranchResult struct {
 	Result            RestackResult
 	RebasedBranchBase string // The new parent revision after successful rebase (only set if Result is RestackDone or RestackConflict)
+	Reparented        bool   // True if the branch was reparented due to merged/deleted parent
+	OldParent         string // The old parent branch name (only set if Reparented is true)
+	NewParent         string // The new parent branch name (only set if Reparented is true)
 }
 
 // ContinueRebaseResult represents the result of continuing a rebase

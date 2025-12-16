@@ -21,6 +21,14 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *output.Splo
 			return fmt.Errorf("failed to restack %s: %w", branchName, err)
 		}
 
+		// Log reparenting if it happened
+		if result.Reparented {
+			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
+				output.ColorBranchName(branchName, true),
+				output.ColorBranchName(result.OldParent, false),
+				output.ColorBranchName(result.NewParent, false))
+		}
+
 		switch result.Result {
 		case engine.RestackDone:
 			parent := eng.GetParent(branchName)

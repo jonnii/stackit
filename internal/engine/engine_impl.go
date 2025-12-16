@@ -564,7 +564,66 @@ func (e *engineImpl) ResetTrunkToRemote() error {
 	return nil
 }
 
+// shouldReparentBranch checks if a parent branch should be reparented
+// Returns true if the parent branch:
+// - No longer exists locally
+// - Has been merged into trunk
+// - Has a "MERGED" PR state in metadata
+func (e *engineImpl) shouldReparentBranch(parentBranchName string) bool {
+	// Check if parent is trunk (no need to reparent)
+	if parentBranchName == e.trunk {
+		return false
+	}
+
+	// Check if parent branch still exists locally
+	parentExists := false
+	for _, name := range e.branches {
+		if name == parentBranchName {
+			parentExists = true
+			break
+		}
+	}
+	if !parentExists {
+		return true
+	}
+
+	// Check if parent has been merged into trunk
+	merged, err := git.IsMerged(parentBranchName, e.trunk)
+	if err == nil && merged {
+		return true
+	}
+
+	// Check if parent has "MERGED" PR state in metadata
+	prInfo, err := e.GetPrInfo(parentBranchName)
+	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
+		return true
+	}
+
+	return false
+}
+
+// findNearestValidAncestor finds the nearest ancestor that hasn't been merged/deleted
+// Returns trunk if all ancestors have been merged
+func (e *engineImpl) findNearestValidAncestor(branchName string) string {
+	current := e.parentMap[branchName]
+
+	for current != "" && current != e.trunk {
+		if !e.shouldReparentBranch(current) {
+			return current
+		}
+		// Move to the next parent
+		parent, ok := e.parentMap[current]
+		if !ok {
+			break
+		}
+		current = parent
+	}
+
+	return e.trunk
+}
+
 // RestackBranch rebases a branch onto its parent
+// If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
 func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
@@ -572,6 +631,31 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 
 	if !ok {
 		return RestackBranchResult{Result: RestackUnneeded}, fmt.Errorf("branch %s is not tracked", branchName)
+	}
+
+	// Track reparenting info
+	var reparented bool
+	var oldParent string
+
+	// Check if parent needs reparenting (merged, deleted, or has MERGED PR state)
+	e.mu.RLock()
+	needsReparent := e.shouldReparentBranch(parent)
+	e.mu.RUnlock()
+
+	if needsReparent {
+		oldParent = parent
+
+		// Find nearest valid ancestor
+		e.mu.RLock()
+		newParent := e.findNearestValidAncestor(branchName)
+		e.mu.RUnlock()
+
+		// Reparent to the nearest valid ancestor
+		if err := e.SetParent(branchName, newParent); err != nil {
+			return RestackBranchResult{Result: RestackConflict}, fmt.Errorf("failed to reparent %s to %s: %w", branchName, newParent, err)
+		}
+		parent = newParent
+		reparented = true
 	}
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
@@ -582,7 +666,13 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 
 	// Check if branch needs restacking
 	if e.IsBranchFixed(branchName) {
-		return RestackBranchResult{Result: RestackUnneeded, RebasedBranchBase: parentRev}, nil
+		return RestackBranchResult{
+			Result:            RestackUnneeded,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, nil
 	}
 
 	// Get old parent revision from metadata
@@ -598,31 +688,67 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 
 	// If parent hasn't changed, no need to restack
 	if parentRev == oldParentRev {
-		return RestackBranchResult{Result: RestackUnneeded, RebasedBranchBase: parentRev}, nil
+		return RestackBranchResult{
+			Result:            RestackUnneeded,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, nil
 	}
 
 	// Perform rebase
 	gitResult, err := git.Rebase(branchName, parent, oldParentRev)
 	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, err
+		return RestackBranchResult{
+			Result:            RestackConflict,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, err
 	}
 
 	if gitResult == git.RebaseConflict {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, nil
+		return RestackBranchResult{
+			Result:            RestackConflict,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, nil
 	}
 
 	// Update metadata with new parent revision
 	meta.ParentBranchRevision = &parentRev
 	if err := git.WriteMetadataRef(branchName, meta); err != nil {
-		return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, fmt.Errorf("failed to update metadata: %w", err)
+		return RestackBranchResult{
+			Result:            RestackDone,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, fmt.Errorf("failed to update metadata: %w", err)
 	}
 
 	// Rebuild to refresh cache
 	if err := e.rebuild(); err != nil {
-		return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, fmt.Errorf("failed to rebuild after restack: %w", err)
+		return RestackBranchResult{
+			Result:            RestackDone,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, fmt.Errorf("failed to rebuild after restack: %w", err)
 	}
 
-	return RestackBranchResult{Result: RestackDone, RebasedBranchBase: parentRev}, nil
+	return RestackBranchResult{
+		Result:            RestackDone,
+		RebasedBranchBase: parentRev,
+		Reparented:        reparented,
+		OldParent:         oldParent,
+		NewParent:         parent,
+	}, nil
 }
 
 // ContinueRebase continues an in-progress rebase

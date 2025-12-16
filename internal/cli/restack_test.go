@@ -13,6 +13,117 @@ import (
 func TestRestackCommand(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
+	t.Run("restack auto-reparents when parent is merged into trunk", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
+				return err
+			}
+			// Create branch1 (parent) using create command
+			if err := s.Repo.CreateChange("branch1 change", "file1", false); err != nil {
+				return err
+			}
+			cmd := exec.Command(binaryPath, "create", "branch1", "-m", "branch1 change")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			// Create branch2 (child) on top of branch1 using create command
+			if err := s.Repo.CreateChange("branch2 change", "file2", false); err != nil {
+				return err
+			}
+			cmd = exec.Command(binaryPath, "create", "branch2", "-m", "branch2 change")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			return nil
+		})
+
+		// Simulate merging branch1 into main by:
+		// 1. Checkout main
+		// 2. Merge branch1 into main (fast-forward or regular merge)
+		err := scene.Repo.CheckoutBranch("main")
+		require.NoError(t, err)
+
+		err = scene.Repo.RunGitCommand("merge", "branch1", "--no-ff", "-m", "Merge branch1")
+		require.NoError(t, err)
+
+		// Now switch to branch2 and run restack
+		err = scene.Repo.CheckoutBranch("branch2")
+		require.NoError(t, err)
+
+		// Run restack --only on branch2
+		// It should detect that branch1 is merged into main and reparent branch2 to main
+		cmd := exec.Command(binaryPath, "restack", "--only")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "restack command failed: %s", string(output))
+		// Should mention reparenting
+		require.Contains(t, string(output), "Reparented", "should mention reparenting")
+		require.Contains(t, string(output), "branch1", "should mention old parent")
+		require.Contains(t, string(output), "main", "should mention new parent (trunk)")
+
+		// Verify branch2's parent is now main
+		cmd = exec.Command(binaryPath, "info")
+		cmd.Dir = scene.Dir
+		infoOutput, err := cmd.CombinedOutput()
+		require.NoError(t, err, "info command failed: %s", string(infoOutput))
+		// The parent should now be main, not branch1
+		require.Contains(t, string(infoOutput), "main", "branch2's parent should now be main")
+	})
+
+	t.Run("restack auto-reparents when parent branch is deleted", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
+				return err
+			}
+			// Create branch1 (parent) using create command
+			if err := s.Repo.CreateChange("branch1 change", "file1", false); err != nil {
+				return err
+			}
+			cmd := exec.Command(binaryPath, "create", "branch1", "-m", "branch1 change")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			// Create branch2 (child) on top of branch1 using create command
+			if err := s.Repo.CreateChange("branch2 change", "file2", false); err != nil {
+				return err
+			}
+			cmd = exec.Command(binaryPath, "create", "branch2", "-m", "branch2 change")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			return nil
+		})
+
+		// Delete branch1 forcefully (simulating it being deleted after PR merge)
+		err := scene.Repo.CheckoutBranch("branch2")
+		require.NoError(t, err)
+
+		// Force delete branch1
+		err = scene.Repo.RunGitCommand("branch", "-D", "branch1")
+		require.NoError(t, err)
+
+		// Run restack --only on branch2
+		// It should detect that branch1 no longer exists and reparent branch2 to main
+		cmd := exec.Command(binaryPath, "restack", "--only")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "restack command failed: %s", string(output))
+		// Should mention reparenting
+		require.Contains(t, string(output), "Reparented", "should mention reparenting")
+		require.Contains(t, string(output), "branch1", "should mention old parent")
+		require.Contains(t, string(output), "main", "should mention new parent (trunk)")
+	})
+
 	t.Run("restack single branch", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {

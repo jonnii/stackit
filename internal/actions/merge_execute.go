@@ -139,7 +139,19 @@ func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
 
 		switch result.Result {
 		case engine.RestackDone:
-			// Success
+			// Success - now push the rebased branch and update PR base
+			// Force push is required since we rebased
+			if err := git.PushBranch(step.BranchName, git.GetRemote(), true, false); err != nil {
+				return fmt.Errorf("failed to push rebased branch %s: %w", step.BranchName, err)
+			}
+			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
+
+			// Update the PR's base branch to trunk on GitHub
+			if err := updatePRBaseBranch(step.BranchName, trunk); err != nil {
+				return fmt.Errorf("failed to update PR base for %s: %w", step.BranchName, err)
+			}
+			splog.Debug("Updated PR base for %s to %s", step.BranchName, trunk)
+
 		case engine.RestackConflict:
 			// Save continuation state
 			continuation := &config.ContinuationState{
@@ -151,7 +163,15 @@ func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
 			}
 			return fmt.Errorf("hit conflict restacking %s", step.BranchName)
 		case engine.RestackUnneeded:
-			// Already up to date
+			// Already up to date, but still need to ensure PR base is correct
+			// Push in case local is ahead of remote
+			if err := git.PushBranch(step.BranchName, git.GetRemote(), true, false); err != nil {
+				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
+			}
+			// Update PR base to trunk
+			if err := updatePRBaseBranch(step.BranchName, trunk); err != nil {
+				splog.Debug("Failed to update PR base for %s: %v", step.BranchName, err)
+			}
 		}
 
 	case StepDeleteBranch:

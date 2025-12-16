@@ -86,7 +86,6 @@ func SyncAction(opts SyncOptions) error {
 	// Clean branches (delete merged/closed)
 	branchesToRestack := []string{}
 
-	splog.Info("Checking if any branches have been merged/closed and can be deleted...")
 	cleanResult, err := CleanBranches(CleanBranchesOptions{
 		Force:  opts.Force,
 		Engine: eng,

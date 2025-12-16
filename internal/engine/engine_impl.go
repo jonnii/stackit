@@ -1242,7 +1242,9 @@ func (e *engineImpl) Detach(revision string) error {
 	return nil
 }
 
-// DetachAndResetBranchChanges detaches and resets branch changes
+// DetachAndResetBranchChanges detaches HEAD and soft resets to the parent's merge base,
+// leaving the branch's changes as unstaged modifications. This is used by split --by-hunk
+// to allow the user to interactively re-stage changes into new branches.
 func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -1253,15 +1255,29 @@ func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
 		return fmt.Errorf("failed to get branch revision: %w", err)
 	}
 
-	// Detach and reset
+	// Get the parent branch
+	parentBranchName := e.parentMap[branchName]
+	if parentBranchName == "" {
+		parentBranchName = e.trunk
+	}
+
+	// Get the merge base between this branch and its parent
+	mergeBase, err := git.GetMergeBase(branchName, parentBranchName)
+	if err != nil {
+		return fmt.Errorf("failed to get merge base: %w", err)
+	}
+
+	// Detach HEAD to the branch revision first
 	_, err = git.RunGitCommand("checkout", "--detach", branchRevision)
 	if err != nil {
 		return fmt.Errorf("failed to detach HEAD: %w", err)
 	}
 
-	// Reset to discard any changes
-	if err := git.HardReset(branchRevision); err != nil {
-		return fmt.Errorf("failed to reset: %w", err)
+	// Soft reset to the merge base - this keeps all the branch's changes
+	// but unstages them, allowing the user to re-stage them interactively
+	_, err = git.RunGitCommand("reset", mergeBase)
+	if err != nil {
+		return fmt.Errorf("failed to soft reset: %w", err)
 	}
 
 	e.currentBranch = ""

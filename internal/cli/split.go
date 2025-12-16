@@ -15,9 +15,10 @@ import (
 // newSplitCmd creates the split command
 func newSplitCmd() *cobra.Command {
 	var (
-		byCommit bool
-		byHunk   bool
-		byFile   []string
+		byCommit          bool
+		byHunk            bool
+		byFile            []string
+		byFileInteractive bool
 	)
 
 	cmd := &cobra.Command{
@@ -26,11 +27,11 @@ func newSplitCmd() *cobra.Command {
 		Short:   "Split the current branch into multiple branches",
 		Long: `Split the current branch into multiple branches.
 
-Has three forms: split --by-commit, split --by-hunk, and split --by-file <pathspecs>.
+Has three forms: split --by-commit, split --by-hunk, and split --by-file.
 split --by-commit slices up the commit history, allowing you to select split points.
 split --by-hunk interactively stages changes to create new single-commit branches.
-split --by-file <pathspecs> extracts files matching the pathspecs into a new parent branch.
-All forms must be run interactively except for --by-file which can run non-interactively.
+split --by-file <files> extracts specified files into a new parent branch.
+split -F (--by-file-interactive) shows an interactive file selector.
 split without options will prompt for a splitting strategy.`,
 		// Disable default help flag to allow -h for --by-hunk
 		DisableFlagParsing: false,
@@ -66,8 +67,9 @@ split without options will prompt for a splitting strategy.`,
 				style = actions.SplitStyleCommit
 			} else if byHunk || cmd.Flags().Changed("hunk") {
 				style = actions.SplitStyleHunk
-			} else if len(byFile) > 0 || cmd.Flags().Changed("file") {
-				// Get file pathspecs from either flag
+			} else if byFileInteractive || len(byFile) > 0 || cmd.Flags().Changed("file") {
+				// -F triggers interactive file selection
+				// --by-file with pathspecs uses those files directly
 				if cmd.Flags().Changed("file") {
 					filePaths, _ := cmd.Flags().GetStringSlice("file")
 					byFile = filePaths
@@ -93,7 +95,8 @@ split without options will prompt for a splitting strategy.`,
 	// Define flags - cobra allows multiple long forms but only one shorthand per variable
 	cmd.Flags().BoolVarP(&byCommit, "by-commit", "c", false, "Split by commit - slice up the history of this branch")
 	cmd.Flags().BoolVarP(&byHunk, "by-hunk", "h", false, "Split by hunk - split into new single-commit branches")
-	cmd.Flags().StringSliceVarP(&byFile, "by-file", "f", nil, "Split by file - takes a number of pathspecs and splits any matching files into a new parent branch")
+	cmd.Flags().StringSliceVarP(&byFile, "by-file", "f", nil, "Split by file - extracts specified files to a new parent branch")
+	cmd.Flags().BoolVarP(&byFileInteractive, "by-file-interactive", "F", false, "Split by file (interactive) - select files to extract")
 
 	// Add alternative long form names (these will be checked in RunE via cmd.Flags().Changed)
 	// Note: We can't bind the same variable twice, so we check for these flags manually

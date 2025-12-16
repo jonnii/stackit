@@ -107,12 +107,20 @@ func SplitAction(opts SplitOptions) error {
 	case SplitStyleHunk:
 		result, err = splitByHunk(currentBranch, opts.Engine, opts.Splog)
 	case SplitStyleFile:
-		if len(opts.Pathspecs) == 0 {
-			return fmt.Errorf("--by-file requires pathspecs")
+		pathspecs := opts.Pathspecs
+		// If no pathspecs provided, prompt interactively
+		if len(pathspecs) == 0 {
+			pathspecs, err = promptForFiles(currentBranch, opts.Engine, opts.Splog)
+			if err != nil {
+				return err
+			}
+			if len(pathspecs) == 0 {
+				return fmt.Errorf("no files selected")
+			}
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(currentBranch, opts.Pathspecs, opts.Engine, opts.Splog)
+		_, err = splitByFile(currentBranch, pathspecs, opts.Engine, opts.Splog)
 		if err != nil {
 			return err
 		}
@@ -538,13 +546,70 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 		return "", fmt.Errorf("cancelled")
 	}
 
-	// Validate name
-	allBranches := eng.AllBranchNames()
-	if containsString(existingNames, branchName) || containsString(allBranches, branchName) {
-		return "", fmt.Errorf("branch name %s is already in use", branchName)
+	// Validate name - don't allow names already picked in this split session
+	if containsString(existingNames, branchName) {
+		return "", fmt.Errorf("branch name %s is already used by another branch in this split", branchName)
+	}
+
+	// Allow reusing the original branch name being split (it will be replaced)
+	// but don't allow other existing branch names
+	if branchName != originalBranchName {
+		allBranches := eng.AllBranchNames()
+		if containsString(allBranches, branchName) {
+			return "", fmt.Errorf("branch name %s is already in use", branchName)
+		}
 	}
 
 	return branchName, nil
+}
+
+// promptForFiles shows an interactive file selector for split --by-file
+func promptForFiles(branchToSplit string, eng engine.Engine, splog *output.Splog) ([]string, error) {
+	// Get the parent branch to compare against
+	parentBranchName := eng.GetParentPrecondition(branchToSplit)
+
+	// Get merge base between branch and parent
+	mergeBase, err := git.GetMergeBase(branchToSplit, parentBranchName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get merge base: %w", err)
+	}
+
+	// Get list of changed files
+	changedFiles, err := git.GetChangedFiles(mergeBase, branchToSplit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files: %w", err)
+	}
+
+	if len(changedFiles) == 0 {
+		return nil, fmt.Errorf("no files changed in branch %s", branchToSplit)
+	}
+
+	if len(changedFiles) == 1 {
+		return nil, fmt.Errorf("only one file changed in branch - nothing to split")
+	}
+
+	// Show instructions
+	splog.Info("Splitting %s by file.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("Select the files to extract to a new parent branch.")
+	splog.Info("The remaining files will stay on %s.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("")
+
+	// Prompt for file selection
+	var selectedFiles []string
+	prompt := &survey.MultiSelect{
+		Message: "Select files to extract:",
+		Options: changedFiles,
+	}
+	if err := survey.AskOne(prompt, &selectedFiles); err != nil {
+		return nil, fmt.Errorf("cancelled")
+	}
+
+	// Validate that not all files were selected
+	if len(selectedFiles) == len(changedFiles) {
+		return nil, fmt.Errorf("cannot extract all files - at least one must remain on the original branch")
+	}
+
+	return selectedFiles, nil
 }
 
 func pluralize(word string, count int) string {

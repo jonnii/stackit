@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -108,4 +109,19 @@ func RunGitCommandWithInput(input string, args ...string) (string, error) {
 // RunGitCommandWithInputAndContext executes a git command with input and context, returning the output
 func RunGitCommandWithInputAndContext(ctx context.Context, input string, args ...string) (string, error) {
 	return runGitCommandInternal(ctx, workingDir, input, args...)
+}
+
+// RunGitCommandInteractive executes a git command interactively with stdin/stdout/stderr
+// connected to the terminal. This is needed for commands like `git add -p` that require
+// user interaction.
+func RunGitCommandInteractive(args ...string) error {
+	cmd := exec.Command("git", args...)
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }

@@ -1236,3 +1236,199 @@ func TestEdgeCases(t *testing.T) {
 		require.Len(t, children, 5)
 	})
 }
+
+func TestDetachAndResetBranchChanges(t *testing.T) {
+	t.Run("detaches and soft resets to parent merge base", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			// Create initial commit on main with a file we'll modify
+			return s.Repo.CreateChangeAndCommit("initial content", "shared")
+		})
+
+		// Create feature branch that modifies the existing file
+		err := scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		// Modify the same file (shared_test.txt) that exists on main
+		err = scene.Repo.CreateChangeAndCommit("feature content", "shared")
+		require.NoError(t, err)
+
+		// Get the main branch commit (merge base)
+		mainCommit, err := scene.Repo.GetRevision("main")
+		require.NoError(t, err)
+
+		// Create engine and track branch
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+		err = eng.TrackBranch("feature", "main")
+		require.NoError(t, err)
+
+		// Call DetachAndResetBranchChanges
+		err = eng.DetachAndResetBranchChanges("feature")
+		require.NoError(t, err)
+
+		// Verify HEAD is detached
+		currentBranch := eng.CurrentBranch()
+		require.Empty(t, currentBranch, "should be in detached HEAD state")
+
+		// Verify we're at the merge base commit
+		headCommit, err := scene.Repo.GetRevision("HEAD")
+		require.NoError(t, err)
+		require.Equal(t, mainCommit, headCommit, "HEAD should be at parent merge base")
+
+		// Verify the feature changes are now unstaged (modified tracked file)
+		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
+		require.NoError(t, err)
+		require.True(t, hasUnstaged, "feature changes should appear as unstaged")
+	})
+
+	t.Run("works with multi-commit branch modifying same file", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "shared")
+		})
+
+		// Create feature branch with multiple commits modifying the same file
+		err := scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("commit 1", "shared")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("commit 2", "shared")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("commit 3", "shared")
+		require.NoError(t, err)
+
+		// Get main commit
+		mainCommit, err := scene.Repo.GetRevision("main")
+		require.NoError(t, err)
+
+		// Create engine and track branch
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+		err = eng.TrackBranch("feature", "main")
+		require.NoError(t, err)
+
+		// Call DetachAndResetBranchChanges
+		err = eng.DetachAndResetBranchChanges("feature")
+		require.NoError(t, err)
+
+		// Verify we're at main
+		headCommit, err := scene.Repo.GetRevision("HEAD")
+		require.NoError(t, err)
+		require.Equal(t, mainCommit, headCommit)
+
+		// Verify changes are unstaged
+		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
+		require.NoError(t, err)
+		require.True(t, hasUnstaged)
+	})
+
+	t.Run("works with stacked branches", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "shared")
+		})
+
+		// Create branch1 on main
+		err := scene.Repo.CreateAndCheckoutBranch("branch1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch1 change", "shared")
+		require.NoError(t, err)
+
+		// Get branch1 commit (this will be the merge base for branch2)
+		branch1Commit, err := scene.Repo.GetRevision("branch1")
+		require.NoError(t, err)
+
+		// Create branch2 on branch1
+		err = scene.Repo.CreateAndCheckoutBranch("branch2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("branch2 change", "shared")
+		require.NoError(t, err)
+
+		// Create engine and track branches
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+		err = eng.TrackBranch("branch1", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch("branch2", "branch1")
+		require.NoError(t, err)
+
+		// Call DetachAndResetBranchChanges on branch2
+		err = eng.DetachAndResetBranchChanges("branch2")
+		require.NoError(t, err)
+
+		// Verify we're at branch1's commit (the parent)
+		headCommit, err := scene.Repo.GetRevision("HEAD")
+		require.NoError(t, err)
+		require.Equal(t, branch1Commit, headCommit, "HEAD should be at branch1 (parent of branch2)")
+
+		// Verify branch2 changes are unstaged
+		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
+		require.NoError(t, err)
+		require.True(t, hasUnstaged)
+	})
+
+	t.Run("handles untracked branch using trunk as parent", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "shared")
+		})
+
+		// Create feature branch (not tracked)
+		err := scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feature change", "shared")
+		require.NoError(t, err)
+
+		mainCommit, err := scene.Repo.GetRevision("main")
+		require.NoError(t, err)
+
+		// Create engine but don't track the branch
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Call DetachAndResetBranchChanges without tracking
+		err = eng.DetachAndResetBranchChanges("feature")
+		require.NoError(t, err)
+
+		// Should use trunk (main) as the parent
+		headCommit, err := scene.Repo.GetRevision("HEAD")
+		require.NoError(t, err)
+		require.Equal(t, mainCommit, headCommit, "should use trunk as parent for untracked branch")
+
+		// Verify changes are unstaged
+		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
+		require.NoError(t, err)
+		require.True(t, hasUnstaged)
+	})
+
+	t.Run("handles new files as untracked", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create feature branch with a NEW file (doesn't exist on main)
+		err := scene.Repo.CreateAndCheckoutBranch("feature")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("new file content", "newfile")
+		require.NoError(t, err)
+
+		mainCommit, err := scene.Repo.GetRevision("main")
+		require.NoError(t, err)
+
+		// Create engine and track branch
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+		err = eng.TrackBranch("feature", "main")
+		require.NoError(t, err)
+
+		// Call DetachAndResetBranchChanges
+		err = eng.DetachAndResetBranchChanges("feature")
+		require.NoError(t, err)
+
+		// Verify we're at main
+		headCommit, err := scene.Repo.GetRevision("HEAD")
+		require.NoError(t, err)
+		require.Equal(t, mainCommit, headCommit)
+
+		// New files should appear as untracked (not unstaged)
+		hasUntracked, err := scene.Repo.HasUntrackedFiles()
+		require.NoError(t, err)
+		require.True(t, hasUntracked, "new files should appear as untracked")
+	})
+}

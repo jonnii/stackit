@@ -149,12 +149,32 @@ func (s *TestShell) Write(filename, content string) *TestShell {
 	return s
 }
 
-// Amend modifies a file and amends the last commit
+// Amend modifies a file and amends the last commit using raw git
 func (s *TestShell) Amend(filename, content string) *TestShell {
 	s.t.Helper()
 	err := s.scene.Repo.CreateChangeAndAmend(content, filename)
 	require.NoError(s.t, err, "failed to amend with %s", filename)
 	return s
+}
+
+// Modify creates a file change and uses stackit modify to amend (with auto-restack)
+func (s *TestShell) Modify(filename, content string) *TestShell {
+	s.t.Helper()
+	// Create the change (staged)
+	err := s.scene.Repo.CreateChange(content, filename, false)
+	require.NoError(s.t, err, "failed to write %s", filename)
+	// Use stackit modify to amend with auto-restack
+	return s.Run("modify -n")
+}
+
+// ModifyWithMessage creates a file change and uses stackit modify with a new message
+func (s *TestShell) ModifyWithMessage(filename, content, message string) *TestShell {
+	s.t.Helper()
+	// Create the change (staged)
+	err := s.scene.Repo.CreateChange(content, filename, false)
+	require.NoError(s.t, err, "failed to write %s", filename)
+	// Use stackit modify to amend with message
+	return s.Run("modify -m '" + message + "'")
 }
 
 // Commit creates a file change and commits it

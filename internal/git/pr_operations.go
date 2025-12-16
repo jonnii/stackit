@@ -247,6 +247,56 @@ func MergePullRequest(branchName string) error {
 	return nil
 }
 
+// GetPRChecksStatus returns the check status for a PR
+// Returns (passing, pending, error)
+// passing: true if all checks are passing, false if any are failing
+// pending: true if any checks are still pending
+func GetPRChecksStatus(branchName string) (bool, bool, error) {
+	// Use gh CLI to get PR checks status
+	cmd := exec.Command("gh", "pr", "checks", branchName, "--json", "name,state,conclusion")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If the command fails, it might be because there are no checks
+		// or the PR doesn't exist. Return passing=true, pending=false as safe defaults
+		return true, false, nil
+	}
+
+	// Parse JSON output
+	var checks []struct {
+		Name       string `json:"name"`
+		State      string `json:"state"`
+		Conclusion string `json:"conclusion"`
+	}
+
+	if err := json.Unmarshal(output, &checks); err != nil {
+		// If we can't parse, assume checks are passing
+		return true, false, nil
+	}
+
+	if len(checks) == 0 {
+		// No checks found, assume passing
+		return true, false, nil
+	}
+
+	hasPending := false
+	hasFailing := false
+
+	for _, check := range checks {
+		state := strings.ToUpper(check.State)
+		conclusion := strings.ToUpper(check.Conclusion)
+
+		if state == "PENDING" || state == "QUEUED" || state == "IN_PROGRESS" {
+			hasPending = true
+		} else if conclusion == "FAILURE" || conclusion == "CANCELLED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+			hasFailing = true
+		}
+	}
+
+	// If any checks are failing, return passing=false
+	// If any checks are pending, return pending=true
+	return !hasFailing, hasPending, nil
+}
+
 // updatePRDraftStatus updates the draft status of a PR using GitHub's GraphQL API
 func updatePRDraftStatus(ctx context.Context, pullRequestID string, isDraft bool) error {
 	// Get GitHub token

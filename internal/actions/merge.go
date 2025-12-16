@@ -2,7 +2,6 @@ package actions
 
 import (
 	"fmt"
-	"strings"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -11,135 +10,117 @@ import (
 
 // MergeOptions are options for the merge command
 type MergeOptions struct {
-	DryRun  bool
-	Confirm bool
-	Engine  engine.Engine
-	Splog   *output.Splog
+	DryRun   bool
+	Confirm  bool
+	Strategy MergeStrategy
+	Force    bool
+	Engine   engine.Engine
+	Splog    *output.Splog
+	RepoRoot string
 }
 
-// MergeAction performs the merge operation
+// MergeAction performs the merge operation using the plan/execute pattern
 func MergeAction(opts MergeOptions) error {
 	eng := opts.Engine
 	splog := opts.Splog
 
-	// Get current branch
-	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
-		return fmt.Errorf("not on a branch")
+	// Default strategy to bottom-up if not specified
+	strategy := opts.Strategy
+	if strategy == "" {
+		strategy = MergeStrategyBottomUp
 	}
 
-	// Check if current branch is trunk
-	if eng.IsTrunk(currentBranch) {
-		return fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
-	}
-
-	// Check if current branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
-		return fmt.Errorf("current branch %s is not tracked by stackit", currentBranch)
-	}
-
-	// Get all branches from trunk to current branch
-	scope := engine.Scope{RecursiveParents: true}
-	parentBranches := eng.GetRelativeStack(currentBranch, scope)
-
-	// Build full list: parent branches + current branch
-	allBranches := make([]string, 0, len(parentBranches)+1)
-	allBranches = append(allBranches, parentBranches...)
-	allBranches = append(allBranches, currentBranch)
-
-	// Collect PRs to merge
-	type prToMerge struct {
-		branchName string
-		prNumber   int
-		prURL      string
-		differs    bool
-	}
-
-	prsToMerge := []prToMerge{}
-
-	for _, branchName := range allBranches {
-		// Get PR info
-		prInfo, err := eng.GetPrInfo(branchName)
+	// Get repo root if not provided
+	repoRoot := opts.RepoRoot
+	if repoRoot == "" {
+		var err error
+		repoRoot, err = git.GetRepoRoot()
 		if err != nil {
-			splog.Debug("Failed to get PR info for %s: %v", branchName, err)
-			continue
+			return fmt.Errorf("failed to get repo root: %w", err)
 		}
-
-		// Skip if no PR
-		if prInfo == nil || prInfo.Number == nil {
-			splog.Debug("No PR found for branch %s", branchName)
-			continue
-		}
-
-		// Skip if PR is not open
-		state := strings.ToUpper(prInfo.State)
-		if state != "OPEN" {
-			splog.Info("Skipping %s: PR #%d is %s", branchName, *prInfo.Number, state)
-			continue
-		}
-
-		// Check if local branch differs from remote
-		matchesRemote, err := eng.BranchMatchesRemote(branchName)
-		if err != nil {
-			splog.Debug("Failed to check if branch matches remote: %v", err)
-			matchesRemote = true // Assume matches if check fails
-		}
-
-		prsToMerge = append(prsToMerge, prToMerge{
-			branchName: branchName,
-			prNumber:   *prInfo.Number,
-			prURL:      prInfo.URL,
-			differs:    !matchesRemote,
-		})
 	}
 
-	// If no PRs to merge, exit early
-	if len(prsToMerge) == 0 {
-		splog.Info("No open PRs found to merge")
-		return nil
+	// 1. Populate remote SHAs so we can accurately check if branches match remote
+	// This must be called before creating the merge plan so BranchMatchesRemote works correctly
+	if err := eng.PopulateRemoteShas(); err != nil {
+		splog.Debug("Failed to populate remote SHAs: %v", err)
+		// Continue anyway - we'll just have less accurate remote matching info
+	} else {
+		splog.Debug("Populated remote SHAs for branch matching")
 	}
 
-	// Dry run mode: just report what would be merged
+	// 2. Check sync status
+	needsSync, staleBranches, err := CheckSyncStatus(eng, splog)
+	if err != nil {
+		return fmt.Errorf("failed to check sync status: %w", err)
+	}
+
+	if needsSync {
+		splog.Warn("Repository is not up to date with remote")
+		if len(staleBranches) > 0 {
+			splog.Info("Stale branches: %v", staleBranches)
+		}
+		splog.Tip("Run 'stackit sync' to update before merging")
+		// In interactive mode, we would prompt here, but for now we'll continue
+		// The plan creation will validate individual branches
+	}
+
+	// 3. Create merge plan
+	plan, validation, err := CreateMergePlan(CreateMergePlanOptions{
+		Strategy: strategy,
+		Force:    opts.Force,
+		Engine:   eng,
+		Splog:    splog,
+		RepoRoot: repoRoot,
+	})
+	if err != nil {
+		return err
+	}
+
+	// 4. Display validation errors if any
+	if !validation.Valid {
+		splog.Warn("Cannot proceed with merge due to validation errors:")
+		for _, errMsg := range validation.Errors {
+			splog.Warn("  ✗ %s", errMsg)
+		}
+		// In dry-run mode, show the plan anyway
+		if !opts.DryRun && !opts.Force {
+			return fmt.Errorf("validation failed (use --force to override)")
+		}
+		if !opts.DryRun && opts.Force {
+			splog.Warn("Proceeding despite validation errors (--force enabled)")
+		}
+	}
+
+	// 5. Display warnings if any
+	if len(validation.Warnings) > 0 {
+		splog.Warn("Warnings:")
+		for _, warn := range validation.Warnings {
+			splog.Warn("  ⚠ %s", warn)
+		}
+		splog.Newline()
+		// Block execution if there are warnings (unless --force or dry-run)
+		if !opts.DryRun && !opts.Force {
+			splog.Warn("Cannot proceed with merge due to warnings. Use --force to override.")
+			return fmt.Errorf("merge blocked due to warnings (use --force to override)")
+		}
+		if !opts.DryRun && opts.Force {
+			splog.Warn("Proceeding despite warnings (--force enabled)")
+		}
+	}
+
+	// 6. Display plan (dry-run or preview)
+	planText := FormatMergePlan(plan, validation)
+	splog.Page(planText)
+
+	// If dry-run, stop here
 	if opts.DryRun {
-		splog.Info("Would merge the following PRs:")
-		splog.Newline()
-		for _, pr := range prsToMerge {
-			branchColor := output.ColorBranchName(pr.branchName, false)
-			splog.Info("  %s: PR #%d", branchColor, pr.prNumber)
-			if pr.prURL != "" {
-				splog.Info("    %s", output.ColorDim(pr.prURL))
-			}
-		}
 		return nil
 	}
 
-	// Check if we need confirmation
-	needsConfirmation := opts.Confirm
-	for _, pr := range prsToMerge {
-		if pr.differs {
-			needsConfirmation = true
-			break
-		}
-	}
-
-	// Prompt for confirmation if needed
-	if needsConfirmation {
-		splog.Info("The following PRs will be merged:")
-		splog.Newline()
-		for _, pr := range prsToMerge {
-			branchColor := output.ColorBranchName(pr.branchName, false)
-			differsMsg := ""
-			if pr.differs {
-				differsMsg = output.ColorDim(" (local differs from remote)")
-			}
-			splog.Info("  %s: PR #%d%s", branchColor, pr.prNumber, differsMsg)
-			if pr.prURL != "" {
-				splog.Info("    %s", output.ColorDim(pr.prURL))
-			}
-		}
-		splog.Newline()
-
-		confirmed, err := promptConfirm("Merge these PRs?", false)
+	// 6. Confirm if needed
+	if opts.Confirm {
+		confirmed, err := PromptConfirm("Proceed with merge?", false)
 		if err != nil {
 			return fmt.Errorf("confirmation cancelled: %w", err)
 		}
@@ -149,18 +130,17 @@ func MergeAction(opts MergeOptions) error {
 		}
 	}
 
-	// Merge each PR
-	for _, pr := range prsToMerge {
-		splog.Info("Merging PR #%d for %s...", pr.prNumber, output.ColorBranchName(pr.branchName, false))
-
-		if err := git.MergePullRequest(pr.branchName); err != nil {
-			splog.Warn("Failed to merge PR #%d for %s: %v", pr.prNumber, pr.branchName, err)
-			// Continue with other PRs
-			continue
-		}
-
-		splog.Info("Successfully merged PR #%d for %s", pr.prNumber, output.ColorBranchName(pr.branchName, true))
+	// 7. Execute the plan
+	if err := ExecuteMergePlan(ExecuteMergePlanOptions{
+		Plan:     plan,
+		Engine:   eng,
+		Splog:    splog,
+		RepoRoot: repoRoot,
+		Force:    opts.Force,
+	}); err != nil {
+		return fmt.Errorf("merge execution failed: %w", err)
 	}
 
+	splog.Info("Merge completed successfully")
 	return nil
 }

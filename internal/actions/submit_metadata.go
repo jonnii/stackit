@@ -31,7 +31,7 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *s
 	}
 
 	// Prompt for title
-	result, err := promptTextInput("Title:", title)
+	result, err := PromptTextInput("Title:", title)
 	if err != nil {
 		return "", fmt.Errorf("failed to get PR title: %w", err)
 	}
@@ -125,7 +125,7 @@ func GetReviewers(reviewersFlag string, ctx *stackitcontext.Context) ([]string, 
 func GetReviewersWithPrompt(reviewersFlag string, ctx *stackitcontext.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Prompt for reviewers
-		result, err := promptTextInput("Reviewers (comma-separated GitHub usernames):", "")
+		result, err := PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get reviewers: %w", err)
 		}

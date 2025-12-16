@@ -9,19 +9,24 @@ import (
 
 // GetMergeBase returns the merge base between two branches
 func GetMergeBase(branch1, branch2 string) (string, error) {
+	return GetMergeBaseByRef("refs/heads/"+branch1, "refs/heads/"+branch2)
+}
+
+// GetMergeBaseByRef returns the merge base between two refs (can be branches or remote refs)
+func GetMergeBaseByRef(ref1Name, ref2Name string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
 	}
 
-	ref1, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branch1), true)
+	ref1, err := repo.Reference(plumbing.ReferenceName(ref1Name), true)
 	if err != nil {
-		return "", fmt.Errorf("failed to get branch1 reference: %w", err)
+		return "", fmt.Errorf("failed to get ref1 reference: %w", err)
 	}
 
-	ref2, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branch2), true)
+	ref2, err := repo.Reference(plumbing.ReferenceName(ref2Name), true)
 	if err != nil {
-		return "", fmt.Errorf("failed to get branch2 reference: %w", err)
+		return "", fmt.Errorf("failed to get ref2 reference: %w", err)
 	}
 
 	var commit1 *object.Commit

@@ -25,10 +25,11 @@ func TestMergeAction(t *testing.T) {
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
-			DryRun:  false,
-			Confirm: false,
-			Engine:  eng,
-			Splog:   splog,
+			DryRun:   false,
+			Confirm:  false,
+			Strategy: actions.MergeStrategyBottomUp,
+			Engine:   eng,
+			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not on a branch")
@@ -52,10 +53,11 @@ func TestMergeAction(t *testing.T) {
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
-			DryRun:  false,
-			Confirm: false,
-			Engine:  eng,
-			Splog:   splog,
+			DryRun:   false,
+			Confirm:  false,
+			Strategy: actions.MergeStrategyBottomUp,
+			Engine:   eng,
+			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot merge from trunk")
@@ -90,10 +92,11 @@ func TestMergeAction(t *testing.T) {
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
-			DryRun:  false,
-			Confirm: false,
-			Engine:  eng,
-			Splog:   splog,
+			DryRun:   false,
+			Confirm:  false,
+			Strategy: actions.MergeStrategyBottomUp,
+			Engine:   eng,
+			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not tracked")
@@ -133,13 +136,15 @@ func TestMergeAction(t *testing.T) {
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
-			DryRun:  false,
-			Confirm: false,
-			Engine:  eng,
-			Splog:   splog,
+			DryRun:   false,
+			Confirm:  false,
+			Strategy: actions.MergeStrategyBottomUp,
+			Engine:   eng,
+			Splog:    splog,
 		})
-		// Should succeed but report no PRs
-		require.NoError(t, err)
+		// Should fail because no PRs found
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no open PRs found")
 	})
 
 	t.Run("dry run mode reports PRs without merging", func(t *testing.T) {
@@ -189,10 +194,11 @@ func TestMergeAction(t *testing.T) {
 
 		splog := output.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
-			DryRun:  true,
-			Confirm: false,
-			Engine:  eng,
-			Splog:   splog,
+			DryRun:   true,
+			Confirm:  false,
+			Strategy: actions.MergeStrategyBottomUp,
+			Engine:   eng,
+			Splog:    splog,
 		})
 		require.NoError(t, err)
 	})

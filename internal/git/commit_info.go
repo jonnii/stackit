@@ -63,6 +63,23 @@ func GetRevision(branchName string) (string, error) {
 	return ref.Hash().String(), nil
 }
 
+// GetRemoteRevision returns the SHA of a remote branch (e.g., origin/branchName)
+func GetRemoteRevision(branchName string) (string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "", err
+	}
+
+	// Try origin/branchName first
+	ref, err := repo.Reference(plumbing.ReferenceName("refs/remotes/origin/"+branchName), true)
+	if err != nil {
+		// Try to fetch it first, or return error
+		return "", fmt.Errorf("failed to get remote branch reference: %w", err)
+	}
+
+	return ref.Hash().String(), nil
+}
+
 // GetCommitMessages returns all commit messages for a branch (excluding parent)
 func GetCommitMessages(branchName string) ([]string, error) {
 	// Get parent branch to determine range

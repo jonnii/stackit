@@ -112,8 +112,8 @@ func (m confirmModel) View() string {
 	return style.Render(fmt.Sprintf("%s %s\n\n(Press y/yes or n/no, Enter to confirm, Ctrl+C to cancel)", m.prompt, yesNo))
 }
 
-// promptTextInput prompts the user for text input
-func promptTextInput(prompt, defaultValue string) (string, error) {
+// PromptTextInput prompts the user for text input
+func PromptTextInput(prompt, defaultValue string) (string, error) {
 	if err := checkInteractiveAllowed(); err != nil {
 		return "", err
 	}
@@ -146,8 +146,8 @@ func promptTextInput(prompt, defaultValue string) (string, error) {
 	return "", fmt.Errorf("unexpected model type")
 }
 
-// promptConfirm prompts the user for yes/no confirmation
-func promptConfirm(prompt string, defaultValue bool) (bool, error) {
+// PromptConfirm prompts the user for yes/no confirmation
+func PromptConfirm(prompt string, defaultValue bool) (bool, error) {
 	if err := checkInteractiveAllowed(); err != nil {
 		return false, err
 	}
@@ -158,16 +158,131 @@ func promptConfirm(prompt string, defaultValue bool) (bool, error) {
 	}
 
 	p := tea.NewProgram(m, tea.WithOutput(nil))
-	_, err := p.Run()
+	model, err := p.Run()
 	if err != nil {
 		return false, err
 	}
 
-	if m.err != nil {
-		return false, m.err
+	if finalModel, ok := model.(confirmModel); ok {
+		if finalModel.err != nil {
+			return false, finalModel.err
+		}
+		return finalModel.choice, nil
 	}
 
-	return m.choice, nil
+	return false, fmt.Errorf("unexpected model type")
+}
+
+// SelectOption represents an option in a selection prompt
+type SelectOption struct {
+	Label string // What to show
+	Value string // Value to return
+}
+
+// selectModel is a selection prompt model with arrow key navigation
+type selectModel struct {
+	options  []SelectOption
+	cursor   int
+	selected string
+	done     bool
+	err      error
+	title    string
+}
+
+func (m selectModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			if len(m.options) > 0 && m.cursor >= 0 && m.cursor < len(m.options) {
+				m.selected = m.options[m.cursor].Value
+				m.done = true
+				return m, tea.Quit
+			}
+		case tea.KeyCtrlC, tea.KeyEsc:
+			m.err = fmt.Errorf("cancelled")
+			m.done = true
+			return m, tea.Quit
+		case tea.KeyUp, tea.KeyShiftTab:
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.cursor = len(m.options) - 1
+			}
+			return m, nil
+		case tea.KeyDown, tea.KeyTab:
+			if m.cursor < len(m.options)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m selectModel) View() string {
+	if m.done {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%s\n\n", m.title))
+
+	for i, opt := range m.options {
+		if i == m.cursor {
+			b.WriteString(fmt.Sprintf("  → %s\n", opt.Label))
+		} else {
+			b.WriteString(fmt.Sprintf("    %s\n", opt.Label))
+		}
+	}
+
+	b.WriteString("\n(↑/↓ to select, Enter to confirm, Ctrl+C to cancel)")
+
+	style := lipgloss.NewStyle().Margin(1, 0)
+	return style.Render(b.String())
+}
+
+// PromptSelect prompts the user to select from a list of options
+func PromptSelect(title string, options []SelectOption, defaultIndex int) (string, error) {
+	if err := checkInteractiveAllowed(); err != nil {
+		return "", err
+	}
+
+	if len(options) == 0 {
+		return "", fmt.Errorf("no options provided")
+	}
+
+	cursor := defaultIndex
+	if cursor < 0 || cursor >= len(options) {
+		cursor = 0
+	}
+
+	m := selectModel{
+		options: options,
+		cursor:  cursor,
+		title:   title,
+	}
+
+	p := tea.NewProgram(m, tea.WithOutput(nil))
+	model, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+
+	if m, ok := model.(selectModel); ok {
+		if m.err != nil {
+			return "", m.err
+		}
+		return m.selected, nil
+	}
+
+	return "", fmt.Errorf("unexpected model type")
 }
 
 // branchSelectModel is a branch selection prompt model with filtering

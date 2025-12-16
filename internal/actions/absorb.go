@@ -131,7 +131,7 @@ func AbsorbAction(opts AbsorbOptions) error {
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
-		confirmed, err := promptConfirm("Apply these changes to the commits?", false)
+		confirmed, err := PromptConfirm("Apply these changes to the commits?", false)
 		if err != nil {
 			return fmt.Errorf("confirmation cancelled: %w", err)
 		}

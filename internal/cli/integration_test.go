@@ -9,275 +9,171 @@ import (
 	"stackit.dev/stackit/testhelpers"
 )
 
-// TestIntegrationStackWorkflow tests a realistic stacked branch workflow:
-// 1. Create multiple stacked branches
-// 2. Amend commits on a branch
-// 3. Restack to propagate changes
-// 4. Squash commits
-func TestIntegrationStackWorkflow(t *testing.T) {
-	t.Parallel()
-	binaryPath := getStackitBinary(t)
+// =============================================================================
+// Test Shell - A helper to make tests read like terminal sessions
+// =============================================================================
 
-	t.Run("full stack workflow: create, amend, restack, squash", func(t *testing.T) {
-		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
-			// Create initial commit on main
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+// TestShell wraps a test scene and provides a fluent interface for running
+// commands. Tests using this read like a series of terminal commands.
+type TestShell struct {
+	t          *testing.T
+	scene      *testhelpers.Scene
+	binaryPath string
+	lastOutput string
+}
 
-		// =====================================================
-		// STEP 1: Create multiple stacked branches
-		// Stack structure: main -> feature-a -> feature-b -> feature-c
-		// =====================================================
-
-		// Create feature-a with a commit
-		err := scene.Repo.CreateChange("feature a content", "feature_a", false)
-		require.NoError(t, err)
-
-		cmd := exec.Command(binaryPath, "create", "feature-a", "-m", "Add feature A")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
-		require.NoError(t, err, "failed to create feature-a: %s", string(output))
-
-		// Verify we're on feature-a
-		currentBranch, err := scene.Repo.CurrentBranchName()
-		require.NoError(t, err)
-		require.Equal(t, "feature-a", currentBranch)
-
-		// Create feature-b stacked on feature-a
-		err = scene.Repo.CreateChange("feature b content", "feature_b", false)
-		require.NoError(t, err)
-
-		cmd = exec.Command(binaryPath, "create", "feature-b", "-m", "Add feature B")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err, "failed to create feature-b: %s", string(output))
-
-		// Create feature-c stacked on feature-b
-		err = scene.Repo.CreateChange("feature c content", "feature_c", false)
-		require.NoError(t, err)
-
-		cmd = exec.Command(binaryPath, "create", "feature-c", "-m", "Add feature C")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err, "failed to create feature-c: %s", string(output))
-
-		// Verify stack structure with log
-		cmd = exec.Command(binaryPath, "log", "--stack")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err, "failed to run log: %s", string(output))
-		logOutput := string(output)
-		require.Contains(t, logOutput, "feature-a")
-		require.Contains(t, logOutput, "feature-b")
-		require.Contains(t, logOutput, "feature-c")
-
-		t.Log("Step 1 complete: Created stack main -> feature-a -> feature-b -> feature-c")
-
-		// =====================================================
-		// STEP 2: Add more commits and amend on feature-a
-		// =====================================================
-
-		// Go back to feature-a
-		err = scene.Repo.CheckoutBranch("feature-a")
-		require.NoError(t, err)
-
-		// Add another commit to feature-a
-		err = scene.Repo.CreateChange("feature a - more content", "feature_a_extra", false)
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature a - additional work", "extra")
-		require.NoError(t, err)
-
-		// Verify feature-a now has 2 commits above main
-		cmd = exec.Command("git", "log", "--oneline", "main..feature-a")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		commitCount := countNonEmptyLines(string(output))
-		require.Equal(t, 2, commitCount, "feature-a should have 2 commits above main")
-
-		// Now amend the last commit
-		err = scene.Repo.CreateChangeAndAmend("feature a - amended content", "feature_a_amended")
-		require.NoError(t, err)
-
-		t.Log("Step 2 complete: Added commits and amended on feature-a")
-
-		// =====================================================
-		// STEP 3: Restack to propagate changes to child branches
-		// =====================================================
-
-		// Restack upstack from feature-a (should update feature-b and feature-c)
-		cmd = exec.Command(binaryPath, "restack", "--upstack")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err, "failed to restack: %s", string(output))
-
-		t.Log("Step 3 complete: Restacked upstack branches")
-
-		// Verify feature-b is still valid after restack
-		err = scene.Repo.CheckoutBranch("feature-b")
-		require.NoError(t, err)
-
-		cmd = exec.Command("git", "log", "--oneline", "feature-a..feature-b")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		require.Contains(t, string(output), "Add feature B", "feature-b should still have its commit")
-
-		// Verify feature-c is still valid after restack
-		err = scene.Repo.CheckoutBranch("feature-c")
-		require.NoError(t, err)
-
-		cmd = exec.Command("git", "log", "--oneline", "feature-b..feature-c")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		require.Contains(t, string(output), "Add feature C", "feature-c should still have its commit")
-
-		// =====================================================
-		// STEP 4: Squash commits on feature-a
-		// =====================================================
-
-		// Go back to feature-a
-		err = scene.Repo.CheckoutBranch("feature-a")
-		require.NoError(t, err)
-
-		// Verify feature-a has 2 commits before squash
-		cmd = exec.Command("git", "log", "--oneline", "main..feature-a")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		beforeSquash := countNonEmptyLines(string(output))
-		require.Equal(t, 2, beforeSquash, "feature-a should have 2 commits before squash")
-
-		// Squash commits on feature-a
-		cmd = exec.Command(binaryPath, "squash", "-m", "Feature A complete")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err, "failed to squash: %s", string(output))
-
-		t.Log("Step 4 complete: Squashed commits on feature-a")
-
-		// Verify feature-a now has only 1 commit
-		cmd = exec.Command("git", "log", "--oneline", "main..feature-a")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		afterSquash := countNonEmptyLines(string(output))
-		require.Equal(t, 1, afterSquash, "feature-a should have 1 commit after squash")
-
-		// Verify the commit message is correct
-		cmd = exec.Command("git", "log", "-1", "--format=%s", "feature-a")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		require.Contains(t, string(output), "Feature A complete")
-
-		// =====================================================
-		// STEP 5: Verify child branches are still valid after squash
-		// =====================================================
-
-		// Squash should have automatically restacked children
-		err = scene.Repo.CheckoutBranch("feature-b")
-		require.NoError(t, err)
-
-		// Verify feature-b's commit is still there
-		cmd = exec.Command("git", "log", "--oneline", "feature-a..feature-b")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		require.Contains(t, string(output), "Add feature B", "feature-b should still have its commit after squash restack")
-
-		// Verify feature-c's commit is still there
-		err = scene.Repo.CheckoutBranch("feature-c")
-		require.NoError(t, err)
-
-		cmd = exec.Command("git", "log", "--oneline", "feature-b..feature-c")
-		cmd.Dir = scene.Dir
-		output, err = cmd.CombinedOutput()
-		require.NoError(t, err)
-		require.Contains(t, string(output), "Add feature C", "feature-c should still have its commit after squash restack")
-
-		t.Log("Step 5 complete: Verified all branches are valid after full workflow")
-
-		// =====================================================
-		// Final verification: All branches still exist
-		// =====================================================
-		testhelpers.ExpectBranches(t, scene.Repo, []string{"feature-a", "feature-b", "feature-c", "main"})
+// NewTestShell creates a shell-like test environment with an initialized repo.
+func NewTestShell(t *testing.T, binaryPath string) *TestShell {
+	t.Helper()
+	scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+		return s.Repo.CreateChangeAndCommit("initial", "init")
 	})
+	return &TestShell{t: t, scene: scene, binaryPath: binaryPath}
+}
 
-	t.Run("stack workflow with parallel branches", func(t *testing.T) {
-		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+// Run executes a stackit CLI command (e.g., "create feature-a -m 'Add feature'")
+func (s *TestShell) Run(args string) *TestShell {
+	s.t.Helper()
+	parts := splitArgs(args)
+	cmd := exec.Command(s.binaryPath, parts...)
+	cmd.Dir = s.scene.Dir
+	output, err := cmd.CombinedOutput()
+	s.lastOutput = string(output)
+	require.NoError(s.t, err, "$ stackit %s\n%s", args, s.lastOutput)
+	return s
+}
 
-		// Create a diamond-shaped stack:
-		//     main
-		//       |
-		//   feature-a
-		//    /     \
-		// feat-b1  feat-b2
-		//    \     /
-		//   feature-c (has both as parents conceptually, but only one direct parent)
+// Git executes a raw git command (use sparingly - prefer stackit commands)
+func (s *TestShell) Git(args string) *TestShell {
+	s.t.Helper()
+	parts := splitArgs(args)
+	cmd := exec.Command("git", parts...)
+	cmd.Dir = s.scene.Dir
+	output, err := cmd.CombinedOutput()
+	s.lastOutput = string(output)
+	require.NoError(s.t, err, "$ git %s\n%s", args, s.lastOutput)
+	return s
+}
 
-		// Create feature-a
-		err := scene.Repo.CreateChange("feature a", "a", false)
-		require.NoError(t, err)
-		cmd := exec.Command(binaryPath, "create", "feature-a", "-m", "Feature A")
-		cmd.Dir = scene.Dir
-		_, err = cmd.CombinedOutput()
-		require.NoError(t, err)
+// Checkout switches to a branch using stackit checkout
+func (s *TestShell) Checkout(branch string) *TestShell {
+	s.t.Helper()
+	return s.Run("checkout " + branch)
+}
 
-		// Create feat-b1 from feature-a
-		err = scene.Repo.CreateChange("feature b1", "b1", false)
-		require.NoError(t, err)
-		cmd = exec.Command(binaryPath, "create", "feat-b1", "-m", "Feature B1")
-		cmd.Dir = scene.Dir
-		_, err = cmd.CombinedOutput()
-		require.NoError(t, err)
+// Top navigates to the top of the current stack
+func (s *TestShell) Top() *TestShell {
+	s.t.Helper()
+	return s.Run("top")
+}
 
-		// Go back to feature-a and create feat-b2
-		err = scene.Repo.CheckoutBranch("feature-a")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChange("feature b2", "b2", false)
-		require.NoError(t, err)
-		cmd = exec.Command(binaryPath, "create", "feat-b2", "-m", "Feature B2")
-		cmd.Dir = scene.Dir
-		_, err = cmd.CombinedOutput()
-		require.NoError(t, err)
+// Bottom navigates to the bottom of the current stack
+func (s *TestShell) Bottom() *TestShell {
+	s.t.Helper()
+	return s.Run("bottom")
+}
 
-		// Create feature-c on top of feat-b2
-		err = scene.Repo.CreateChange("feature c", "c", false)
-		require.NoError(t, err)
-		cmd = exec.Command(binaryPath, "create", "feature-c", "-m", "Feature C")
-		cmd.Dir = scene.Dir
-		_, err = cmd.CombinedOutput()
-		require.NoError(t, err)
+// Write creates/modifies a file and stages it (simulates editing a file)
+func (s *TestShell) Write(filename, content string) *TestShell {
+	s.t.Helper()
+	err := s.scene.Repo.CreateChange(content, filename, false)
+	require.NoError(s.t, err, "failed to write %s", filename)
+	return s
+}
 
-		// Verify structure
-		testhelpers.ExpectBranches(t, scene.Repo, []string{"feat-b1", "feat-b2", "feature-a", "feature-c", "main"})
+// Amend modifies a file and amends the last commit
+func (s *TestShell) Amend(filename, content string) *TestShell {
+	s.t.Helper()
+	err := s.scene.Repo.CreateChangeAndAmend(content, filename)
+	require.NoError(s.t, err, "failed to amend with %s", filename)
+	return s
+}
 
-		// Now amend feature-a and restack everything
-		err = scene.Repo.CheckoutBranch("feature-a")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndAmend("feature a amended", "a_amended")
-		require.NoError(t, err)
+// Commit creates a file change and commits it
+func (s *TestShell) Commit(filename, message string) *TestShell {
+	s.t.Helper()
+	err := s.scene.Repo.CreateChangeAndCommit(message, filename)
+	require.NoError(s.t, err, "failed to commit %s", filename)
+	return s
+}
 
-		// Restack upstack - should update both b1, b2, and c
-		cmd = exec.Command(binaryPath, "restack", "--upstack")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
-		require.NoError(t, err, "failed to restack parallel branches: %s", string(output))
+// Output returns the last command's output
+func (s *TestShell) Output() string {
+	return s.lastOutput
+}
 
-		// Verify all branches are still valid
-		for _, branch := range []string{"feat-b1", "feat-b2", "feature-c"} {
-			err = scene.Repo.CheckoutBranch(branch)
-			require.NoError(t, err, "should be able to checkout %s", branch)
+// OutputContains asserts the last output contains the given string
+func (s *TestShell) OutputContains(substr string) *TestShell {
+	s.t.Helper()
+	require.Contains(s.t, s.lastOutput, substr)
+	return s
+}
+
+// OnBranch asserts we're on the expected branch
+func (s *TestShell) OnBranch(expected string) *TestShell {
+	s.t.Helper()
+	branch, err := s.scene.Repo.CurrentBranchName()
+	require.NoError(s.t, err)
+	require.Equal(s.t, expected, branch)
+	return s
+}
+
+// HasBranches asserts the repo has exactly these branches
+func (s *TestShell) HasBranches(branches ...string) *TestShell {
+	s.t.Helper()
+	testhelpers.ExpectBranches(s.t, s.scene.Repo, branches)
+	return s
+}
+
+// CommitCount asserts the number of commits between two refs
+func (s *TestShell) CommitCount(from, to string, expected int) *TestShell {
+	s.t.Helper()
+	cmd := exec.Command("git", "log", "--oneline", from+".."+to)
+	cmd.Dir = s.scene.Dir
+	output, err := cmd.CombinedOutput()
+	require.NoError(s.t, err)
+	actual := countNonEmptyLines(string(output))
+	require.Equal(s.t, expected, actual, "expected %d commits between %s..%s, got %d", expected, from, to, actual)
+	return s
+}
+
+// Log prints a message (useful for documenting test steps)
+func (s *TestShell) Log(msg string) *TestShell {
+	s.t.Log(msg)
+	return s
+}
+
+// splitArgs splits a command string into args, respecting quotes
+func splitArgs(s string) []string {
+	var args []string
+	var current strings.Builder
+	inQuote := false
+	quoteChar := rune(0)
+
+	for _, r := range s {
+		switch {
+		case r == '"' || r == '\'':
+			if inQuote && r == quoteChar {
+				inQuote = false
+			} else if !inQuote {
+				inQuote = true
+				quoteChar = r
+			} else {
+				current.WriteRune(r)
+			}
+		case r == ' ' && !inQuote:
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
 		}
-
-		t.Log("Parallel branch workflow complete")
-	})
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
 }
 
 // countNonEmptyLines counts lines that have non-whitespace content
@@ -289,4 +185,118 @@ func countNonEmptyLines(s string) int {
 		}
 	}
 	return count
+}
+
+// =============================================================================
+// Integration Tests - Now read like terminal sessions!
+// =============================================================================
+
+func TestIntegrationStackWorkflow(t *testing.T) {
+	t.Parallel()
+	binaryPath := getStackitBinary(t)
+
+	t.Run("full stack workflow: create, amend, restack, squash", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShell(t, binaryPath)
+
+		// Build a stack: main -> feature-a -> feature-b -> feature-c
+		sh.Log("Creating stacked branches...")
+		sh.Write("feature_a", "feature a content").
+			Run("create feature-a -m 'Add feature A'").
+			OnBranch("feature-a")
+
+		sh.Write("feature_b", "feature b content").
+			Run("create feature-b -m 'Add feature B'").
+			OnBranch("feature-b")
+
+		sh.Write("feature_c", "feature c content").
+			Run("create feature-c -m 'Add feature C'").
+			OnBranch("feature-c")
+
+		sh.Run("log --stack").
+			OutputContains("feature-a").
+			OutputContains("feature-b").
+			OutputContains("feature-c")
+
+		// Add commits and amend on feature-a
+		sh.Log("Adding commits and amending on feature-a...")
+		sh.Checkout("feature-a").
+			Commit("feature_a_extra", "additional work").
+			CommitCount("main", "feature-a", 2).
+			Amend("feature_a_amended", "amended content")
+
+		// Restack to propagate changes
+		sh.Log("Restacking upstack branches...")
+		sh.Run("restack --upstack")
+
+		// Verify children are still valid
+		sh.Checkout("feature-b").
+			Run("info").
+			OutputContains("feature-b")
+
+		sh.Checkout("feature-c").
+			Run("info").
+			OutputContains("feature-c")
+
+		// Squash commits on feature-a
+		sh.Log("Squashing commits on feature-a...")
+		sh.Checkout("feature-a").
+			CommitCount("main", "feature-a", 2).
+			Run("squash -m 'Feature A complete'").
+			CommitCount("main", "feature-a", 1)
+
+		// Verify the squashed commit message
+		sh.Run("info").
+			OutputContains("Feature A complete")
+
+		// Verify children survived the squash
+		sh.Log("Verifying children are still valid after squash...")
+		sh.Checkout("feature-b").
+			Run("info").
+			OutputContains("feature-b")
+
+		sh.Checkout("feature-c").
+			Run("info").
+			OutputContains("feature-c")
+
+		sh.HasBranches("feature-a", "feature-b", "feature-c", "main")
+		sh.Log("✓ Full workflow complete!")
+	})
+
+	t.Run("stack workflow with parallel branches", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShell(t, binaryPath)
+
+		// Create diamond-shaped stack:
+		//        main
+		//          |
+		//      feature-a
+		//       /     \
+		//   feat-b1  feat-b2
+		//               |
+		//           feature-c
+
+		sh.Log("Creating diamond-shaped branch structure...")
+		sh.Write("a", "feature a").Run("create feature-a -m 'Feature A'")
+		sh.Write("b1", "feature b1").Run("create feat-b1 -m 'Feature B1'")
+
+		sh.Checkout("feature-a")
+		sh.Write("b2", "feature b2").Run("create feat-b2 -m 'Feature B2'")
+		sh.Write("c", "feature c").Run("create feature-c -m 'Feature C'")
+
+		sh.HasBranches("feat-b1", "feat-b2", "feature-a", "feature-c", "main")
+
+		// Amend feature-a and restack everything
+		sh.Log("Amending feature-a and restacking...")
+		sh.Checkout("feature-a").
+			Amend("a_amended", "feature a amended").
+			Run("restack --upstack")
+
+		// Verify all branches survived
+		sh.Checkout("feat-b1").Run("info").OutputContains("feat-b1")
+		sh.Checkout("feat-b2").Run("info").OutputContains("feat-b2")
+		sh.Checkout("feature-c").Run("info").OutputContains("feature-c")
+
+		sh.Log("✓ Parallel branch workflow complete!")
+	})
 }

@@ -241,6 +241,12 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 		currentBranch = ""
 	}
 
+	// Get the repo root for running git commands in the correct directory
+	repoRoot, err := GetRepoRoot()
+	if err != nil {
+		return fmt.Errorf("failed to get repo root: %w", err)
+	}
+
 	// Get commit's parent
 	parentSHA, err := GetParentCommitSHA(commitSHA)
 	if err != nil {
@@ -264,10 +270,14 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 		return fmt.Errorf("failed to get commit date: %w", err)
 	}
 
-	// Create a temporary patch file with all hunks
-	tmpDir := os.TempDir()
-	patchFile := filepath.Join(tmpDir, fmt.Sprintf("stackit-absorb-%s.patch", commitSHA[:8]))
-	defer os.Remove(patchFile)
+	// Create a temporary directory for patch files (unique per operation to avoid conflicts)
+	tmpDir, err := os.MkdirTemp("", fmt.Sprintf("stackit-absorb-%s-*", commitSHA[:8]))
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	patchFile := filepath.Join(tmpDir, "hunks.patch")
 
 	// Group hunks by file
 	hunksByFile := make(map[string][]Hunk)
@@ -362,8 +372,7 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	}
 
 	// Create temporary file for commit diff
-	commitPatchFile := filepath.Join(tmpDir, fmt.Sprintf("stackit-absorb-commit-%s.patch", commitSHA[:8]))
-	defer os.Remove(commitPatchFile)
+	commitPatchFile := filepath.Join(tmpDir, "commit.patch")
 
 	if err := os.WriteFile(commitPatchFile, []byte(commitDiff), 0644); err != nil {
 		// Restore branch
@@ -375,22 +384,28 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 
 	// Apply the original commit's changes
 	cmd := exec.Command("git", "apply", "--cached", commitPatchFile)
+	cmd.Dir = repoRoot
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		// Restore branch
 		if currentBranch != "" {
 			_ = CheckoutBranch(currentBranch)
 		}
-		return fmt.Errorf("failed to apply commit diff: %w", err)
+		return fmt.Errorf("failed to apply commit diff: %w (stderr: %s)", err, stderr.String())
 	}
 
 	// Now apply the hunks patch
 	cmd = exec.Command("git", "apply", "--cached", patchFile)
+	cmd.Dir = repoRoot
+	stderr.Reset()
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		// Restore branch
 		if currentBranch != "" {
 			_ = CheckoutBranch(currentBranch)
 		}
-		return fmt.Errorf("failed to apply patch: %w", err)
+		return fmt.Errorf("failed to apply patch: %w (stderr: %s)", err, stderr.String())
 	}
 
 	// Create new commit with same message, author, and date
@@ -403,13 +418,16 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	env = append(env, fmt.Sprintf("GIT_COMMITTER_DATE=%s", date.Format("2006-01-02T15:04:05-0700")))
 
 	cmd = exec.Command("git", "commit", "-m", commitMessage)
+	cmd.Dir = repoRoot
 	cmd.Env = env
+	stderr.Reset()
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		// Restore branch
 		if currentBranch != "" {
 			_ = CheckoutBranch(currentBranch)
 		}
-		return fmt.Errorf("failed to create commit: %w", err)
+		return fmt.Errorf("failed to create commit: %w (stderr: %s)", err, stderr.String())
 	}
 
 	// Get new commit SHA

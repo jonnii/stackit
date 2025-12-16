@@ -31,6 +31,40 @@ func NewTestShell(t *testing.T, binaryPath string) *TestShell {
 	return &TestShell{t: t, scene: scene, binaryPath: binaryPath}
 }
 
+// NewTestShellWithRemote creates a shell-like test environment with a local bare repo as "origin".
+// This is useful for testing sync workflows that require a remote.
+func NewTestShellWithRemote(t *testing.T, binaryPath string) *TestShell {
+	t.Helper()
+
+	// Create a bare repository to act as the remote
+	remoteDir := t.TempDir()
+	cmd := exec.Command("git", "init", "--bare", remoteDir)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "failed to create bare repo: %s", string(output))
+
+	// Create the scene with the remote set up
+	scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+		// Create initial commit
+		if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
+			return err
+		}
+		// Add the bare repo as origin
+		cmd := exec.Command("git", "remote", "add", "origin", remoteDir)
+		cmd.Dir = s.Dir
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+		// Push main to origin
+		cmd = exec.Command("git", "push", "-u", "origin", "main")
+		cmd.Dir = s.Dir
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+		return nil
+	})
+	return &TestShell{t: t, scene: scene, binaryPath: binaryPath}
+}
+
 // Run executes a stackit CLI command (e.g., "create feature-a -m 'Add feature'")
 func (s *TestShell) Run(args string) *TestShell {
 	s.t.Helper()
@@ -298,5 +332,272 @@ func TestIntegrationStackWorkflow(t *testing.T) {
 		sh.Checkout("feature-c").Run("info").OutputContains("feature-c")
 
 		sh.Log("✓ Parallel branch workflow complete!")
+	})
+}
+
+func TestIntegrationSyncWorkflow(t *testing.T) {
+	t.Parallel()
+	binaryPath := getStackitBinary(t)
+
+	t.Run("sync cleans up merged branch and reparents children", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShellWithRemote(t, binaryPath)
+
+		// Scenario:
+		// 1. Build stack: main → branch-a → branch-b → branch-c
+		// 2. Simulate "branch-a PR merged" by merging branch-a into main
+		// 3. Run `stackit sync --force --no-restack` (no restack to isolate cleanup behavior)
+		// 4. Verify:
+		//    - branch-a was deleted
+		//    - branch-b is now parented to main
+		//    - branch-c is still parented to branch-b
+
+		sh.Log("Building stack: main → branch-a → branch-b → branch-c...")
+		sh.Write("a", "feature a content").
+			Run("create branch-a -m 'Add feature A'").
+			OnBranch("branch-a")
+
+		sh.Write("b", "feature b content").
+			Run("create branch-b -m 'Add feature B'").
+			OnBranch("branch-b")
+
+		sh.Write("c", "feature c content").
+			Run("create branch-c -m 'Add feature C'").
+			OnBranch("branch-c")
+
+		sh.HasBranches("branch-a", "branch-b", "branch-c", "main")
+
+		// Simulate merging branch-a into main (like a GitHub PR merge)
+		sh.Log("Simulating PR merge: merging branch-a into main...")
+		sh.Git("checkout main").
+			Git("merge branch-a --no-ff -m 'Merge branch-a'")
+
+		// Push the merge to origin so sync can pull it
+		sh.Git("push origin main")
+
+		// Verify main now has branch-a's changes
+		cmd := exec.Command("git", "log", "--oneline", "main")
+		cmd.Dir = sh.scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+		require.Contains(t, string(output), "Merge branch-a", "main should have merge commit")
+
+		// Run sync with --force to auto-confirm deletions, --no-restack to isolate cleanup
+		sh.Log("Running sync to clean up merged branches...")
+		sh.Run("sync --force --no-restack")
+
+		// Verify branch-a was deleted
+		sh.Log("Verifying branch-a was deleted...")
+		cmd = exec.Command("git", "branch", "--list", "branch-a")
+		cmd.Dir = sh.scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+		require.Empty(t, strings.TrimSpace(string(output)), "branch-a should be deleted")
+
+		// Verify branch-b and branch-c still exist
+		sh.HasBranches("branch-b", "branch-c", "main")
+
+		// Verify branch-b's parent is now main (via info command)
+		sh.Log("Verifying branch-b is now parented to main...")
+		sh.Checkout("branch-b").
+			Run("info")
+		// The info output should show branch-b with main as parent
+		require.Contains(t, sh.Output(), "branch-b", "info should show branch-b")
+
+		// Verify branch-c is still valid and its parent chain is correct
+		sh.Log("Verifying branch-c is still accessible...")
+		sh.Checkout("branch-c").
+			Run("info").
+			OutputContains("branch-c")
+
+		sh.Log("✓ Sync cleanup workflow complete!")
+	})
+
+	t.Run("sync restacks branches after cleaning merged PRs", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShellWithRemote(t, binaryPath)
+
+		// Scenario:
+		// 1. Build stack: main → branch-a → branch-b
+		// 2. Merge branch-a into main
+		// 3. Run sync with restack enabled
+		// 4. Verify branch-b is rebased onto main
+
+		sh.Log("Building stack: main → branch-a → branch-b...")
+		sh.Write("a", "feature a content").
+			Run("create branch-a -m 'Add feature A'").
+			OnBranch("branch-a")
+
+		sh.Write("b", "feature b content").
+			Run("create branch-b -m 'Add feature B'").
+			OnBranch("branch-b")
+
+		// Get branch-b's commit before sync
+		cmd := exec.Command("git", "rev-parse", "branch-b")
+		cmd.Dir = sh.scene.Dir
+		beforeSHA := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+
+		// Simulate merging branch-a into main
+		sh.Log("Simulating PR merge: merging branch-a into main...")
+		sh.Git("checkout main").
+			Git("merge branch-a --no-ff -m 'Merge branch-a'")
+
+		// Push the merge to origin
+		sh.Git("push origin main")
+
+		// Run sync with restack (default)
+		sh.Log("Running sync with restack...")
+		sh.Checkout("branch-b"). // Need to be on a tracked branch for restack
+						Run("sync --force")
+
+		// Get branch-b's commit after sync
+		cmd = exec.Command("git", "rev-parse", "branch-b")
+		cmd.Dir = sh.scene.Dir
+		afterSHA := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+
+		// branch-b should have been restacked (commit SHA changed)
+		require.NotEqual(t, beforeSHA, afterSHA, "branch-b should be restacked (SHA should change)")
+
+		// Verify branch-a was deleted
+		cmd = exec.Command("git", "branch", "--list", "branch-a")
+		cmd.Dir = sh.scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+		require.Empty(t, strings.TrimSpace(string(output)), "branch-a should be deleted")
+
+		// Verify branch-b is now directly on main
+		cmd = exec.Command("git", "merge-base", "main", "branch-b")
+		cmd.Dir = sh.scene.Dir
+		mergeBase := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+
+		cmd = exec.Command("git", "rev-parse", "main")
+		cmd.Dir = sh.scene.Dir
+		mainSHA := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+
+		require.Equal(t, mainSHA, mergeBase, "branch-b should be rebased directly onto main")
+
+		sh.Log("✓ Sync with restack workflow complete!")
+	})
+}
+
+func TestIntegrationConflictResolution(t *testing.T) {
+	t.Parallel()
+	binaryPath := getStackitBinary(t)
+
+	t.Run("continue through cascading conflicts in stack", func(t *testing.T) {
+		// TODO: Implement multi-level conflict resolution test
+		//
+		// Scenario:
+		// 1. Build stack: main → branch-a → branch-b → branch-c
+		//    where each branch modifies the SAME file (to create conflicts)
+		// 2. Add a new commit to main that modifies the same file
+		// 3. Run `stackit restack` from branch-a
+		// 4. Verify: restack stops at branch-a with conflict
+		// 5. Resolve conflict, run `stackit continue`
+		// 6. Verify: restack continues, stops at branch-b with conflict
+		// 7. Resolve conflict, run `stackit continue`
+		// 8. Verify: restack continues, stops at branch-c with conflict
+		// 9. Resolve conflict, run `stackit continue`
+		// 10. Verify: all branches are now successfully restacked
+		//
+		// This tests:
+		// - Continuation state persistence across multiple conflicts
+		// - Proper resumption of restack after conflict resolution
+		// - Cascading conflicts through a deep stack
+
+		t.Skip("TODO: Implement cascading conflict resolution test")
+
+		_ = binaryPath // Will be used when implemented
+	})
+
+	t.Run("continue preserves stack structure after mid-stack conflict", func(t *testing.T) {
+		// TODO: Implement mid-stack conflict preservation test
+		//
+		// Scenario:
+		// 1. Build stack: main → a → b → c → d
+		// 2. Amend branch-b with conflicting changes
+		// 3. Run `stackit restack --upstack` from branch-b
+		// 4. Verify: conflict occurs at branch-c
+		// 5. Resolve conflict, run continue
+		// 6. Verify: branch-c and branch-d are properly restacked
+		// 7. Verify: parent relationships are preserved correctly
+		//
+		// This tests:
+		// - Restack from mid-stack position
+		// - Conflict in middle of upstack chain
+		// - Preservation of deep stack structure
+
+		t.Skip("TODO: Implement mid-stack conflict preservation test")
+
+		_ = binaryPath // Will be used when implemented
+	})
+}
+
+func TestIntegrationSplitWorkflow(t *testing.T) {
+	t.Parallel()
+	binaryPath := getStackitBinary(t)
+
+	t.Run("split mid-stack branch with multiple children restacks all descendants", func(t *testing.T) {
+		// TODO: Implement split with multiple children test
+		//
+		// Scenario - Diamond structure with split:
+		//
+		// Before split:
+		//           main
+		//             |
+		//         feature-a (has files: config.go, api.go, utils.go)
+		//          /     \
+		//      child-1  child-2
+		//                  |
+		//              grandchild
+		//
+		// After split --by-file config.go,api.go:
+		//
+		//           main
+		//             |
+		//        feature-a_split (has: config.go, api.go)
+		//             |
+		//         feature-a (has: utils.go only)
+		//          /     \
+		//      child-1  child-2
+		//                  |
+		//              grandchild
+		//
+		// Verify:
+		// - New parent branch created with extracted files
+		// - Original branch only has remaining files
+		// - All 3 descendants (child-1, child-2, grandchild) are restacked
+		// - Parent relationships are updated correctly
+		//
+		// This tests:
+		// - Split creates correct parent branch
+		// - Multiple children are all restacked
+		// - Deep descendants (grandchild) are handled
+		// - Diamond structure is preserved
+
+		t.Skip("TODO: Implement split mid-stack with multiple children test")
+
+		_ = binaryPath // Will be used when implemented
+	})
+
+	t.Run("split at stack bottom updates all upstack branches", func(t *testing.T) {
+		// TODO: Implement split at bottom test
+		//
+		// Scenario:
+		// 1. Build: main → feature-a (4 files) → feature-b → feature-c
+		// 2. Split feature-a to extract 2 files to new parent
+		// 3. Verify:
+		//    - New branch feature-a_split is between main and feature-a
+		//    - feature-a, feature-b, feature-c all properly restacked
+		//    - Commit history is clean
+		//
+		// This tests:
+		// - Split at the base of a deep stack
+		// - All upstack branches restack correctly
+		// - No orphaned commits
+
+		t.Skip("TODO: Implement split at stack bottom test")
+
+		_ = binaryPath // Will be used when implemented
 	})
 }

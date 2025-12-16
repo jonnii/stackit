@@ -66,7 +66,8 @@ func TestSubmitCommand(t *testing.T) {
 		lines := strings.Split(outputStr, "\n")
 		foundBranch2 := false
 		for _, line := range lines {
-			if strings.Contains(line, "branch2") && (strings.Contains(line, "Create") || strings.Contains(line, "Update") || strings.Contains(line, "No-op")) {
+			// Check for new format: "▸ branch2 (current) → create" or old format with "Create/Update/No-op"
+			if strings.Contains(line, "branch2") && (strings.Contains(line, "create") || strings.Contains(line, "update") || strings.Contains(line, "no changes") || strings.Contains(line, "Create") || strings.Contains(line, "Update") || strings.Contains(line, "No-op")) {
 				foundBranch2 = true
 				break
 			}

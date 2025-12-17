@@ -8,7 +8,7 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// LogOptions specifies options for the log command
+// LogOptions contains options for the log command
 type LogOptions struct {
 	Style         string // "SHORT" or "FULL"
 	Reverse       bool
@@ -18,7 +18,7 @@ type LogOptions struct {
 }
 
 // LogAction displays the branch tree
-func LogAction(opts LogOptions, ctx *runtime.Context) error {
+func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	// Populate remote SHAs if needed
 	if err := ctx.Engine.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)

@@ -6,8 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/demo"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -25,41 +23,13 @@ func newLogCmd() *cobra.Command {
 		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
 		Aliases: []string{"l"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check for demo mode
-			if ctx, ok := demo.NewDemoContext(); ok {
-				branchName := ctx.Engine.Trunk()
-				if stack || steps > 0 {
-					branchName = ctx.Engine.CurrentBranch()
-				}
-
-				opts := actions.LogOptions{
-					Style:         "FULL",
-					Reverse:       reverse,
-					BranchName:    branchName,
-					ShowUntracked: showUntracked,
-				}
-
-				if steps > 0 {
-					opts.Steps = &steps
-				}
-
-				return actions.LogAction(opts, ctx)
-			}
-
-			// Ensure stackit is initialized
-			repoRoot, err := EnsureInitialized()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
 				return err
 			}
 
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
+			eng := ctx.Engine
 
 			// Determine branch name
 			branchName := eng.Trunk()
@@ -84,7 +54,7 @@ func newLogCmd() *cobra.Command {
 			}
 
 			// Execute log action
-			return actions.LogAction(opts, ctx)
+			return actions.LogAction(ctx, opts)
 		},
 	}
 

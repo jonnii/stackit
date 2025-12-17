@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -40,11 +40,9 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
 		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
 
-		// Create submit options with mocked client
-		splog := output.NewSplog()
+		// Create context and submit options with mocked client
+		ctx := runtime.NewContext(eng)
 		opts := actions.SubmitOptions{
-			Engine:       eng,
-			Splog:        splog,
 			DryRun:       false, // We want to test actual PR creation
 			NoEdit:       true,  // Skip interactive prompts
 			Draft:        true,  // Set draft status explicitly to skip prompt
@@ -53,7 +51,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = actions.SubmitAction(opts)
+		err = actions.SubmitAction(ctx, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was created in the mock
@@ -113,11 +111,9 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Create submit options with mocked client
-		splog := output.NewSplog()
+		// Create context and submit options with mocked client
+		ctx := runtime.NewContext(eng)
 		opts := actions.SubmitOptions{
-			Engine:       eng,
-			Splog:        splog,
 			DryRun:       false,
 			NoEdit:       true,
 			GitHubClient: githubClient,
@@ -125,7 +121,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = actions.SubmitAction(opts)
+		err = actions.SubmitAction(ctx, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was updated in the mock

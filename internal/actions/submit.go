@@ -103,7 +103,7 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	// Restack if requested (skip in demo mode)
 	if opts.Restack && !isDemoMode() {
 		splog.Info("Restacking branches before submitting...")
-		repoRoot := opts.RepoRoot
+		repoRoot := ctx.RepoRoot
 		if repoRoot == "" {
 			repoRoot, _ = git.GetRepoRoot()
 		}
@@ -116,8 +116,6 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 
 	// Validate and prepare branches (combined message)
 	splog.Info("Preparing...")
-	ctx := runtime.NewContext(eng)
-	ctx.Splog = splog
 
 	// Skip validation in demo mode
 	if !isDemoMode() {

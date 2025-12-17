@@ -1,14 +1,9 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -28,30 +23,11 @@ func newSquashCmd() *cobra.Command {
 This command combines all commits in the current branch into a single commit. After squashing,
 all upstack branches (children) are automatically restacked.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Determine noEdit flag: matches charcoal logic: noEdit = argv['no-edit'] || !argv.edit
 			// If --no-edit is set, noEdit = true
@@ -60,12 +36,9 @@ all upstack branches (children) are automatically restacked.`,
 			noEditFlag := noEdit || !edit
 
 			// Run squash action
-			return actions.SquashAction(actions.SquashOptions{
-				Message:  message,
-				NoEdit:   noEditFlag,
-				Engine:   eng,
-				Splog:    ctx.Splog,
-				RepoRoot: repoRoot,
+			return actions.SquashAction(ctx, actions.SquashOptions{
+				Message: message,
+				NoEdit:  noEditFlag,
 			})
 		},
 	}

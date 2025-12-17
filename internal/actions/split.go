@@ -9,6 +9,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -25,9 +26,6 @@ const (
 type SplitOptions struct {
 	Style     SplitStyle
 	Pathspecs []string
-	Engine    engine.Engine
-	Splog     *tui.Splog
-	RepoRoot  string
 }
 
 // SplitResult contains the result of a split operation
@@ -37,9 +35,12 @@ type SplitResult struct {
 }
 
 // SplitAction performs the split operation
-func SplitAction(opts SplitOptions) error {
+func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
 	// Get current branch
-	currentBranch := opts.Engine.CurrentBranch()
+	currentBranch := eng.CurrentBranch()
 	if currentBranch == "" {
 		return fmt.Errorf("not on a branch")
 	}
@@ -54,14 +55,14 @@ func SplitAction(opts SplitOptions) error {
 	}
 
 	// Ensure branch is tracked
-	if !opts.Engine.IsBranchTracked(currentBranch) {
+	if !eng.IsBranchTracked(currentBranch) {
 		// Auto-track the branch
-		parent := opts.Engine.GetParent(currentBranch)
+		parent := eng.GetParent(currentBranch)
 		if parent == "" {
 			// Try to find parent from git
-			parent = opts.Engine.Trunk()
+			parent = eng.Trunk()
 		}
-		if err := opts.Engine.TrackBranch(currentBranch, parent); err != nil {
+		if err := eng.TrackBranch(currentBranch, parent); err != nil {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 	}
@@ -70,7 +71,7 @@ func SplitAction(opts SplitOptions) error {
 	style := opts.Style
 	if style == "" {
 		// Check if there's more than one commit
-		commits, err := opts.Engine.GetAllCommits(currentBranch, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(currentBranch, engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits: %w", err)
 		}
@@ -103,14 +104,14 @@ func SplitAction(opts SplitOptions) error {
 	var result *SplitResult
 	switch style {
 	case SplitStyleCommit:
-		result, err = splitByCommit(currentBranch, opts.Engine, opts.Splog)
+		result, err = splitByCommit(currentBranch, eng, splog)
 	case SplitStyleHunk:
-		result, err = splitByHunk(currentBranch, opts.Engine, opts.Splog)
+		result, err = splitByHunk(currentBranch, eng, splog)
 	case SplitStyleFile:
 		pathspecs := opts.Pathspecs
 		// If no pathspecs provided, prompt interactively
 		if len(pathspecs) == 0 {
-			pathspecs, err = promptForFiles(currentBranch, opts.Engine, opts.Splog)
+			pathspecs, err = promptForFiles(currentBranch, eng, splog)
 			if err != nil {
 				return err
 			}
@@ -120,7 +121,7 @@ func SplitAction(opts SplitOptions) error {
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(currentBranch, pathspecs, opts.Engine, opts.Splog)
+		_, err = splitByFile(currentBranch, pathspecs, eng, splog)
 		if err != nil {
 			return err
 		}
@@ -130,9 +131,9 @@ func SplitAction(opts SplitOptions) error {
 			IncludeCurrent:    false,
 			RecursiveChildren: true,
 		}
-		upstackBranches := opts.Engine.GetRelativeStack(currentBranch, scope)
+		upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 		if len(upstackBranches) > 0 {
-			if err := RestackBranches(upstackBranches, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+			if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -151,10 +152,10 @@ func SplitAction(opts SplitOptions) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := opts.Engine.GetRelativeStack(currentBranch, scope)
+	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	// Apply the split
-	if err := opts.Engine.ApplySplitToCommits(engine.ApplySplitOptions{
+	if err := eng.ApplySplitToCommits(engine.ApplySplitOptions{
 		BranchToSplit: currentBranch,
 		BranchNames:   result.BranchNames,
 		BranchPoints:  result.BranchPoints,
@@ -164,7 +165,7 @@ func SplitAction(opts SplitOptions) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(upstackBranches, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

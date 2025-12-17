@@ -7,32 +7,34 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// InfoOptions specifies options for the info command
+// InfoOptions contains options for the info command
 type InfoOptions struct {
 	BranchName string
 	Body       bool
 	Diff       bool
 	Patch      bool
 	Stat       bool
-	Engine     engine.Engine
-	Splog      *tui.Splog
 }
 
 // InfoAction displays information about a branch
-func InfoAction(opts InfoOptions) error {
+func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
 	branchName := opts.BranchName
 	if branchName == "" {
-		branchName = opts.Engine.CurrentBranch()
+		branchName = eng.CurrentBranch()
 		if branchName == "" {
 			return fmt.Errorf("not on a branch and no branch specified")
 		}
 	}
 
 	// Check if branch exists
-	if !opts.Engine.IsBranchTracked(branchName) && !opts.Engine.IsTrunk(branchName) {
+	if !eng.IsBranchTracked(branchName) && !eng.IsTrunk(branchName) {
 		// Check if it's a git branch
 		_, err := git.GetRevision(branchName)
 		if err != nil {
@@ -49,20 +51,20 @@ func InfoAction(opts InfoOptions) error {
 	var outputLines []string
 
 	// Get branch info
-	isCurrent := branchName == opts.Engine.CurrentBranch()
-	isTrunk := opts.Engine.IsTrunk(branchName)
+	isCurrent := branchName == eng.CurrentBranch()
+	isTrunk := eng.IsTrunk(branchName)
 
 	// Branch name with current indicator
 	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
-	if !isTrunk && !opts.Engine.IsBranchFixed(branchName) {
+	if !isTrunk && !eng.IsBranchFixed(branchName) {
 		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
 	// Commit date
-	commitDate, err := opts.Engine.GetCommitDate(branchName)
+	commitDate, err := eng.GetCommitDate(branchName)
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
 		outputLines = append(outputLines, tui.ColorDim(dateStr))
@@ -71,7 +73,7 @@ func InfoAction(opts InfoOptions) error {
 	// PR info (skip for trunk)
 	var prInfo *engine.PrInfo
 	if !isTrunk {
-		prInfo, _ = opts.Engine.GetPrInfo(branchName)
+		prInfo, _ = eng.GetPrInfo(branchName)
 		if prInfo != nil && prInfo.Number != nil {
 			prTitleLine := getPRTitleLine(prInfo)
 			if prTitleLine != "" {
@@ -85,14 +87,14 @@ func InfoAction(opts InfoOptions) error {
 	}
 
 	// Parent branch
-	parentBranchName := opts.Engine.GetParent(branchName)
+	parentBranchName := eng.GetParent(branchName)
 	if parentBranchName != "" {
 		outputLines = append(outputLines, "")
 		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranchName))
 	}
 
 	// Children branches
-	children := opts.Engine.GetChildren(branchName)
+	children := eng.GetChildren(branchName)
 	if len(children) > 0 {
 		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))
 		for _, child := range children {
@@ -120,7 +122,7 @@ func InfoAction(opts InfoOptions) error {
 				baseRevision = *meta.ParentBranchRevision
 			}
 		}
-		branchRevision, err := opts.Engine.GetRevision(branchName)
+		branchRevision, err := eng.GetRevision(branchName)
 		if err == nil {
 			commitsOutput, err := git.ShowCommits(baseRevision, branchRevision, true, opts.Stat)
 			if err == nil && commitsOutput != "" {
@@ -129,7 +131,7 @@ func InfoAction(opts InfoOptions) error {
 		}
 	} else {
 		// Show commit list (readable format)
-		commits, err := opts.Engine.GetAllCommits(branchName, engine.CommitFormatReadable)
+		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
 				outputLines = append(outputLines, tui.ColorDim(commit))
@@ -142,7 +144,7 @@ func InfoAction(opts InfoOptions) error {
 		outputLines = append(outputLines, "")
 		if isTrunk {
 			// For trunk, show diff from HEAD~1 to HEAD
-			headRevision, err := opts.Engine.GetRevision(branchName)
+			headRevision, err := eng.GetRevision(branchName)
 			if err == nil {
 				// Get parent commit
 				parentSHA, err := git.GetCommitSHA(branchName, 1)
@@ -157,7 +159,7 @@ func InfoAction(opts InfoOptions) error {
 			// For regular branches, show diff from parent revision
 			meta, err := git.ReadMetadataRef(branchName)
 			if err == nil && meta.ParentBranchRevision != nil {
-				branchRevision, err := opts.Engine.GetRevision(branchName)
+				branchRevision, err := eng.GetRevision(branchName)
 				if err == nil {
 					diffOutput, err := git.ShowDiff(*meta.ParentBranchRevision, branchRevision, opts.Stat)
 					if err == nil && diffOutput != "" {
@@ -176,8 +178,8 @@ func InfoAction(opts InfoOptions) error {
 	}
 
 	// Output the result
-	opts.Splog.Page(strings.Join(outputLines, "\n"))
-	opts.Splog.Newline()
+	splog.Page(strings.Join(outputLines, "\n"))
+	splog.Newline()
 
 	return nil
 }

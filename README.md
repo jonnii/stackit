@@ -1,5 +1,7 @@
 # Stackit
 
+[![Tests](https://github.com/jonnii/stackit/actions/workflows/test.yml/badge.svg)](https://github.com/jonnii/stackit/actions/workflows/test.yml)
+
 **Stackit** is a command-line tool that makes working with stacked changes fast and intuitive.
 
 Stacked changes (or stacked diffs) are a workflow where you break large features into small, reviewable branches that build on top of each other. Stackit manages the complexity of keeping these branches in sync, rebased, and submitted as pull requests.

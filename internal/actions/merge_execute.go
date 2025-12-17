@@ -17,6 +17,7 @@ type ExecuteMergePlanOptions struct {
 	Splog    *output.Splog
 	RepoRoot string
 	Force    bool
+	DemoMode bool // If true, simulate execution without actual git operations
 }
 
 // ExecuteMergePlan executes a validated merge plan step by step
@@ -25,6 +26,12 @@ func ExecuteMergePlan(opts ExecuteMergePlanOptions) error {
 	splog := opts.Splog
 
 	for i, step := range plan.Steps {
+		// In demo mode, simulate execution without actual operations
+		if opts.DemoMode {
+			splog.Info("✓ [DEMO] %s", step.Description)
+			continue
+		}
+
 		// 1. Re-validate preconditions for this step
 		if err := validateStepPreconditions(step, opts); err != nil {
 			return fmt.Errorf("step %d (%s) failed precondition: %w", i+1, step.Description, err)

@@ -6,9 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -42,35 +40,16 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 				return fmt.Errorf("only one of --downstack, --only, or --upstack can be specified")
 			}
 
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Determine target branch
 			targetBranch := branch
 			if targetBranch == "" {
-				targetBranch = eng.CurrentBranch()
+				targetBranch = ctx.Engine.CurrentBranch()
 				if targetBranch == "" {
 					return fmt.Errorf("not on a branch and --branch not specified")
 				}
@@ -84,12 +63,9 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			}
 
 			// Run restack action
-			return actions.RestackAction(actions.RestackOptions{
+			return actions.RestackAction(ctx, actions.RestackOptions{
 				BranchName: targetBranch,
 				Scope:      scope,
-				Engine:     eng,
-				Splog:      ctx.Splog,
-				RepoRoot:   repoRoot,
 			})
 		},
 	}

@@ -5,6 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -70,25 +71,25 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *tui.Splog, 
 	return nil
 }
 
-// RestackOptions are options for the restack command
+// RestackOptions contains options for the restack command
 type RestackOptions struct {
 	BranchName string
 	Scope      engine.Scope
-	Engine     engine.Engine
-	Splog      *tui.Splog
-	RepoRoot   string
 }
 
 // RestackAction performs the restack operation
-func RestackAction(opts RestackOptions) error {
+func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
 	// Get branches to restack based on scope
-	branches := opts.Engine.GetRelativeStack(opts.BranchName, opts.Scope)
+	branches := eng.GetRelativeStack(opts.BranchName, opts.Scope)
 
 	if len(branches) == 0 {
-		opts.Splog.Info("No branches to restack.")
+		splog.Info("No branches to restack.")
 		return nil
 	}
 
 	// Call RestackBranches
-	return RestackBranches(branches, opts.Engine, opts.Splog, opts.RepoRoot)
+	return RestackBranches(branches, eng, splog, ctx.RepoRoot)
 }

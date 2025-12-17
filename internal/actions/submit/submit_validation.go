@@ -1,8 +1,9 @@
-package actions
+package submit
 
 import (
 	"fmt"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -12,7 +13,7 @@ import (
 // ValidateBranchesToSubmit validates that branches are ready to submit
 func ValidateBranchesToSubmit(branches []string, eng engine.Engine, ctx *runtime.Context) error {
 	// Sync PR info first
-	repoOwner, repoName, _ := getRepoInfo()
+	repoOwner, repoName, _ := actions.GetRepoInfo()
 	if repoOwner != "" && repoName != "" {
 		if err := git.SyncPrInfo(branches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue

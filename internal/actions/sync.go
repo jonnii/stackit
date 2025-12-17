@@ -75,7 +75,7 @@ func SyncAction(opts SyncOptions) error {
 
 	// Sync PR info
 	allBranches := eng.AllBranchNames()
-	repoOwner, repoName, _ := getRepoInfo()
+	repoOwner, repoName, _ := GetRepoInfo()
 	if repoOwner != "" && repoName != "" {
 		if err := git.SyncPrInfo(allBranches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
@@ -213,7 +213,7 @@ func hasUncommittedChanges() bool {
 }
 
 // getRepoInfo gets repository owner and name from git remote
-func getRepoInfo() (string, string, error) {
+func GetRepoInfo() (string, string, error) {
 	// Get remote URL
 	url, err := git.RunGitCommand("config", "--get", "remote.origin.url")
 	if err != nil {

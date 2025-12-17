@@ -1,16 +1,16 @@
-package actions_test
+package submit_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/submit"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
-func TestSubmitActionWithMockedGitHub(t *testing.T) {
+func TestActionWithMockedGitHub(t *testing.T) {
 	t.Run("creates PR for branch", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, nil)
 
@@ -43,7 +43,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		// Create context with mocked client
 		ctx := runtime.NewContext(eng)
 		ctx.GitHubClient = githubClient
-		opts := actions.SubmitOptions{
+		opts := submit.Options{
 			DryRun:   false, // We want to test actual PR creation
 			NoEdit:   true,  // Skip interactive prompts
 			Draft:    true,  // Set draft status explicitly to skip prompt
@@ -51,7 +51,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = actions.SubmitAction(ctx, opts)
+		err = submit.Action(ctx, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was created in the mock
@@ -114,14 +114,14 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		// Create context with mocked client
 		ctx := runtime.NewContext(eng)
 		ctx.GitHubClient = githubClient
-		opts := actions.SubmitOptions{
+		opts := submit.Options{
 			DryRun:   false,
 			NoEdit:   true,
 			SkipPush: true, // Skip push since we don't have a real remote
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = actions.SubmitAction(ctx, opts)
+		err = submit.Action(ctx, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was updated in the mock

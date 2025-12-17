@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/submit"
 	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -54,7 +54,7 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 			}
 
 			// Run submit action
-			return actions.SubmitAction(ctx, actions.SubmitOptions{
+			return submit.Action(ctx, submit.Options{
 				Branch:               branch,
 				Stack:                stack,
 				Force:                force,

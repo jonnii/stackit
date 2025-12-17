@@ -1,18 +1,19 @@
-package actions
+package submit
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// SubmitOptions contains options for the submit command
-type SubmitOptions struct {
+// Options contains options for the submit command
+type Options struct {
 	Branch               string
 	Stack                bool
 	Force                bool
@@ -42,8 +43,8 @@ type SubmitOptions struct {
 	SkipPush bool
 }
 
-// SubmissionInfo contains information about a branch to submit
-type SubmissionInfo struct {
+// Info contains information about a branch to submit
+type Info struct {
 	BranchName string
 	Head       string
 	Base       string
@@ -54,10 +55,13 @@ type SubmissionInfo struct {
 	Metadata   *PRMetadata
 }
 
-// SubmitAction performs the submit operation
-func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
+// Action performs the submit operation
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+
+	// Create UI early - all output goes through this
+	ui := tui.NewSubmitUI(splog)
 
 	// Validate flags
 	if opts.Draft && opts.Publish {
@@ -82,52 +86,49 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	}
 
 	// Display the stack tree with PR annotations
-	displaySubmitStackTree(branches, opts, eng, splog, currentBranch)
+	stackLines := getStackTreeLines(branches, opts, eng, currentBranch)
+	ui.ShowStack(stackLines)
 
 	// Restack if requested
 	if opts.Restack {
-		splog.Info("Restacking branches before submitting...")
+		ui.ShowRestackStart()
 		repoRoot := ctx.RepoRoot
 		if repoRoot == "" {
 			repoRoot, _ = git.GetRepoRoot()
 		}
-		if err := RestackBranches(branches, eng, splog, repoRoot); err != nil {
+		if err := actions.RestackBranches(branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
+		ui.ShowRestackComplete()
 	}
 
 	// Validate and prepare branches
-	splog.Info("Preparing...")
+	ui.ShowPreparing()
 
 	if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch, ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
 
 	// Check if we should abort
-	shouldAbort, err := shouldAbortSubmit(opts, len(submissionInfos) > 0, ctx)
-	if err != nil {
-		return err
-	}
-	if shouldAbort {
+	if opts.DryRun {
+		ui.ShowDryRunComplete()
 		return nil
 	}
 
-	// Push branches and create/update PRs
-	splog.Newline()
-	splog.Info("Submitting...")
-	githubCtx := context.Background()
-
-	githubClient, err := getGitHubClient(ctx)
-	if err != nil {
-		return err
+	if len(submissionInfos) == 0 {
+		ui.ShowNoChanges()
+		return nil
 	}
-	repoOwner, repoName := githubClient.GetOwnerRepo()
+
+	if opts.Confirm {
+		// TODO: Add interactive confirmation prompt
+	}
 
 	// Build progress items
 	progressItems := make([]tui.SubmitItem, len(submissionInfos))
@@ -140,17 +141,23 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 		}
 	}
 
-	// Create progress UI (auto-detects TTY)
-	progressUI := tui.NewSubmitProgressUI(splog)
-	progressUI.Start(progressItems)
+	// Start submission phase
+	ui.StartSubmitting(progressItems)
+
+	githubCtx := context.Background()
+	githubClient, err := getGitHubClient(ctx)
+	if err != nil {
+		return err
+	}
+	repoOwner, repoName := githubClient.GetOwnerRepo()
 
 	remote := "origin" // TODO: Get from config
 	for idx, submissionInfo := range submissionInfos {
-		progressUI.UpdateItem(idx, "submitting", "", nil)
+		ui.UpdateSubmitItem(idx, "submitting", "", nil)
 
 		if err := pushBranchIfNeeded(submissionInfo, opts, remote, eng); err != nil {
-			progressUI.UpdateItem(idx, "error", "", err)
-			progressUI.Complete()
+			ui.UpdateSubmitItem(idx, "error", "", err)
+			ui.Complete()
 			return err
 		}
 
@@ -162,16 +169,16 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 		}
 
 		if err != nil {
-			progressUI.UpdateItem(idx, "error", "", err)
-			progressUI.Complete()
+			ui.UpdateSubmitItem(idx, "error", "", err)
+			ui.Complete()
 			return err
 		}
 
-		progressUI.UpdateItem(idx, "done", prURL, nil)
+		ui.UpdateSubmitItem(idx, "done", prURL, nil)
 
 		// Open in browser if requested
 		if opts.View && prURL != "" {
-			if err := openBrowser(prURL); err != nil {
+			if err := actions.OpenBrowser(prURL); err != nil {
 				splog.Debug("Failed to open browser: %v", err)
 			}
 		}
@@ -182,14 +189,14 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 		splog.Debug("Failed to update PR footers: %v", err)
 	}
 
-	progressUI.Complete()
+	ui.Complete()
 
 	return nil
 }
 
-// prepareBranchesForSubmit prepares submission info for each branch
-func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.Engine, ctx *runtime.Context, currentBranch string) ([]SubmissionInfo, error) {
-	var submissionInfos []SubmissionInfo
+// prepareBranchesForSubmit prepares submission info for each branch, outputting via UI
+func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine, ctx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
+	var submissionInfos []Info
 
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
@@ -207,12 +214,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 
 		// Check if we should skip
 		if opts.UpdateOnly && action == "create" {
-			// For skipped branches, show dimmed with (current) indicator if applicable
-			displayName := branchName
-			if isCurrent {
-				displayName = branchName + " (current)"
-			}
-			ctx.Splog.Info("  ▸ %s %s", tui.ColorDim(displayName), tui.ColorDim("— skipped, no existing PR"))
+			ui.ShowBranchPlan(branchName, action, isCurrent, true, "skipped, no existing PR")
 			continue
 		}
 
@@ -224,27 +226,21 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			// Check if draft status needs to change
 			draftStatusNeedsChange := false
 			if opts.Draft && !prInfo.IsDraft {
-				// Want to mark as draft, but it's not draft
 				draftStatusNeedsChange = true
 			} else if opts.Publish && prInfo.IsDraft {
-				// Want to publish, but it's currently draft
 				draftStatusNeedsChange = true
 			}
 
 			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always || draftStatusNeedsChange
 
 			if !needsUpdate && !opts.Draft && !opts.Publish {
-				displayName := branchName
-				if isCurrent {
-					displayName = branchName + " (current)"
-				}
-				ctx.Splog.Info("  ▸ %s %s", tui.ColorDim(displayName), tui.ColorDim("— no changes"))
+				ui.ShowBranchPlan(branchName, action, isCurrent, true, "no changes")
 				continue
 			}
 		}
 
 		// Prepare metadata
-		metadataOpts := SubmitMetadataOptions{
+		metadataOpts := MetadataOptions{
 			Edit:              opts.Edit && !opts.NoEdit,
 			EditTitle:         opts.EditTitle && !opts.NoEditTitle,
 			EditDescription:   opts.EditDescription && !opts.NoEditDescription,
@@ -266,7 +262,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 		headSHA, _ := eng.GetRevision(branchName)
 		baseSHA, _ := eng.GetRevision(parentBranchName)
 
-		submissionInfo := SubmissionInfo{
+		submissionInfo := Info{
 			BranchName: branchName,
 			Head:       branchName,
 			Base:       parentBranchName,
@@ -277,39 +273,12 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			Metadata:   metadata,
 		}
 
-		// Log action in planning phase - ColorBranchName adds (current) automatically
-		actionLabel := "create"
-		if action == "update" {
-			actionLabel = "update"
-		}
-		ctx.Splog.Info("  ▸ %s → %s",
-			tui.ColorBranchName(branchName, isCurrent),
-			tui.ColorDim(actionLabel))
+		ui.ShowBranchPlan(branchName, action, isCurrent, false, "")
 
 		submissionInfos = append(submissionInfos, submissionInfo)
 	}
 
 	return submissionInfos, nil
-}
-
-// shouldAbortSubmit checks if we should abort the submit operation
-func shouldAbortSubmit(opts SubmitOptions, hasAnyPRs bool, ctx *runtime.Context) (bool, error) {
-	if opts.DryRun {
-		ctx.Splog.Info("Dry run complete.")
-		return true, nil
-	}
-
-	if !hasAnyPRs {
-		ctx.Splog.Info("All PRs up to date.")
-		return true, nil
-	}
-
-	if opts.Confirm {
-		// TODO: Add interactive confirmation prompt
-		// For now, we'll just continue
-	}
-
-	return false, nil
 }
 
 // getRecursiveDescendants gets all descendants of a branch recursively
@@ -326,7 +295,7 @@ func getRecursiveDescendants(eng engine.Engine, branchName string) []string {
 }
 
 // getBranchesToSubmit returns the list of branches to submit based on options
-func getBranchesToSubmit(opts SubmitOptions, eng engine.Engine) ([]string, error) {
+func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	// Get branch scope
 	branchName := opts.Branch
 	if branchName == "" {
@@ -386,7 +355,7 @@ func getGitHubClient(ctx *runtime.Context) (git.GitHubClient, error) {
 }
 
 // pushBranchIfNeeded pushes a branch to remote if needed
-func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remote string, eng engine.Engine) error {
+func pushBranchIfNeeded(submissionInfo Info, opts Options, remote string, eng engine.Engine) error {
 	// Skip if dry run or skip push is set
 	if opts.DryRun || opts.SkipPush {
 		return nil
@@ -403,7 +372,7 @@ func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remot
 }
 
 // createPullRequest creates a new pull request
-func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
+func createPullRequest(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
 	prURL, err := createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
@@ -418,7 +387,7 @@ func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng en
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	createOpts := git.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -450,7 +419,7 @@ func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 }
 
 // updatePullRequest updates an existing pull request
-func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
+func updatePullRequest(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
 	prURL, err := updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
@@ -465,7 +434,7 @@ func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng en
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	// Check if base changed
 	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
 	baseChanged := false
@@ -528,8 +497,8 @@ func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Con
 			continue
 		}
 
-		footer := CreatePRBodyFooter(branchName, eng)
-		updatedBody := UpdatePRBodyFooter(prInfo.Body, footer)
+		footer := actions.CreatePRBodyFooter(branchName, eng)
+		updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
 
 		if updatedBody != prInfo.Body {
 			updateOpts := git.UpdatePROptions{
@@ -561,8 +530,8 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 			continue
 		}
 
-		footer := CreatePRBodyFooter(branchName, eng)
-		updatedBody := UpdatePRBodyFooter(prInfo.Body, footer)
+		footer := actions.CreatePRBodyFooter(branchName, eng)
+		updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
 
 		if updatedBody != prInfo.Body {
 			updateOpts := git.UpdatePROptions{
@@ -576,8 +545,8 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 	return nil
 }
 
-// displaySubmitStackTree displays the stack tree with PR annotations before submitting
-func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.Engine, splog *tui.Splog, currentBranch string) {
+// getStackTreeLines returns the stack tree lines with PR annotations
+func getStackTreeLines(branches []string, opts Options, eng engine.Engine, currentBranch string) []string {
 	// Create the tree renderer
 	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
@@ -610,11 +579,5 @@ func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.En
 	}
 	renderer.SetAnnotations(annotations)
 
-	// Render a simple list of branches to submit (in order from bottom to top)
-	splog.Info("Stack to submit:")
-	stackLines := renderer.RenderBranchList(branches)
-	for _, line := range stackLines {
-		splog.Info("%s", line)
-	}
-	splog.Newline()
+	return renderer.RenderBranchList(branches)
 }

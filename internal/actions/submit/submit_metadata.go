@@ -1,4 +1,4 @@
-package actions
+package submit
 
 import (
 	"fmt"
@@ -140,7 +140,7 @@ func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]strin
 }
 
 // PreparePRMetadata prepares PR metadata for a branch
-func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine.Engine, ctx *runtime.Context) (*PRMetadata, error) {
+func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engine, ctx *runtime.Context) (*PRMetadata, error) {
 	prInfo, _ := eng.GetPrInfo(branchName)
 
 	metadata := &PRMetadata{
@@ -212,8 +212,8 @@ func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine
 	return metadata, nil
 }
 
-// SubmitMetadataOptions contains options for PR metadata collection
-type SubmitMetadataOptions struct {
+// MetadataOptions contains options for PR metadata collection
+type MetadataOptions struct {
 	Edit              bool
 	EditTitle         bool
 	EditDescription   bool

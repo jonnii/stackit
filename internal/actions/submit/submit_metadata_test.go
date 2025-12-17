@@ -1,11 +1,11 @@
-package actions_test
+package submit_test
 
 import (
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/submit"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
@@ -20,11 +20,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			Draft: true,
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.True(t, metadata.IsDraft, "PR should be created as draft when --draft flag is set")
 	})
@@ -37,11 +37,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			Publish: true,
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.False(t, metadata.IsDraft, "PR should be created as non-draft when --publish flag is set")
 	})
@@ -54,11 +54,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			// No draft or publish flag - should default to published
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.False(t, metadata.IsDraft, "PR should default to published (not draft) when no flag is specified")
 	})
@@ -79,11 +79,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			// No draft or publish flag
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.True(t, metadata.IsDraft, "PR should preserve existing draft status")
 
@@ -95,7 +95,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		metadata, err = actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err = submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.False(t, metadata.IsDraft, "PR should preserve existing non-draft status")
 	})
@@ -116,11 +116,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			Draft: true,
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.True(t, metadata.IsDraft, "PR should be marked as draft when --draft flag is set, even if existing PR is not draft")
 	})
@@ -141,11 +141,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			Publish: true,
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.False(t, metadata.IsDraft, "PR should be marked as non-draft when --publish flag is set, even if existing PR is draft")
 	})
@@ -171,11 +171,11 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		err = scene.Repo.CreateChangeAndCommit("feat: test feature", "change")
 		require.NoError(t, err)
 
-		opts := actions.SubmitMetadataOptions{
+		opts := submit.MetadataOptions{
 			NoEdit: true,
 		}
 
-		metadata, err := actions.PreparePRMetadata(branchName, opts, eng, ctx)
+		metadata, err := submit.PreparePRMetadata(branchName, opts, eng, ctx)
 		require.NoError(t, err)
 		require.NotEmpty(t, metadata.Title, "Title should be set from commit subject")
 		require.Equal(t, "feat: test feature", metadata.Title)

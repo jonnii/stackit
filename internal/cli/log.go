@@ -6,12 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newLogCmd creates the log command
@@ -49,52 +46,10 @@ func newLogCmd() *cobra.Command {
 				return actions.LogAction(opts, ctx)
 			}
 
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Ensure stackit is initialized
+			repoRoot, err := EnsureInitialized()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
-			}
-
-			// Auto-initialize if not initialized
-			if !config.IsInitialized(repoRoot) {
-				splog := output.NewSplog()
-				splog.Info("Stackit has not been initialized, attempting to setup now...")
-
-				// Run init logic
-				branchNames, err := git.GetAllBranchNames()
-				if err != nil {
-					return fmt.Errorf("failed to get branches: %w", err)
-				}
-
-				if len(branchNames) == 0 {
-					return fmt.Errorf("no branches found in current repo; cannot initialize Stackit.\nPlease create your first commit and then re-run stackit init")
-				}
-
-				// Infer trunk
-				trunkName := InferTrunk(branchNames)
-				if trunkName == "" {
-					// Fallback to first branch or main
-					trunkName = "main"
-					found := false
-					for _, name := range branchNames {
-						if name == "main" {
-							found = true
-							break
-						}
-					}
-					if !found && len(branchNames) > 0 {
-						trunkName = branchNames[0]
-					}
-				}
-
-				if err := config.SetTrunk(repoRoot, trunkName); err != nil {
-					return fmt.Errorf("failed to initialize: %w", err)
-				}
+				return err
 			}
 
 			// Create engine

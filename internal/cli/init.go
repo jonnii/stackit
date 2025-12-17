@@ -66,6 +66,61 @@ func selectTrunkBranch(branchNames []string, inferredTrunk string, interactive b
 	return "", fmt.Errorf("no branches available")
 }
 
+// EnsureInitialized initializes stackit if not already initialized.
+// Returns the repo root path. This is used by commands that need stackit
+// to be initialized but want to auto-initialize for convenience.
+func EnsureInitialized() (string, error) {
+	// Initialize git repository
+	if err := git.InitDefaultRepo(); err != nil {
+		return "", fmt.Errorf("not a git repository: %w", err)
+	}
+
+	// Get repo root
+	repoRoot, err := git.GetRepoRoot()
+	if err != nil {
+		return "", fmt.Errorf("failed to get repo root: %w", err)
+	}
+
+	// Auto-initialize if not initialized
+	if !config.IsInitialized(repoRoot) {
+		splog := output.NewSplog()
+		splog.Info("Stackit has not been initialized, attempting to setup now...")
+
+		// Run init logic
+		branchNames, err := git.GetAllBranchNames()
+		if err != nil {
+			return "", fmt.Errorf("failed to get branches: %w", err)
+		}
+
+		if len(branchNames) == 0 {
+			return "", fmt.Errorf("no branches found in current repo; cannot initialize Stackit.\nPlease create your first commit and then re-run stackit init")
+		}
+
+		// Infer trunk
+		trunkName := InferTrunk(branchNames)
+		if trunkName == "" {
+			// Fallback to first branch or main
+			trunkName = "main"
+			found := false
+			for _, name := range branchNames {
+				if name == "main" {
+					found = true
+					break
+				}
+			}
+			if !found && len(branchNames) > 0 {
+				trunkName = branchNames[0]
+			}
+		}
+
+		if err := config.SetTrunk(repoRoot, trunkName); err != nil {
+			return "", fmt.Errorf("failed to initialize: %w", err)
+		}
+	}
+
+	return repoRoot, nil
+}
+
 // newInitCmd creates the init command
 func newInitCmd() *cobra.Command {
 	var (

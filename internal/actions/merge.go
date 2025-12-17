@@ -3,42 +3,27 @@ package actions
 import (
 	"fmt"
 
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// MergeOptions are options for the merge command
+// MergeOptions contains options for the merge command
 type MergeOptions struct {
 	DryRun   bool
 	Confirm  bool
 	Strategy MergeStrategy
 	Force    bool
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
-	DemoMode bool // If true, simulate execution without actual git operations
 }
 
 // MergeAction performs the merge operation using the plan/execute pattern
-func MergeAction(opts MergeOptions) error {
-	eng := opts.Engine
-	splog := opts.Splog
+func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	// Default strategy to bottom-up if not specified
 	strategy := opts.Strategy
 	if strategy == "" {
 		strategy = MergeStrategyBottomUp
-	}
-
-	// Get repo root if not provided (skip in demo mode)
-	repoRoot := opts.RepoRoot
-	if repoRoot == "" && !opts.DemoMode {
-		var err error
-		repoRoot, err = git.GetRepoRoot()
-		if err != nil {
-			return fmt.Errorf("failed to get repo root: %w", err)
-		}
 	}
 
 	// 1. Populate remote SHAs so we can accurately check if branches match remote
@@ -67,12 +52,9 @@ func MergeAction(opts MergeOptions) error {
 	}
 
 	// 3. Create merge plan
-	plan, validation, err := CreateMergePlan(CreateMergePlanOptions{
+	plan, validation, err := CreateMergePlan(ctx, CreateMergePlanOptions{
 		Strategy: strategy,
 		Force:    opts.Force,
-		Engine:   eng,
-		Splog:    splog,
-		RepoRoot: repoRoot,
 	})
 	if err != nil {
 		return err
@@ -132,13 +114,9 @@ func MergeAction(opts MergeOptions) error {
 	}
 
 	// 7. Execute the plan
-	if err := ExecuteMergePlan(ExecuteMergePlanOptions{
-		Plan:     plan,
-		Engine:   eng,
-		Splog:    splog,
-		RepoRoot: repoRoot,
-		Force:    opts.Force,
-		DemoMode: opts.DemoMode,
+	if err := ExecuteMergePlan(ctx, ExecuteMergePlanOptions{
+		Plan:  plan,
+		Force: opts.Force,
 	}); err != nil {
 		return fmt.Errorf("merge execution failed: %w", err)
 	}

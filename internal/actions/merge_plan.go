@@ -6,6 +6,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -74,19 +75,16 @@ type MergePlanValidation struct {
 	Warnings []string // Non-blocking warnings
 }
 
-// CreateMergePlanOptions are options for creating a merge plan
+// CreateMergePlanOptions contains options for creating a merge plan
 type CreateMergePlanOptions struct {
 	Strategy MergeStrategy
 	Force    bool
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
 }
 
 // CreateMergePlan analyzes the current state and builds a merge plan
-func CreateMergePlan(opts CreateMergePlanOptions) (*MergePlan, *MergePlanValidation, error) {
-	eng := opts.Engine
-	splog := opts.Splog
+func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergePlan, *MergePlanValidation, error) {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	// 1. Get current branch, validate not on trunk
 	currentBranch := eng.CurrentBranch()

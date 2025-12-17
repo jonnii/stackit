@@ -7,10 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/demo"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -32,65 +28,11 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check for demo mode
-			if ctx, ok := demo.NewDemoContext(); ok {
-				// In demo mode, determine if interactive or non-interactive
-				interactive := strategy == "" && !yes && !force
-
-				// Parse strategy for non-interactive mode
-				var mergeStrategy actions.MergeStrategy
-				if strategy != "" {
-					switch strings.ToLower(strategy) {
-					case "bottom-up", "bottomup":
-						mergeStrategy = actions.MergeStrategyBottomUp
-					case "top-down", "topdown":
-						mergeStrategy = actions.MergeStrategyTopDown
-					default:
-						return fmt.Errorf("invalid strategy: %s (must be 'bottom-up' or 'top-down')", strategy)
-					}
-				}
-
-				if interactive {
-					return runInteractiveMergeWizard(ctx.Engine, ctx, "", dryRun, true, force)
-				}
-
-				// Non-interactive demo mode
-				return actions.MergeAction(actions.MergeOptions{
-					DryRun:   dryRun,
-					Confirm:  !yes,
-					Strategy: mergeStrategy,
-					Force:    force,
-					Engine:   ctx.Engine,
-					Splog:    ctx.Splog,
-					RepoRoot: "",
-					DemoMode: true,
-				})
-			}
-
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Determine if we should run in interactive mode
 			// Interactive if no flags are provided (except dry-run which is always allowed)
@@ -111,18 +53,15 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 			// Run interactive wizard if needed
 			if interactive {
-				return runInteractiveMergeWizard(eng, ctx, repoRoot, dryRun, false, false)
+				return runInteractiveMergeWizard(ctx, dryRun, force)
 			}
 
 			// Run merge action
-			return actions.MergeAction(actions.MergeOptions{
+			return actions.MergeAction(ctx, actions.MergeOptions{
 				DryRun:   dryRun,
 				Confirm:  !yes, // If --yes is set, don't confirm
 				Strategy: mergeStrategy,
 				Force:    force,
-				Engine:   eng,
-				Splog:    ctx.Splog,
-				RepoRoot: repoRoot,
 			})
 		},
 	}
@@ -136,7 +75,8 @@ If no flags are provided, an interactive wizard will guide you through the merge
 }
 
 // runInteractiveMergeWizard runs the interactive merge wizard
-func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot string, dryRun bool, demoMode bool, forceFlag bool) error {
+func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool) error {
+	eng := ctx.Engine
 	splog := ctx.Splog
 
 	splog.Info("🔍 Analyzing stack...")
@@ -154,12 +94,9 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	}
 
 	// Create initial plan with bottom-up strategy (default)
-	plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
+	plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 		Strategy: actions.MergeStrategyBottomUp,
 		Force:    forceFlag,
-		Engine:   eng,
-		Splog:    splog,
-		RepoRoot: repoRoot,
 	})
 	if err != nil {
 		return err
@@ -261,12 +198,9 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	splog.Newline()
 
 	// Recreate plan with selected strategy
-	plan, validation, err = actions.CreateMergePlan(actions.CreateMergePlanOptions{
+	plan, validation, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 		Strategy: mergeStrategy,
 		Force:    forceFlag,
-		Engine:   eng,
-		Splog:    splog,
-		RepoRoot: repoRoot,
 	})
 	if err != nil {
 		return err
@@ -297,13 +231,9 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	}
 
 	// Execute the plan
-	if err := actions.ExecuteMergePlan(actions.ExecuteMergePlanOptions{
-		Plan:     plan,
-		Engine:   eng,
-		Splog:    splog,
-		RepoRoot: repoRoot,
-		Force:    forceFlag,
-		DemoMode: demoMode,
+	if err := actions.ExecuteMergePlan(ctx, actions.ExecuteMergePlanOptions{
+		Plan:  plan,
+		Force: forceFlag,
 	}); err != nil {
 		return fmt.Errorf("merge execution failed: %w", err)
 	}

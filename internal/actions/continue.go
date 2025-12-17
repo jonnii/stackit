@@ -4,45 +4,45 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// ContinueOptions are options for the continue command
+// ContinueOptions contains options for the continue command
 type ContinueOptions struct {
-	AddAll   bool
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
+	AddAll bool
 }
 
 // ContinueAction performs the continue operation
-func ContinueAction(opts ContinueOptions) error {
+func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
 	// Check if rebase is in progress
 	if !git.IsRebaseInProgress() {
 		// Clear any stale continuation state
-		_ = config.ClearContinuationState(opts.RepoRoot)
+		_ = config.ClearContinuationState(ctx.RepoRoot)
 		return fmt.Errorf("no rebase in progress. Nothing to continue")
 	}
 
 	// Load continuation state
-	continuation, err := config.GetContinuationState(opts.RepoRoot)
+	continuation, err := config.GetContinuationState(ctx.RepoRoot)
 	if err != nil {
 		// No continuation state - this is okay, we can still continue the rebase
 		// but we won't be able to resume restacking
-		opts.Splog.Info("No continuation state found. Continuing rebase only.")
+		splog.Info("No continuation state found. Continuing rebase only.")
 		// Try to continue the rebase anyway (user might have started it manually)
 		// But we need a rebasedBranchBase - try to get it from current branch's parent
-		currentBranch := opts.Engine.CurrentBranch()
+		currentBranch := eng.CurrentBranch()
 		if currentBranch == "" {
 			return fmt.Errorf("not on a branch")
 		}
-		parent := opts.Engine.GetParent(currentBranch)
+		parent := eng.GetParent(currentBranch)
 		if parent == "" {
-			parent = opts.Engine.Trunk()
+			parent = eng.Trunk()
 		}
-		parentRev, err := opts.Engine.GetRevision(parent)
+		parentRev, err := eng.GetRevision(parent)
 		if err != nil {
 			return fmt.Errorf("failed to get parent revision: %w", err)
 		}
@@ -61,7 +61,7 @@ func ContinueAction(opts ContinueOptions) error {
 	}
 
 	// Continue the rebase
-	result, err := opts.Engine.ContinueRebase(continuation.RebasedBranchBase)
+	result, err := eng.ContinueRebase(continuation.RebasedBranchBase)
 	if err != nil {
 		return fmt.Errorf("failed to continue rebase: %w", err)
 	}
@@ -69,33 +69,33 @@ func ContinueAction(opts ContinueOptions) error {
 	// Handle result
 	if result.Result == int(git.RebaseConflict) {
 		// Another conflict - persist state again
-		if err := config.PersistContinuationState(opts.RepoRoot, continuation); err != nil {
+		if err := config.PersistContinuationState(ctx.RepoRoot, continuation); err != nil {
 			return fmt.Errorf("failed to persist continuation: %w", err)
 		}
 		// Get current branch name for conflict status
 		branchName := result.BranchName
 		if branchName == "" {
-			branchName = opts.Engine.CurrentBranch()
+			branchName = eng.CurrentBranch()
 		}
-		if err := PrintConflictStatus(branchName, opts.Engine, opts.Splog); err != nil {
+		if err := PrintConflictStatus(branchName, eng, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)
 		}
 		return fmt.Errorf("rebase conflict is not yet resolved")
 	}
 
 	// Success - inform user
-	opts.Splog.Info("Resolved rebase conflict for %s.", tui.ColorBranchName(result.BranchName, true))
+	splog.Info("Resolved rebase conflict for %s.", tui.ColorBranchName(result.BranchName, true))
 
 	// Continue with remaining branches to restack
 	if len(continuation.BranchesToRestack) > 0 {
-		if err := RestackBranches(continuation.BranchesToRestack, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+		if err := RestackBranches(continuation.BranchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 			return err
 		}
 	}
 
 	// Clear continuation state
-	if err := config.ClearContinuationState(opts.RepoRoot); err != nil {
-		opts.Splog.Debug("Failed to clear continuation state: %v", err)
+	if err := config.ClearContinuationState(ctx.RepoRoot); err != nil {
+		splog.Debug("Failed to clear continuation state: %v", err)
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -27,28 +28,26 @@ type ModifyOptions struct {
 
 	// Interactive rebase
 	InteractiveRebase bool // Start interactive rebase on branch commits
-
-	// Dependencies
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
 }
 
 // ModifyAction performs the modify operation
-func ModifyAction(opts ModifyOptions) error {
-	currentBranch := opts.Engine.CurrentBranch()
+func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
+	currentBranch := eng.CurrentBranch()
 	if currentBranch == "" {
 		return fmt.Errorf("not on a branch")
 	}
 
 	// Check if we're on trunk
-	if opts.Engine.IsTrunk(currentBranch) {
+	if eng.IsTrunk(currentBranch) {
 		return fmt.Errorf("cannot modify trunk branch %s", currentBranch)
 	}
 
 	// Handle interactive rebase separately
 	if opts.InteractiveRebase {
-		return interactiveRebaseAction(opts)
+		return interactiveRebaseAction(ctx, opts)
 	}
 
 	// Check if rebase is in progress
@@ -58,14 +57,14 @@ func ModifyAction(opts ModifyOptions) error {
 
 	// Check if branch is empty when amending
 	if !opts.CreateCommit {
-		isEmpty, err := opts.Engine.IsBranchEmpty(currentBranch)
+		isEmpty, err := eng.IsBranchEmpty(currentBranch)
 		if err != nil {
 			return fmt.Errorf("failed to check if branch is empty: %w", err)
 		}
 		if isEmpty {
 			// If branch is empty, we must create a new commit
 			opts.CreateCommit = true
-			opts.Splog.Info("Branch has no commits, creating new commit instead of amending.")
+			splog.Info("Branch has no commits, creating new commit instead of amending.")
 		}
 	}
 
@@ -101,9 +100,9 @@ func ModifyAction(opts ModifyOptions) error {
 
 	// Log success
 	if opts.CreateCommit {
-		opts.Splog.Info("Created new commit in %s.", tui.ColorBranchName(currentBranch, true))
+		splog.Info("Created new commit in %s.", tui.ColorBranchName(currentBranch, true))
 	} else {
-		opts.Splog.Info("Amended commit in %s.", tui.ColorBranchName(currentBranch, true))
+		splog.Info("Amended commit in %s.", tui.ColorBranchName(currentBranch, true))
 	}
 
 	// Restack upstack branches
@@ -112,11 +111,11 @@ func ModifyAction(opts ModifyOptions) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := opts.Engine.GetRelativeStack(currentBranch, scope)
+	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	if len(upstackBranches) > 0 {
-		opts.Splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(upstackBranches, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
+		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}
@@ -158,16 +157,19 @@ func runInteractivePatch() error {
 }
 
 // interactiveRebaseAction performs an interactive rebase on the branch's commits
-func interactiveRebaseAction(opts ModifyOptions) error {
-	currentBranch := opts.Engine.CurrentBranch()
+func interactiveRebaseAction(ctx *runtime.Context, opts ModifyOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
+	currentBranch := eng.CurrentBranch()
 
 	// Get the parent branch to determine rebase base
-	parent := opts.Engine.GetParent(currentBranch)
+	parent := eng.GetParent(currentBranch)
 	if parent == "" {
-		parent = opts.Engine.Trunk()
+		parent = eng.Trunk()
 	}
 
-	opts.Splog.Info("Starting interactive rebase for %s onto %s...",
+	splog.Info("Starting interactive rebase for %s onto %s...",
 		tui.ColorBranchName(currentBranch, true),
 		tui.ColorBranchName(parent, false))
 
@@ -186,7 +188,7 @@ func interactiveRebaseAction(opts ModifyOptions) error {
 		return nil
 	}
 
-	opts.Splog.Info("Interactive rebase completed.")
+	splog.Info("Interactive rebase completed.")
 
 	// Restack upstack branches
 	scope := engine.Scope{
@@ -194,11 +196,11 @@ func interactiveRebaseAction(opts ModifyOptions) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := opts.Engine.GetRelativeStack(currentBranch, scope)
+	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	if len(upstackBranches) > 0 {
-		opts.Splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(upstackBranches, opts.Engine, opts.Splog, opts.RepoRoot); err != nil {
+		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
+		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

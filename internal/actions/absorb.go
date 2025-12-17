@@ -6,24 +6,22 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// AbsorbOptions are options for the absorb command
+// AbsorbOptions contains options for the absorb command
 type AbsorbOptions struct {
-	All      bool
-	DryRun   bool
-	Force    bool
-	Patch    bool
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
+	All    bool
+	DryRun bool
+	Force  bool
+	Patch  bool
 }
 
 // AbsorbAction performs the absorb operation
-func AbsorbAction(opts AbsorbOptions) error {
-	eng := opts.Engine
-	splog := opts.Splog
+func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
@@ -196,7 +194,7 @@ func AbsorbAction(opts AbsorbOptions) error {
 	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(upstackBranches, eng, splog, opts.RepoRoot); err != nil {
+		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

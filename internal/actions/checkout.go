@@ -9,7 +9,7 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// CheckoutOptions specifies options for the checkout command
+// CheckoutOptions contains options for the checkout command
 type CheckoutOptions struct {
 	BranchName    string // Optional: branch to checkout directly
 	ShowUntracked bool   // Include untracked branches in selection
@@ -19,9 +19,11 @@ type CheckoutOptions struct {
 }
 
 // CheckoutAction performs the checkout operation
-func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
+func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
 	// Populate remote SHAs if needed
-	if err := ctx.Engine.PopulateRemoteShas(); err != nil {
+	if err := eng.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
 	}
 
@@ -30,22 +32,22 @@ func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 
 	// Handle --trunk flag
 	if opts.CheckoutTrunk {
-		branchName = ctx.Engine.Trunk()
+		branchName = eng.Trunk()
 	} else if opts.BranchName != "" {
 		// Direct checkout
 		branchName = opts.BranchName
 	} else {
 		// Interactive selection
-		branchName, err = interactiveBranchSelection(opts, ctx)
+		branchName, err = interactiveBranchSelection(ctx, opts)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Check if already on the branch
-	currentBranch := ctx.Engine.CurrentBranch()
+	currentBranch := eng.CurrentBranch()
 	if branchName == currentBranch {
-		ctx.Splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
+		splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
 		return nil
 	}
 
@@ -54,14 +56,14 @@ func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
-	ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
+	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
 	printBranchInfo(branchName, ctx)
 
 	return nil
 }
 
 // interactiveBranchSelection shows an interactive branch selector
-func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (string, error) {
+func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (string, error) {
 	var choices []tui.BranchChoice
 	var initialIndex int = -1
 	currentBranch := ctx.Engine.CurrentBranch()

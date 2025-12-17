@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -28,20 +25,11 @@ func newCheckoutCmd() *cobra.Command {
 The interactive selector allows you to navigate branches using arrow keys and filter
 by typing. Use flags to customize which branches are shown.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Ensure stackit is initialized
-			repoRoot, err := EnsureInitialized()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
 				return err
 			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Get branch name from args
 			branchName := ""
@@ -59,7 +47,7 @@ by typing. Use flags to customize which branches are shown.`,
 			}
 
 			// Execute checkout action
-			return actions.CheckoutAction(opts, ctx)
+			return actions.CheckoutAction(ctx, opts)
 		},
 	}
 

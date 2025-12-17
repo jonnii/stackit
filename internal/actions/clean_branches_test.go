@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -61,11 +61,9 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
-			Force:  true,
-			Engine: eng,
-			Splog:  splog,
+		ctx := runtime.NewContext(eng)
+		result, err := actions.CleanBranches(ctx, actions.CleanBranchesOptions{
+			Force: true,
 		})
 		require.NoError(t, err)
 
@@ -135,11 +133,9 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
-			Force:  true,
-			Engine: eng,
-			Splog:  splog,
+		ctx := runtime.NewContext(eng)
+		result, err := actions.CleanBranches(ctx, actions.CleanBranchesOptions{
+			Force: true,
 		})
 		require.NoError(t, err)
 
@@ -170,11 +166,9 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.TrackBranch("branch1", "main")
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
-			Force:  false,
-			Engine: eng,
-			Splog:  splog,
+		ctx := runtime.NewContext(eng)
+		result, err := actions.CleanBranches(ctx, actions.CleanBranchesOptions{
+			Force: false,
 		})
 		require.NoError(t, err)
 

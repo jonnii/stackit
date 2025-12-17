@@ -1,14 +1,9 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -27,45 +22,17 @@ func newSyncCmd() *cobra.Command {
 Restacks all branches in your repository that can be restacked without conflicts. 
 If trunk cannot be fast-forwarded to match remote, overwrites trunk with the remote version.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
-			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
-
-			// Handle --all flag (stub for now)
-			if all {
-				// For now, just sync the current trunk
-				// In the future, this would sync across all configured trunks
-				ctx.Splog.Info("Syncing branches across all configured trunks...")
+				return err
 			}
 
 			// Run sync action
-			return actions.SyncAction(actions.SyncOptions{
+			return actions.SyncAction(ctx, actions.SyncOptions{
 				All:     all,
 				Force:   force,
 				Restack: restack,
-				Engine:  eng,
-				Splog:   ctx.Splog,
 			})
 		},
 	}

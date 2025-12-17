@@ -17,6 +17,7 @@ type MergeOptions struct {
 	Engine   engine.Engine
 	Splog    *output.Splog
 	RepoRoot string
+	DemoMode bool // If true, simulate execution without actual git operations
 }
 
 // MergeAction performs the merge operation using the plan/execute pattern
@@ -30,9 +31,9 @@ func MergeAction(opts MergeOptions) error {
 		strategy = MergeStrategyBottomUp
 	}
 
-	// Get repo root if not provided
+	// Get repo root if not provided (skip in demo mode)
 	repoRoot := opts.RepoRoot
-	if repoRoot == "" {
+	if repoRoot == "" && !opts.DemoMode {
 		var err error
 		repoRoot, err = git.GetRepoRoot()
 		if err != nil {
@@ -137,6 +138,7 @@ func MergeAction(opts MergeOptions) error {
 		Splog:    splog,
 		RepoRoot: repoRoot,
 		Force:    opts.Force,
+		DemoMode: opts.DemoMode,
 	}); err != nil {
 		return fmt.Errorf("merge execution failed: %w", err)
 	}

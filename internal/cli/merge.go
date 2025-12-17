@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -9,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
@@ -31,6 +33,44 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check for demo mode
+			if os.Getenv("STACKIT_DEMO") != "" {
+				eng := demo.NewDemoEngine()
+				ctx := context.NewContext(eng)
+
+				// In demo mode, determine if interactive or non-interactive
+				interactive := strategy == "" && !yes && !force
+
+				// Parse strategy for non-interactive mode
+				var mergeStrategy actions.MergeStrategy
+				if strategy != "" {
+					switch strings.ToLower(strategy) {
+					case "bottom-up", "bottomup":
+						mergeStrategy = actions.MergeStrategyBottomUp
+					case "top-down", "topdown":
+						mergeStrategy = actions.MergeStrategyTopDown
+					default:
+						return fmt.Errorf("invalid strategy: %s (must be 'bottom-up' or 'top-down')", strategy)
+					}
+				}
+
+				if interactive {
+					return runInteractiveMergeWizard(eng, ctx, "", dryRun, true, force)
+				}
+
+				// Non-interactive demo mode
+				return actions.MergeAction(actions.MergeOptions{
+					DryRun:   dryRun,
+					Confirm:  !yes,
+					Strategy: mergeStrategy,
+					Force:    force,
+					Engine:   eng,
+					Splog:    ctx.Splog,
+					RepoRoot: "",
+					DemoMode: true,
+				})
+			}
+
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)
@@ -75,7 +115,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 			// Run interactive wizard if needed
 			if interactive {
-				return runInteractiveMergeWizard(eng, ctx, repoRoot, dryRun)
+				return runInteractiveMergeWizard(eng, ctx, repoRoot, dryRun, false, false)
 			}
 
 			// Run merge action
@@ -100,7 +140,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 }
 
 // runInteractiveMergeWizard runs the interactive merge wizard
-func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot string, dryRun bool) error {
+func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot string, dryRun bool, demoMode bool, forceFlag bool) error {
 	splog := ctx.Splog
 
 	splog.Info("🔍 Analyzing stack...")
@@ -120,7 +160,7 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot
 	// Create initial plan with bottom-up strategy (default)
 	plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
 		Strategy: actions.MergeStrategyBottomUp,
-		Force:    false,
+		Force:    forceFlag,
 		Engine:   eng,
 		Splog:    splog,
 		RepoRoot: repoRoot,
@@ -177,8 +217,11 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot
 			splog.Warn("  ⚠ %s", warn)
 		}
 		splog.Newline()
-		splog.Info("Cannot proceed with merge due to warnings. Use --force to override validation checks.")
-		return fmt.Errorf("merge blocked due to warnings (use --force to override)")
+		if !forceFlag {
+			splog.Info("Cannot proceed with merge due to warnings. Use --force to override validation checks.")
+			return fmt.Errorf("merge blocked due to warnings (use --force to override)")
+		}
+		splog.Info("Proceeding despite warnings (--force enabled)")
 	}
 
 	// Prompt for strategy using interactive selector
@@ -205,7 +248,7 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot
 	// Recreate plan with selected strategy
 	plan, validation, err = actions.CreateMergePlan(actions.CreateMergePlanOptions{
 		Strategy: mergeStrategy,
-		Force:    false,
+		Force:    forceFlag,
 		Engine:   eng,
 		Splog:    splog,
 		RepoRoot: repoRoot,
@@ -244,7 +287,8 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot
 		Engine:   eng,
 		Splog:    splog,
 		RepoRoot: repoRoot,
-		Force:    false,
+		Force:    forceFlag,
+		DemoMode: demoMode,
 	}); err != nil {
 		return fmt.Errorf("merge execution failed: %w", err)
 	}

@@ -54,14 +54,6 @@ type SubmissionInfo struct {
 	Metadata   *PRMetadata
 }
 
-// SubmitResult tracks the results of a submit operation
-type SubmitResult struct {
-	BranchName string
-	Action     string // "created" or "updated"
-	URL        string
-	IsCurrent  bool
-}
-
 // SubmitAction performs the submit operation
 func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	eng := ctx.Engine
@@ -131,48 +123,55 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	splog.Info("Submitting...")
 	githubCtx := context.Background()
 
-	githubClient, err := getGitHubClient(opts, ctx)
+	githubClient, err := getGitHubClient(ctx)
 	if err != nil {
 		return err
 	}
 	repoOwner, repoName := githubClient.GetOwnerRepo()
 
-	// Track results for summary
-	var results []SubmitResult
+	// Build progress items
+	progressItems := make([]tui.SubmitItem, len(submissionInfos))
+	for i, info := range submissionInfos {
+		progressItems[i] = tui.SubmitItem{
+			BranchName: info.BranchName,
+			Action:     info.Action,
+			PRNumber:   info.PRNumber,
+			Status:     "pending",
+		}
+	}
+
+	// Create progress UI (auto-detects TTY)
+	progressUI := tui.NewSubmitProgressUI(splog)
+	progressUI.Start(progressItems)
 
 	remote := "origin" // TODO: Get from config
-	for _, submissionInfo := range submissionInfos {
-		if err := pushBranchIfNeeded(submissionInfo, opts, remote); err != nil {
+	for idx, submissionInfo := range submissionInfos {
+		progressUI.UpdateItem(idx, "submitting", "", nil)
+
+		if err := pushBranchIfNeeded(submissionInfo, opts, remote, eng); err != nil {
+			progressUI.UpdateItem(idx, "error", "", err)
+			progressUI.Complete()
 			return err
 		}
 
 		var prURL string
-		var action string
 		if submissionInfo.Action == "create" {
 			prURL, err = createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
-			if err != nil {
-				return err
-			}
-			action = "created"
 		} else {
 			prURL, err = updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
-			if err != nil {
-				return err
-			}
-			action = "updated"
 		}
 
-		results = append(results, SubmitResult{
-			BranchName: submissionInfo.BranchName,
-			Action:     action,
-			URL:        prURL,
-			IsCurrent:  submissionInfo.BranchName == currentBranch,
-		})
+		if err != nil {
+			progressUI.UpdateItem(idx, "error", "", err)
+			progressUI.Complete()
+			return err
+		}
+
+		progressUI.UpdateItem(idx, "done", prURL, nil)
 
 		// Open in browser if requested
 		if opts.View && prURL != "" {
 			if err := openBrowser(prURL); err != nil {
-				// Log error but don't fail the operation
 				splog.Debug("Failed to open browser: %v", err)
 			}
 		}
@@ -183,48 +182,9 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 		splog.Debug("Failed to update PR footers: %v", err)
 	}
 
-	// Print results
-	for _, result := range results {
-		splog.Info("  ✓ %s → %s", result.BranchName, result.URL)
-	}
-
-	// Print summary
-	splog.Newline()
-	createdCount := 0
-	updatedCount := 0
-	for _, result := range results {
-		if result.Action == "created" {
-			createdCount++
-		} else {
-			updatedCount++
-		}
-	}
-	splog.Info("Done! %s", formatSubmitSummary(createdCount, updatedCount))
+	progressUI.Complete()
 
 	return nil
-}
-
-// formatSubmitSummary formats the summary message
-func formatSubmitSummary(created, updated int) string {
-	var parts []string
-	if created > 0 {
-		if created == 1 {
-			parts = append(parts, "1 PR created")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d PRs created", created))
-		}
-	}
-	if updated > 0 {
-		if updated == 1 {
-			parts = append(parts, "1 PR updated")
-		} else {
-			parts = append(parts, fmt.Sprintf("%d PRs updated", updated))
-		}
-	}
-	if len(parts) == 0 {
-		return "No changes"
-	}
-	return strings.Join(parts, ", ")
 }
 
 // prepareBranchesForSubmit prepares submission info for each branch
@@ -417,30 +377,23 @@ func getBranchesToSubmit(opts SubmitOptions, eng engine.Engine) ([]string, error
 	return branches, nil
 }
 
-// getGitHubClient returns the GitHub client from options or context
-func getGitHubClient(opts SubmitOptions, ctx *runtime.Context) (git.GitHubClient, error) {
-	// Allow test override
-	if opts.GitHubClient != nil {
-		return opts.GitHubClient, nil
-	}
-
-	// Use context's client (set during context creation)
+// getGitHubClient returns the GitHub client from context
+func getGitHubClient(ctx *runtime.Context) (git.GitHubClient, error) {
 	if ctx.GitHubClient != nil {
 		return ctx.GitHubClient, nil
 	}
-
 	return nil, fmt.Errorf("no GitHub client available - check your GITHUB_TOKEN")
 }
 
 // pushBranchIfNeeded pushes a branch to remote if needed
-func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remote string) error {
+func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remote string, eng engine.Engine) error {
 	// Skip if dry run or skip push is set
 	if opts.DryRun || opts.SkipPush {
 		return nil
 	}
 
 	forceWithLease := !opts.Force
-	if err := git.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
+	if err := eng.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
 		if strings.Contains(err.Error(), "stale info") {
 			return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
 		}

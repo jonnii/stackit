@@ -243,11 +243,16 @@ func (e *DemoEngine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) erro
 // SyncManager interface implementation
 
 func (e *DemoEngine) BranchMatchesRemote(branchName string) (bool, error) {
-	return true, nil // Demo branches always match remote
+	return false, nil // Demo branches never match remote (so submit always has work to do)
 }
 
 func (e *DemoEngine) PopulateRemoteShas() error {
 	simulateDelay(delayMedium) // Fetching remote refs takes time
+	return nil
+}
+
+func (e *DemoEngine) PushBranch(branchName string, remote string, force bool, forceWithLease bool) error {
+	simulateDelay(delayMedium) // Git push takes time
 	return nil
 }
 

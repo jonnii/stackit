@@ -40,14 +40,14 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
 		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
 
-		// Create context and submit options with mocked client
+		// Create context with mocked client
 		ctx := runtime.NewContext(eng)
+		ctx.GitHubClient = githubClient
 		opts := actions.SubmitOptions{
-			DryRun:       false, // We want to test actual PR creation
-			NoEdit:       true,  // Skip interactive prompts
-			Draft:        true,  // Set draft status explicitly to skip prompt
-			GitHubClient: githubClient,
-			SkipPush:     true, // Skip push since we don't have a real remote
+			DryRun:   false, // We want to test actual PR creation
+			NoEdit:   true,  // Skip interactive prompts
+			Draft:    true,  // Set draft status explicitly to skip prompt
+			SkipPush: true,  // Skip push since we don't have a real remote
 		}
 
 		// With mocked client, push is skipped, so this should succeed
@@ -111,13 +111,13 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Create context and submit options with mocked client
+		// Create context with mocked client
 		ctx := runtime.NewContext(eng)
+		ctx.GitHubClient = githubClient
 		opts := actions.SubmitOptions{
-			DryRun:       false,
-			NoEdit:       true,
-			GitHubClient: githubClient,
-			SkipPush:     true, // Skip push since we don't have a real remote
+			DryRun:   false,
+			NoEdit:   true,
+			SkipPush: true, // Skip push since we don't have a real remote
 		}
 
 		// With mocked client, push is skipped, so this should succeed

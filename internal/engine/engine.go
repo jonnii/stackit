@@ -59,6 +59,7 @@ type SyncManager interface {
 	// Remote operations
 	BranchMatchesRemote(branchName string) (bool, error)
 	PopulateRemoteShas() error
+	PushBranch(branchName string, remote string, force bool, forceWithLease bool) error
 
 	// Sync operations
 	PullTrunk() (PullResult, error)

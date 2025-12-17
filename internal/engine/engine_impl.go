@@ -351,6 +351,11 @@ func (e *engineImpl) PopulateRemoteShas() error {
 	return nil
 }
 
+// PushBranch pushes a branch to the remote
+func (e *engineImpl) PushBranch(branchName string, remote string, force bool, forceWithLease bool) error {
+	return git.PushBranch(branchName, remote, force, forceWithLease)
+}
+
 // Reset clears all branch metadata and rebuilds with new trunk
 func (e *engineImpl) Reset(newTrunkName string) error {
 	e.mu.Lock()

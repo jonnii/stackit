@@ -27,34 +27,24 @@ func newTrunkCmd() *cobra.Command {
 By default, displays the trunk branch that the current branch's stack is based on.
 Use --all to see all configured trunk branches, or --add to add an additional trunk.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
-			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit is not initialized. Run 'stackit init' first")
+				return err
 			}
 
 			// Handle --add flag
 			if add != "" {
-				return handleAddTrunk(repoRoot, add)
+				return handleAddTrunk(ctx.RepoRoot, add)
 			}
 
 			// Handle --all flag
 			if all {
-				return handleShowAllTrunks(repoRoot)
+				return handleShowAllTrunks(ctx.RepoRoot)
 			}
 
 			// Default: show trunk for current branch
-			return handleShowTrunk(repoRoot)
+			return handleShowTrunk(ctx)
 		},
 	}
 
@@ -115,33 +105,26 @@ func handleShowAllTrunks(repoRoot string) error {
 }
 
 // handleShowTrunk shows the trunk for the current branch
-func handleShowTrunk(repoRoot string) error {
-	// Create engine
-	eng, err := engine.NewEngine(repoRoot)
-	if err != nil {
-		return fmt.Errorf("failed to create engine: %w", err)
-	}
-
-	// Create context
-	ctx := runtime.NewContext(eng)
+func handleShowTrunk(ctx *runtime.Context) error {
+	eng := ctx.Engine
 
 	// Get current branch
-	currentBranch := ctx.Engine.CurrentBranch()
+	currentBranch := eng.CurrentBranch()
 	if currentBranch == "" {
 		// Not on a branch, just show primary trunk
-		trunk := ctx.Engine.Trunk()
+		trunk := eng.Trunk()
 		fmt.Println(trunk)
 		return nil
 	}
 
 	// If current branch is trunk, show it
-	if ctx.Engine.IsTrunk(currentBranch) {
+	if eng.IsTrunk(currentBranch) {
 		fmt.Println(currentBranch)
 		return nil
 	}
 
 	// Find the trunk by walking up the parent chain
-	trunk := findTrunkForBranch(ctx.Engine, currentBranch, repoRoot)
+	trunk := findTrunkForBranch(eng, currentBranch, ctx.RepoRoot)
 	fmt.Println(trunk)
 	return nil
 }

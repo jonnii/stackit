@@ -5,10 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/errors"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -24,30 +21,11 @@ Lists all branches that have the current branch as their parent in the stack.
 This is useful for understanding the structure of your stack and seeing which
 branches depend on the current branch.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit is not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()

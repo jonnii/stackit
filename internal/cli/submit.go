@@ -1,15 +1,10 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
 	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -53,7 +48,7 @@ and fails if there are conflicts. Blocks force pushes to branches that overwrite
 you last submitted or got them. Opens an interactive prompt that allows you to input pull request metadata.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, repoRoot, err := getContext()
+			ctx, err := runtime.GetContext()
 			if err != nil {
 				return err
 			}
@@ -87,7 +82,7 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 				IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
 				Engine:               ctx.Engine,
 				Splog:                ctx.Splog,
-				RepoRoot:             repoRoot,
+				RepoRoot:             ctx.RepoRoot,
 			})
 		},
 	}
@@ -121,40 +116,4 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 	cmd.Flags().BoolVar(&cli, "cli", false, "Edit PR metadata via the CLI instead of on web.")
 
 	return cmd
-}
-
-// getContext returns the appropriate context (demo or real) based on the environment.
-func getContext() (*runtime.Context, string, error) {
-	// Check for demo mode first
-	if runtime.IsDemoMode() {
-		ctx, repoRoot, err := runtime.NewContextAuto("")
-		if err != nil {
-			return nil, "", err
-		}
-		return ctx, repoRoot, nil
-	}
-
-	// Initialize git repository
-	if err := git.InitDefaultRepo(); err != nil {
-		return nil, "", fmt.Errorf("not a git repository: %w", err)
-	}
-
-	// Get repo root
-	repoRoot, err := git.GetRepoRoot()
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get repo root: %w", err)
-	}
-
-	// Check if initialized
-	if !config.IsInitialized(repoRoot) {
-		return nil, "", fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-	}
-
-	// Create engine
-	eng, err := engine.NewEngine(repoRoot)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create engine: %w", err)
-	}
-
-	return runtime.NewContext(eng), repoRoot, nil
 }

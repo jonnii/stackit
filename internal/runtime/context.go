@@ -3,16 +3,20 @@
 package runtime
 
 import (
+	"fmt"
 	"os"
 
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
 )
 
 // Context provides access to engine and output for commands
 type Context struct {
-	Engine engine.Engine
-	Splog  *output.Splog
+	Engine   engine.Engine
+	Splog    *output.Splog
+	RepoRoot string
 }
 
 // NewContext creates a new context with the given engine
@@ -20,6 +24,15 @@ func NewContext(eng engine.Engine) *Context {
 	return &Context{
 		Engine: eng,
 		Splog:  output.NewSplog(),
+	}
+}
+
+// NewContextWithRepoRoot creates a new context with the given engine and repo root
+func NewContextWithRepoRoot(eng engine.Engine, repoRoot string) *Context {
+	return &Context{
+		Engine:   eng,
+		Splog:    output.NewSplog(),
+		RepoRoot: repoRoot,
 	}
 }
 
@@ -35,18 +48,44 @@ var DemoEngineFactory func() engine.Engine
 // NewContextAuto creates a context automatically based on the environment.
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine
 // using the provided repoRoot.
-// Returns (context, repoRoot, error). In demo mode, repoRoot will be empty.
-func NewContextAuto(repoRoot string) (*Context, string, error) {
+func NewContextAuto(repoRoot string) (*Context, error) {
 	if IsDemoMode() && DemoEngineFactory != nil {
 		eng := DemoEngineFactory()
-		return NewContext(eng), "", nil
+		return NewContext(eng), nil
 	}
 
 	// Create real engine
 	eng, err := engine.NewEngine(repoRoot)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	return NewContext(eng), repoRoot, nil
+	return NewContextWithRepoRoot(eng, repoRoot), nil
+}
+
+// GetContext returns the appropriate context (demo or real) based on the environment.
+// This handles git initialization and config checks for real mode.
+func GetContext() (*Context, error) {
+	// Check for demo mode first
+	if IsDemoMode() {
+		return NewContextAuto("")
+	}
+
+	// Initialize git repository
+	if err := git.InitDefaultRepo(); err != nil {
+		return nil, fmt.Errorf("not a git repository: %w", err)
+	}
+
+	// Get repo root
+	repoRoot, err := git.GetRepoRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo root: %w", err)
+	}
+
+	// Check if initialized
+	if !config.IsInitialized(repoRoot) {
+		return nil, fmt.Errorf("stackit not initialized. Run 'stackit init' first")
+	}
+
+	return NewContextAuto(repoRoot)
 }

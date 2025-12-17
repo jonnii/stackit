@@ -11,7 +11,7 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// CreateOptions specifies options for the create command
+// CreateOptions contains options for the create command
 type CreateOptions struct {
 	BranchName string
 	Message    string
@@ -23,9 +23,12 @@ type CreateOptions struct {
 }
 
 // CreateAction creates a new branch stacked on top of the current branch
-func CreateAction(opts CreateOptions, ctx *runtime.Context) error {
+func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
 	// Get current branch
-	currentBranch := ctx.Engine.CurrentBranch()
+	currentBranch := eng.CurrentBranch()
 	if currentBranch == "" {
 		return fmt.Errorf("not on a branch")
 	}
@@ -46,7 +49,7 @@ func CreateAction(opts CreateOptions, ctx *runtime.Context) error {
 	}
 
 	// Check if branch already exists
-	allBranches := ctx.Engine.AllBranchNames()
+	allBranches := eng.AllBranchNames()
 	for _, name := range allBranches {
 		if name == branchName {
 			return fmt.Errorf("branch %s already exists", branchName)
@@ -124,23 +127,23 @@ func CreateAction(opts CreateOptions, ctx *runtime.Context) error {
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
-		ctx.Splog.Info("No staged changes; created a branch with no commit.")
+		splog.Info("No staged changes; created a branch with no commit.")
 	}
 
 	// Track the branch with current branch as parent
-	if err := ctx.Engine.TrackBranch(branchName, currentBranch); err != nil {
+	if err := eng.TrackBranch(branchName, currentBranch); err != nil {
 		// Log error but don't fail - branch is created, just not tracked
-		ctx.Splog.Info("Warning: failed to track branch: %v", err)
+		splog.Info("Warning: failed to track branch: %v", err)
 	}
 
 	// Handle insert logic
 	if opts.Insert {
 		if err := handleInsert(branchName, currentBranch, ctx); err != nil {
-			ctx.Splog.Info("Warning: failed to insert branch: %v", err)
+			splog.Info("Warning: failed to insert branch: %v", err)
 		}
 	} else {
 		// Check if current branch has children and show tip
-		children := ctx.Engine.GetChildren(currentBranch)
+		children := eng.GetChildren(currentBranch)
 		siblings := []string{}
 		for _, child := range children {
 			if child != branchName {
@@ -148,7 +151,7 @@ func CreateAction(opts CreateOptions, ctx *runtime.Context) error {
 			}
 		}
 		if len(siblings) > 0 {
-			ctx.Splog.Info("Tip: To insert a created branch into the middle of your stack, use the `--insert` flag.")
+			splog.Info("Tip: To insert a created branch into the middle of your stack, use the `--insert` flag.")
 		}
 	}
 

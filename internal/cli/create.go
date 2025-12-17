@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -30,20 +27,11 @@ If no branch name is specified, generate a branch name from the commit message.
 If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Ensure stackit is initialized
-			repoRoot, err := EnsureInitialized()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
 				return err
 			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Get branch name from args
 			branchName := ""
@@ -63,7 +51,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			}
 
 			// Execute create action
-			return actions.CreateAction(opts, ctx)
+			return actions.CreateAction(ctx, opts)
 		},
 	}
 

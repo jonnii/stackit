@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -29,6 +28,27 @@ func newLogCmd() *cobra.Command {
 		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
 		Aliases: []string{"l"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check for demo mode
+			if ctx, ok := demo.NewDemoContext(); ok {
+				branchName := ctx.Engine.Trunk()
+				if stack || steps > 0 {
+					branchName = ctx.Engine.CurrentBranch()
+				}
+
+				opts := actions.LogOptions{
+					Style:         "FULL",
+					Reverse:       reverse,
+					BranchName:    branchName,
+					ShowUntracked: showUntracked,
+				}
+
+				if steps > 0 {
+					opts.Steps = &steps
+				}
+
+				return actions.LogAction(opts, ctx)
+			}
+
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)

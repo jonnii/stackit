@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -34,10 +33,7 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Check for demo mode
-			if os.Getenv("STACKIT_DEMO") != "" {
-				eng := demo.NewDemoEngine()
-				ctx := context.NewContext(eng)
-
+			if ctx, ok := demo.NewDemoContext(); ok {
 				// In demo mode, determine if interactive or non-interactive
 				interactive := strategy == "" && !yes && !force
 
@@ -55,7 +51,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 				}
 
 				if interactive {
-					return runInteractiveMergeWizard(eng, ctx, "", dryRun, true, force)
+					return runInteractiveMergeWizard(ctx.Engine, ctx, "", dryRun, true, force)
 				}
 
 				// Non-interactive demo mode
@@ -64,7 +60,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 					Confirm:  !yes,
 					Strategy: mergeStrategy,
 					Force:    force,
-					Engine:   eng,
+					Engine:   ctx.Engine,
 					Splog:    ctx.Splog,
 					RepoRoot: "",
 					DemoMode: true,

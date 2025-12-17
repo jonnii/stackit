@@ -1,14 +1,9 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -42,30 +37,11 @@ Examples:
   stackit modify -c -a -m "New commit"    # Create new commit instead of amending
   stackit modify --interactive-rebase     # Interactive rebase on branch commits`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Determine noEdit flag:
 			// - If --no-edit is explicitly set, use it
@@ -78,7 +54,7 @@ Examples:
 			}
 
 			// Run modify action
-			return actions.ModifyAction(actions.ModifyOptions{
+			return actions.ModifyAction(ctx, actions.ModifyOptions{
 				All:               all,
 				Update:            update,
 				Patch:             patch,
@@ -89,9 +65,6 @@ Examples:
 				ResetAuthor:       resetAuthor,
 				Verbose:           verbose,
 				InteractiveRebase: interactiveRebase,
-				Engine:            eng,
-				Splog:             ctx.Splog,
-				RepoRoot:          repoRoot,
 			})
 		},
 	}

@@ -2,10 +2,27 @@ package demo
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
 )
+
+// IsDemoMode returns true if STACKIT_DEMO environment variable is set
+func IsDemoMode() bool {
+	return os.Getenv("STACKIT_DEMO") != ""
+}
+
+// NewDemoContext creates a demo engine and context if in demo mode.
+// Returns (context, true) if in demo mode, (nil, false) otherwise.
+func NewDemoContext() (*context.Context, bool) {
+	if !IsDemoMode() {
+		return nil, false
+	}
+	eng := NewDemoEngine()
+	return context.NewContext(eng), true
+}
 
 // DemoEngine implements the engine.Engine interface with simulated data
 type DemoEngine struct {

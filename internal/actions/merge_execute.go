@@ -7,38 +7,30 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// ExecuteMergePlanOptions are options for executing a merge plan
+// ExecuteMergePlanOptions contains options for executing a merge plan
 type ExecuteMergePlanOptions struct {
-	Plan     *MergePlan
-	Engine   engine.Engine
-	Splog    *tui.Splog
-	RepoRoot string
-	Force    bool
-	DemoMode bool // If true, simulate execution without actual git operations
+	Plan  *MergePlan
+	Force bool
 }
 
 // ExecuteMergePlan executes a validated merge plan step by step
-func ExecuteMergePlan(opts ExecuteMergePlanOptions) error {
+func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
 	plan := opts.Plan
-	splog := opts.Splog
+	splog := ctx.Splog
 
 	for i, step := range plan.Steps {
-		// In demo mode, simulate execution without actual operations
-		if opts.DemoMode {
-			splog.Info("✓ [DEMO] %s", step.Description)
-			continue
-		}
 
 		// 1. Re-validate preconditions for this step
-		if err := validateStepPreconditions(step, opts); err != nil {
+		if err := validateStepPreconditions(step, ctx, opts); err != nil {
 			return fmt.Errorf("step %d (%s) failed precondition: %w", i+1, step.Description, err)
 		}
 
 		// 2. Execute the step
-		if err := executeStep(step, opts); err != nil {
+		if err := executeStep(step, ctx, opts); err != nil {
 			return fmt.Errorf("step %d (%s) failed: %w", i+1, step.Description, err)
 		}
 
@@ -50,8 +42,8 @@ func ExecuteMergePlan(opts ExecuteMergePlanOptions) error {
 }
 
 // validateStepPreconditions validates that a step can be executed
-func validateStepPreconditions(step MergePlanStep, opts ExecuteMergePlanOptions) error {
-	eng := opts.Engine
+func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+	eng := ctx.Engine
 
 	switch step.StepType {
 	case StepMergePR:
@@ -102,9 +94,9 @@ func validateStepPreconditions(step MergePlanStep, opts ExecuteMergePlanOptions)
 }
 
 // executeStep executes a single step
-func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
-	eng := opts.Engine
-	splog := opts.Splog
+func executeStep(step MergePlanStep, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	switch step.StepType {
 	case StepMergePR:
@@ -165,7 +157,7 @@ func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
 				RebasedBranchBase:     result.RebasedBranchBase,
 				CurrentBranchOverride: eng.CurrentBranch(),
 			}
-			if err := config.PersistContinuationState(opts.RepoRoot, continuation); err != nil {
+			if err := config.PersistContinuationState(ctx.RepoRoot, continuation); err != nil {
 				return fmt.Errorf("failed to persist continuation: %w", err)
 			}
 			return fmt.Errorf("hit conflict restacking %s", step.BranchName)
@@ -192,7 +184,7 @@ func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
 
 	case StepUpdatePRBase:
 		// For top-down strategy: rebase branch onto trunk and update PR base
-		if err := executeUpdatePRBase(step, opts); err != nil {
+		if err := executeUpdatePRBase(step, ctx); err != nil {
 			return err
 		}
 
@@ -205,8 +197,8 @@ func executeStep(step MergePlanStep, opts ExecuteMergePlanOptions) error {
 
 // executeUpdatePRBase handles the UPDATE_PR_BASE step
 // This is used in top-down strategy to rebase the current branch onto trunk
-func executeUpdatePRBase(step MergePlanStep, opts ExecuteMergePlanOptions) error {
-	eng := opts.Engine
+func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
+	eng := ctx.Engine
 	trunk := eng.Trunk()
 
 	// Get the parent revision (old base)

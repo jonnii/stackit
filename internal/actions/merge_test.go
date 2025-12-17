@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -23,13 +23,12 @@ func TestMergeAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.MergeAction(actions.MergeOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.MergeAction(ctx, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
-			Engine:   eng,
-			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not on a branch")
@@ -51,13 +50,12 @@ func TestMergeAction(t *testing.T) {
 		// Verify we're on trunk
 		require.True(t, eng.IsTrunk(eng.CurrentBranch()))
 
-		splog := tui.NewSplog()
-		err = actions.MergeAction(actions.MergeOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.MergeAction(ctx, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
-			Engine:   eng,
-			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot merge from trunk")
@@ -90,13 +88,12 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is not tracked
 		require.False(t, eng.IsBranchTracked("branch1"))
 
-		splog := tui.NewSplog()
-		err = actions.MergeAction(actions.MergeOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.MergeAction(ctx, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
-			Engine:   eng,
-			Splog:    splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not tracked")
@@ -134,13 +131,12 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is tracked (metadata should persist)
 		require.True(t, eng.IsBranchTracked("branch1"))
 
-		splog := tui.NewSplog()
-		err = actions.MergeAction(actions.MergeOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.MergeAction(ctx, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
-			Engine:   eng,
-			Splog:    splog,
 		})
 		// Should fail because no PRs found
 		require.Error(t, err)
@@ -192,13 +188,12 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
-		splog := tui.NewSplog()
-		err = actions.MergeAction(actions.MergeOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.MergeAction(ctx, actions.MergeOptions{
 			DryRun:   true,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
-			Engine:   eng,
-			Splog:    splog,
 		})
 		require.NoError(t, err)
 	})

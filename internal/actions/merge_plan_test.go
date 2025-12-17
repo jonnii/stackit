@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -57,13 +57,11 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    false,
-			Engine:   eng,
-			Splog:    splog,
-			RepoRoot: scene.Dir,
 		})
 
 		require.NoError(t, err)
@@ -110,13 +108,11 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    false,
-			Engine:   eng,
-			Splog:    splog,
-			RepoRoot: scene.Dir,
 		})
 
 		require.NoError(t, err)
@@ -159,13 +155,11 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    true,
-			Engine:   eng,
-			Splog:    splog,
-			RepoRoot: scene.Dir,
 		})
 
 		require.NoError(t, err)

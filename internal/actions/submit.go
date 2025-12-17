@@ -41,6 +41,7 @@ type SubmitOptions struct {
 	IgnoreOutOfSyncTrunk bool
 	Engine               engine.Engine
 	Splog                *output.Splog
+	DemoMode             bool // If true, simulate submission without actual git/GitHub operations
 	// For testing: optional GitHub client, owner, and repo
 	// If nil, will use GetGitHubClient()
 	GitHubClient *github.Client
@@ -90,8 +91,8 @@ func SubmitAction(opts SubmitOptions) error {
 
 	currentBranch := eng.CurrentBranch()
 
-	// Restack if requested
-	if opts.Restack {
+	// Restack if requested (skip in demo mode)
+	if opts.Restack && !opts.DemoMode {
 		splog.Info("Restacking branches before submitting...")
 		repoRoot, err := git.GetRepoRoot()
 		if err != nil {
@@ -100,14 +101,20 @@ func SubmitAction(opts SubmitOptions) error {
 		if err := RestackBranches(branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
+	} else if opts.Restack && opts.DemoMode {
+		splog.Info("[DEMO] Would restack branches before submitting...")
 	}
 
 	// Validate and prepare branches (combined message)
 	splog.Info("Preparing...")
 	ctx := stackitcontext.NewContext(eng)
 	ctx.Splog = splog
-	if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+
+	// Skip validation in demo mode
+	if !opts.DemoMode {
+		if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
 	}
 
 	// Populate remote SHAs
@@ -116,7 +123,7 @@ func SubmitAction(opts SubmitOptions) error {
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch)
+	submissionInfos, err := prepareBranchesForSubmitDemo(branches, opts, eng, ctx, currentBranch)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -128,6 +135,11 @@ func SubmitAction(opts SubmitOptions) error {
 	}
 	if shouldAbort {
 		return nil
+	}
+
+	// In demo mode, simulate the submission
+	if opts.DemoMode {
+		return submitActionDemo(submissionInfos, currentBranch, splog)
 	}
 
 	// Push branches and create/update PRs
@@ -205,6 +217,127 @@ func SubmitAction(opts SubmitOptions) error {
 	splog.Info("Done! %s", formatSubmitSummary(createdCount, updatedCount))
 
 	return nil
+}
+
+// submitActionDemo simulates the submit operation in demo mode
+func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, splog *output.Splog) error {
+	splog.Newline()
+	splog.Info("Submitting...")
+
+	var results []SubmitResult
+	for _, info := range submissionInfos {
+		action := "created"
+		if info.Action == "update" {
+			action = "updated"
+		}
+
+		// Generate fake PR URL
+		prNum := 100 + len(results) + 1
+		if info.PRNumber != nil {
+			prNum = *info.PRNumber
+		}
+		prURL := fmt.Sprintf("https://github.com/example/repo/pull/%d", prNum)
+
+		results = append(results, SubmitResult{
+			BranchName: info.BranchName,
+			Action:     action,
+			URL:        prURL,
+			IsCurrent:  info.BranchName == currentBranch,
+		})
+	}
+
+	// Print results
+	for _, result := range results {
+		splog.Info("  ✓ [DEMO] %s → %s", result.BranchName, result.URL)
+	}
+
+	// Print summary
+	splog.Newline()
+	createdCount := 0
+	updatedCount := 0
+	for _, result := range results {
+		if result.Action == "created" {
+			createdCount++
+		} else {
+			updatedCount++
+		}
+	}
+	splog.Info("Done! %s", formatSubmitSummary(createdCount, updatedCount))
+
+	return nil
+}
+
+// prepareBranchesForSubmitDemo prepares submission info for demo mode (without interactive prompts)
+func prepareBranchesForSubmitDemo(branches []string, opts SubmitOptions, eng engine.Engine, ctx *stackitcontext.Context, currentBranch string) ([]SubmissionInfo, error) {
+	// In demo mode, skip interactive prompts
+	if opts.DemoMode {
+		var submissionInfos []SubmissionInfo
+		for _, branchName := range branches {
+			parentBranchName := eng.GetParent(branchName)
+			if parentBranchName == "" {
+				parentBranchName = eng.Trunk()
+			}
+			prInfo, _ := eng.GetPrInfo(branchName)
+
+			action := "create"
+			prNumber := (*int)(nil)
+			if prInfo != nil && prInfo.Number != nil {
+				action = "update"
+				prNumber = prInfo.Number
+			}
+
+			isCurrent := branchName == currentBranch
+
+			// Skip if update-only and no existing PR
+			if opts.UpdateOnly && action == "create" {
+				displayName := branchName
+				if isCurrent {
+					displayName = branchName + " (current)"
+				}
+				ctx.Splog.Info("  ▸ %s %s", output.ColorDim(displayName), output.ColorDim("— skipped, no existing PR"))
+				continue
+			}
+
+			// Get SHAs (fake for demo)
+			headSHA, _ := eng.GetRevision(branchName)
+			baseSHA, _ := eng.GetRevision(parentBranchName)
+
+			// Use PR title from existing PR info or generate from branch name
+			title := branchName
+			if prInfo != nil && prInfo.Title != "" {
+				title = prInfo.Title
+			}
+
+			submissionInfo := SubmissionInfo{
+				BranchName: branchName,
+				Head:       branchName,
+				Base:       parentBranchName,
+				HeadSHA:    headSHA,
+				BaseSHA:    baseSHA,
+				Action:     action,
+				PRNumber:   prNumber,
+				Metadata: &PRMetadata{
+					Title:   title,
+					Body:    "Demo PR body",
+					IsDraft: opts.Draft,
+				},
+			}
+
+			actionLabel := "create"
+			if action == "update" {
+				actionLabel = "update"
+			}
+			ctx.Splog.Info("  ▸ %s → %s",
+				output.ColorBranchName(branchName, isCurrent),
+				output.ColorDim(actionLabel))
+
+			submissionInfos = append(submissionInfos, submissionInfo)
+		}
+		return submissionInfos, nil
+	}
+
+	// Normal mode - use original function
+	return prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch)
 }
 
 // formatSubmitSummary formats the summary message

@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 )
@@ -51,6 +52,40 @@ creating or updating distinct pull requests for each. Validates that branches ar
 and fails if there are conflicts. Blocks force pushes to branches that overwrite branches that have changed since
 you last submitted or got them. Opens an interactive prompt that allows you to input pull request metadata.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check for demo mode
+			if ctx, ok := demo.NewDemoContext(); ok {
+				return actions.SubmitAction(actions.SubmitOptions{
+					Branch:               branch,
+					Stack:                stack,
+					Force:                force,
+					DryRun:               dryRun,
+					Confirm:              confirm,
+					UpdateOnly:           updateOnly,
+					Always:               always,
+					Restack:              restack,
+					Draft:                draft,
+					Publish:              publish,
+					Edit:                 edit,
+					EditTitle:            editTitle,
+					EditDescription:      editDescription,
+					NoEdit:               noEdit,
+					NoEditTitle:          noEditTitle,
+					NoEditDescription:    noEditDescription,
+					Reviewers:            reviewers,
+					TeamReviewers:        teamReviewers,
+					MergeWhenReady:       mergeWhenReady,
+					RerequestReview:      rerequestReview,
+					View:                 view,
+					Web:                  web,
+					Comment:              comment,
+					TargetTrunk:          targetTrunk,
+					IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
+					Engine:               ctx.Engine,
+					Splog:                ctx.Splog,
+					DemoMode:             true,
+				})
+			}
+
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)

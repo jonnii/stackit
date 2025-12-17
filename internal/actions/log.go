@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // LogOptions specifies options for the log command
@@ -25,7 +25,7 @@ func LogAction(opts LogOptions, ctx *runtime.Context) error {
 	}
 
 	// Create tree renderer
-	renderer := output.NewStackTreeRenderer(
+	renderer := tui.NewStackTreeRenderer(
 		ctx.Engine.CurrentBranch(),
 		ctx.Engine.Trunk(),
 		ctx.Engine.GetChildren,
@@ -35,7 +35,7 @@ func LogAction(opts LogOptions, ctx *runtime.Context) error {
 	)
 
 	// Render the stack
-	stackLines := renderer.RenderStack(opts.BranchName, output.TreeRenderOptions{
+	stackLines := renderer.RenderStack(opts.BranchName, tui.TreeRenderOptions{
 		Short:   opts.Style == "SHORT",
 		Reverse: opts.Reverse,
 		Steps:   opts.Steps,

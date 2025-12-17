@@ -9,7 +9,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // SplitStyle specifies the split mode
@@ -26,7 +26,7 @@ type SplitOptions struct {
 	Style     SplitStyle
 	Pathspecs []string
 	Engine    engine.Engine
-	Splog     *output.Splog
+	Splog     *tui.Splog
 	RepoRoot  string
 }
 
@@ -173,7 +173,7 @@ func SplitAction(opts SplitOptions) error {
 }
 
 // splitByCommit splits a branch by selecting commit points
-func splitByCommit(branchToSplit string, eng engine.Engine, splog *output.Splog) (*SplitResult, error) {
+func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
 	// Get readable commits
 	readableCommits, err := eng.GetAllCommits(branchToSplit, engine.CommitFormatReadable)
 	if err != nil {
@@ -188,11 +188,11 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *output.Splog)
 	numChildren := len(eng.GetChildren(branchToSplit))
 
 	// Show instructions
-	splog.Info("Splitting the commits of %s into multiple branches.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("Splitting the commits of %s into multiple branches.", tui.ColorBranchName(branchToSplit, true))
 	prInfo, _ := eng.GetPrInfo(branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
-			output.ColorBranchName(branchToSplit, true), *prInfo.Number)
+			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
 	}
 	splog.Info("")
 	splog.Info("For each branch you'd like to create:")
@@ -245,7 +245,7 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *output.Splog)
 }
 
 // getBranchPoints interactively gets branch points from the user
-func getBranchPoints(readableCommits []string, numChildren int, parentBranchName string, splog *output.Splog) ([]int, error) {
+func getBranchPoints(readableCommits []string, numChildren int, parentBranchName string, splog *tui.Splog) ([]int, error) {
 	// Array where nth index is whether we want a branch pointing to nth commit
 	isBranchPoint := make([]bool, len(readableCommits))
 	isBranchPoint[0] = true // First commit always has a branch
@@ -337,7 +337,7 @@ func getBranchPoints(readableCommits []string, numChildren int, parentBranchName
 }
 
 // splitByHunk splits a branch by interactively staging hunks
-func splitByHunk(branchToSplit string, eng engine.Engine, splog *output.Splog) (*SplitResult, error) {
+func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
 	// Detach and reset branch changes
 	if err := eng.DetachAndResetBranchChanges(branchToSplit); err != nil {
 		return nil, fmt.Errorf("failed to detach and reset: %w", err)
@@ -353,11 +353,11 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *output.Splog) (
 	defaultCommitMessage := strings.Join(commitMessages, "\n\n")
 
 	// Show instructions
-	splog.Info("Splitting %s into multiple single-commit branches.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("Splitting %s into multiple single-commit branches.", tui.ColorBranchName(branchToSplit, true))
 	prInfo, _ := eng.GetPrInfo(branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
-			output.ColorBranchName(branchToSplit, true), *prInfo.Number)
+			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
 	}
 	splog.Info("")
 	splog.Info("For each branch you'd like to create:")
@@ -449,7 +449,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *output.Splog) (
 }
 
 // splitByFile splits a branch by extracting files to a new parent branch
-func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, splog *output.Splog) (*SplitResult, error) {
+func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
 	// Get parent branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -564,7 +564,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 }
 
 // promptForFiles shows an interactive file selector for split --by-file
-func promptForFiles(branchToSplit string, eng engine.Engine, splog *output.Splog) ([]string, error) {
+func promptForFiles(branchToSplit string, eng engine.Engine, splog *tui.Splog) ([]string, error) {
 	// Get the parent branch to compare against
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -589,9 +589,9 @@ func promptForFiles(branchToSplit string, eng engine.Engine, splog *output.Splog
 	}
 
 	// Show instructions
-	splog.Info("Splitting %s by file.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("Splitting %s by file.", tui.ColorBranchName(branchToSplit, true))
 	splog.Info("Select the files to extract to a new parent branch.")
-	splog.Info("The remaining files will stay on %s.", output.ColorBranchName(branchToSplit, true))
+	splog.Info("The remaining files will stay on %s.", tui.ColorBranchName(branchToSplit, true))
 	splog.Info("")
 
 	// Prompt for file selection

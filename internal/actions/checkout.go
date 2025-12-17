@@ -5,8 +5,8 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // CheckoutOptions specifies options for the checkout command
@@ -45,7 +45,7 @@ func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 	// Check if already on the branch
 	currentBranch := ctx.Engine.CurrentBranch()
 	if branchName == currentBranch {
-		ctx.Splog.Info("Already on %s.", output.ColorBranchName(branchName, true))
+		ctx.Splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
-	ctx.Splog.Info("Checked out %s.", output.ColorBranchName(branchName, false))
+	ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
 	printBranchInfo(branchName, ctx)
 
 	return nil
@@ -62,7 +62,7 @@ func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 
 // interactiveBranchSelection shows an interactive branch selector
 func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (string, error) {
-	var choices []branchChoice
+	var choices []tui.BranchChoice
 	var initialIndex int = -1
 	currentBranch := ctx.Engine.CurrentBranch()
 	seenBranches := make(map[string]bool)
@@ -88,14 +88,14 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 			seenBranches[branchName] = true
 			display := branchName
 			if branchName == currentBranch {
-				display = output.ColorBranchName(branchName, true)
+				display = tui.ColorBranchName(branchName, true)
 				initialIndex = len(choices)
 			} else {
-				display = output.ColorBranchName(branchName, false)
+				display = tui.ColorBranchName(branchName, false)
 			}
-			choices = append(choices, branchChoice{
-				display: display,
-				value:   branchName,
+			choices = append(choices, tui.BranchChoice{
+				Display: display,
+				Value:   branchName,
 			})
 		}
 	} else {
@@ -110,13 +110,13 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 			seenBranches[branchName] = true
 
 			isCurrent := branchName == currentBranch
-			display := output.ColorBranchName(branchName, isCurrent)
+			display := tui.ColorBranchName(branchName, isCurrent)
 			if isCurrent {
 				initialIndex = len(choices)
 			}
-			choices = append(choices, branchChoice{
-				display: display,
-				value:   branchName,
+			choices = append(choices, tui.BranchChoice{
+				Display: display,
+				Value:   branchName,
 			})
 		}
 	}
@@ -126,9 +126,9 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 		untracked := getUntrackedBranchNames(ctx)
 		for _, branchName := range untracked {
 			if !seenBranches[branchName] {
-				choices = append(choices, branchChoice{
-					display: branchName,
-					value:   branchName,
+				choices = append(choices, tui.BranchChoice{
+					Display: branchName,
+					Value:   branchName,
 				})
 				seenBranches[branchName] = true
 			}
@@ -144,14 +144,14 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 		if trunkName != "" && !seenBranches[trunkName] {
 			display := trunkName
 			if trunkName == currentBranch {
-				display = output.ColorBranchName(trunkName, true)
+				display = tui.ColorBranchName(trunkName, true)
 				initialIndex = 0
 			} else {
-				display = output.ColorBranchName(trunkName, false)
+				display = tui.ColorBranchName(trunkName, false)
 			}
-			choices = append(choices, branchChoice{
-				display: display,
-				value:   trunkName,
+			choices = append(choices, tui.BranchChoice{
+				Display: display,
+				Value:   trunkName,
 			})
 			seenBranches[trunkName] = true
 		}
@@ -161,14 +161,14 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 			if !seenBranches[branchName] {
 				display := branchName
 				if branchName == currentBranch {
-					display = output.ColorBranchName(branchName, true)
+					display = tui.ColorBranchName(branchName, true)
 					initialIndex = len(choices)
 				} else {
-					display = output.ColorBranchName(branchName, false)
+					display = tui.ColorBranchName(branchName, false)
 				}
-				choices = append(choices, branchChoice{
-					display: display,
-					value:   branchName,
+				choices = append(choices, tui.BranchChoice{
+					Display: display,
+					Value:   branchName,
 				})
 				seenBranches[branchName] = true
 			}
@@ -189,7 +189,7 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (str
 	}
 
 	// Show interactive selector
-	selected, err := promptBranchSelection("Checkout a branch (arrow keys to navigate, type to filter)", choices, initialIndex)
+	selected, err := tui.PromptBranchSelection("Checkout a branch (arrow keys to navigate, type to filter)", choices, initialIndex)
 	if err != nil {
 		return "", err
 	}
@@ -211,8 +211,8 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 	if !ctx.Engine.IsBranchFixed(branchName) {
 		parent := ctx.Engine.GetParentPrecondition(branchName)
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
-			output.ColorBranchName(parent, false),
-			output.ColorCyan("stackit upstack restack"))
+			tui.ColorBranchName(parent, false),
+			tui.ColorCyan("stackit upstack restack"))
 		return
 	}
 
@@ -230,9 +230,9 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		if !ctx.Engine.IsBranchFixed(ancestor) {
 			parent := ctx.Engine.GetParentPrecondition(ancestor)
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
-				output.ColorBranchName(ancestor, false),
-				output.ColorBranchName(parent, false),
-				output.ColorCyan("stackit stack restack"))
+				tui.ColorBranchName(ancestor, false),
+				tui.ColorBranchName(parent, false),
+				tui.ColorCyan("stackit stack restack"))
 			return
 		}
 	}

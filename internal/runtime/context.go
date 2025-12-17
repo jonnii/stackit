@@ -10,13 +10,13 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // Context provides access to engine and output for commands
 type Context struct {
 	Engine       engine.Engine
-	Splog        *output.Splog
+	Splog        *tui.Splog
 	RepoRoot     string
 	GitHubClient git.GitHubClient
 }
@@ -25,7 +25,7 @@ type Context struct {
 func NewContext(eng engine.Engine) *Context {
 	return &Context{
 		Engine: eng,
-		Splog:  output.NewSplog(),
+		Splog:  tui.NewSplog(),
 	}
 }
 
@@ -33,7 +33,7 @@ func NewContext(eng engine.Engine) *Context {
 func NewContextWithRepoRoot(eng engine.Engine, repoRoot string) *Context {
 	return &Context{
 		Engine:   eng,
-		Splog:    output.NewSplog(),
+		Splog:    tui.NewSplog(),
 		RepoRoot: repoRoot,
 	}
 }

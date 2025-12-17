@@ -9,8 +9,8 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // newParentCmd creates the parent command
@@ -57,14 +57,14 @@ and seeing which branch the current branch is based on.`,
 
 			// Check if on trunk
 			if ctx.Engine.IsTrunk(currentBranch) {
-				ctx.Splog.Info("%s is trunk and has no parent.", output.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("%s is trunk and has no parent.", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}
 
 			// Get parent
 			parent := ctx.Engine.GetParent(currentBranch)
 			if parent == "" {
-				ctx.Splog.Info("%s has no parent (untracked branch).", output.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}
 

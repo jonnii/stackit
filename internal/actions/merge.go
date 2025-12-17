@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // MergeOptions are options for the merge command
@@ -15,7 +15,7 @@ type MergeOptions struct {
 	Strategy MergeStrategy
 	Force    bool
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 	DemoMode bool // If true, simulate execution without actual git operations
 }
@@ -121,7 +121,7 @@ func MergeAction(opts MergeOptions) error {
 
 	// 6. Confirm if needed
 	if opts.Confirm {
-		confirmed, err := PromptConfirm("Proceed with merge?", false)
+		confirmed, err := tui.PromptConfirm("Proceed with merge?", false)
 		if err != nil {
 			return fmt.Errorf("confirmation cancelled: %w", err)
 		}

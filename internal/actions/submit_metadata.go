@@ -9,6 +9,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // GetPRTitle gets the PR title, prompting if needed
@@ -31,7 +32,7 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *r
 	}
 
 	// Prompt for title
-	result, err := PromptTextInput("Title:", title)
+	result, err := tui.PromptTextInput("Title:", title)
 	if err != nil {
 		return "", fmt.Errorf("failed to get PR title: %w", err)
 	}
@@ -125,7 +126,7 @@ func GetReviewers(reviewersFlag string, ctx *runtime.Context) ([]string, []strin
 func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Prompt for reviewers
-		result, err := PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
+		result, err := tui.PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get reviewers: %w", err)
 		}

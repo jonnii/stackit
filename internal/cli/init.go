@@ -9,7 +9,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // isInteractive checks if we're in an interactive terminal
@@ -83,7 +83,7 @@ func EnsureInitialized() (string, error) {
 
 	// Auto-initialize if not initialized
 	if !config.IsInitialized(repoRoot) {
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		splog.Info("Stackit has not been initialized, attempting to setup now...")
 
 		// Run init logic
@@ -156,7 +156,7 @@ func newInitCmd() *cobra.Command {
 			}
 
 			// Create splog for output
-			splog := output.NewSplog()
+			splog := tui.NewSplog()
 
 			// Determine trunk
 			trunkName := trunk
@@ -202,7 +202,7 @@ func newInitCmd() *cobra.Command {
 			splog.Newline()
 
 			// Use output formatter for colored output
-			coloredTrunk := output.ColorBranchName(trunkName, false)
+			coloredTrunk := tui.ColorBranchName(trunkName, false)
 			splog.Info("Trunk set to %s", coloredTrunk)
 
 			// Create engine and perform reset/rebuild

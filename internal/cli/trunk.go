@@ -8,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // newTrunkCmd creates the trunk command
@@ -88,8 +88,8 @@ func handleAddTrunk(repoRoot string, trunkName string) error {
 		return err
 	}
 
-	splog := output.NewSplog()
-	splog.Info("Added %s as a trunk branch.", output.ColorBranchName(trunkName, false))
+	splog := tui.NewSplog()
+	splog.Info("Added %s as a trunk branch.", tui.ColorBranchName(trunkName, false))
 	return nil
 }
 

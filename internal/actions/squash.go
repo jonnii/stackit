@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // SquashOptions are options for the squash command
@@ -12,7 +12,7 @@ type SquashOptions struct {
 	Message  string
 	NoEdit   bool
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 }
 
@@ -32,7 +32,7 @@ func SquashAction(opts SquashOptions) error {
 		return fmt.Errorf("failed to squash branch: %w", err)
 	}
 
-	opts.Splog.Info("Squashed commits in %s.", output.ColorBranchName(currentBranch, true))
+	opts.Splog.Info("Squashed commits in %s.", tui.ColorBranchName(currentBranch, true))
 
 	// Get upstack branches (recursive children only, excluding current branch)
 	scope := engine.Scope{

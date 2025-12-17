@@ -7,14 +7,14 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // ExecuteMergePlanOptions are options for executing a merge plan
 type ExecuteMergePlanOptions struct {
 	Plan     *MergePlan
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 	Force    bool
 	DemoMode bool // If true, simulate execution without actual git operations
@@ -284,7 +284,7 @@ func updatePRBaseBranch(branchName, newBase string) error {
 }
 
 // CheckSyncStatus checks if the repository is up to date with remote
-func CheckSyncStatus(eng engine.Engine, splog *output.Splog) (bool, []string, error) {
+func CheckSyncStatus(eng engine.Engine, splog *tui.Splog) (bool, []string, error) {
 	needsSync := false
 	staleBranches := []string{}
 

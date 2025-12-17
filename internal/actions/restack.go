@@ -5,14 +5,14 @@ import (
 
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // RestackBranches restacks a list of branches
-func RestackBranches(branchNames []string, eng engine.Engine, splog *output.Splog, repoRoot string) error {
+func RestackBranches(branchNames []string, eng engine.Engine, splog *tui.Splog, repoRoot string) error {
 	for i, branchName := range branchNames {
 		if eng.IsTrunk(branchName) {
-			splog.Info("%s does not need to be restacked.", output.ColorBranchName(branchName, false))
+			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
 			continue
 		}
 
@@ -24,9 +24,9 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *output.Splo
 		// Log reparenting if it happened
 		if result.Reparented {
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				output.ColorBranchName(branchName, true),
-				output.ColorBranchName(result.OldParent, false),
-				output.ColorBranchName(result.NewParent, false))
+				tui.ColorBranchName(branchName, true),
+				tui.ColorBranchName(result.OldParent, false),
+				tui.ColorBranchName(result.NewParent, false))
 		}
 
 		switch result.Result {
@@ -36,8 +36,8 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *output.Splo
 				parent = eng.Trunk()
 			}
 			splog.Info("Restacked %s on %s.",
-				output.ColorBranchName(branchName, true),
-				output.ColorBranchName(parent, false))
+				tui.ColorBranchName(branchName, true),
+				tui.ColorBranchName(parent, false))
 		case engine.RestackConflict:
 			// Persist continuation state with remaining branches
 			continuation := &config.ContinuationState{
@@ -62,8 +62,8 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *output.Splo
 				parent = eng.Trunk()
 			}
 			splog.Info("%s does not need to be restacked on %s.",
-				output.ColorBranchName(branchName, false),
-				output.ColorBranchName(parent, false))
+				tui.ColorBranchName(branchName, false),
+				tui.ColorBranchName(parent, false))
 		}
 	}
 
@@ -75,7 +75,7 @@ type RestackOptions struct {
 	BranchName string
 	Scope      engine.Scope
 	Engine     engine.Engine
-	Splog      *output.Splog
+	Splog      *tui.Splog
 	RepoRoot   string
 }
 

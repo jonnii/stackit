@@ -1,4 +1,4 @@
-package actions
+package tui
 
 import (
 	"fmt"
@@ -287,8 +287,8 @@ func PromptSelect(title string, options []SelectOption, defaultIndex int) (strin
 
 // branchSelectModel is a branch selection prompt model with filtering
 type branchSelectModel struct {
-	choices  []branchChoice
-	filtered []branchChoice
+	choices  []BranchChoice
+	filtered []BranchChoice
 	filter   string
 	cursor   int
 	selected string
@@ -297,9 +297,10 @@ type branchSelectModel struct {
 	message  string
 }
 
-type branchChoice struct {
-	display string // What to show (may include tree visualization)
-	value   string // Actual branch name
+// BranchChoice represents a branch option in a selection prompt
+type BranchChoice struct {
+	Display string // What to show (may include tree visualization)
+	Value   string // Actual branch name
 }
 
 func (m branchSelectModel) Init() tea.Cmd {
@@ -312,7 +313,7 @@ func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyEnter:
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-				m.selected = m.filtered[m.cursor].value
+				m.selected = m.filtered[m.cursor].Value
 				m.done = true
 				return m, tea.Quit
 			}
@@ -368,10 +369,10 @@ func (m *branchSelectModel) updateFiltered() {
 	}
 
 	filterLower := strings.ToLower(m.filter)
-	m.filtered = []branchChoice{}
+	m.filtered = []BranchChoice{}
 	for _, choice := range m.choices {
-		if strings.Contains(strings.ToLower(choice.display), filterLower) ||
-			strings.Contains(strings.ToLower(choice.value), filterLower) {
+		if strings.Contains(strings.ToLower(choice.Display), filterLower) ||
+			strings.Contains(strings.ToLower(choice.Value), filterLower) {
 			m.filtered = append(m.filtered, choice)
 		}
 	}
@@ -397,7 +398,7 @@ func (m branchSelectModel) View() string {
 			if i == m.cursor {
 				cursor = ">"
 			}
-			b.WriteString(fmt.Sprintf("%s %s\n", cursor, choice.display))
+			b.WriteString(fmt.Sprintf("%s %s\n", cursor, choice.Display))
 		}
 	}
 
@@ -407,8 +408,8 @@ func (m branchSelectModel) View() string {
 	return style.Render(b.String())
 }
 
-// promptBranchSelection prompts the user to select a branch
-func promptBranchSelection(message string, choices []branchChoice, initialIndex int) (string, error) {
+// PromptBranchSelection prompts the user to select a branch
+func PromptBranchSelection(message string, choices []BranchChoice, initialIndex int) (string, error) {
 	if err := checkInteractiveAllowed(); err != nil {
 		return "", err
 	}
@@ -425,7 +426,7 @@ func promptBranchSelection(message string, choices []branchChoice, initialIndex 
 	if initialIndex >= 0 && initialIndex < len(choices) {
 		initialChoice := choices[initialIndex]
 		for i, filtered := range m.filtered {
-			if filtered.value == initialChoice.value {
+			if filtered.Value == initialChoice.Value {
 				m.cursor = i
 				break
 			}

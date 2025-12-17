@@ -6,14 +6,14 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // ContinueOptions are options for the continue command
 type ContinueOptions struct {
 	AddAll   bool
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 }
 
@@ -84,7 +84,7 @@ func ContinueAction(opts ContinueOptions) error {
 	}
 
 	// Success - inform user
-	opts.Splog.Info("Resolved rebase conflict for %s.", output.ColorBranchName(result.BranchName, true))
+	opts.Splog.Info("Resolved rebase conflict for %s.", tui.ColorBranchName(result.BranchName, true))
 
 	// Continue with remaining branches to restack
 	if len(continuation.BranchesToRestack) > 0 {

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -23,7 +23,7 @@ func TestMergeAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
@@ -51,7 +51,7 @@ func TestMergeAction(t *testing.T) {
 		// Verify we're on trunk
 		require.True(t, eng.IsTrunk(eng.CurrentBranch()))
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
@@ -90,7 +90,7 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is not tracked
 		require.False(t, eng.IsBranchTracked("branch1"))
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
@@ -134,7 +134,7 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is tracked (metadata should persist)
 		require.True(t, eng.IsBranchTracked("branch1"))
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
@@ -192,7 +192,7 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.MergeAction(actions.MergeOptions{
 			DryRun:   true,
 			Confirm:  false,

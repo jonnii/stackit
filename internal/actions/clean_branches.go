@@ -4,14 +4,14 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // CleanBranchesOptions are options for cleaning branches
 type CleanBranchesOptions struct {
 	Force  bool
 	Engine engine.Engine
-	Splog  *output.Splog
+	Splog  *tui.Splog
 }
 
 // CleanBranchesResult contains the result of cleaning branches
@@ -84,8 +84,8 @@ func CleanBranches(opts CleanBranchesOptions) (*CleanBranchesResult, error) {
 					return nil, fmt.Errorf("failed to set parent for %s: %w", branchName, err)
 				}
 				splog.Info("Set parent of %s to %s.",
-					output.ColorBranchName(branchName, false),
-					output.ColorBranchName(newParent, false))
+					tui.ColorBranchName(branchName, false),
+					tui.ColorBranchName(newParent, false))
 				branchesWithNewParents = append(branchesWithNewParents, branchName)
 
 				// Remove this branch as a blocker for its old parent
@@ -106,7 +106,7 @@ func CleanBranches(opts CleanBranchesOptions) (*CleanBranchesResult, error) {
 }
 
 // greedilyDeleteUnblockedBranches deletes branches that have no blockers
-func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool, eng engine.Engine, splog *output.Splog) {
+func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool, eng engine.Engine, splog *tui.Splog) {
 	for branchName, blockers := range branchesToDelete {
 		if len(blockers) == 0 {
 			// No blockers, safe to delete
@@ -121,7 +121,7 @@ func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool
 				continue
 			}
 
-			splog.Info("Deleted branch %s", output.ColorBranchName(branchName, false))
+			splog.Info("Deleted branch %s", tui.ColorBranchName(branchName, false))
 
 			// Remove from deletion map
 			delete(branchesToDelete, branchName)
@@ -139,7 +139,7 @@ func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool
 }
 
 // shouldDeleteBranch checks if a branch should be deleted
-func shouldDeleteBranch(branchName string, eng engine.Engine, force bool, splog *output.Splog) (bool, string) {
+func shouldDeleteBranch(branchName string, eng engine.Engine, force bool, splog *tui.Splog) (bool, string) {
 	// Check PR info
 	prInfo, err := eng.GetPrInfo(branchName)
 	if err == nil && prInfo != nil {

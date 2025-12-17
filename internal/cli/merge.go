@@ -11,8 +11,8 @@ import (
 	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // newMergeCmd creates the merge command
@@ -166,12 +166,12 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	}
 
 	// Display current state using stack tree
-	splog.Info("You are on branch: %s", output.ColorBranchName(currentBranch, false))
+	splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch, false))
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {
 		// Create tree renderer
-		renderer := output.NewStackTreeRenderer(
+		renderer := tui.NewStackTreeRenderer(
 			currentBranch,
 			eng.Trunk(),
 			eng.GetChildren,
@@ -181,9 +181,9 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 		)
 
 		// Build annotations for branches to merge
-		annotations := make(map[string]output.BranchAnnotation)
+		annotations := make(map[string]tui.BranchAnnotation)
 		for _, branchInfo := range plan.BranchesToMerge {
-			annotation := output.BranchAnnotation{
+			annotation := tui.BranchAnnotation{
 				PRNumber:    &branchInfo.PRNumber,
 				CheckStatus: string(branchInfo.ChecksStatus),
 				IsDraft:     branchInfo.IsDraft,
@@ -208,7 +208,7 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 		if len(plan.UpstackBranches) > 0 {
 			splog.Info("Branches above (will be restacked on trunk):")
 			for _, branchName := range plan.UpstackBranches {
-				splog.Info("  • %s", output.ColorBranchName(branchName, false))
+				splog.Info("  • %s", tui.ColorBranchName(branchName, false))
 			}
 			splog.Newline()
 		}
@@ -240,12 +240,12 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	}
 
 	// Prompt for strategy using interactive selector
-	strategyOptions := []actions.SelectOption{
+	strategyOptions := []tui.SelectOption{
 		{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
 		{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
 	}
 
-	selectedStrategy, err := actions.PromptSelect("Select merge strategy:", strategyOptions, 0)
+	selectedStrategy, err := tui.PromptSelect("Select merge strategy:", strategyOptions, 0)
 	if err != nil {
 		return fmt.Errorf("strategy selection cancelled: %w", err)
 	}
@@ -287,7 +287,7 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot
 	}
 
 	// Prompt for confirmation
-	confirmed, err := actions.PromptConfirm("Proceed with merge?", false)
+	confirmed, err := tui.PromptConfirm("Proceed with merge?", false)
 	if err != nil {
 		return fmt.Errorf("confirmation cancelled: %w", err)
 	}

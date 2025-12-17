@@ -6,7 +6,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // AbsorbOptions are options for the absorb command
@@ -16,7 +16,7 @@ type AbsorbOptions struct {
 	Force    bool
 	Patch    bool
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 }
 
@@ -131,7 +131,7 @@ func AbsorbAction(opts AbsorbOptions) error {
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
-		confirmed, err := PromptConfirm("Apply these changes to the commits?", false)
+		confirmed, err := tui.PromptConfirm("Apply these changes to the commits?", false)
 		if err != nil {
 			return fmt.Errorf("confirmation cancelled: %w", err)
 		}
@@ -176,7 +176,7 @@ func AbsorbAction(opts AbsorbOptions) error {
 			return fmt.Errorf("failed to apply hunks to commit %s: %w", commitSHA[:8], err)
 		}
 
-		splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], output.ColorBranchName(branchName, false))
+		splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], tui.ColorBranchName(branchName, false))
 	}
 
 	// Warn about unabsorbed hunks
@@ -243,7 +243,7 @@ func findBranchForCommit(commitSHA string, branches []string, eng engine.Engine)
 }
 
 // printDryRunOutput prints what would be absorbed in dry-run mode
-func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *output.Splog) error {
+func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
 	splog.Info("Would absorb the following changes:")
 	splog.Newline()
 
@@ -257,10 +257,10 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 		// Get commit message - show first commit message from the branch
 		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
-			splog.Info("  %s in %s:", commitSHA[:8], output.ColorBranchName(branchName, false))
+			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])
 		} else {
-			splog.Info("  %s in %s:", commitSHA[:8], output.ColorBranchName(branchName, false))
+			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 		}
 
 		for _, hunk := range hunks {
@@ -280,7 +280,7 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 }
 
 // printAbsorbPlan prints the plan for absorbing changes
-func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *output.Splog) error {
+func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
 	splog.Info("Will absorb the following changes:")
 	splog.Newline()
 
@@ -290,7 +290,7 @@ func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.
 			branchName = "unknown"
 		}
 
-		splog.Info("  Commit %s in %s:", commitSHA[:8], output.ColorBranchName(branchName, false))
+		splog.Info("  Commit %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 		for _, hunk := range hunks {
 			splog.Info("    - %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}

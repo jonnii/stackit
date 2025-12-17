@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -19,7 +19,7 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.SyncAction(actions.SyncOptions{
 			All:     false,
 			Force:   false,
@@ -42,7 +42,7 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.SyncAction(actions.SyncOptions{
 			All:     false,
 			Force:   false,
@@ -73,7 +73,7 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("branch1", "main")
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.SyncAction(actions.SyncOptions{
 			All:     false,
 			Force:   false,
@@ -119,7 +119,7 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("branch3", "branch2")
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.SyncAction(actions.SyncOptions{
 			All:     false,
 			Force:   false,
@@ -194,7 +194,7 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("stackB-child1", "stackB")
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		err = actions.SyncAction(actions.SyncOptions{
 			All:     false,
 			Force:   false,

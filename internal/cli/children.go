@@ -9,8 +9,8 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // newChildrenCmd creates the children command
@@ -58,7 +58,7 @@ branches depend on the current branch.`,
 			// Get children
 			children := ctx.Engine.GetChildren(currentBranch)
 			if len(children) == 0 {
-				ctx.Splog.Info("%s has no children.", output.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("%s has no children.", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}
 

@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // ModifyOptions contains options for the modify command
@@ -30,7 +30,7 @@ type ModifyOptions struct {
 
 	// Dependencies
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 }
 
@@ -101,9 +101,9 @@ func ModifyAction(opts ModifyOptions) error {
 
 	// Log success
 	if opts.CreateCommit {
-		opts.Splog.Info("Created new commit in %s.", output.ColorBranchName(currentBranch, true))
+		opts.Splog.Info("Created new commit in %s.", tui.ColorBranchName(currentBranch, true))
 	} else {
-		opts.Splog.Info("Amended commit in %s.", output.ColorBranchName(currentBranch, true))
+		opts.Splog.Info("Amended commit in %s.", tui.ColorBranchName(currentBranch, true))
 	}
 
 	// Restack upstack branches
@@ -168,8 +168,8 @@ func interactiveRebaseAction(opts ModifyOptions) error {
 	}
 
 	opts.Splog.Info("Starting interactive rebase for %s onto %s...",
-		output.ColorBranchName(currentBranch, true),
-		output.ColorBranchName(parent, false))
+		tui.ColorBranchName(currentBranch, true),
+		tui.ColorBranchName(parent, false))
 
 	// Run interactive rebase
 	cmd := exec.Command("git", "rebase", "-i", parent)

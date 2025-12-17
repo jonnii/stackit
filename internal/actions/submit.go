@@ -7,8 +7,8 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // SubmitOptions contains options for the submit command
@@ -38,9 +38,6 @@ type SubmitOptions struct {
 	Comment              string
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
-	// For testing: optional GitHub client
-	// If nil, will use context's GitHubClient
-	GitHubClient git.GitHubClient
 	// SkipPush skips pushing branches to remote (for testing)
 	SkipPush bool
 }
@@ -255,7 +252,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			if isCurrent {
 				displayName = branchName + " (current)"
 			}
-			ctx.Splog.Info("  ▸ %s %s", output.ColorDim(displayName), output.ColorDim("— skipped, no existing PR"))
+			ctx.Splog.Info("  ▸ %s %s", tui.ColorDim(displayName), tui.ColorDim("— skipped, no existing PR"))
 			continue
 		}
 
@@ -281,7 +278,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 				if isCurrent {
 					displayName = branchName + " (current)"
 				}
-				ctx.Splog.Info("  ▸ %s %s", output.ColorDim(displayName), output.ColorDim("— no changes"))
+				ctx.Splog.Info("  ▸ %s %s", tui.ColorDim(displayName), tui.ColorDim("— no changes"))
 				continue
 			}
 		}
@@ -326,8 +323,8 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 			actionLabel = "update"
 		}
 		ctx.Splog.Info("  ▸ %s → %s",
-			output.ColorBranchName(branchName, isCurrent),
-			output.ColorDim(actionLabel))
+			tui.ColorBranchName(branchName, isCurrent),
+			tui.ColorDim(actionLabel))
 
 		submissionInfos = append(submissionInfos, submissionInfo)
 	}
@@ -453,16 +450,16 @@ func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remot
 }
 
 // createPullRequest creates a new pull request
-func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) (string, error) {
+func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
 	prURL, err := createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
 	}
 
 	splog.Info("%s: %s (%s)",
-		output.ColorBranchName(submissionInfo.BranchName, true),
+		tui.ColorBranchName(submissionInfo.BranchName, true),
 		prURL,
-		output.ColorDim("created"))
+		tui.ColorDim("created"))
 
 	return prURL, nil
 }
@@ -500,16 +497,16 @@ func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 }
 
 // updatePullRequest updates an existing pull request
-func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) (string, error) {
+func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
 	prURL, err := updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
 	}
 
 	splog.Info("%s: %s (%s)",
-		output.ColorBranchName(submissionInfo.BranchName, true),
+		tui.ColorBranchName(submissionInfo.BranchName, true),
 		prURL,
-		output.ColorDim("updated"))
+		tui.ColorDim("updated"))
 
 	return prURL, nil
 }
@@ -570,7 +567,7 @@ func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 }
 
 // updatePRFooters updates PR body footers with dependency trees
-func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) error {
+func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) error {
 	splog.Info("Updating dependency trees in PR bodies...")
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(branchName)
@@ -595,9 +592,9 @@ func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Con
 				prURL = prInfo.URL
 			}
 			splog.Info("%s: %s (%s)",
-				output.ColorBranchName(branchName, true),
+				tui.ColorBranchName(branchName, true),
 				prURL,
-				output.ColorDim("updated"))
+				tui.ColorDim("updated"))
 		}
 	}
 	return nil
@@ -627,9 +624,9 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 }
 
 // displaySubmitStackTree displays the stack tree with PR annotations before submitting
-func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.Engine, splog *output.Splog, currentBranch string) {
+func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.Engine, splog *tui.Splog, currentBranch string) {
 	// Create the tree renderer
-	renderer := output.NewStackTreeRenderer(
+	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
 		eng.Trunk(),
 		eng.GetChildren,
@@ -639,11 +636,11 @@ func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.En
 	)
 
 	// Build annotations for each branch
-	annotations := make(map[string]output.BranchAnnotation)
+	annotations := make(map[string]tui.BranchAnnotation)
 	for _, branchName := range branches {
 		prInfo, _ := eng.GetPrInfo(branchName)
 
-		annotation := output.BranchAnnotation{
+		annotation := tui.BranchAnnotation{
 			NeedsRestack: !eng.IsBranchFixed(branchName),
 		}
 

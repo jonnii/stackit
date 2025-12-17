@@ -6,7 +6,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // MergeStrategy defines how PRs in the stack should be merged
@@ -79,7 +79,7 @@ type CreateMergePlanOptions struct {
 	Strategy MergeStrategy
 	Force    bool
 	Engine   engine.Engine
-	Splog    *output.Splog
+	Splog    *tui.Splog
 	RepoRoot string
 }
 
@@ -448,7 +448,7 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 }
 
 // getBranchRemoteDifference returns a detailed description of how a branch differs from remote
-func getBranchRemoteDifference(branchName string, eng engine.Engine, splog *output.Splog) string {
+func getBranchRemoteDifference(branchName string, eng engine.Engine, splog *tui.Splog) string {
 	// Get local SHA
 	localSha, err := git.GetRevision(branchName)
 	if err != nil {

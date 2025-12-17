@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -61,7 +61,7 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
 			Force:  true,
 			Engine: eng,
@@ -135,7 +135,7 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
 			Force:  true,
 			Engine: eng,
@@ -170,7 +170,7 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.TrackBranch("branch1", "main")
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		result, err := actions.CleanBranches(actions.CleanBranchesOptions{
 			Force:  false,
 			Engine: eng,

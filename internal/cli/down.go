@@ -10,8 +10,8 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // newDownCmd creates the down command
@@ -76,7 +76,7 @@ as an argument to move multiple levels at once.`,
 
 			// Check if on trunk
 			if ctx.Engine.IsTrunk(currentBranch) {
-				ctx.Splog.Info("Already at trunk (%s).", output.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("Already at trunk (%s).", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}
 
@@ -87,11 +87,11 @@ as an argument to move multiple levels at once.`,
 				if parent == "" {
 					// No parent found - branch is untracked or we've gone past trunk
 					if i == 0 {
-						ctx.Splog.Info("%s has no parent (untracked branch).", output.ColorBranchName(currentBranch, true))
+						ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch, true))
 						return nil
 					}
 					// We moved some steps but can't go further
-					ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", output.ColorBranchName(targetBranch, false), i)
+					ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", tui.ColorBranchName(targetBranch, false), i)
 					break
 				}
 				ctx.Splog.Info("⮑  %s", parent)
@@ -109,7 +109,7 @@ as an argument to move multiple levels at once.`,
 				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 			}
 
-			ctx.Splog.Info("Checked out %s.", output.ColorBranchName(targetBranch, false))
+			ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(targetBranch, false))
 			return nil
 		},
 	}

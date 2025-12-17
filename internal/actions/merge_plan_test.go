@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -57,7 +57,7 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    false,
@@ -110,7 +110,7 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    false,
@@ -159,7 +159,7 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := output.NewSplog()
+		splog := tui.NewSplog()
 		plan, validation, err := actions.CreateMergePlan(actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    true,

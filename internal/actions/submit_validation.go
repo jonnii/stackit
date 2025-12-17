@@ -5,8 +5,8 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // ValidateBranchesToSubmit validates that branches are ready to submit
@@ -51,13 +51,13 @@ func validateBaseRevisions(branches []string, eng engine.Engine, ctx *runtime.Co
 		if eng.IsTrunk(parentBranchName) {
 			if !eng.IsBranchFixed(branchName) {
 				ctx.Splog.Info("Note that %s has fallen behind trunk. You may encounter conflicts if you attempt to merge it.",
-					output.ColorBranchName(branchName, false))
+					tui.ColorBranchName(branchName, false))
 			}
 		} else if validatedBranches[parentBranchName] {
 			// Parent is in the submission list
 			if !eng.IsBranchFixed(branchName) {
 				return fmt.Errorf("you are trying to submit at least one branch that has not been restacked on its parent. To resolve this, check out %s and run 'stackit restack'",
-					output.ColorBranchName(branchName, false))
+					tui.ColorBranchName(branchName, false))
 			}
 		} else {
 			// Parent is not in submission list
@@ -67,7 +67,7 @@ func validateBaseRevisions(branches []string, eng engine.Engine, ctx *runtime.Co
 			}
 			if !matchesRemote {
 				return fmt.Errorf("you are trying to submit at least one branch whose base does not match its parent remotely, without including its parent. You may want to use 'stackit submit --stack' to ensure that the ancestors of %s are included in your submission",
-					output.ColorBranchName(branchName, false))
+					tui.ColorBranchName(branchName, false))
 			}
 		}
 

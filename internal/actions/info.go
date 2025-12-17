@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/tui"
 )
 
 // InfoOptions specifies options for the info command
@@ -18,7 +18,7 @@ type InfoOptions struct {
 	Patch      bool
 	Stat       bool
 	Engine     engine.Engine
-	Splog      *output.Splog
+	Splog      *tui.Splog
 }
 
 // InfoAction displays information about a branch
@@ -53,11 +53,11 @@ func InfoAction(opts InfoOptions) error {
 	isTrunk := opts.Engine.IsTrunk(branchName)
 
 	// Branch name with current indicator
-	coloredBranchName := output.ColorBranchName(branchName, isCurrent)
+	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
 	if !isTrunk && !opts.Engine.IsBranchFixed(branchName) {
-		coloredBranchName += " " + output.ColorNeedsRestack("(needs restack)")
+		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
@@ -65,7 +65,7 @@ func InfoAction(opts InfoOptions) error {
 	commitDate, err := opts.Engine.GetCommitDate(branchName)
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
-		outputLines = append(outputLines, output.ColorDim(dateStr))
+		outputLines = append(outputLines, tui.ColorDim(dateStr))
 	}
 
 	// PR info (skip for trunk)
@@ -79,7 +79,7 @@ func InfoAction(opts InfoOptions) error {
 				outputLines = append(outputLines, prTitleLine)
 			}
 			if prInfo.URL != "" {
-				outputLines = append(outputLines, output.ColorMagenta(prInfo.URL))
+				outputLines = append(outputLines, tui.ColorMagenta(prInfo.URL))
 			}
 		}
 	}
@@ -88,13 +88,13 @@ func InfoAction(opts InfoOptions) error {
 	parentBranchName := opts.Engine.GetParent(branchName)
 	if parentBranchName != "" {
 		outputLines = append(outputLines, "")
-		outputLines = append(outputLines, fmt.Sprintf("%s: %s", output.ColorCyan("Parent"), parentBranchName))
+		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranchName))
 	}
 
 	// Children branches
 	children := opts.Engine.GetChildren(branchName)
 	if len(children) > 0 {
-		outputLines = append(outputLines, fmt.Sprintf("%s:", output.ColorCyan("Children")))
+		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))
 		for _, child := range children {
 			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child))
 		}
@@ -132,7 +132,7 @@ func InfoAction(opts InfoOptions) error {
 		commits, err := opts.Engine.GetAllCommits(branchName, engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
-				outputLines = append(outputLines, output.ColorDim(commit))
+				outputLines = append(outputLines, tui.ColorDim(commit))
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func InfoAction(opts InfoOptions) error {
 	// Apply dimming for merged/closed PRs
 	if prInfo != nil && (prInfo.State == "MERGED" || prInfo.State == "CLOSED") {
 		for i := range outputLines {
-			outputLines[i] = output.ColorDim(outputLines[i])
+			outputLines[i] = tui.ColorDim(outputLines[i])
 		}
 	}
 
@@ -188,16 +188,16 @@ func getPRTitleLine(prInfo *engine.PrInfo) string {
 		return ""
 	}
 
-	prNumber := output.ColorPRNumber(*prInfo.Number)
+	prNumber := tui.ColorPRNumber(*prInfo.Number)
 	state := prInfo.State
 
 	if state == "MERGED" {
 		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title)
 	} else if state == "CLOSED" {
 		// Strikethrough not easily available, use dim instead
-		return fmt.Sprintf("%s (Abandoned) %s", prNumber, output.ColorDim(prInfo.Title))
+		return fmt.Sprintf("%s (Abandoned) %s", prNumber, tui.ColorDim(prInfo.Title))
 	} else {
-		prState := output.ColorPRState(state, prInfo.IsDraft)
+		prState := tui.ColorPRState(state, prInfo.IsDraft)
 		return fmt.Sprintf("%s %s %s", prNumber, prState, prInfo.Title)
 	}
 }

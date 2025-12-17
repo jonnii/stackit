@@ -11,11 +11,6 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// isDemoMode checks if we're running in demo mode
-func isDemoMode() bool {
-	return runtime.IsDemoMode()
-}
-
 // SubmitOptions contains options for the submit command
 type SubmitOptions struct {
 	Branch               string
@@ -100,8 +95,8 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	// Display the stack tree with PR annotations
 	displaySubmitStackTree(branches, opts, eng, splog, currentBranch)
 
-	// Restack if requested (skip in demo mode)
-	if opts.Restack && !isDemoMode() {
+	// Restack if requested
+	if opts.Restack {
 		splog.Info("Restacking branches before submitting...")
 		repoRoot := ctx.RepoRoot
 		if repoRoot == "" {
@@ -110,22 +105,17 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 		if err := RestackBranches(branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
-	} else if opts.Restack && isDemoMode() {
-		splog.Info("[DEMO] Would restack branches before submitting...")
 	}
 
-	// Validate and prepare branches (combined message)
+	// Validate and prepare branches
 	splog.Info("Preparing...")
 
-	// Skip validation in demo mode
-	if !isDemoMode() {
-		if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
-		}
+	if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmitDemo(branches, opts, eng, ctx, currentBranch)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -137,11 +127,6 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	}
 	if shouldAbort {
 		return nil
-	}
-
-	// In demo mode, simulate the submission
-	if isDemoMode() {
-		return submitActionDemo(submissionInfos, currentBranch, eng, splog)
 	}
 
 	// Push branches and create/update PRs
@@ -220,119 +205,6 @@ func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
 	splog.Info("Done! %s", formatSubmitSummary(createdCount, updatedCount))
 
 	return nil
-}
-
-// submitActionDemo simulates the submit operation in demo mode
-func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, eng engine.Engine, splog *output.Splog) error {
-	splog.Newline()
-	splog.Info("Submitting PRs...")
-
-	// Build TUI items
-	items := make([]output.SubmitItem, len(submissionInfos))
-	for i, info := range submissionInfos {
-		items[i] = output.SubmitItem{
-			BranchName: info.BranchName,
-			Action:     info.Action,
-			PRNumber:   info.PRNumber,
-			Status:     "pending",
-		}
-	}
-
-	// Submit function for each item
-	submitFunc := func(idx int) (string, error) {
-		info := submissionInfos[idx]
-		prNum := 100 + idx + 1
-		if info.PRNumber != nil {
-			prNum = *info.PRNumber
-		}
-		prURL := fmt.Sprintf("https://github.com/example/repo/pull/%d", prNum)
-
-		err := eng.UpsertPrInfo(info.BranchName, &engine.PrInfo{
-			Number:  &prNum,
-			Title:   info.Metadata.Title,
-			Body:    info.Metadata.Body,
-			IsDraft: info.Metadata.IsDraft,
-			State:   "OPEN",
-			Base:    info.Base,
-			URL:     prURL,
-		})
-		return prURL, err
-	}
-
-	return output.RunSubmitTUISimple(items, submitFunc, splog)
-}
-
-// prepareBranchesForSubmitDemo prepares submission info for demo mode (without interactive prompts)
-func prepareBranchesForSubmitDemo(branches []string, opts SubmitOptions, eng engine.Engine, ctx *runtime.Context, currentBranch string) ([]SubmissionInfo, error) {
-	// In demo mode, skip interactive prompts
-	if isDemoMode() {
-		var submissionInfos []SubmissionInfo
-		for _, branchName := range branches {
-			parentBranchName := eng.GetParent(branchName)
-			if parentBranchName == "" {
-				parentBranchName = eng.Trunk()
-			}
-			prInfo, _ := eng.GetPrInfo(branchName)
-
-			action := "create"
-			prNumber := (*int)(nil)
-			if prInfo != nil && prInfo.Number != nil {
-				action = "update"
-				prNumber = prInfo.Number
-			}
-
-			isCurrent := branchName == currentBranch
-
-			// Skip if update-only and no existing PR
-			if opts.UpdateOnly && action == "create" {
-				displayName := branchName
-				if isCurrent {
-					displayName = branchName + " (current)"
-				}
-				ctx.Splog.Info("  ▸ %s %s", output.ColorDim(displayName), output.ColorDim("— skipped, no existing PR"))
-				continue
-			}
-
-			// Get SHAs (fake for demo)
-			headSHA, _ := eng.GetRevision(branchName)
-			baseSHA, _ := eng.GetRevision(parentBranchName)
-
-			// Use PR title from existing PR info or generate from branch name
-			title := branchName
-			if prInfo != nil && prInfo.Title != "" {
-				title = prInfo.Title
-			}
-
-			submissionInfo := SubmissionInfo{
-				BranchName: branchName,
-				Head:       branchName,
-				Base:       parentBranchName,
-				HeadSHA:    headSHA,
-				BaseSHA:    baseSHA,
-				Action:     action,
-				PRNumber:   prNumber,
-				Metadata: &PRMetadata{
-					Title:   title,
-					Body:    "Demo PR body",
-					IsDraft: opts.Draft,
-				},
-			}
-
-			actionLabel := "create"
-			if action == "update" {
-				actionLabel = "update"
-			}
-			ctx.Splog.Info("  ▸ %s → %s",
-				output.ColorBranchName(branchName, isCurrent),
-				output.ColorDim(actionLabel))
-
-			submissionInfos = append(submissionInfos, submissionInfo)
-		}
-		return submissionInfos, nil
-	}
-
-	// Normal mode - use original function
-	return prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch)
 }
 
 // formatSubmitSummary formats the summary message
@@ -550,20 +422,17 @@ func getBranchesToSubmit(opts SubmitOptions, eng engine.Engine) ([]string, error
 
 // getGitHubClient returns the GitHub client from options or context
 func getGitHubClient(opts SubmitOptions, ctx *runtime.Context) (git.GitHubClient, error) {
+	// Allow test override
 	if opts.GitHubClient != nil {
 		return opts.GitHubClient, nil
 	}
 
+	// Use context's client (set during context creation)
 	if ctx.GitHubClient != nil {
 		return ctx.GitHubClient, nil
 	}
 
-	// Try to create a new client
-	ghClient, err := git.NewRealGitHubClient(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get GitHub client: %w", err)
-	}
-	return ghClient, nil
+	return nil, fmt.Errorf("no GitHub client available - check your GITHUB_TOKEN")
 }
 
 // pushBranchIfNeeded pushes a branch to remote if needed

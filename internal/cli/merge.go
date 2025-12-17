@@ -8,11 +8,11 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newMergeCmd creates the merge command
@@ -90,7 +90,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Determine if we should run in interactive mode
 			// Interactive if no flags are provided (except dry-run which is always allowed)
@@ -136,7 +136,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 }
 
 // runInteractiveMergeWizard runs the interactive merge wizard
-func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot string, dryRun bool, demoMode bool, forceFlag bool) error {
+func runInteractiveMergeWizard(eng engine.Engine, ctx *runtime.Context, repoRoot string, dryRun bool, demoMode bool, forceFlag bool) error {
 	splog := ctx.Splog
 
 	splog.Info("🔍 Analyzing stack...")
@@ -165,34 +165,53 @@ func runInteractiveMergeWizard(eng engine.Engine, ctx *context.Context, repoRoot
 		return err
 	}
 
-	// Display current state
+	// Display current state using stack tree
 	splog.Info("You are on branch: %s", output.ColorBranchName(currentBranch, false))
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {
-		splog.Info("Stack to merge (bottom to top):")
-		for i, branchInfo := range plan.BranchesToMerge {
-			marker := ""
-			if branchInfo.BranchName == currentBranch {
-				marker = " ← current"
-			}
-			checksIcon := "✓"
-			if branchInfo.ChecksStatus == actions.ChecksFailing {
-				checksIcon = "✗"
-			} else if branchInfo.ChecksStatus == actions.ChecksPending {
-				checksIcon = "⏳"
-			}
-			splog.Info("  %d. %s  PR #%d  %s Checks %s%s", i+1, output.ColorBranchName(branchInfo.BranchName, false), branchInfo.PRNumber, checksIcon, branchInfo.ChecksStatus, marker)
-		}
-		splog.Newline()
-	}
+		// Create tree renderer
+		renderer := output.NewStackTreeRenderer(
+			currentBranch,
+			eng.Trunk(),
+			eng.GetChildren,
+			eng.GetParent,
+			eng.IsTrunk,
+			eng.IsBranchFixed,
+		)
 
-	if len(plan.UpstackBranches) > 0 {
-		splog.Info("Branches above (will be restacked on trunk):")
-		for _, branchName := range plan.UpstackBranches {
-			splog.Info("  • %s", output.ColorBranchName(branchName, false))
+		// Build annotations for branches to merge
+		annotations := make(map[string]output.BranchAnnotation)
+		for _, branchInfo := range plan.BranchesToMerge {
+			annotation := output.BranchAnnotation{
+				PRNumber:    &branchInfo.PRNumber,
+				CheckStatus: string(branchInfo.ChecksStatus),
+				IsDraft:     branchInfo.IsDraft,
+			}
+			annotations[branchInfo.BranchName] = annotation
+		}
+		renderer.SetAnnotations(annotations)
+
+		// Render a list of branches to merge
+		splog.Info("Stack to merge (bottom to top):")
+		branchNames := make([]string, len(plan.BranchesToMerge))
+		for i, branchInfo := range plan.BranchesToMerge {
+			branchNames[i] = branchInfo.BranchName
+		}
+		stackLines := renderer.RenderBranchList(branchNames)
+		for _, line := range stackLines {
+			splog.Info("%s", line)
 		}
 		splog.Newline()
+
+		// Show upstack branches that will be restacked
+		if len(plan.UpstackBranches) > 0 {
+			splog.Info("Branches above (will be restacked on trunk):")
+			for _, branchName := range plan.UpstackBranches {
+				splog.Info("  • %s", output.ColorBranchName(branchName, false))
+			}
+			splog.Newline()
+		}
 	}
 
 	// Show validation errors if any

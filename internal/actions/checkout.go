@@ -3,7 +3,7 @@ package actions
 import (
 	"fmt"
 
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
@@ -19,7 +19,7 @@ type CheckoutOptions struct {
 }
 
 // CheckoutAction performs the checkout operation
-func CheckoutAction(opts CheckoutOptions, ctx *context.Context) error {
+func CheckoutAction(opts CheckoutOptions, ctx *runtime.Context) error {
 	// Populate remote SHAs if needed
 	if err := ctx.Engine.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
@@ -61,7 +61,7 @@ func CheckoutAction(opts CheckoutOptions, ctx *context.Context) error {
 }
 
 // interactiveBranchSelection shows an interactive branch selector
-func interactiveBranchSelection(opts CheckoutOptions, ctx *context.Context) (string, error) {
+func interactiveBranchSelection(opts CheckoutOptions, ctx *runtime.Context) (string, error) {
 	var choices []branchChoice
 	var initialIndex int = -1
 	currentBranch := ctx.Engine.CurrentBranch()
@@ -198,7 +198,7 @@ func interactiveBranchSelection(opts CheckoutOptions, ctx *context.Context) (str
 }
 
 // printBranchInfo prints information about the checked out branch
-func printBranchInfo(branchName string, ctx *context.Context) {
+func printBranchInfo(branchName string, ctx *runtime.Context) {
 	if ctx.Engine.IsTrunk(branchName) {
 		return
 	}
@@ -239,7 +239,7 @@ func printBranchInfo(branchName string, ctx *context.Context) {
 }
 
 // collectBranchesDepthFirst returns branches with trunk first, then children recursively
-func collectBranchesDepthFirst(branchName string, ctx *context.Context) []string {
+func collectBranchesDepthFirst(branchName string, ctx *runtime.Context) []string {
 	var result []string
 	result = append(result, branchName)
 

@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 )
@@ -65,7 +65,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Determine target branch
 			targetBranch := branch

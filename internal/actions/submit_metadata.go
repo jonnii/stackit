@@ -6,13 +6,13 @@ import (
 	"os/exec"
 	"strings"
 
-	stackitcontext "stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 )
 
 // GetPRTitle gets the PR title, prompting if needed
-func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *stackitcontext.Context) (string, error) {
+func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *runtime.Context) (string, error) {
 	// First check if we have a saved title
 	title := existingTitle
 	if title == "" {
@@ -40,7 +40,7 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *s
 }
 
 // GetPRBody gets the PR body, prompting if needed
-func GetPRBody(branchName string, editInline bool, existingBody string, ctx *stackitcontext.Context) (string, error) {
+func GetPRBody(branchName string, editInline bool, existingBody string, ctx *runtime.Context) (string, error) {
 	body := existingBody
 	if body == "" {
 		// Infer from commit messages
@@ -68,7 +68,7 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *sta
 }
 
 // editPRBodyInEditor opens an editor to edit the PR body
-func editPRBodyInEditor(initialBody string, ctx *stackitcontext.Context) (string, error) {
+func editPRBodyInEditor(initialBody string, ctx *runtime.Context) (string, error) {
 	// Create temporary file
 	tmpFile, err := os.CreateTemp("", "stackit-pr-description-*.md")
 	if err != nil {
@@ -110,7 +110,7 @@ func editPRBodyInEditor(initialBody string, ctx *stackitcontext.Context) (string
 }
 
 // GetReviewers gets reviewers from flag or prompts user
-func GetReviewers(reviewersFlag string, ctx *stackitcontext.Context) ([]string, []string, error) {
+func GetReviewers(reviewersFlag string, ctx *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Don't prompt by default - return empty
 		return nil, nil, nil
@@ -122,7 +122,7 @@ func GetReviewers(reviewersFlag string, ctx *stackitcontext.Context) ([]string, 
 }
 
 // GetReviewersWithPrompt gets reviewers, prompting if flag is empty
-func GetReviewersWithPrompt(reviewersFlag string, ctx *stackitcontext.Context) ([]string, []string, error) {
+func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Prompt for reviewers
 		result, err := PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
@@ -139,7 +139,7 @@ func GetReviewersWithPrompt(reviewersFlag string, ctx *stackitcontext.Context) (
 }
 
 // PreparePRMetadata prepares PR metadata for a branch
-func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine.Engine, ctx *stackitcontext.Context) (*PRMetadata, error) {
+func PreparePRMetadata(branchName string, opts SubmitMetadataOptions, eng engine.Engine, ctx *runtime.Context) (*PRMetadata, error) {
 	prInfo, _ := eng.GetPrInfo(branchName)
 
 	metadata := &PRMetadata{

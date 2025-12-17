@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/output"
 	"stackit.dev/stackit/testhelpers"
@@ -42,7 +42,7 @@ func TestSwitchBranchAction(t *testing.T) {
 
 		// Create context
 		splog := output.NewSplog()
-		ctx := &context.Context{
+		ctx := &runtime.Context{
 			Engine: eng,
 			Splog:  splog,
 		}
@@ -110,7 +110,7 @@ func TestSwitchBranchAction(t *testing.T) {
 
 		// Create context
 		splog := output.NewSplog()
-		ctx := &context.Context{
+		ctx := &runtime.Context{
 			Engine: eng,
 			Splog:  splog,
 		}
@@ -149,7 +149,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		require.NoError(t, err)
 
 		splog := output.NewSplog()
-		ctx := &context.Context{
+		ctx := &runtime.Context{
 			Engine: eng,
 			Splog:  splog,
 		}
@@ -179,7 +179,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		require.NoError(t, err)
 
 		splog := output.NewSplog()
-		ctx := &context.Context{
+		ctx := &runtime.Context{
 			Engine: eng,
 			Splog:  splog,
 		}
@@ -234,7 +234,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		require.NoError(t, err)
 
 		splog := output.NewSplog()
-		ctx := &context.Context{
+		ctx := &runtime.Context{
 			Engine: eng,
 			Splog:  splog,
 		}

@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
@@ -78,7 +78,7 @@ it reaches the first branch that has trunk as its parent (or trunk itself).`,
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Execute bottom action
 			return actions.SwitchBranchAction(actions.DirectionBottom, ctx)

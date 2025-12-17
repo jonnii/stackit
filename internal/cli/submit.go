@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/demo"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -109,7 +109,7 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Run submit action
 			return actions.SubmitAction(actions.SubmitOptions{

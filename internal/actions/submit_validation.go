@@ -3,14 +3,14 @@ package actions
 import (
 	"fmt"
 
-	stackitcontext "stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
 )
 
 // ValidateBranchesToSubmit validates that branches are ready to submit
-func ValidateBranchesToSubmit(branches []string, eng engine.Engine, ctx *stackitcontext.Context) error {
+func ValidateBranchesToSubmit(branches []string, eng engine.Engine, ctx *runtime.Context) error {
 	// Sync PR info first
 	repoOwner, repoName, _ := getRepoInfo()
 	if repoOwner != "" && repoName != "" {
@@ -42,7 +42,7 @@ func ValidateBranchesToSubmit(branches []string, eng engine.Engine, ctx *stackit
 // 1. Its parent is trunk, OR
 // 2. We are submitting its parent before it and it does not need restacking, OR
 // 3. Its base matches the existing head for its parent's PR
-func validateBaseRevisions(branches []string, eng engine.Engine, ctx *stackitcontext.Context) error {
+func validateBaseRevisions(branches []string, eng engine.Engine, ctx *runtime.Context) error {
 	validatedBranches := make(map[string]bool)
 
 	for _, branchName := range branches {
@@ -78,7 +78,7 @@ func validateBaseRevisions(branches []string, eng engine.Engine, ctx *stackitcon
 }
 
 // validateNoEmptyBranches checks for empty branches and prompts user if found
-func validateNoEmptyBranches(branches []string, eng engine.Engine, ctx *stackitcontext.Context) error {
+func validateNoEmptyBranches(branches []string, eng engine.Engine, ctx *runtime.Context) error {
 	emptyBranches := []string{}
 	for _, branchName := range branches {
 		isEmpty, err := eng.IsBranchEmpty(branchName)
@@ -109,7 +109,7 @@ func validateNoEmptyBranches(branches []string, eng engine.Engine, ctx *stackitc
 }
 
 // validateNoMergedOrClosedBranches checks for merged/closed PRs and prompts user if found
-func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, ctx *stackitcontext.Context) error {
+func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, ctx *runtime.Context) error {
 	mergedOrClosedBranches := []string{}
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(branchName)

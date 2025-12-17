@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
@@ -88,7 +88,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Get branch name from args
 			branchName := ""

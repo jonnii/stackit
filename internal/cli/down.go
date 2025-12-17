@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
@@ -66,7 +66,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()

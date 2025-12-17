@@ -2,12 +2,26 @@ package demo
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
-	"stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/runtime"
 )
+
+// Delay constants for simulating real operations
+const (
+	delayShort  = 150 * time.Millisecond
+	delayMedium = 300 * time.Millisecond
+	delayLong   = 500 * time.Millisecond
+)
+
+// simulateDelay adds a random delay around the base duration
+func simulateDelay(base time.Duration) {
+	jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+	time.Sleep(base + jitter)
+}
 
 // IsDemoMode returns true if STACKIT_DEMO environment variable is set
 func IsDemoMode() bool {
@@ -16,12 +30,12 @@ func IsDemoMode() bool {
 
 // NewDemoContext creates a demo engine and context if in demo mode.
 // Returns (context, true) if in demo mode, (nil, false) otherwise.
-func NewDemoContext() (*context.Context, bool) {
+func NewDemoContext() (*runtime.Context, bool) {
 	if !IsDemoMode() {
 		return nil, false
 	}
 	eng := NewDemoEngine()
-	return context.NewContext(eng), true
+	return runtime.NewContext(eng), true
 }
 
 // DemoEngine implements the engine.Engine interface with simulated data
@@ -224,10 +238,12 @@ func (e *DemoEngine) BranchMatchesRemote(branchName string) (bool, error) {
 }
 
 func (e *DemoEngine) PopulateRemoteShas() error {
-	return nil // No-op for demo
+	simulateDelay(delayMedium) // Fetching remote refs takes time
+	return nil
 }
 
 func (e *DemoEngine) PullTrunk() (engine.PullResult, error) {
+	simulateDelay(delayLong) // Git pull takes time
 	return engine.PullUnneeded, nil
 }
 
@@ -236,6 +252,7 @@ func (e *DemoEngine) ResetTrunkToRemote() error {
 }
 
 func (e *DemoEngine) RestackBranch(branchName string) (engine.RestackBranchResult, error) {
+	simulateDelay(delayMedium) // Rebase operation takes time
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
 	}, nil
@@ -251,6 +268,7 @@ func (e *DemoEngine) ContinueRebase(rebasedBranchBase string) (engine.ContinueRe
 // SquashManager interface implementation
 
 func (e *DemoEngine) SquashCurrentBranch(opts engine.SquashOptions) error {
+	simulateDelay(delayMedium) // Squash takes time
 	return nil
 }
 
@@ -264,6 +282,7 @@ func (e *DemoEngine) GetAllCommits(branchName string, format engine.CommitFormat
 }
 
 func (e *DemoEngine) ApplySplitToCommits(opts engine.ApplySplitOptions) error {
+	simulateDelay(delayLong) // Split involves multiple git operations
 	return nil
 }
 
@@ -276,6 +295,7 @@ func (e *DemoEngine) DetachAndResetBranchChanges(branchName string) error {
 }
 
 func (e *DemoEngine) ForceCheckoutBranch(branchName string) error {
+	simulateDelay(delayShort) // Checkout is fast
 	return nil
 }
 

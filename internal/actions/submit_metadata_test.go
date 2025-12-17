@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 )
@@ -17,7 +17,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		opts := actions.SubmitMetadataOptions{
@@ -34,7 +34,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		opts := actions.SubmitMetadataOptions{
@@ -51,7 +51,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		opts := actions.SubmitMetadataOptions{
@@ -68,7 +68,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		// Create existing PR info with draft status
@@ -105,7 +105,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		// Create existing PR info with non-draft status
@@ -130,7 +130,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		// Create existing PR info with draft status
@@ -161,7 +161,7 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		ctx := context.NewContext(eng)
+		ctx := runtime.NewContext(eng)
 		branchName := "feature"
 
 		// Create a commit with a subject

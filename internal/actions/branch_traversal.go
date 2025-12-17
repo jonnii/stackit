@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 )
@@ -18,7 +18,7 @@ const (
 )
 
 // SwitchBranchAction switches to a branch based on the given direction
-func SwitchBranchAction(direction Direction, ctx *context.Context) error {
+func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 	currentBranch := ctx.Engine.CurrentBranch()
 	if currentBranch == "" {
 		return errors.ErrNotOnBranch
@@ -60,7 +60,7 @@ func SwitchBranchAction(direction Direction, ctx *context.Context) error {
 }
 
 // traverseDownward walks down the parent chain to find the first branch from trunk
-func traverseDownward(currentBranch string, ctx *context.Context) string {
+func traverseDownward(currentBranch string, ctx *runtime.Context) string {
 	if ctx.Engine.IsTrunk(currentBranch) {
 		return currentBranch
 	}
@@ -81,7 +81,7 @@ func traverseDownward(currentBranch string, ctx *context.Context) string {
 }
 
 // traverseUpward walks up the children chain to find the tip branch
-func traverseUpward(currentBranch string, ctx *context.Context) (string, error) {
+func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) {
 	children := ctx.Engine.GetChildren(currentBranch)
 	if len(children) == 0 {
 		// No children, we're at the tip
@@ -107,7 +107,7 @@ func traverseUpward(currentBranch string, ctx *context.Context) (string, error) 
 }
 
 // handleMultipleChildren prompts the user to select a branch when multiple children exist
-func handleMultipleChildren(children []string, ctx *context.Context) (string, error) {
+func handleMultipleChildren(children []string, ctx *runtime.Context) (string, error) {
 	if !isInteractive() {
 		return "", fmt.Errorf("cannot get top branch in non-interactive mode; multiple choices available:\n%s", formatBranchList(children))
 	}

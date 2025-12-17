@@ -7,7 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 )
@@ -51,7 +51,7 @@ all upstack branches (children) are automatically restacked.`,
 			}
 
 			// Create context
-			ctx := context.NewContext(eng)
+			ctx := runtime.NewContext(eng)
 
 			// Determine noEdit flag: matches charcoal logic: noEdit = argv['no-edit'] || !argv.edit
 			// If --no-edit is set, noEdit = true

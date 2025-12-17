@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"stackit.dev/stackit/internal/branchutil"
-	"stackit.dev/stackit/internal/context"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/git"
 )
 
@@ -23,7 +23,7 @@ type CreateOptions struct {
 }
 
 // CreateAction creates a new branch stacked on top of the current branch
-func CreateAction(opts CreateOptions, ctx *context.Context) error {
+func CreateAction(opts CreateOptions, ctx *runtime.Context) error {
 	// Get current branch
 	currentBranch := ctx.Engine.CurrentBranch()
 	if currentBranch == "" {
@@ -156,7 +156,7 @@ func CreateAction(opts CreateOptions, ctx *context.Context) error {
 }
 
 // handleInsert moves children of the current branch to be children of the new branch
-func handleInsert(newBranch, currentBranch string, ctx *context.Context) error {
+func handleInsert(newBranch, currentBranch string, ctx *runtime.Context) error {
 	children := ctx.Engine.GetChildren(currentBranch)
 	siblings := []string{}
 	for _, child := range children {

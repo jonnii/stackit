@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v62/github"
-	stackitcontext "stackit.dev/stackit/internal/context"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // SubmitOptions contains options for the submit command
@@ -91,6 +91,14 @@ func SubmitAction(opts SubmitOptions) error {
 
 	currentBranch := eng.CurrentBranch()
 
+	// Populate remote SHAs early for accurate display
+	if err := eng.PopulateRemoteShas(); err != nil {
+		splog.Debug("Failed to populate remote SHAs: %v", err)
+	}
+
+	// Display the stack tree with PR annotations
+	displaySubmitStackTree(branches, opts, eng, splog, currentBranch)
+
 	// Restack if requested (skip in demo mode)
 	if opts.Restack && !opts.DemoMode {
 		splog.Info("Restacking branches before submitting...")
@@ -107,7 +115,7 @@ func SubmitAction(opts SubmitOptions) error {
 
 	// Validate and prepare branches (combined message)
 	splog.Info("Preparing...")
-	ctx := stackitcontext.NewContext(eng)
+	ctx := runtime.NewContext(eng)
 	ctx.Splog = splog
 
 	// Skip validation in demo mode
@@ -115,11 +123,6 @@ func SubmitAction(opts SubmitOptions) error {
 		if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
-	}
-
-	// Populate remote SHAs
-	if err := eng.PopulateRemoteShas(); err != nil {
-		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
@@ -268,7 +271,7 @@ func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, sp
 }
 
 // prepareBranchesForSubmitDemo prepares submission info for demo mode (without interactive prompts)
-func prepareBranchesForSubmitDemo(branches []string, opts SubmitOptions, eng engine.Engine, ctx *stackitcontext.Context, currentBranch string) ([]SubmissionInfo, error) {
+func prepareBranchesForSubmitDemo(branches []string, opts SubmitOptions, eng engine.Engine, ctx *runtime.Context, currentBranch string) ([]SubmissionInfo, error) {
 	// In demo mode, skip interactive prompts
 	if opts.DemoMode {
 		var submissionInfos []SubmissionInfo
@@ -364,7 +367,7 @@ func formatSubmitSummary(created, updated int) string {
 }
 
 // prepareBranchesForSubmit prepares submission info for each branch
-func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.Engine, ctx *stackitcontext.Context, currentBranch string) ([]SubmissionInfo, error) {
+func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.Engine, ctx *runtime.Context, currentBranch string) ([]SubmissionInfo, error) {
 	var submissionInfos []SubmissionInfo
 
 	for _, branchName := range branches {
@@ -469,7 +472,7 @@ func prepareBranchesForSubmit(branches []string, opts SubmitOptions, eng engine.
 }
 
 // shouldAbortSubmit checks if we should abort the submit operation
-func shouldAbortSubmit(opts SubmitOptions, hasAnyPRs bool, ctx *stackitcontext.Context) (bool, error) {
+func shouldAbortSubmit(opts SubmitOptions, hasAnyPRs bool, ctx *runtime.Context) (bool, error) {
 	if opts.DryRun {
 		ctx.Splog.Info("Dry run complete.")
 		return true, nil
@@ -761,4 +764,47 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 		}
 	}
 	return nil
+}
+
+// displaySubmitStackTree displays the stack tree with PR annotations before submitting
+func displaySubmitStackTree(branches []string, opts SubmitOptions, eng engine.Engine, splog *output.Splog, currentBranch string) {
+	// Create the tree renderer
+	renderer := output.NewStackTreeRenderer(
+		currentBranch,
+		eng.Trunk(),
+		eng.GetChildren,
+		eng.GetParent,
+		eng.IsTrunk,
+		eng.IsBranchFixed,
+	)
+
+	// Build annotations for each branch
+	annotations := make(map[string]output.BranchAnnotation)
+	for _, branchName := range branches {
+		prInfo, _ := eng.GetPrInfo(branchName)
+
+		annotation := output.BranchAnnotation{
+			NeedsRestack: !eng.IsBranchFixed(branchName),
+		}
+
+		if prInfo != nil && prInfo.Number != nil {
+			annotation.PRNumber = prInfo.Number
+			annotation.PRAction = "update"
+			annotation.IsDraft = prInfo.IsDraft
+		} else {
+			annotation.PRAction = "create"
+			annotation.IsDraft = opts.Draft
+		}
+
+		annotations[branchName] = annotation
+	}
+	renderer.SetAnnotations(annotations)
+
+	// Render a simple list of branches to submit (in order from bottom to top)
+	splog.Info("Stack to submit:")
+	stackLines := renderer.RenderBranchList(branches)
+	for _, line := range stackLines {
+		splog.Info("%s", line)
+	}
+	splog.Newline()
 }

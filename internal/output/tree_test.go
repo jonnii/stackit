@@ -321,4 +321,3 @@ func TestBranchAnnotation_CheckStatus(t *testing.T) {
 		t.Errorf("expected failing check icon ✗, got: %s", output)
 	}
 }
-

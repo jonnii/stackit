@@ -37,7 +37,8 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 
 		// Create mocked GitHub client
 		config := testhelpers.NewMockGitHubServerConfig()
-		githubClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
 
 		// Create submit options with mocked client
 		splog := output.NewSplog()
@@ -48,8 +49,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 			NoEdit:       true,  // Skip interactive prompts
 			Draft:        true,  // Set draft status explicitly to skip prompt
 			GitHubClient: githubClient,
-			GitHubOwner:  owner,
-			GitHubRepo:   repo,
+			SkipPush:     true, // Skip push since we don't have a real remote
 		}
 
 		// With mocked client, push is skipped, so this should succeed
@@ -89,7 +89,8 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 
 		// Create mocked GitHub client with existing PR
 		config := testhelpers.NewMockGitHubServerConfig()
-		githubClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
 
 		// Pre-create a PR in the mock
 		branchName := "feature"
@@ -120,8 +121,7 @@ func TestSubmitActionWithMockedGitHub(t *testing.T) {
 			DryRun:       false,
 			NoEdit:       true,
 			GitHubClient: githubClient,
-			GitHubOwner:  owner,
-			GitHubRepo:   repo,
+			SkipPush:     true, // Skip push since we don't have a real remote
 		}
 
 		// With mocked client, push is skipped, so this should succeed

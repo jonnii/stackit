@@ -130,7 +130,7 @@ func PromptTextInput(prompt, defaultValue string) (string, error) {
 		prompt:    prompt,
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(nil))
+	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	model, err := p.Run()
 	if err != nil {
 		return "", err
@@ -157,7 +157,7 @@ func PromptConfirm(prompt string, defaultValue bool) (bool, error) {
 		choice: defaultValue,
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(nil))
+	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	model, err := p.Run()
 	if err != nil {
 		return false, err
@@ -269,7 +269,7 @@ func PromptSelect(title string, options []SelectOption, defaultIndex int) (strin
 		title:   title,
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(nil))
+	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	model, err := p.Run()
 	if err != nil {
 		return "", err
@@ -438,7 +438,7 @@ func promptBranchSelection(message string, choices []branchChoice, initialIndex 
 		}
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(nil))
+	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	model, err := p.Run()
 	if err != nil {
 		return "", err

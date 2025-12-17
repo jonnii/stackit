@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v62/github"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
@@ -44,14 +43,11 @@ type SubmitOptions struct {
 	Comment              string
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
-	Engine               engine.Engine
-	Splog                *output.Splog
-	RepoRoot             string
-	// For testing: optional GitHub client, owner, and repo
-	// If nil, will use GetGitHubClient()
-	GitHubClient *github.Client
-	GitHubOwner  string
-	GitHubRepo   string
+	// For testing: optional GitHub client
+	// If nil, will use context's GitHubClient
+	GitHubClient git.GitHubClient
+	// SkipPush skips pushing branches to remote (for testing)
+	SkipPush bool
 }
 
 // SubmissionInfo contains information about a branch to submit
@@ -75,9 +71,9 @@ type SubmitResult struct {
 }
 
 // SubmitAction performs the submit operation
-func SubmitAction(opts SubmitOptions) error {
-	eng := opts.Engine
-	splog := opts.Splog
+func SubmitAction(ctx *runtime.Context, opts SubmitOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	// Validate flags
 	if opts.Draft && opts.Publish {
@@ -155,10 +151,11 @@ func SubmitAction(opts SubmitOptions) error {
 	splog.Info("Submitting...")
 	githubCtx := context.Background()
 
-	githubClient, repoOwner, repoName, err := getGitHubClient(opts, githubCtx)
+	githubClient, err := getGitHubClient(opts, ctx)
 	if err != nil {
 		return err
 	}
+	repoOwner, repoName := githubClient.GetOwnerRepo()
 
 	// Track results for summary
 	var results []SubmitResult
@@ -230,24 +227,29 @@ func SubmitAction(opts SubmitOptions) error {
 // submitActionDemo simulates the submit operation in demo mode
 func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, eng engine.Engine, splog *output.Splog) error {
 	splog.Newline()
-	splog.Info("Submitting...")
+	splog.Info("Submitting PRs...")
 
-	var results []SubmitResult
-	for _, info := range submissionInfos {
-		action := "created"
-		if info.Action == "update" {
-			action = "updated"
+	// Build TUI items
+	items := make([]output.SubmitItem, len(submissionInfos))
+	for i, info := range submissionInfos {
+		items[i] = output.SubmitItem{
+			BranchName: info.BranchName,
+			Action:     info.Action,
+			PRNumber:   info.PRNumber,
+			Status:     "pending",
 		}
+	}
 
-		// Generate fake PR URL
-		prNum := 100 + len(results) + 1
+	// Submit function for each item
+	submitFunc := func(idx int) (string, error) {
+		info := submissionInfos[idx]
+		prNum := 100 + idx + 1
 		if info.PRNumber != nil {
 			prNum = *info.PRNumber
 		}
 		prURL := fmt.Sprintf("https://github.com/example/repo/pull/%d", prNum)
 
-		// Update PR info through engine (this triggers delay in demo engine)
-		eng.UpsertPrInfo(info.BranchName, &engine.PrInfo{
+		err := eng.UpsertPrInfo(info.BranchName, &engine.PrInfo{
 			Number:  &prNum,
 			Title:   info.Metadata.Title,
 			Body:    info.Metadata.Body,
@@ -256,31 +258,10 @@ func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, en
 			Base:    info.Base,
 			URL:     prURL,
 		})
-
-		splog.Info("  ✓ %s → %s", info.BranchName, prURL)
-
-		results = append(results, SubmitResult{
-			BranchName: info.BranchName,
-			Action:     action,
-			URL:        prURL,
-			IsCurrent:  info.BranchName == currentBranch,
-		})
+		return prURL, err
 	}
 
-	// Print summary
-	splog.Newline()
-	createdCount := 0
-	updatedCount := 0
-	for _, result := range results {
-		if result.Action == "created" {
-			createdCount++
-		} else {
-			updatedCount++
-		}
-	}
-	splog.Info("Done! %s", formatSubmitSummary(createdCount, updatedCount))
-
-	return nil
+	return output.RunSubmitTUISimple(items, submitFunc, splog)
 }
 
 // prepareBranchesForSubmitDemo prepares submission info for demo mode (without interactive prompts)
@@ -569,26 +550,28 @@ func getBranchesToSubmit(opts SubmitOptions, eng engine.Engine) ([]string, error
 	return branches, nil
 }
 
-// getGitHubClient returns the GitHub client and repository information
-func getGitHubClient(opts SubmitOptions, ctx context.Context) (*github.Client, string, string, error) {
+// getGitHubClient returns the GitHub client from options or context
+func getGitHubClient(opts SubmitOptions, ctx *runtime.Context) (git.GitHubClient, error) {
 	if opts.GitHubClient != nil {
-		if opts.GitHubOwner == "" || opts.GitHubRepo == "" {
-			return nil, "", "", fmt.Errorf("GitHubOwner and GitHubRepo must be provided when using GitHubClient")
-		}
-		return opts.GitHubClient, opts.GitHubOwner, opts.GitHubRepo, nil
+		return opts.GitHubClient, nil
 	}
 
-	githubClient, repoOwner, repoName, err := git.GetGitHubClient(ctx)
-	if err != nil {
-		return nil, "", "", fmt.Errorf("failed to get GitHub client: %w", err)
+	if ctx.GitHubClient != nil {
+		return ctx.GitHubClient, nil
 	}
-	return githubClient, repoOwner, repoName, nil
+
+	// Try to create a new client
+	ghClient, err := git.NewRealGitHubClient(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GitHub client: %w", err)
+	}
+	return ghClient, nil
 }
 
 // pushBranchIfNeeded pushes a branch to remote if needed
 func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remote string) error {
-	// Skip if using mocked client for testing or dry run
-	if opts.GitHubClient != nil || opts.DryRun {
+	// Skip if dry run or skip push is set
+	if opts.DryRun || opts.SkipPush {
 		return nil
 	}
 
@@ -603,7 +586,7 @@ func pushBranchIfNeeded(submissionInfo SubmissionInfo, opts SubmitOptions, remot
 }
 
 // createPullRequest creates a new pull request
-func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) (string, error) {
+func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) (string, error) {
 	prURL, err := createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
@@ -618,7 +601,7 @@ func createPullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng en
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	createOpts := git.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -628,19 +611,16 @@ func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 		Reviewers:     submissionInfo.Metadata.Reviewers,
 		TeamReviewers: submissionInfo.Metadata.TeamReviewers,
 	}
-	pr, err := git.CreatePullRequest(githubCtx, githubClient, repoOwner, repoName, createOpts)
+	pr, err := githubClient.CreatePullRequest(githubCtx, repoOwner, repoName, createOpts)
 	if err != nil {
 		return "", fmt.Errorf("failed to create PR for %s: %w", submissionInfo.BranchName, err)
 	}
 
 	// Update PR info
 	prNumber := pr.Number
-	prURL := ""
-	if pr.HTMLURL != nil {
-		prURL = *pr.HTMLURL
-	}
+	prURL := pr.HTMLURL
 	eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
-		Number:  prNumber,
+		Number:  &prNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
 		IsDraft: submissionInfo.Metadata.IsDraft,
@@ -653,7 +633,7 @@ func createPullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 }
 
 // updatePullRequest updates an existing pull request
-func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) (string, error) {
+func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) (string, error) {
 	prURL, err := updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 	if err != nil {
 		return "", err
@@ -668,7 +648,7 @@ func updatePullRequest(submissionInfo SubmissionInfo, opts SubmitOptions, eng en
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	// Check if base changed
 	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
 	baseChanged := false
@@ -692,7 +672,7 @@ func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 	if baseChanged {
 		updateOpts.Base = &submissionInfo.Base
 	}
-	if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
+	if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
 		return "", fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
 	}
 
@@ -703,9 +683,9 @@ func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 		prURL = prInfo.URL
 	} else {
 		// Get from GitHub
-		pr, err := git.GetPullRequestByBranch(githubCtx, githubClient, repoOwner, repoName, submissionInfo.BranchName)
-		if err == nil && pr != nil && pr.HTMLURL != nil {
-			prURL = *pr.HTMLURL
+		pr, err := githubClient.GetPullRequestByBranch(githubCtx, repoOwner, repoName, submissionInfo.BranchName)
+		if err == nil && pr != nil {
+			prURL = pr.HTMLURL
 		}
 	}
 
@@ -723,7 +703,7 @@ func updatePullRequestQuiet(submissionInfo SubmissionInfo, opts SubmitOptions, e
 }
 
 // updatePRFooters updates PR body footers with dependency trees
-func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string, splog *output.Splog) error {
+func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *output.Splog) error {
 	splog.Info("Updating dependency trees in PR bodies...")
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(branchName)
@@ -738,7 +718,7 @@ func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Con
 			updateOpts := git.UpdatePROptions{
 				Body: &updatedBody,
 			}
-			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
+			if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
 				splog.Debug("Failed to update PR footer for %s: %v", branchName, err)
 				continue
 			}
@@ -757,7 +737,7 @@ func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Con
 }
 
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx context.Context, githubClient *github.Client, repoOwner, repoName string) error {
+func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) error {
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {
@@ -771,7 +751,7 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 			updateOpts := git.UpdatePROptions{
 				Body: &updatedBody,
 			}
-			if err := git.UpdatePullRequest(githubCtx, githubClient, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
+			if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
 				continue
 			}
 		}

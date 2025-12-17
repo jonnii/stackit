@@ -6,10 +6,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newTrunkCmd creates the trunk command

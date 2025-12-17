@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // Direction represents the traversal direction

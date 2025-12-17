@@ -3,10 +3,10 @@ package actions
 import (
 	"fmt"
 
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/output"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // ValidateBranchesToSubmit validates that branches are ready to submit

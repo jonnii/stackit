@@ -54,7 +54,7 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 			}
 
 			// Run submit action
-			return actions.SubmitAction(actions.SubmitOptions{
+			return actions.SubmitAction(ctx, actions.SubmitOptions{
 				Branch:               branch,
 				Stack:                stack,
 				Force:                force,
@@ -80,9 +80,6 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 				Comment:              comment,
 				TargetTrunk:          targetTrunk,
 				IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
-				Engine:               ctx.Engine,
-				Splog:                ctx.Splog,
-				RepoRoot:             ctx.RepoRoot,
 			})
 		},
 	}

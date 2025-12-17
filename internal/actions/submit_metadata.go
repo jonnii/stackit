@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // GetPRTitle gets the PR title, prompting if needed

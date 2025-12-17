@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -14,9 +15,10 @@ import (
 
 // Context provides access to engine and output for commands
 type Context struct {
-	Engine   engine.Engine
-	Splog    *output.Splog
-	RepoRoot string
+	Engine       engine.Engine
+	Splog        *output.Splog
+	RepoRoot     string
+	GitHubClient git.GitHubClient
 }
 
 // NewContext creates a new context with the given engine
@@ -45,13 +47,21 @@ func IsDemoMode() bool {
 // This is set by the demo package to avoid circular imports.
 var DemoEngineFactory func() engine.Engine
 
+// DemoGitHubClientFactory is a function that creates a demo GitHub client.
+// This is set by the demo package to avoid circular imports.
+var DemoGitHubClientFactory func() git.GitHubClient
+
 // NewContextAuto creates a context automatically based on the environment.
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine
 // using the provided repoRoot.
 func NewContextAuto(repoRoot string) (*Context, error) {
 	if IsDemoMode() && DemoEngineFactory != nil {
 		eng := DemoEngineFactory()
-		return NewContext(eng), nil
+		ctx := NewContext(eng)
+		if DemoGitHubClientFactory != nil {
+			ctx.GitHubClient = DemoGitHubClientFactory()
+		}
+		return ctx, nil
 	}
 
 	// Create real engine
@@ -60,7 +70,15 @@ func NewContextAuto(repoRoot string) (*Context, error) {
 		return nil, err
 	}
 
-	return NewContextWithRepoRoot(eng, repoRoot), nil
+	ctx := NewContextWithRepoRoot(eng, repoRoot)
+
+	// Try to create real GitHub client (may fail if no token)
+	ghClient, err := git.NewRealGitHubClient(context.Background())
+	if err == nil {
+		ctx.GitHubClient = ghClient
+	}
+
+	return ctx, nil
 }
 
 // GetContext returns the appropriate context (demo or real) based on the environment.

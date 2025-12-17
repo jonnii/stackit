@@ -12,6 +12,11 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
+// isDemoMode checks if we're running in demo mode
+func isDemoMode() bool {
+	return runtime.IsDemoMode()
+}
+
 // SubmitOptions contains options for the submit command
 type SubmitOptions struct {
 	Branch               string
@@ -41,7 +46,7 @@ type SubmitOptions struct {
 	IgnoreOutOfSyncTrunk bool
 	Engine               engine.Engine
 	Splog                *output.Splog
-	DemoMode             bool // If true, simulate submission without actual git/GitHub operations
+	RepoRoot             string
 	// For testing: optional GitHub client, owner, and repo
 	// If nil, will use GetGitHubClient()
 	GitHubClient *github.Client
@@ -100,16 +105,16 @@ func SubmitAction(opts SubmitOptions) error {
 	displaySubmitStackTree(branches, opts, eng, splog, currentBranch)
 
 	// Restack if requested (skip in demo mode)
-	if opts.Restack && !opts.DemoMode {
+	if opts.Restack && !isDemoMode() {
 		splog.Info("Restacking branches before submitting...")
-		repoRoot, err := git.GetRepoRoot()
-		if err != nil {
-			return fmt.Errorf("failed to get repo root: %w", err)
+		repoRoot := opts.RepoRoot
+		if repoRoot == "" {
+			repoRoot, _ = git.GetRepoRoot()
 		}
 		if err := RestackBranches(branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
-	} else if opts.Restack && opts.DemoMode {
+	} else if opts.Restack && isDemoMode() {
 		splog.Info("[DEMO] Would restack branches before submitting...")
 	}
 
@@ -119,7 +124,7 @@ func SubmitAction(opts SubmitOptions) error {
 	ctx.Splog = splog
 
 	// Skip validation in demo mode
-	if !opts.DemoMode {
+	if !isDemoMode() {
 		if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -141,8 +146,8 @@ func SubmitAction(opts SubmitOptions) error {
 	}
 
 	// In demo mode, simulate the submission
-	if opts.DemoMode {
-		return submitActionDemo(submissionInfos, currentBranch, splog)
+	if isDemoMode() {
+		return submitActionDemo(submissionInfos, currentBranch, eng, splog)
 	}
 
 	// Push branches and create/update PRs
@@ -223,7 +228,7 @@ func SubmitAction(opts SubmitOptions) error {
 }
 
 // submitActionDemo simulates the submit operation in demo mode
-func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, splog *output.Splog) error {
+func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, eng engine.Engine, splog *output.Splog) error {
 	splog.Newline()
 	splog.Info("Submitting...")
 
@@ -241,17 +246,25 @@ func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, sp
 		}
 		prURL := fmt.Sprintf("https://github.com/example/repo/pull/%d", prNum)
 
+		// Update PR info through engine (this triggers delay in demo engine)
+		eng.UpsertPrInfo(info.BranchName, &engine.PrInfo{
+			Number:  &prNum,
+			Title:   info.Metadata.Title,
+			Body:    info.Metadata.Body,
+			IsDraft: info.Metadata.IsDraft,
+			State:   "OPEN",
+			Base:    info.Base,
+			URL:     prURL,
+		})
+
+		splog.Info("  ✓ %s → %s", info.BranchName, prURL)
+
 		results = append(results, SubmitResult{
 			BranchName: info.BranchName,
 			Action:     action,
 			URL:        prURL,
 			IsCurrent:  info.BranchName == currentBranch,
 		})
-	}
-
-	// Print results
-	for _, result := range results {
-		splog.Info("  ✓ [DEMO] %s → %s", result.BranchName, result.URL)
 	}
 
 	// Print summary
@@ -273,7 +286,7 @@ func submitActionDemo(submissionInfos []SubmissionInfo, currentBranch string, sp
 // prepareBranchesForSubmitDemo prepares submission info for demo mode (without interactive prompts)
 func prepareBranchesForSubmitDemo(branches []string, opts SubmitOptions, eng engine.Engine, ctx *runtime.Context, currentBranch string) ([]SubmissionInfo, error) {
 	// In demo mode, skip interactive prompts
-	if opts.DemoMode {
+	if isDemoMode() {
 		var submissionInfos []SubmissionInfo
 		for _, branchName := range branches {
 			parentBranchName := eng.GetParent(branchName)

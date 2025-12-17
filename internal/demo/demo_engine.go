@@ -28,8 +28,16 @@ func IsDemoMode() bool {
 	return os.Getenv("STACKIT_DEMO") != ""
 }
 
+func init() {
+	// Register the demo engine factory with runtime package
+	runtime.DemoEngineFactory = func() engine.Engine {
+		return NewDemoEngine()
+	}
+}
+
 // NewDemoContext creates a demo engine and context if in demo mode.
 // Returns (context, true) if in demo mode, (nil, false) otherwise.
+// Deprecated: Use runtime.NewContextAuto instead.
 func NewDemoContext() (*runtime.Context, bool) {
 	if !IsDemoMode() {
 		return nil, false
@@ -227,6 +235,7 @@ func (e *DemoEngine) GetPrInfo(branchName string) (*engine.PrInfo, error) {
 }
 
 func (e *DemoEngine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) error {
+	simulateDelay(delayLong) // GitHub API call to create/update PR
 	e.prInfoMap[branchName] = prInfo
 	return nil
 }

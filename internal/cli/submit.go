@@ -7,10 +7,10 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
-	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/demo"
+	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newSubmitCmd creates the submit command
@@ -52,64 +52,11 @@ creating or updating distinct pull requests for each. Validates that branches ar
 and fails if there are conflicts. Blocks force pushes to branches that overwrite branches that have changed since
 you last submitted or got them. Opens an interactive prompt that allows you to input pull request metadata.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check for demo mode
-			if ctx, ok := demo.NewDemoContext(); ok {
-				return actions.SubmitAction(actions.SubmitOptions{
-					Branch:               branch,
-					Stack:                stack,
-					Force:                force,
-					DryRun:               dryRun,
-					Confirm:              confirm,
-					UpdateOnly:           updateOnly,
-					Always:               always,
-					Restack:              restack,
-					Draft:                draft,
-					Publish:              publish,
-					Edit:                 edit,
-					EditTitle:            editTitle,
-					EditDescription:      editDescription,
-					NoEdit:               noEdit,
-					NoEditTitle:          noEditTitle,
-					NoEditDescription:    noEditDescription,
-					Reviewers:            reviewers,
-					TeamReviewers:        teamReviewers,
-					MergeWhenReady:       mergeWhenReady,
-					RerequestReview:      rerequestReview,
-					View:                 view,
-					Web:                  web,
-					Comment:              comment,
-					TargetTrunk:          targetTrunk,
-					IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
-					Engine:               ctx.Engine,
-					Splog:                ctx.Splog,
-					DemoMode:             true,
-				})
-			}
-
-			// Initialize git repository
-			if err := git.InitDefaultRepo(); err != nil {
-				return fmt.Errorf("not a git repository: %w", err)
-			}
-
-			// Get repo root
-			repoRoot, err := git.GetRepoRoot()
+			// Get context (demo or real)
+			ctx, repoRoot, err := getContext()
 			if err != nil {
-				return fmt.Errorf("failed to get repo root: %w", err)
+				return err
 			}
-
-			// Check if initialized
-			if !config.IsInitialized(repoRoot) {
-				return fmt.Errorf("stackit not initialized. Run 'stackit init' first")
-			}
-
-			// Create engine
-			eng, err := engine.NewEngine(repoRoot)
-			if err != nil {
-				return fmt.Errorf("failed to create engine: %w", err)
-			}
-
-			// Create context
-			ctx := runtime.NewContext(eng)
 
 			// Run submit action
 			return actions.SubmitAction(actions.SubmitOptions{
@@ -138,8 +85,9 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 				Comment:              comment,
 				TargetTrunk:          targetTrunk,
 				IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
-				Engine:               eng,
+				Engine:               ctx.Engine,
 				Splog:                ctx.Splog,
+				RepoRoot:             repoRoot,
 			})
 		},
 	}
@@ -172,9 +120,41 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 	cmd.Flags().BoolVar(&ignoreOutOfSyncTrunk, "ignore-out-of-sync-trunk", false, "Perform the submit operation even if the trunk branch is out of sync with its upstream branch.")
 	cmd.Flags().BoolVar(&cli, "cli", false, "Edit PR metadata via the CLI instead of on web.")
 
-	// Add alias - ss maps to submit --stack
-	// We'll handle this by creating a separate command or using PersistentPreRun
-	// For now, users can use "stackit submit --stack" or we can add a separate command
-
 	return cmd
+}
+
+// getContext returns the appropriate context (demo or real) based on the environment.
+func getContext() (*runtime.Context, string, error) {
+	// Check for demo mode first
+	if runtime.IsDemoMode() {
+		ctx, repoRoot, err := runtime.NewContextAuto("")
+		if err != nil {
+			return nil, "", err
+		}
+		return ctx, repoRoot, nil
+	}
+
+	// Initialize git repository
+	if err := git.InitDefaultRepo(); err != nil {
+		return nil, "", fmt.Errorf("not a git repository: %w", err)
+	}
+
+	// Get repo root
+	repoRoot, err := git.GetRepoRoot()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get repo root: %w", err)
+	}
+
+	// Check if initialized
+	if !config.IsInitialized(repoRoot) {
+		return nil, "", fmt.Errorf("stackit not initialized. Run 'stackit init' first")
+	}
+
+	// Create engine
+	eng, err := engine.NewEngine(repoRoot)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create engine: %w", err)
+	}
+
+	return runtime.NewContext(eng), repoRoot, nil
 }

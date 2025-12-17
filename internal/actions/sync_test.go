@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -19,13 +19,12 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.SyncAction(actions.SyncOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: false,
-			Engine:  eng,
-			Splog:   splog,
 		})
 		require.NoError(t, err)
 	})
@@ -42,13 +41,12 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.SyncAction(actions.SyncOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: false,
-			Engine:  eng,
-			Splog:   splog,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "uncommitted changes")
@@ -73,13 +71,12 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("branch1", "main")
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.SyncAction(actions.SyncOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
-			Engine:  eng,
-			Splog:   splog,
 		})
 		// Should succeed (even if no restacking needed)
 		require.NoError(t, err)
@@ -119,13 +116,12 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("branch3", "branch2")
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.SyncAction(actions.SyncOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
-			Engine:  eng,
-			Splog:   splog,
 		})
 		// Should succeed - branches should be restacked in correct order
 		require.NoError(t, err)
@@ -194,13 +190,12 @@ func TestSyncAction(t *testing.T) {
 		err = eng.TrackBranch("stackB-child1", "stackB")
 		require.NoError(t, err)
 
-		splog := tui.NewSplog()
-		err = actions.SyncAction(actions.SyncOptions{
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
-			Engine:  eng,
-			Splog:   splog,
 		})
 		// Should succeed - branches should be restacked with parents before children
 		// Order should be something like: stackA, stackA-child1, stackA-child2, stackB, stackB-child1

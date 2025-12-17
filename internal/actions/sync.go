@@ -6,22 +6,28 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// SyncOptions are options for the sync command
+// SyncOptions contains options for the sync command
 type SyncOptions struct {
 	All     bool
 	Force   bool
 	Restack bool
-	Engine  engine.Engine
-	Splog   *tui.Splog
 }
 
 // SyncAction performs the sync operation
-func SyncAction(opts SyncOptions) error {
-	eng := opts.Engine
-	splog := opts.Splog
+func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
+	// Handle --all flag (stub for now)
+	if opts.All {
+		// For now, just sync the current trunk
+		// In the future, this would sync across all configured trunks
+		splog.Info("Syncing branches across all configured trunks...")
+	}
 
 	// Check for uncommitted changes
 	if hasUncommittedChanges() {
@@ -86,10 +92,8 @@ func SyncAction(opts SyncOptions) error {
 	// Clean branches (delete merged/closed)
 	branchesToRestack := []string{}
 
-	cleanResult, err := CleanBranches(CleanBranchesOptions{
-		Force:  opts.Force,
-		Engine: eng,
-		Splog:  splog,
+	cleanResult, err := CleanBranches(ctx, CleanBranchesOptions{
+		Force: opts.Force,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to clean branches: %w", err)
@@ -138,11 +142,7 @@ func SyncAction(opts SyncOptions) error {
 
 	// Restack branches
 	if len(sortedBranches) > 0 {
-		repoRoot, err := git.GetRepoRoot()
-		if err != nil {
-			return fmt.Errorf("failed to get repo root: %w", err)
-		}
-		if err := RestackBranches(sortedBranches, eng, splog, repoRoot); err != nil {
+		if err := RestackBranches(sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}

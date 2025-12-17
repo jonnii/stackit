@@ -4,14 +4,13 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// CleanBranchesOptions are options for cleaning branches
+// CleanBranchesOptions contains options for cleaning branches
 type CleanBranchesOptions struct {
-	Force  bool
-	Engine engine.Engine
-	Splog  *tui.Splog
+	Force bool
 }
 
 // CleanBranchesResult contains the result of cleaning branches
@@ -21,9 +20,9 @@ type CleanBranchesResult struct {
 
 // CleanBranches finds and deletes merged/closed branches
 // Returns branches whose parents have changed (need restacking)
-func CleanBranches(opts CleanBranchesOptions) (*CleanBranchesResult, error) {
-	eng := opts.Engine
-	splog := opts.Splog
+func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranchesResult, error) {
+	eng := ctx.Engine
+	splog := ctx.Splog
 
 	// Start from trunk children
 	branchesToProcess := eng.GetChildren(eng.Trunk())

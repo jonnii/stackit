@@ -63,7 +63,7 @@ func GetStagedDiff(ctx context.Context, files ...string) (string, error) {
 		args = append(args, "--")
 		args = append(args, files...)
 	}
-	output, err := RunGitCommandWithInputAndContext(ctx, "", args...)
+	output, err := RunGitCommandRawWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get staged diff: %w", err)
 	}
@@ -77,7 +77,7 @@ func GetUnstagedDiff(ctx context.Context, files ...string) (string, error) {
 		args = append(args, "--")
 		args = append(args, files...)
 	}
-	output, err := RunGitCommandWithInputAndContext(ctx, "", args...)
+	output, err := RunGitCommandRawWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get unstaged diff: %w", err)
 	}

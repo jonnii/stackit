@@ -34,7 +34,7 @@ func TestStageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify changes are staged
-		hasStaged, err = git.HasStagedChanges()
+		hasStaged, err = git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasStaged)
 	})

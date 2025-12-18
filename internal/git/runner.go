@@ -102,6 +102,11 @@ func RunGitCommandRaw(args ...string) (string, error) {
 	return defaultRunner.runInternal(context.Background(), "", false, args...)
 }
 
+// RunGitCommandRawWithContext executes a git command using the default runner and returns the raw output (no trimming) with context
+func RunGitCommandRawWithContext(ctx context.Context, args ...string) (string, error) {
+	return defaultRunner.runInternal(ctx, "", false, args...)
+}
+
 // RunGitCommandLines executes a git command using the default runner and returns output as lines
 func RunGitCommandLines(args ...string) ([]string, error) {
 	output, err := RunGitCommand(args...)

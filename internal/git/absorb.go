@@ -122,7 +122,7 @@ func hunkOverlaps(h1, h2 Hunk) bool {
 
 // GetCommitDiff returns the diff for a commit
 func GetCommitDiff(ctx context.Context, commitSHA, parentSHA string) (string, error) {
-	output, err := RunGitCommandWithInputAndContext(ctx, "", "diff", parentSHA, commitSHA)
+	output, err := RunGitCommandRawWithContext(ctx, "diff", parentSHA, commitSHA)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit diff: %w", err)
 	}
@@ -265,9 +265,6 @@ func ApplyHunksToCommit(ctx context.Context, hunks []Hunk, commitSHA string, bra
 	}
 
 	date, err := GetCommitDateFromSHA(ctx, commitSHA)
-	if err != nil {
-		return fmt.Errorf("failed to get commit date: %w", err)
-	}
 	if err != nil {
 		return fmt.Errorf("failed to get commit date: %w", err)
 	}

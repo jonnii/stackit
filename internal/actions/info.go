@@ -171,7 +171,11 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	}
 
 	// Apply dimming for merged/closed PRs
-	if prInfo != nil && (prInfo.State == "MERGED" || prInfo.State == "CLOSED") {
+	const (
+		prStateMerged = "MERGED"
+		prStateClosed = "CLOSED"
+	)
+	if prInfo != nil && (prInfo.State == prStateMerged || prInfo.State == prStateClosed) {
 		for i := range outputLines {
 			outputLines[i] = tui.ColorDim(outputLines[i])
 		}
@@ -190,12 +194,18 @@ func getPRTitleLine(prInfo *engine.PrInfo) string {
 		return ""
 	}
 
-	prNumber := tui.ColorPRNumber(*prInfo.Number)
 	state := prInfo.State
 
-	if state == "MERGED" {
+	const (
+		prStateMerged = "MERGED"
+		prStateClosed = "CLOSED"
+	)
+
+	prNumber := tui.ColorPRNumber(*prInfo.Number)
+
+	if state == prStateMerged {
 		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title)
-	} else if state == "CLOSED" {
+	} else if state == prStateClosed {
 		// Strikethrough not easily available, use dim instead
 		return fmt.Sprintf("%s (Abandoned) %s", prNumber, tui.ColorDim(prInfo.Title))
 	} else {

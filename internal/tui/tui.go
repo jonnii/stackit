@@ -75,10 +75,18 @@ func NewSubmitTUIModel(items []SubmitItem, submitFunc func(idx int) tea.Cmd) Sub
 	}
 }
 
+const (
+	statusPending    = "pending"
+	statusSubmitting = "submitting"
+	statusDone       = "done"
+	statusError      = "error"
+	actionUpdate     = "update"
+)
+
 func (m SubmitTUIModel) Init() tea.Cmd {
 	// Start spinner and first submission
 	if len(m.items) > 0 {
-		m.items[0].Status = "submitting"
+		m.items[0].Status = statusSubmitting
 		return tea.Batch(m.spinner.Tick, m.submitFunc(0))
 	}
 	return nil
@@ -100,10 +108,10 @@ func (m SubmitTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SubmitResultMsg:
 		if msg.Idx < len(m.items) {
 			if msg.Error != nil {
-				m.items[msg.Idx].Status = "error"
+				m.items[msg.Idx].Status = statusError
 				m.items[msg.Idx].Error = msg.Error
 			} else {
-				m.items[msg.Idx].Status = "done"
+				m.items[msg.Idx].Status = statusDone
 				m.items[msg.Idx].URL = msg.URL
 			}
 		}
@@ -111,7 +119,7 @@ func (m SubmitTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Move to next item
 		m.currentIdx++
 		if m.currentIdx < len(m.items) {
-			m.items[m.currentIdx].Status = "submitting"
+			m.items[m.currentIdx].Status = statusSubmitting
 			return m, tea.Batch(m.spinner.Tick, m.submitFunc(m.currentIdx))
 		}
 
@@ -140,24 +148,24 @@ func (m SubmitTUIModel) View() string {
 		var status string
 
 		switch item.Status {
-		case "pending":
+		case statusPending:
 			icon = m.styles.dimStyle.Render("○")
 			status = m.styles.dimStyle.Render("pending")
-		case "submitting":
+		case statusSubmitting:
 			icon = m.spinner.View()
 			action := "Creating"
-			if item.Action == "update" {
+			if item.Action == actionUpdate {
 				action = "Updating"
 			}
 			status = m.styles.spinnerStyle.Render(action + "...")
-		case "done":
+		case statusDone:
 			icon = m.styles.doneStyle.Render("✓")
 			action := "created"
-			if item.Action == "update" {
+			if item.Action == actionUpdate {
 				action = "updated"
 			}
 			status = m.styles.doneStyle.Render(action)
-		case "error":
+		case statusError:
 			icon = m.styles.errorStyle.Render("✗")
 			status = m.styles.errorStyle.Render("failed")
 		}
@@ -165,10 +173,10 @@ func (m SubmitTUIModel) View() string {
 		branchName := m.styles.branchStyle.Render(item.BranchName)
 		line := fmt.Sprintf("  %s %s %s", icon, branchName, status)
 
-		if item.Status == "done" && item.URL != "" {
+		if item.Status == statusDone && item.URL != "" {
 			line += " " + m.styles.urlStyle.Render("→ "+item.URL)
 		}
-		if item.Status == "error" && item.Error != nil {
+		if item.Status == statusError && item.Error != nil {
 			line += " " + m.styles.errorStyle.Render(item.Error.Error())
 		}
 
@@ -184,9 +192,9 @@ func (m SubmitTUIModel) View() string {
 		completed := 0
 		failed := 0
 		for _, item := range m.items {
-			if item.Status == "done" {
+			if item.Status == statusDone {
 				completed++
-			} else if item.Status == "error" {
+			} else if item.Status == statusError {
 				failed++
 			}
 		}
@@ -214,7 +222,7 @@ func IsTTY() bool {
 	if err != nil {
 		return false
 	}
-	f.Close()
+	_ = f.Close()
 	return true
 }
 
@@ -229,9 +237,14 @@ func RunSubmitTUI(items []SubmitItem, submitFunc func(idx int) tea.Cmd) error {
 
 // RunSubmitTUISimple runs a simple non-interactive version for non-TTY environments
 func RunSubmitTUISimple(items []SubmitItem, submitFunc func(idx int) (string, error), splog *Splog) error {
+	const (
+		actionUpdate  = "update"
+		actionCreated = "created"
+		actionUpdated = "updated"
+	)
 	for i, item := range items {
 		action := "Creating"
-		if item.Action == "update" {
+		if item.Action == actionUpdate {
 			action = "Updating"
 		}
 		splog.Info("  ⋯ %s %s...", item.BranchName, action)
@@ -242,9 +255,9 @@ func RunSubmitTUISimple(items []SubmitItem, submitFunc func(idx int) (string, er
 			return err
 		}
 
-		actionDone := "created"
-		if item.Action == "update" {
-			actionDone = "updated"
+		actionDone := actionCreated
+		if item.Action == actionUpdate {
+			actionDone = actionUpdated
 		}
 		splog.Info("  ✓ %s %s → %s", item.BranchName, actionDone, url)
 	}

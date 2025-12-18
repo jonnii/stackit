@@ -66,14 +66,14 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 					// Request reviewers - just return success
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusCreated)
-					json.NewEncoder(w).Encode(map[string]interface{}{"message": "Reviewers requested"})
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "Reviewers requested"})
 					return
 				}
 				if r.Method == "DELETE" {
 					// Remove reviewers - just return success
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(map[string]interface{}{"message": "Reviewers removed"})
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "Reviewers removed"})
 					return
 				}
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -171,7 +171,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(pr)
+				_ = json.NewEncoder(w).Encode(pr)
 				return
 			}
 
@@ -227,7 +227,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(pr)
+				_ = json.NewEncoder(w).Encode(pr)
 				return
 			}
 		}
@@ -260,7 +260,7 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(pr)
+				_ = json.NewEncoder(w).Encode(pr)
 				return
 			}
 
@@ -280,13 +280,13 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 						// Return empty list
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						json.NewEncoder(w).Encode([]*github.PullRequest{})
+						_ = json.NewEncoder(w).Encode([]*github.PullRequest{})
 						return
 					}
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode([]*github.PullRequest{pr})
+					_ = json.NewEncoder(w).Encode([]*github.PullRequest{pr})
 					return
 				}
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -80,12 +80,12 @@ func (s *Splog) Info(format string, args ...interface{}) {
 
 // Page writes output that should be paged (for now, just print)
 func (s *Splog) Page(content string) {
-	fmt.Fprint(s.writer, content)
+	_, _ = fmt.Fprint(s.writer, content)
 }
 
 // Newline writes a newline
 func (s *Splog) Newline() {
-	fmt.Fprintln(s.writer)
+	_, _ = fmt.Fprintln(s.writer)
 }
 
 // Warn writes a warning message

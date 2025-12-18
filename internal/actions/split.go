@@ -122,7 +122,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(currentBranch, pathspecs, eng, splog)
+		_, err = splitByFile(currentBranch, pathspecs, eng)
 		if err != nil {
 			return err
 		}
@@ -203,7 +203,7 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*
 	splog.Info("")
 
 	// Get branch points interactively
-	branchPoints, err := getBranchPoints(readableCommits, numChildren, parentBranchName, splog)
+	branchPoints, err := getBranchPoints(readableCommits, numChildren, parentBranchName)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*
 }
 
 // getBranchPoints interactively gets branch points from the user
-func getBranchPoints(readableCommits []string, numChildren int, parentBranchName string, splog *tui.Splog) ([]int, error) {
+func getBranchPoints(readableCommits []string, numChildren int, parentBranchName string) ([]int, error) {
 	// Array where nth index is whether we want a branch pointing to nth commit
 	isBranchPoint := make([]bool, len(readableCommits))
 	isBranchPoint[0] = true // First commit always has a branch
@@ -393,7 +393,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 		// Stage patch interactively
 		if err := git.StagePatch(); err != nil {
 			// If user cancels, restore branch
-			eng.ForceCheckoutBranch(branchToSplit)
+			_ = eng.ForceCheckoutBranch(branchToSplit)
 			return nil, fmt.Errorf("canceled: no new branches created")
 		}
 
@@ -451,7 +451,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 }
 
 // splitByFile splits a branch by extracting files to a new parent branch
-func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
+func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine) (*SplitResult, error) {
 	// Get parent branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -476,26 +476,26 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine, sp
 	args := append([]string{"checkout", branchToSplit, "--"}, pathspecs...)
 	if _, err := git.RunGitCommand(args...); err != nil {
 		// Cleanup: delete the new branch
-		git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(newBranchName)
 		return nil, fmt.Errorf("failed to checkout files: %w", err)
 	}
 
 	// Stage all changes
 	if err := git.StageAll(); err != nil {
-		git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(newBranchName)
 		return nil, fmt.Errorf("failed to stage changes: %w", err)
 	}
 
 	// Commit
 	commitMessage := fmt.Sprintf("Extract %s from %s", strings.Join(pathspecs, ", "), branchToSplit)
 	if err := git.Commit(commitMessage, 0); err != nil {
-		git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(newBranchName)
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Track the new branch
 	if err := eng.TrackBranch(newBranchName, parentBranchName); err != nil {
-		git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(newBranchName)
 		return nil, fmt.Errorf("failed to track branch: %w", err)
 	}
 

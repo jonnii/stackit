@@ -65,26 +65,26 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	hasStaged, err := git.HasStagedChanges()
 	if err != nil {
 		// Clean up branch on error
-		git.DeleteBranch(branchName)
+		_ = git.DeleteBranch(branchName)
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
 
 	// Stage changes based on flags
 	if opts.All {
 		if err := git.StageAll(); err != nil {
-			git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(branchName)
 			return fmt.Errorf("failed to stage all changes: %w", err)
 		}
 		hasStaged = true
 	} else if opts.Update {
 		if err := git.StageTracked(); err != nil {
-			git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(branchName)
 			return fmt.Errorf("failed to stage tracked changes: %w", err)
 		}
 		hasStaged = true
 	} else if opts.Patch {
 		if err := git.StagePatch(); err != nil {
-			git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(branchName)
 			return fmt.Errorf("failed to stage patch: %w", err)
 		}
 		hasStaged = true
@@ -92,7 +92,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		// Check for unstaged changes and prompt if interactive
 		hasUnstaged, err := git.HasUnstagedChanges()
 		if err != nil {
-			git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(branchName)
 			return fmt.Errorf("failed to check unstaged changes: %w", err)
 		}
 
@@ -101,10 +101,10 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 			if isInteractive() {
 				ctx.Splog.Info("You have unstaged changes. Would you like to stage them? (y/n): ")
 				var response string
-				fmt.Scanln(&response)
+				_, _ = fmt.Scanln(&response)
 				if response == "y" || response == "Y" || response == "yes" {
 					if err := git.StageAll(); err != nil {
-						git.DeleteBranch(branchName)
+						_ = git.DeleteBranch(branchName)
 						return fmt.Errorf("failed to stage changes: %w", err)
 					}
 					hasStaged = true
@@ -123,7 +123,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
-			git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(branchName)
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
@@ -181,7 +181,7 @@ func handleInsert(newBranch, currentBranch string, ctx *runtime.Context) error {
 		}
 		ctx.Splog.Info("Enter numbers separated by commas (or 'all' for all): ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 
 		if response == "all" || response == "All" || response == "ALL" {
 			toMove = siblings

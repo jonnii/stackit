@@ -138,7 +138,7 @@ func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, ctx 
 	// TODO: Add interactive prompt when needed
 	for _, branchName := range mergedOrClosedBranches {
 		// Clear PR info to allow creating new PR
-		eng.UpsertPrInfo(branchName, &engine.PrInfo{})
+		_ = eng.UpsertPrInfo(branchName, &engine.PrInfo{})
 	}
 
 	return nil

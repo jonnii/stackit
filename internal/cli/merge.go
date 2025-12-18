@@ -198,7 +198,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	splog.Newline()
 
 	// Recreate plan with selected strategy
-	plan, validation, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
+	plan, _, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 		Strategy: mergeStrategy,
 		Force:    forceFlag,
 	})

@@ -849,9 +849,7 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 	}
 
 	// Delete metadata
-	if err := git.DeleteMetadataRef(branchName); err != nil {
-		// Non-fatal, continue
-	}
+	_ = git.DeleteMetadataRef(branchName)
 
 	// Update children to point to parent
 	for _, child := range children {

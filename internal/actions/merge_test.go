@@ -74,7 +74,7 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create engine (will see branch1 but not track it)
-		eng, err := engine.NewEngine(scene.Dir)
+		_, err = engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
 		// Switch to branch1
@@ -83,7 +83,7 @@ func TestMergeAction(t *testing.T) {
 
 		// Create new engine to get updated current branch
 		// Note: The branch won't be tracked in the new engine since we didn't track it
-		eng, err = engine.NewEngine(scene.Dir)
+		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
 		// Verify branch is not tracked

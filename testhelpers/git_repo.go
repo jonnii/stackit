@@ -171,7 +171,7 @@ func (r *GitRepo) CreateChange(textValue string, prefix string, unstaged bool) e
 	}
 	filePath := filepath.Join(r.Dir, fileName)
 
-	if err := os.WriteFile(filePath, []byte(textValue), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(textValue), 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -212,13 +212,17 @@ func (r *GitRepo) DeleteBranch(name string) error {
 // CreatePrecommitHook creates a pre-commit hook.
 func (r *GitRepo) CreatePrecommitHook(contents string) error {
 	hookDir := filepath.Join(r.Dir, ".git", "hooks")
-	if err := os.MkdirAll(hookDir, 0755); err != nil {
+	if err := os.MkdirAll(hookDir, 0700); err != nil {
 		return fmt.Errorf("failed to create hooks directory: %w", err)
 	}
 
 	hookPath := filepath.Join(hookDir, "pre-commit")
-	if err := os.WriteFile(hookPath, []byte(contents), 0755); err != nil {
+	if err := os.WriteFile(hookPath, []byte(contents), 0600); err != nil {
 		return fmt.Errorf("failed to write hook: %w", err)
+	}
+	// nolint:gosec // Hook must be executable
+	if err := os.Chmod(hookPath, 0700); err != nil {
+		return fmt.Errorf("failed to make hook executable: %w", err)
 	}
 
 	return nil

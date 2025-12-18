@@ -129,23 +129,38 @@ func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url 
 		return
 	}
 
+	const (
+		statusSubmitting = "submitting"
+		statusDone       = "done"
+		statusError      = "error"
+		actionUpdate     = "update"
+	)
+
 	switch status {
-	case "submitting":
-		action := "Creating"
-		if item.Action == "update" {
-			action = "Updating"
+	case statusSubmitting:
+		const (
+			labelCreating = "Creating"
+			labelUpdating = "Updating"
+		)
+		action := labelCreating
+		if item.Action == actionUpdate {
+			action = labelUpdating
 		}
 		u.splog.Info("  ⋯ %s %s...", item.BranchName, action)
 
-	case "done":
+	case statusDone:
 		u.completed++
-		actionDone := "created"
-		if item.Action == "update" {
-			actionDone = "updated"
+		const (
+			actionCreated = "created"
+			actionUpdated = "updated"
+		)
+		actionDone := actionCreated
+		if item.Action == actionUpdate {
+			actionDone = actionUpdated
 		}
 		u.splog.Info("  ✓ %s %s → %s", item.BranchName, actionDone, url)
 
-	case "error":
+	case statusError:
 		u.failed++
 		u.splog.Info("  ✗ %s failed: %v", item.BranchName, err)
 	}
@@ -409,6 +424,12 @@ func (m *ttySubmitModel) View() string {
 	var b strings.Builder
 	b.WriteString("\n")
 
+	const (
+		statusSubmitting = "submitting"
+		statusDone       = "done"
+		statusError      = "error"
+	)
+
 	if m.renderer != nil {
 		// Update annotations based on items
 		for _, item := range m.items {
@@ -424,14 +445,14 @@ func (m *ttySubmitModel) View() string {
 				ann.CustomLabel = m.styles.dimStyle.Render("(skipped: " + item.SkipReason + ")")
 			} else {
 				switch item.Status {
-				case "submitting":
+				case statusSubmitting:
 					ann.CustomLabel = m.styles.spinnerStyle.Render(m.spinner.View() + " submitting...")
-				case "done":
+				case statusDone:
 					ann.CustomLabel = m.styles.doneStyle.Render("✓")
 					if item.URL != "" {
 						ann.CustomLabel += " " + m.styles.urlStyle.Render("→ "+item.URL)
 					}
-				case "error":
+				case statusError:
 					ann.CustomLabel = m.styles.errorStyle.Render("✗")
 					if item.Error != nil {
 						ann.CustomLabel += " " + m.styles.errorStyle.Render(item.Error.Error())
@@ -453,13 +474,21 @@ func (m *ttySubmitModel) View() string {
 			case "pending", "":
 				icon = m.styles.dimStyle.Render("○")
 				status = m.styles.dimStyle.Render("will " + item.Action)
-			case "submitting":
+			case statusSubmitting:
 				icon = m.spinner.View()
-				status = m.styles.spinnerStyle.Render(item.Action + "ing...")
-			case "done":
+				const (
+					labelCreating = "Creating"
+					labelUpdating = "Updating"
+				)
+				action := labelCreating
+				if item.Action == "update" {
+					action = labelUpdating
+				}
+				status = m.styles.spinnerStyle.Render(action + "ing...")
+			case statusDone:
 				icon = m.styles.doneStyle.Render("✓")
 				status = m.styles.doneStyle.Render(item.Action + "ed")
-			case "error":
+			case statusError:
 				icon = m.styles.errorStyle.Render("✗")
 				status = m.styles.errorStyle.Render("failed")
 			}
@@ -490,9 +519,9 @@ func (m *ttySubmitModel) View() string {
 		completed := 0
 		failed := 0
 		for _, item := range m.items {
-			if item.Status == "done" {
+			if item.Status == statusDone {
 				completed++
-			} else if item.Status == "error" {
+			} else if item.Status == statusError {
 				failed++
 			}
 		}

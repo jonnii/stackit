@@ -157,7 +157,7 @@ func runInteractivePatch() error {
 }
 
 // interactiveRebaseAction performs an interactive rebase on the branch's commits
-func interactiveRebaseAction(ctx *runtime.Context, opts ModifyOptions) error {
+func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 

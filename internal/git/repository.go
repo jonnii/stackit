@@ -32,7 +32,7 @@ func OpenRepository(path string) (*Repository, error) {
 		// Try parent directory (for bare repos or submodules)
 		parentGitDir := filepath.Join(filepath.Dir(absPath), ".git")
 		if _, err := os.Stat(parentGitDir); err == nil {
-			gitDir = parentGitDir
+			_ = parentGitDir
 		}
 	}
 

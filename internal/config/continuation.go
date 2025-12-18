@@ -40,7 +40,7 @@ func PersistContinuationState(repoRoot string, state *ContinuationState) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal continuation state: %w", err)
 	}
-	return os.WriteFile(configPath, data, 0644)
+	return os.WriteFile(configPath, data, 0600)
 }
 
 // ClearContinuationState removes the continuation state file

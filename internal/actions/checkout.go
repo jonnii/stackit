@@ -88,7 +88,7 @@ func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (str
 				continue
 			}
 			seenBranches[branchName] = true
-			display := branchName
+			var display string
 			if branchName == currentBranch {
 				display = tui.ColorBranchName(branchName, true)
 				initialIndex = len(choices)
@@ -144,7 +144,7 @@ func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (str
 
 		// Ensure trunk is always included
 		if trunkName != "" && !seenBranches[trunkName] {
-			display := trunkName
+			var display string
 			if trunkName == currentBranch {
 				display = tui.ColorBranchName(trunkName, true)
 				initialIndex = 0
@@ -161,7 +161,7 @@ func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (str
 		// Add all other branches
 		for _, branchName := range allBranches {
 			if !seenBranches[branchName] {
-				display := branchName
+				var display string
 				if branchName == currentBranch {
 					display = tui.ColorBranchName(branchName, true)
 					initialIndex = len(choices)

@@ -35,7 +35,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Check if there are staged changes (before handling flags)
-	hasStaged, err := git.HasStagedChanges()
+	_, err := git.HasStagedChanges()
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -55,7 +55,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Re-check staged changes after flags
-	hasStaged, err = git.HasStagedChanges()
+	hasStaged, err := git.HasStagedChanges()
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}

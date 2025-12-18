@@ -172,7 +172,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		// If branch doesn't exist on remote, that's fine (might be local-only or already merged)
 		if !matchesRemote && prInfo != nil && prInfo.Number != nil {
 			// Get detailed difference information
-			diffInfo := getBranchRemoteDifference(branchName, eng, splog)
+			diffInfo := getBranchRemoteDifference(branchName, splog)
 			if diffInfo != "" {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s differs from remote: %s", branchName, diffInfo))
 			} else {
@@ -235,12 +235,12 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	_ = upstackScope // Reserved for future use
 
 	// 6. Build ordered steps based on strategy
-	steps := []MergePlanStep{}
+	var steps []MergePlanStep
 	if opts.Strategy == MergeStrategyTopDown {
-		steps = buildTopDownSteps(branchesToMerge, currentBranch, upstackBranches, eng)
+		steps = buildTopDownSteps(branchesToMerge, currentBranch, upstackBranches)
 	} else {
 		// Default to bottom-up
-		steps = buildBottomUpSteps(branchesToMerge, currentBranch, upstackBranches, eng)
+		steps = buildBottomUpSteps(branchesToMerge, upstackBranches)
 	}
 
 	plan := &MergePlan{
@@ -257,7 +257,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 }
 
 // buildBottomUpSteps builds steps for bottom-up merge strategy
-func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, currentBranch string, upstackBranches []string, eng engine.Engine) []MergePlanStep {
+func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []string) []MergePlanStep {
 	steps := []MergePlanStep{}
 
 	for i, branchInfo := range branchesToMerge {
@@ -313,7 +313,7 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, currentBranch string,
 }
 
 // buildTopDownSteps builds steps for top-down merge strategy
-func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, upstackBranches []string, eng engine.Engine) []MergePlanStep {
+func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, upstackBranches []string) []MergePlanStep {
 	steps := []MergePlanStep{}
 
 	if len(branchesToMerge) == 0 {
@@ -389,6 +389,12 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 
 // FormatMergePlan formats a merge plan for display
 func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
+	const (
+		iconSuccess = "✓"
+		iconFailure = "✗"
+		iconPending = "⏳"
+		iconWarning = "⚠"
+	)
 	var result string
 
 	result += fmt.Sprintf("Merge Strategy: %s\n", plan.Strategy)
@@ -402,11 +408,11 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 			if branchInfo.BranchName == plan.CurrentBranch {
 				marker = " ← current"
 			}
-			checksIcon := "✓"
+			checksIcon := iconSuccess
 			if branchInfo.ChecksStatus == ChecksFailing {
-				checksIcon = "✗"
+				checksIcon = iconFailure
 			} else if branchInfo.ChecksStatus == ChecksPending {
-				checksIcon = "⏳"
+				checksIcon = iconPending
 			}
 			result += fmt.Sprintf("  %d. %s  PR #%d  %s Checks %s%s\n", i+1, branchInfo.BranchName, branchInfo.PRNumber, checksIcon, branchInfo.ChecksStatus, marker)
 		}
@@ -424,7 +430,7 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 	if len(validation.Errors) > 0 {
 		result += "Errors:\n"
 		for _, err := range validation.Errors {
-			result += fmt.Sprintf("  ✗ %s\n", err)
+			result += fmt.Sprintf("  %s %s\n", iconFailure, err)
 		}
 		result += "\n"
 	}
@@ -432,7 +438,7 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 	if len(validation.Warnings) > 0 {
 		result += "Warnings:\n"
 		for _, warn := range validation.Warnings {
-			result += fmt.Sprintf("  ⚠ %s\n", warn)
+			result += fmt.Sprintf("  %s %s\n", iconWarning, warn)
 		}
 		result += "\n"
 	}
@@ -446,7 +452,7 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 }
 
 // getBranchRemoteDifference returns a detailed description of how a branch differs from remote
-func getBranchRemoteDifference(branchName string, eng engine.Engine, splog *tui.Splog) string {
+func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {
 	// Get local SHA
 	localSha, err := git.GetRevision(branchName)
 	if err != nil {

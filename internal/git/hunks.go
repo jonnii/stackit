@@ -23,7 +23,7 @@ func ParseStagedHunks() ([]Hunk, error) {
 		return nil, fmt.Errorf("failed to get staged diff: %w", err)
 	}
 
-	if strings.TrimSpace(diffOutput) == "" {
+	if diffOutput == "" {
 		return []Hunk{}, nil
 	}
 
@@ -39,6 +39,7 @@ func ParseStagedHunks() ([]Hunk, error) {
 	var hunkLines []string
 
 	for _, line := range lines {
+		line = strings.TrimRight(line, "\r")
 		// Check for file header (starts with "diff --git" or "--- a/" or "+++ b/")
 		if strings.HasPrefix(line, "diff --git") {
 			// Save previous hunk if exists

@@ -457,12 +457,6 @@ func TestAbsorbCommand(t *testing.T) {
 	})
 
 	t.Run("absorb hunks to different branches in stack", func(t *testing.T) {
-		// TODO: This test exposes a bug where absorbing to multiple commits in different
-		// branches fails because the staged diff is consumed after the first absorption.
-		// The implementation needs to capture the staged diff once at the beginning and
-		// reuse it for all commit applications.
-		t.Skip("Known limitation: absorbing to multiple commits in different branches not yet supported")
-
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit

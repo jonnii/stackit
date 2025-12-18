@@ -43,16 +43,16 @@ func RunGitCommand(args ...string) (string, error) {
 func RunGitCommandInDir(dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
 	defer cancel()
-	return runGitCommandInternal(ctx, dir, "", args...)
+	return runGitCommandInternal(ctx, dir, "", true, args...)
 }
 
 // RunGitCommandWithContext executes a git command with the given context and returns the output
 func RunGitCommandWithContext(ctx context.Context, args ...string) (string, error) {
-	return runGitCommandInternal(ctx, workingDir, "", args...)
+	return runGitCommandInternal(ctx, workingDir, "", true, args...)
 }
 
 // runGitCommandInternal is the internal implementation that handles directory and input
-func runGitCommandInternal(ctx context.Context, dir string, input string, args ...string) (string, error) {
+func runGitCommandInternal(ctx context.Context, dir string, input string, trim bool, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -71,7 +71,17 @@ func runGitCommandInternal(ctx context.Context, dir string, input string, args .
 		}
 		return "", errors.NewGitCommandError("git", args, stdout.String(), stderr.String(), err)
 	}
-	return strings.TrimSpace(stdout.String()), nil
+	if trim {
+		return strings.TrimSpace(stdout.String()), nil
+	}
+	return stdout.String(), nil
+}
+
+// RunGitCommandRaw executes a git command and returns the raw output (no trimming)
+func RunGitCommandRaw(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
+	defer cancel()
+	return runGitCommandInternal(ctx, workingDir, "", false, args...)
 }
 
 // RunGitCommandLines executes a git command and returns output as lines
@@ -103,12 +113,12 @@ func RunGitCommandLinesWithContext(ctx context.Context, args ...string) ([]strin
 func RunGitCommandWithInput(input string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
 	defer cancel()
-	return runGitCommandInternal(ctx, workingDir, input, args...)
+	return runGitCommandInternal(ctx, workingDir, input, true, args...)
 }
 
 // RunGitCommandWithInputAndContext executes a git command with input and context, returning the output
 func RunGitCommandWithInputAndContext(ctx context.Context, input string, args ...string) (string, error) {
-	return runGitCommandInternal(ctx, workingDir, input, args...)
+	return runGitCommandInternal(ctx, workingDir, input, true, args...)
 }
 
 // RunGitCommandInteractive executes a git command interactively with stdin/stdout/stderr

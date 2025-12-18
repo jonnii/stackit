@@ -68,8 +68,13 @@ func CommitWithOptions(opts CommitOptions) error {
 }
 
 // GetStagedDiff returns the unified diff of staged changes
-func GetStagedDiff() (string, error) {
-	output, err := RunGitCommand("diff", "--cached")
+func GetStagedDiff(files ...string) (string, error) {
+	args := []string{"diff", "--cached"}
+	if len(files) > 0 {
+		args = append(args, "--")
+		args = append(args, files...)
+	}
+	output, err := RunGitCommandRaw(args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get staged diff: %w", err)
 	}
@@ -77,8 +82,13 @@ func GetStagedDiff() (string, error) {
 }
 
 // GetUnstagedDiff returns the unified diff of unstaged changes
-func GetUnstagedDiff() (string, error) {
-	output, err := RunGitCommand("diff")
+func GetUnstagedDiff(files ...string) (string, error) {
+	args := []string{"diff"}
+	if len(files) > 0 {
+		args = append(args, "--")
+		args = append(args, files...)
+	}
+	output, err := RunGitCommandRaw(args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get unstaged diff: %w", err)
 	}

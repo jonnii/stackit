@@ -121,7 +121,7 @@ func hunkOverlaps(h1, h2 Hunk) bool {
 
 // GetCommitDiff returns the diff for a commit
 func GetCommitDiff(commitSHA, parentSHA string) (string, error) {
-	output, err := RunGitCommand("diff", parentSHA, commitSHA)
+	output, err := RunGitCommandRaw("diff", parentSHA, commitSHA)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit diff: %w", err)
 	}
@@ -154,6 +154,7 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 	var hunkLines []string
 
 	for _, line := range lines {
+		line = strings.TrimRight(line, "\r")
 		// Check for file header
 		if strings.HasPrefix(line, "diff --git") {
 			// Save previous hunk if exists
@@ -282,67 +283,30 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 		hunksByFile[hunk.File] = append(hunksByFile[hunk.File], hunk)
 	}
 
-	// Write patch file with all hunks
-	// Use the original staged diff format which git apply understands
-	stagedDiff, err := GetStagedDiff()
-	if err != nil {
-		// Fallback: construct patch manually
-		var patchContent strings.Builder
-		for file, fileHunks := range hunksByFile {
-			patchContent.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", file, file))
-			patchContent.WriteString(fmt.Sprintf("--- a/%s\n", file))
-			patchContent.WriteString(fmt.Sprintf("+++ b/%s\n", file))
-			for _, hunk := range fileHunks {
-				// hunk.Content already includes the @@ header and lines
-				patchContent.WriteString(hunk.Content)
-				if !strings.HasSuffix(hunk.Content, "\n") {
-					patchContent.WriteString("\n")
-				}
+	// Construct patch manually from hunks
+	// This is more precise than GetStagedDiff() because it only includes
+	// the hunks that were matched to THIS commit.
+	var patchContent strings.Builder
+	for file, fileHunks := range hunksByFile {
+		// We need to provide enough headers for git apply --cached to work.
+		// For a simple hunk application, we need the diff --git, ---, and +++ headers.
+		patchContent.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", file, file))
+		patchContent.WriteString(fmt.Sprintf("--- a/%s\n", file))
+		patchContent.WriteString(fmt.Sprintf("+++ b/%s\n", file))
+		for _, hunk := range fileHunks {
+			// hunk.Content already includes the @@ header and lines
+			patchContent.WriteString(hunk.Content)
+			if !strings.HasSuffix(hunk.Content, "\n") {
+				patchContent.WriteString("\n")
 			}
-		}
-		if err := os.WriteFile(patchFile, []byte(patchContent.String()), 0600); err != nil {
-			return fmt.Errorf("failed to write patch file: %w", err)
-		}
-	} else {
-		// Use the actual staged diff - filter to only include files we care about
-		lines := strings.Split(stagedDiff, "\n")
-		var filteredLines []string
-		var includeFile bool
-		for _, line := range lines {
-			if strings.HasPrefix(line, "diff --git") {
-				// Check if this file is in our hunks
-				includeFile = false
-				for file := range hunksByFile {
-					if strings.Contains(line, file) {
-						includeFile = true
-						break
-					}
-				}
-			}
-			if includeFile {
-				filteredLines = append(filteredLines, line)
-			}
-		}
-		if err := os.WriteFile(patchFile, []byte(strings.Join(filteredLines, "\n")), 0600); err != nil {
-			return fmt.Errorf("failed to write patch file: %w", err)
 		}
 	}
-
-	// Stash all changes (staged and unstaged) before checkout
-	// We'll restore them after we're done
-	stashOutput, stashErr := RunGitCommand("stash", "push", "-u", "-m", fmt.Sprintf("stackit-absorb-temp-%s", commitSHA[:8]))
-	if stashErr != nil {
-		// If stash fails, try to reset hard to clean working directory
-		_, _ = RunGitCommand("reset", "--hard", "HEAD")
-		_, _ = RunGitCommand("clean", "-fd")
+	if err := os.WriteFile(patchFile, []byte(patchContent.String()), 0600); err != nil {
+		return fmt.Errorf("failed to write patch file: %w", err)
 	}
 
 	// Checkout parent commit (detached HEAD)
 	if err := CheckoutDetached(parentSHA); err != nil {
-		// Restore stash if we created one
-		if stashErr == nil && stashOutput != "" {
-			_, _ = RunGitCommand("stash", "pop")
-		}
 		// Restore branch
 		if currentBranch != "" {
 			_ = CheckoutBranch(currentBranch)
@@ -350,58 +314,46 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 		return fmt.Errorf("failed to checkout parent: %w", err)
 	}
 
-	// Clean up stash after we're done (at the end of the function)
+	// Cleanup logic to ensure we always try to get back to original branch
 	defer func() {
-		if stashErr == nil && stashOutput != "" {
-			// Drop the stash we created
-			_, _ = RunGitCommand("stash", "drop", "stash@{0}")
+		// Use git command directly to avoid go-git caching issues
+		nowBranch, _ := RunGitCommand("branch", "--show-current")
+		nowBranch = strings.TrimSpace(nowBranch)
+
+		if nowBranch != currentBranch && currentBranch != "" {
+			// Clean up index/working tree if needed before checkout
+			_, _ = RunGitCommand("reset", "--hard", "HEAD")
+			_, _ = RunGitCommand("checkout", "-f", currentBranch)
 		}
 	}()
 
-	// First, apply the original commit's changes
+	// First, apply the original commit's changes to the index
 	commitDiff, err := GetCommitDiff(commitSHA, parentSHA)
 	if err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to get commit diff: %w", err)
 	}
 
 	// Create temporary file for commit diff
 	commitPatchFile := filepath.Join(tmpDir, "commit.patch")
-
 	if err := os.WriteFile(commitPatchFile, []byte(commitDiff), 0600); err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to write commit patch file: %w", err)
 	}
 
-	// Apply the original commit's changes
+	// Apply the original commit's changes to the index
 	cmd := exec.Command("git", "apply", "--cached", commitPatchFile)
 	cmd.Dir = repoRoot
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to apply commit diff: %w (stderr: %s)", err, stderr.String())
 	}
 
-	// Now apply the hunks patch
+	// Now apply the hunks patch to the index
 	cmd = exec.Command("git", "apply", "--cached", patchFile)
 	cmd.Dir = repoRoot
 	stderr.Reset()
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to apply patch: %w (stderr: %s)", err, stderr.String())
 	}
 
@@ -420,37 +372,18 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	stderr.Reset()
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to create commit: %w (stderr: %s)", err, stderr.String())
 	}
 
 	// Get new commit SHA
 	newCommitSHA, err := RunGitCommand("rev-parse", "HEAD")
 	if err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to get new commit SHA: %w", err)
 	}
 
 	// Update branch to point to new commit
 	if err := UpdateBranchRef(branchName, strings.TrimSpace(newCommitSHA)); err != nil {
-		// Restore branch
-		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
-		}
 		return fmt.Errorf("failed to update branch: %w", err)
-	}
-
-	// Restore original branch
-	if currentBranch != "" {
-		if err := CheckoutBranch(currentBranch); err != nil {
-			return fmt.Errorf("failed to restore branch: %w", err)
-		}
 	}
 
 	return nil

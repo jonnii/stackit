@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // RepoConfig represents the repository configuration
@@ -14,6 +15,7 @@ type RepoConfig struct {
 	Trunk                      *string  `json:"trunk,omitempty"`
 	Trunks                     []string `json:"trunks,omitempty"`
 	IsGithubIntegrationEnabled *bool    `json:"isGithubIntegrationEnabled,omitempty"`
+	BranchNamePattern          *string  `json:"branchNamePattern,omitempty"`
 }
 
 // GetRepoConfig reads the repository configuration
@@ -149,6 +151,45 @@ func SetTrunk(repoRoot string, trunkName string) error {
 		enabled := false
 		config.IsGithubIntegrationEnabled = &enabled
 	}
+
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return os.WriteFile(configPath, configJSON, 0600)
+}
+
+// GetBranchNamePattern returns the branch name pattern from config, or default if not set
+func GetBranchNamePattern(repoRoot string) (string, error) {
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		return "", err
+	}
+
+	if config.BranchNamePattern != nil {
+		return *config.BranchNamePattern, nil
+	}
+
+	// Default pattern
+	return "{username}/{date}/{message}", nil
+}
+
+// SetBranchNamePattern updates the branch name pattern in the config
+func SetBranchNamePattern(repoRoot string, pattern string) error {
+	// Validate that pattern contains {message} placeholder
+	if !strings.Contains(pattern, "{message}") {
+		return fmt.Errorf("branch name pattern must contain {message} placeholder")
+	}
+
+	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
+
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		config = &RepoConfig{}
+	}
+
+	config.BranchNamePattern = &pattern
 
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

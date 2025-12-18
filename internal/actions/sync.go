@@ -1,9 +1,7 @@
 package actions
 
 import (
-	"context"
 	"fmt"
-	"strings"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -22,7 +20,7 @@ type SyncOptions struct {
 func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
-	context := ctx.Context
+	gctx := ctx.Context
 
 	// Handle --all flag (stub for now)
 	if opts.All {
@@ -32,20 +30,20 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Check for uncommitted changes
-	if hasUncommittedChanges(context) {
+	if HasUncommittedChanges(gctx) {
 		return fmt.Errorf("you have uncommitted changes. Please commit or stash them before syncing")
 	}
 
 	// Pull trunk
 	splog.Info("Pulling %s from remote...", tui.ColorBranchName(eng.Trunk(), false))
-	pullResult, err := eng.PullTrunk(context)
+	pullResult, err := eng.PullTrunk(gctx)
 	if err != nil {
 		return fmt.Errorf("failed to pull trunk: %w", err)
 	}
 
 	switch pullResult {
 	case engine.PullDone:
-		rev, _ := eng.GetRevision(context, eng.Trunk())
+		rev, _ := eng.GetRevision(gctx, eng.Trunk())
 		revShort := rev
 		if len(rev) > 7 {
 			revShort = rev[:7]
@@ -67,10 +65,10 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 		}
 
 		if shouldReset {
-			if err := eng.ResetTrunkToRemote(context); err != nil {
+			if err := eng.ResetTrunkToRemote(gctx); err != nil {
 				return fmt.Errorf("failed to reset trunk: %w", err)
 			}
-			rev, _ := eng.GetRevision(context, eng.Trunk())
+			rev, _ := eng.GetRevision(gctx, eng.Trunk())
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -83,9 +81,9 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Sync PR info
 	allBranches := eng.AllBranchNames()
-	repoOwner, repoName, _ := GetRepoInfo(context)
+	repoOwner, repoName, _ := GetRepoInfo(gctx)
 	if repoOwner != "" && repoName != "" {
-		if err := git.SyncPrInfo(context, allBranches, repoOwner, repoName); err != nil {
+		if err := git.SyncPrInfo(gctx, allBranches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}
@@ -118,13 +116,11 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	currentBranch := eng.CurrentBranch()
 	if currentBranch != "" && eng.IsBranchTracked(currentBranch) {
 		// Get full stack (up to trunk)
-		stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveParents: true})
-		// Add current branch and its stack
-		branchesToRestack = append(branchesToRestack, currentBranch)
+		stack := GetFullStack(eng, currentBranch)
+		// Add branches to restack list
 		branchesToRestack = append(branchesToRestack, stack...)
 	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
-		// If on trunk, restack all branches - use GetRelativeStack which returns
-		// branches in topological order (parent before children) via DFS
+		// If on trunk, restack all branches
 		stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveChildren: true})
 		branchesToRestack = append(branchesToRestack, stack...)
 	}
@@ -140,112 +136,14 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Sort branches topologically (parents before children) for correct restack order
-	sortedBranches := sortBranchesTopologically(uniqueBranches, eng)
+	sortedBranches := SortBranchesTopologically(uniqueBranches, eng)
 
 	// Restack branches
 	if len(sortedBranches) > 0 {
-		if err := RestackBranches(context, sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(gctx, sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
 
 	return nil
-}
-
-// sortBranchesTopologically sorts branches so parents come before children.
-// This ensures correct restack order (bottom of stack first).
-func sortBranchesTopologically(branches []string, eng engine.BranchReader) []string {
-	if len(branches) == 0 {
-		return branches
-	}
-
-	// Build a set for quick lookup
-	branchSet := make(map[string]bool)
-	for _, b := range branches {
-		branchSet[b] = true
-	}
-
-	// Calculate depth for each branch (distance from trunk)
-	depths := make(map[string]int)
-	var getDepth func(branch string) int
-	getDepth = func(branch string) int {
-		if depth, ok := depths[branch]; ok {
-			return depth
-		}
-		if eng.IsTrunk(branch) {
-			depths[branch] = 0
-			return 0
-		}
-		parent := eng.GetParent(branch)
-		if parent == "" || eng.IsTrunk(parent) {
-			depths[branch] = 1
-			return 1
-		}
-		depths[branch] = getDepth(parent) + 1
-		return depths[branch]
-	}
-
-	// Calculate depth for all branches
-	for _, branch := range branches {
-		getDepth(branch)
-	}
-
-	// Sort by depth (parents first, then children)
-	result := make([]string, len(branches))
-	copy(result, branches)
-	for i := 0; i < len(result)-1; i++ {
-		for j := i + 1; j < len(result); j++ {
-			if depths[result[i]] > depths[result[j]] {
-				result[i], result[j] = result[j], result[i]
-			}
-		}
-	}
-
-	return result
-}
-
-// hasUncommittedChanges checks if there are uncommitted changes
-func hasUncommittedChanges(ctx context.Context) bool {
-	// Check git status
-	output, err := git.RunGitCommandWithContext(ctx, "status", "--porcelain")
-	if err != nil {
-		return false
-	}
-	return output != ""
-}
-
-// getRepoInfo gets repository owner and name from git remote
-func GetRepoInfo(ctx context.Context) (string, string, error) {
-	// Get remote URL
-	url, err := git.RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
-	if err != nil {
-		return "", "", err
-	}
-
-	// Parse URL (handles both https and ssh formats)
-	url = strings.TrimSuffix(url, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("invalid remote URL")
-	}
-
-	repoName := parts[len(parts)-1]
-	var owner string
-	if strings.Contains(url, "@") {
-		// SSH format: git@github.com:owner/repo
-		sshParts := strings.Split(url, ":")
-		if len(sshParts) < 2 {
-			return "", "", fmt.Errorf("invalid SSH remote URL")
-		}
-		pathParts := strings.Split(sshParts[1], "/")
-		if len(pathParts) < 2 {
-			return "", "", fmt.Errorf("invalid SSH remote URL")
-		}
-		owner = pathParts[0]
-	} else {
-		// HTTPS format: https://github.com/owner/repo
-		owner = parts[len(parts)-2]
-	}
-
-	return owner, repoName, nil
 }

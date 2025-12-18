@@ -32,7 +32,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if err := checkRebaseInProgress(ctx.Context); err != nil {
+	if err := CheckRebaseInProgress(ctx.Context); err != nil {
 		return err
 	}
 
@@ -42,18 +42,13 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
 
-	// Handle --all flag: stage all tracked changes
-	if opts.All {
-		if err := git.StageTracked(ctx.Context); err != nil {
-			return fmt.Errorf("failed to stage all changes: %w", err)
-		}
+	// Handle staging flags
+	stagingOpts := StagingOptions{
+		All:   opts.All,
+		Patch: opts.Patch,
 	}
-
-	// Handle --patch flag: interactive patch staging
-	if opts.Patch {
-		if err := git.StagePatch(ctx.Context); err != nil {
-			return fmt.Errorf("failed to stage patch: %w", err)
-		}
+	if err := StageChanges(ctx.Context, stagingOpts); err != nil {
+		return err
 	}
 
 	// Re-check staged changes after flags
@@ -77,17 +72,21 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get all commits downstack from current branch
 	// We need commits from all branches downstack, not just current branch
-	scope := engine.Scope{
-		RecursiveParents:  true,
-		IncludeCurrent:    true,
-		RecursiveChildren: false,
-	}
-	downstackBranches := eng.GetRelativeStack(currentBranch, scope)
+	downstackBranches := GetDownstack(eng, currentBranch)
+	// Include current branch
+	downstackBranches = append([]string{currentBranch}, downstackBranches...)
 
 	// Get all commit SHAs from downstack branches (newest to oldest)
-	commitSHAs, err := getAllCommitSHAs(ctx.Context, downstackBranches, eng)
-	if err != nil {
-		return fmt.Errorf("failed to get commit SHAs: %w", err)
+	commitSHAs := []string{}
+	for _, branchName := range downstackBranches {
+		commits, err := eng.GetAllCommits(ctx.Context, branchName, engine.CommitFormatSHA)
+		if err != nil {
+			return fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
+		}
+		// Commits are returned oldest to newest, but we want newest to oldest for search
+		for i := len(commits) - 1; i >= 0; i-- {
+			commitSHAs = append(commitSHAs, commits[i])
+		}
 	}
 
 	// Find target commit for each hunk
@@ -158,13 +157,13 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 				idxJ = target.CommitIndex
 			}
 		}
-		return idxI > idxJ // Higher index = older commit
+		return idxI > idxJ // Higher index = older commit search position
 	})
 
 	// Track the oldest modified branch to know where to start restacking from
 	var oldestModifiedBranch string
 	if len(commitList) > 0 {
-		oldestModifiedBranch, _ = findBranchForCommit(ctx.Context, commitList[0], downstackBranches, eng)
+		oldestModifiedBranch, _ = eng.FindBranchForCommit(ctx.Context, commitList[0])
 	}
 
 	// Stash all changes (staged and unstaged) before starting to rewrite commits
@@ -181,9 +180,9 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		hunks := hunksByCommit[commitSHA]
 
 		// Find branch for this commit
-		branchName, err := findBranchForCommit(ctx.Context, commitSHA, downstackBranches, eng)
+		branchName, err := eng.FindBranchForCommit(ctx.Context, commitSHA)
 		if err != nil {
-			return fmt.Errorf("failed to find branch for commit: %w", err)
+			return fmt.Errorf("failed to find branch for commit %s: %w", commitSHA[:8], err)
 		}
 
 		// Apply all hunks for this commit together
@@ -209,20 +208,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Restack all branches above the oldest modified branch
 	if oldestModifiedBranch != "" {
-		scope = engine.Scope{
-			RecursiveParents:  false,
-			IncludeCurrent:    true, // Include the current branch if it's upstack
-			RecursiveChildren: true,
-		}
-		branchesToRestack := eng.GetRelativeStack(oldestModifiedBranch, scope)
-
-		// Filter out the oldestModifiedBranch itself (we only want descendants)
-		var upstackBranches []string
-		for _, b := range branchesToRestack {
-			if b != oldestModifiedBranch {
-				upstackBranches = append(upstackBranches, b)
-			}
-		}
+		upstackBranches := GetUpstack(eng, oldestModifiedBranch)
 
 		if len(upstackBranches) > 0 {
 			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
@@ -234,52 +220,14 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	return nil
 }
 
-// getAllCommitSHAs gets all commit SHAs from a list of branches (newest to oldest)
-func getAllCommitSHAs(ctx context.Context, branches []string, eng engine.Engine) ([]string, error) {
-	var allSHAs []string
-
-	for _, branchName := range branches {
-		// Get commits for this branch
-		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatSHA)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
-		}
-
-		// Commits are returned oldest to newest, but we want newest to oldest
-		for i := len(commits) - 1; i >= 0; i-- {
-			allSHAs = append(allSHAs, commits[i])
-		}
-	}
-
-	return allSHAs, nil
-}
-
-// findBranchForCommit finds which branch a commit belongs to
-func findBranchForCommit(ctx context.Context, commitSHA string, branches []string, eng engine.Engine) (string, error) {
-	for _, branchName := range branches {
-		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatSHA)
-		if err != nil {
-			continue
-		}
-
-		for _, sha := range commits {
-			if sha == commitSHA {
-				return branchName, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("commit %s not found in any branch", commitSHA)
-}
-
 // printDryRunOutput prints what would be absorbed in dry-run mode
-func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
+func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Would absorb the following changes:")
 	splog.Newline()
 
 	// Get commit info for display
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := findBranchForCommit(ctx, commitSHA, branches, eng)
+		branchName, err := eng.FindBranchForCommit(ctx, commitSHA)
 		if err != nil {
 			branchName = "unknown"
 		}
@@ -308,12 +256,12 @@ func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk,
 }
 
 // printAbsorbPlan prints the plan for absorbing changes
-func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
+func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Will absorb the following changes:")
 	splog.Newline()
 
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := findBranchForCommit(ctx, commitSHA, branches, eng)
+		branchName, err := eng.FindBranchForCommit(ctx, commitSHA)
 		if err != nil {
 			branchName = "unknown"
 		}
@@ -331,12 +279,4 @@ func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, u
 			splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}
 	}
-}
-
-// checkRebaseInProgress checks if a rebase is in progress
-func checkRebaseInProgress(ctx context.Context) error {
-	if git.IsRebaseInProgress(ctx) {
-		return fmt.Errorf("cannot absorb during a rebase. Please finish or abort the rebase first")
-	}
-	return nil
 }

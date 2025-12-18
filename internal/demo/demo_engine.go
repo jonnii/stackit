@@ -188,6 +188,11 @@ func (e *DemoEngine) GetRevision(ctx context.Context, branchName string) (string
 	return fmt.Sprintf("abc%x123", len(branchName)), nil
 }
 
+func (e *DemoEngine) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
+	// For demo, just return the current branch
+	return e.CurrentBranch(), nil
+}
+
 func (e *DemoEngine) GetRelativeStackUpstack(branchName string) []string {
 	return e.getDescendants(branchName)
 }

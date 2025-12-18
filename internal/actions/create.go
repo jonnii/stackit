@@ -5,7 +5,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"stackit.dev/stackit/internal/branchutil"
 	"stackit.dev/stackit/internal/git"
@@ -29,9 +28,9 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	splog := ctx.Splog
 
 	// Get current branch
-	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
-		return fmt.Errorf("not on a branch")
+	currentBranch, err := ValidateOnBranch(ctx)
+	if err != nil {
+		return err
 	}
 
 	// Determine branch name
@@ -71,26 +70,24 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Stage changes based on flags
-	if opts.All {
-		if err := git.StageAll(ctx.Context); err != nil {
+	stagingOpts := StagingOptions{
+		All:    opts.All,
+		Update: opts.Update,
+		Patch:  opts.Patch,
+	}
+	if err := StageChanges(ctx.Context, stagingOpts); err != nil {
+		_ = git.DeleteBranch(ctx.Context, branchName)
+		return err
+	}
+
+	// If no staging flags, check for unstaged changes and prompt if interactive
+	if !opts.All && !opts.Update && !opts.Patch {
+		hasStaged, err = git.HasStagedChanges(ctx.Context)
+		if err != nil {
 			_ = git.DeleteBranch(ctx.Context, branchName)
-			return fmt.Errorf("failed to stage all changes: %w", err)
+			return fmt.Errorf("failed to check staged changes: %w", err)
 		}
-		hasStaged = true
-	} else if opts.Update {
-		if err := git.StageTracked(ctx.Context); err != nil {
-			_ = git.DeleteBranch(ctx.Context, branchName)
-			return fmt.Errorf("failed to stage tracked changes: %w", err)
-		}
-		hasStaged = true
-	} else if opts.Patch {
-		if err := git.StagePatch(ctx.Context); err != nil {
-			_ = git.DeleteBranch(ctx.Context, branchName)
-			return fmt.Errorf("failed to stage patch: %w", err)
-		}
-		hasStaged = true
-	} else {
-		// Check for unstaged changes and prompt if interactive
+
 		hasUnstaged, err := git.HasUnstagedChanges(ctx.Context)
 		if err != nil {
 			_ = git.DeleteBranch(ctx.Context, branchName)
@@ -99,7 +96,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 		if hasUnstaged && !hasStaged {
 			// Check if we're in an interactive terminal
-			if isInteractive() {
+			if IsInteractive() {
 				ctx.Splog.Info("You have unstaged changes. Would you like to stage them? (y/n): ")
 				var response string
 				_, _ = fmt.Scanln(&response)
@@ -112,6 +109,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 				}
 			}
 		}
+	} else {
+		hasStaged = true
 	}
 
 	// Commit if there are staged changes
@@ -175,7 +174,7 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 
 	// If multiple children, prompt user to select which to move
 	var toMove []string
-	if len(siblings) > 1 && isInteractive() {
+	if len(siblings) > 1 && IsInteractive() {
 		runtimeCtx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
 		for i, child := range siblings {
 			runtimeCtx.Splog.Info("%d. %s", i+1, child)
@@ -204,22 +203,6 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	}
 
 	return nil
-}
-
-// isInteractive checks if we're in an interactive terminal
-func isInteractive() bool {
-	// Allow forcing non-interactive mode via environment variable
-	// This is useful for tests and CI environments
-	if os.Getenv("STACKIT_NON_INTERACTIVE") != "" {
-		return false
-	}
-
-	// Check if stdin is a terminal
-	fileInfo, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
 // getCommitMessage gets commit message from environment or prompts user

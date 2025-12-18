@@ -1,0 +1,48 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - goconst
+    - unconvert
+    - unparam
+    - gosec
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: stackit.dev/stackit
+  misspell:
+    locale: US
+  gosec:
+    excludes:
+      - G204  # Subprocess launched with variable - common in Git tools
+      - G304  # File path provided as taint input - common in file operations
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+    # Ignore long lines in test files
+    - path: _test\.go
+      linters:
+        - lll

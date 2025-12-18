@@ -13,7 +13,7 @@ import (
 // SubmitUI defines the interface for the full submit workflow display
 type SubmitUI interface {
 	// ShowStack displays the stack to be submitted
-	ShowStack(lines []string)
+	ShowStack(renderer *StackTreeRenderer, rootBranch string)
 
 	// ShowRestack shows restack progress
 	ShowRestackStart()
@@ -35,7 +35,7 @@ type SubmitUI interface {
 	StartSubmitting(items []SubmitItem)
 
 	// UpdateSubmitItem updates status during submission
-	UpdateSubmitItem(idx int, status string, url string, err error)
+	UpdateSubmitItem(branchName string, status string, url string, err error)
 
 	// Complete finalizes and shows summary
 	Complete()
@@ -66,8 +66,9 @@ func NewSimpleSubmitUI(splog *Splog) *SimpleSubmitUI {
 	return &SimpleSubmitUI{splog: splog}
 }
 
-func (u *SimpleSubmitUI) ShowStack(lines []string) {
+func (u *SimpleSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
 	u.splog.Info("Stack to submit:")
+	lines := renderer.RenderStack(rootBranch, TreeRenderOptions{})
 	for _, line := range lines {
 		u.splog.Info("%s", line)
 	}
@@ -113,12 +114,20 @@ func (u *SimpleSubmitUI) StartSubmitting(items []SubmitItem) {
 	u.splog.Info("Submitting...")
 }
 
-func (u *SimpleSubmitUI) UpdateSubmitItem(idx int, status string, url string, err error) {
-	if idx >= len(u.items) {
-		return
+func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url string, err error) {
+	var item *SubmitItem
+	var itemIdx int
+	for i := range u.items {
+		if u.items[i].BranchName == branchName {
+			item = &u.items[i]
+			itemIdx = i
+			break
+		}
 	}
 
-	item := u.items[idx]
+	if item == nil {
+		return
+	}
 
 	switch status {
 	case "submitting":
@@ -141,9 +150,9 @@ func (u *SimpleSubmitUI) UpdateSubmitItem(idx int, status string, url string, er
 		u.splog.Info("  ✗ %s failed: %v", item.BranchName, err)
 	}
 
-	u.items[idx].Status = status
-	u.items[idx].URL = url
-	u.items[idx].Error = err
+	u.items[itemIdx].Status = status
+	u.items[itemIdx].URL = url
+	u.items[itemIdx].Error = err
 }
 
 func (u *SimpleSubmitUI) Complete() {
@@ -162,11 +171,9 @@ func (u *SimpleSubmitUI) Complete() {
 // TTYSubmitUI implements SubmitUI with bubbletea for animated progress
 type TTYSubmitUI struct {
 	splog         *Splog
-	items         []SubmitItem
 	program       *tea.Program
 	model         *ttySubmitModel
 	inSubmitPhase bool
-	hasShownStack bool
 }
 
 // NewTTYSubmitUI creates a new TTY submit UI
@@ -174,67 +181,81 @@ func NewTTYSubmitUI(splog *Splog) *TTYSubmitUI {
 	return &TTYSubmitUI{splog: splog}
 }
 
-func (u *TTYSubmitUI) ShowStack(lines []string) {
-	u.splog.Info("Stack to submit:")
-	for _, line := range lines {
-		u.splog.Info("%s", line)
-	}
-	u.splog.Newline()
-	u.hasShownStack = true
-}
+func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
+	u.model = newTTYSubmitModel(nil)
+	u.model.renderer = renderer
+	u.model.rootBranch = rootBranch
 
-func (u *TTYSubmitUI) ShowRestackStart() {
-	u.splog.Info("Restacking branches before submitting...")
-}
-
-func (u *TTYSubmitUI) ShowRestackComplete() {
-	// Nothing needed
-}
-
-func (u *TTYSubmitUI) ShowPreparing() {
-	// Skip - we'll show this in the bubbletea UI
-}
-
-func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent bool, skip bool, skipReason string) {
-	// Skip - we'll show this in the bubbletea UI during submission
-}
-
-func (u *TTYSubmitUI) ShowNoChanges() {
-	u.splog.Info("All PRs up to date.")
-}
-
-func (u *TTYSubmitUI) ShowDryRunComplete() {
-	u.splog.Info("Dry run complete.")
-}
-
-func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
-	u.items = make([]SubmitItem, len(items))
-	copy(u.items, items)
-	u.inSubmitPhase = true
-
-	// Add a blank line before starting bubbletea if we showed the stack
-	if u.hasShownStack {
-		u.splog.Newline()
-	}
-
-	u.model = newTTYSubmitModel(u.items)
 	u.program = tea.NewProgram(u.model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 
 	// Run program in background
 	go func() {
-		u.program.Run()
+		if _, err := u.program.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error running submit TUI: %v\n", err)
+		}
 	}()
 }
 
-func (u *TTYSubmitUI) UpdateSubmitItem(idx int, status string, url string, err error) {
+func (u *TTYSubmitUI) ShowRestackStart() {
+	if u.program != nil {
+		u.program.Send(globalMessageMsg("Restacking branches..."))
+	}
+}
+
+func (u *TTYSubmitUI) ShowRestackComplete() {
+	if u.program != nil {
+		u.program.Send(globalMessageMsg(""))
+	}
+}
+
+func (u *TTYSubmitUI) ShowPreparing() {
+	if u.program != nil {
+		u.program.Send(globalMessageMsg("Preparing branches..."))
+	}
+}
+
+func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent bool, skip bool, skipReason string) {
+	if u.program != nil {
+		u.program.Send(planUpdateMsg{
+			branchName: branchName,
+			action:     action,
+			isCurrent:  isCurrent,
+			skip:       skip,
+			skipReason: skipReason,
+		})
+	}
+}
+
+func (u *TTYSubmitUI) ShowNoChanges() {
+	if u.program != nil {
+		u.program.Send(globalMessageMsg("All PRs up to date."))
+	}
+}
+
+func (u *TTYSubmitUI) ShowDryRunComplete() {
+	if u.program != nil {
+		u.program.Send(globalMessageMsg("Dry run complete."))
+		u.program.Send(progressCompleteMsg{})
+	}
+}
+
+func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
+	u.inSubmitPhase = true
+	if u.program != nil {
+		u.program.Send(globalMessageMsg("Submitting..."))
+		u.program.Send(startSubmitMsg{items: items})
+	}
+}
+
+func (u *TTYSubmitUI) UpdateSubmitItem(branchName string, status string, url string, err error) {
 	if !u.inSubmitPhase || u.program == nil {
 		return
 	}
 	u.program.Send(progressUpdateMsg{
-		idx:    idx,
-		status: status,
-		url:    url,
-		err:    err,
+		branchName: branchName,
+		status:     status,
+		url:        url,
+		err:        err,
 	})
 }
 
@@ -242,6 +263,7 @@ func (u *TTYSubmitUI) Complete() {
 	if !u.inSubmitPhase || u.program == nil {
 		return
 	}
+	u.program.Send(globalMessageMsg(""))
 	u.program.Send(progressCompleteMsg{})
 	u.program.Wait()
 }
@@ -251,18 +273,35 @@ func (u *TTYSubmitUI) Complete() {
 // ============================================================================
 
 type ttySubmitModel struct {
-	items   []SubmitItem
-	spinner spinner.Model
-	done    bool
-	styles  submitStyles
+	items         []SubmitItem
+	renderer      *StackTreeRenderer
+	rootBranch    string
+	spinner       spinner.Model
+	done          bool
+	styles        submitStyles
+	globalMessage string
 }
 
 type progressUpdateMsg struct {
-	idx    int
-	status string
-	url    string
-	err    error
+	branchName string
+	status     string
+	url        string
+	err        error
 }
+
+type startSubmitMsg struct {
+	items []SubmitItem
+}
+
+type planUpdateMsg struct {
+	branchName string
+	action     string
+	isCurrent  bool
+	skip       bool
+	skipReason string
+}
+
+type globalMessageMsg string
 
 type progressCompleteMsg struct{}
 
@@ -301,11 +340,60 @@ func (m *ttySubmitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
+	case startSubmitMsg:
+		// Update status for items that are in msg.items
+		for _, newItem := range msg.items {
+			found := false
+			for i, item := range m.items {
+				if item.BranchName == newItem.BranchName {
+					m.items[i].Status = newItem.Status
+					m.items[i].Action = newItem.Action
+					m.items[i].PRNumber = newItem.PRNumber
+					found = true
+					break
+				}
+			}
+			if !found {
+				m.items = append(m.items, newItem)
+			}
+		}
+		return m, nil
+
+	case planUpdateMsg:
+		// Update existing item or add new one
+		found := false
+		for i, item := range m.items {
+			if item.BranchName == msg.branchName {
+				m.items[i].Action = msg.action
+				m.items[i].IsSkipped = msg.skip
+				m.items[i].SkipReason = msg.skipReason
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.items = append(m.items, SubmitItem{
+				BranchName: msg.branchName,
+				Action:     msg.action,
+				IsSkipped:  msg.skip,
+				SkipReason: msg.skipReason,
+				Status:     "pending",
+			})
+		}
+		return m, nil
+
+	case globalMessageMsg:
+		m.globalMessage = string(msg)
+		return m, nil
+
 	case progressUpdateMsg:
-		if msg.idx < len(m.items) {
-			m.items[msg.idx].Status = msg.status
-			m.items[msg.idx].URL = msg.url
-			m.items[msg.idx].Error = msg.err
+		for i, item := range m.items {
+			if item.BranchName == msg.branchName {
+				m.items[i].Status = msg.status
+				m.items[i].URL = msg.url
+				m.items[i].Error = msg.err
+				break
+			}
 		}
 		return m, m.spinner.Tick
 
@@ -321,55 +409,82 @@ func (m *ttySubmitModel) View() string {
 	var b strings.Builder
 	b.WriteString("\n")
 
-	for i, item := range m.items {
-		var icon string
-		var status string
+	if m.renderer != nil {
+		// Update annotations based on items
+		for _, item := range m.items {
+			ann := m.renderer.Annotations[item.BranchName]
 
-		switch item.Status {
-		case "pending", "":
-			icon = m.styles.dimStyle.Render("○")
-			// Show the planned action for pending items
-			actionPlan := "will create"
-			if item.Action == "update" {
-				actionPlan = "will update"
+			// Update PR action if known
+			if item.Action != "" {
+				ann.PRAction = item.Action
 			}
-			status = m.styles.dimStyle.Render(actionPlan)
-		case "submitting":
-			icon = m.spinner.View()
-			action := "creating"
-			if item.Action == "update" {
-				action = "updating"
+
+			// Update custom label for status
+			if item.IsSkipped {
+				ann.CustomLabel = m.styles.dimStyle.Render("(skipped: " + item.SkipReason + ")")
+			} else {
+				switch item.Status {
+				case "submitting":
+					ann.CustomLabel = m.styles.spinnerStyle.Render(m.spinner.View() + " submitting...")
+				case "done":
+					ann.CustomLabel = m.styles.doneStyle.Render("✓")
+					if item.URL != "" {
+						ann.CustomLabel += " " + m.styles.urlStyle.Render("→ "+item.URL)
+					}
+				case "error":
+					ann.CustomLabel = m.styles.errorStyle.Render("✗")
+					if item.Error != nil {
+						ann.CustomLabel += " " + m.styles.errorStyle.Render(item.Error.Error())
+					}
+				}
 			}
-			status = m.styles.spinnerStyle.Render(action + "...")
-		case "done":
-			icon = m.styles.doneStyle.Render("✓")
-			action := "created"
-			if item.Action == "update" {
-				action = "updated"
-			}
-			status = m.styles.doneStyle.Render(action)
-		case "error":
-			icon = m.styles.errorStyle.Render("✗")
-			status = m.styles.errorStyle.Render("failed")
+			m.renderer.SetAnnotation(item.BranchName, ann)
 		}
 
-		branchName := m.styles.branchStyle.Render(item.BranchName)
-		line := fmt.Sprintf("  %s %s %s", icon, branchName, status)
+		lines := m.renderer.RenderStack(m.rootBranch, TreeRenderOptions{})
+		b.WriteString(strings.Join(lines, "\n"))
+	} else {
+		// Fallback to list view if no renderer
+		for i, item := range m.items {
+			var icon string
+			var status string
 
-		if item.Status == "done" && item.URL != "" {
-			line += " " + m.styles.urlStyle.Render("→ "+item.URL)
-		}
-		if item.Status == "error" && item.Error != nil {
-			line += " " + m.styles.errorStyle.Render(item.Error.Error())
-		}
+			switch item.Status {
+			case "pending", "":
+				icon = m.styles.dimStyle.Render("○")
+				status = m.styles.dimStyle.Render("will " + item.Action)
+			case "submitting":
+				icon = m.spinner.View()
+				status = m.styles.spinnerStyle.Render(item.Action + "ing...")
+			case "done":
+				icon = m.styles.doneStyle.Render("✓")
+				status = m.styles.doneStyle.Render(item.Action + "ed")
+			case "error":
+				icon = m.styles.errorStyle.Render("✗")
+				status = m.styles.errorStyle.Render("failed")
+			}
 
-		b.WriteString(line)
-		if i < len(m.items)-1 {
-			b.WriteString("\n")
+			branchName := m.styles.branchStyle.Render(item.BranchName)
+			line := fmt.Sprintf("  %s %s %s", icon, branchName, status)
+
+			if item.Status == "done" && item.URL != "" {
+				line += " " + m.styles.urlStyle.Render("→ "+item.URL)
+			}
+			if item.Status == "error" && item.Error != nil {
+				line += " " + m.styles.errorStyle.Render(item.Error.Error())
+			}
+
+			b.WriteString(line)
+			if i < len(m.items)-1 {
+				b.WriteString("\n")
+			}
 		}
 	}
 
-	b.WriteString("\n")
+	if m.globalMessage != "" {
+		b.WriteString("\n\n")
+		b.WriteString(m.styles.dimStyle.Render(m.globalMessage))
+	}
 
 	if m.done {
 		completed := 0
@@ -381,14 +496,14 @@ func (m *ttySubmitModel) View() string {
 				failed++
 			}
 		}
-		b.WriteString("\n")
+		b.WriteString("\n\n")
 		if failed > 0 {
 			b.WriteString(m.styles.errorStyle.Render(fmt.Sprintf("Completed: %d, Failed: %d", completed, failed)))
-		} else {
+		} else if completed > 0 {
 			b.WriteString(m.styles.doneStyle.Render(fmt.Sprintf("✓ All %d PRs submitted successfully", completed)))
 		}
-		b.WriteString("\n")
 	}
 
+	b.WriteString("\n")
 	return b.String()
 }

@@ -31,7 +31,7 @@ type StackTreeRenderer struct {
 	getParent     func(branchName string) string
 	isTrunk       func(branchName string) bool
 	isBranchFixed func(branchName string) bool
-	annotations   map[string]BranchAnnotation
+	Annotations   map[string]BranchAnnotation
 }
 
 // NewStackTreeRenderer creates a new tree renderer
@@ -50,18 +50,18 @@ func NewStackTreeRenderer(
 		getParent:     getParent,
 		isTrunk:       isTrunk,
 		isBranchFixed: isBranchFixed,
-		annotations:   make(map[string]BranchAnnotation),
+		Annotations:   make(map[string]BranchAnnotation),
 	}
 }
 
 // SetAnnotation sets the annotation for a branch
 func (r *StackTreeRenderer) SetAnnotation(branchName string, annotation BranchAnnotation) {
-	r.annotations[branchName] = annotation
+	r.Annotations[branchName] = annotation
 }
 
 // SetAnnotations sets annotations for multiple branches
 func (r *StackTreeRenderer) SetAnnotations(annotations map[string]BranchAnnotation) {
-	r.annotations = annotations
+	r.Annotations = annotations
 }
 
 // RenderStack renders the full stack tree starting from a branch
@@ -277,7 +277,7 @@ func (r *StackTreeRenderer) getBranchLines(args treeRenderArgs) []string {
 		line += "▸" + args.branchName
 
 		// Add annotation
-		annotation := r.annotations[args.branchName]
+		annotation := r.Annotations[args.branchName]
 		line += r.formatAnnotation(annotation, args.noStyleBranchName)
 
 		// Add restack indicator
@@ -342,7 +342,7 @@ func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 	coloredBranchName := ColorBranchName(branchName, isCurrent)
 
 	// Add annotation
-	annotation := r.annotations[branchName]
+	annotation := r.Annotations[branchName]
 	coloredBranchName += r.formatAnnotationColored(annotation)
 
 	// Add restack indicator if needed
@@ -494,7 +494,7 @@ func (r *StackTreeRenderer) RenderBranchList(branches []string) []string {
 
 	for _, branchName := range branches {
 		isCurrent := branchName == r.currentBranch
-		annotation := r.annotations[branchName]
+		annotation := r.Annotations[branchName]
 
 		line := "  "
 		if isCurrent {

@@ -86,8 +86,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Display the stack tree with PR annotations
-	stackLines := getStackTreeLines(branches, opts, eng, currentBranch)
-	ui.ShowStack(stackLines)
+	renderer, rootBranch := getStackTreeRenderer(branches, opts, eng, currentBranch)
+	ui.ShowStack(renderer, rootBranch)
 
 	// Restack if requested
 	if opts.Restack {
@@ -152,11 +152,11 @@ func Action(ctx *runtime.Context, opts Options) error {
 	repoOwner, repoName := githubClient.GetOwnerRepo()
 
 	remote := "origin" // TODO: Get from config
-	for idx, submissionInfo := range submissionInfos {
-		ui.UpdateSubmitItem(idx, "submitting", "", nil)
+	for _, submissionInfo := range submissionInfos {
+		ui.UpdateSubmitItem(submissionInfo.BranchName, "submitting", "", nil)
 
 		if err := pushBranchIfNeeded(submissionInfo, opts, remote, eng); err != nil {
-			ui.UpdateSubmitItem(idx, "error", "", err)
+			ui.UpdateSubmitItem(submissionInfo.BranchName, "error", "", err)
 			ui.Complete()
 			return err
 		}
@@ -169,12 +169,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 
 		if err != nil {
-			ui.UpdateSubmitItem(idx, "error", "", err)
+			ui.UpdateSubmitItem(submissionInfo.BranchName, "error", "", err)
 			ui.Complete()
 			return err
 		}
 
-		ui.UpdateSubmitItem(idx, "done", prURL, nil)
+		ui.UpdateSubmitItem(submissionInfo.BranchName, "done", prURL, nil)
 
 		// Open in browser if requested
 		if opts.View && prURL != "" {
@@ -545,8 +545,8 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 	return nil
 }
 
-// getStackTreeLines returns the stack tree lines with PR annotations
-func getStackTreeLines(branches []string, opts Options, eng engine.Engine, currentBranch string) []string {
+// getStackTreeRenderer returns the stack tree renderer with PR annotations
+func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, currentBranch string) (*tui.StackTreeRenderer, string) {
 	// Create the tree renderer
 	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
@@ -559,8 +559,16 @@ func getStackTreeLines(branches []string, opts Options, eng engine.Engine, curre
 
 	// Build annotations for each branch
 	annotations := make(map[string]tui.BranchAnnotation)
-	for _, branchName := range branches {
+	branchSet := make(map[string]bool)
+	for _, b := range branches {
+		branchSet[b] = true
+	}
+
+	for _, branchName := range eng.AllBranchNames() {
 		prInfo, _ := eng.GetPrInfo(branchName)
+		if prInfo == nil && !branchSet[branchName] {
+			continue
+		}
 
 		annotation := tui.BranchAnnotation{
 			NeedsRestack: !eng.IsBranchFixed(branchName),
@@ -568,9 +576,11 @@ func getStackTreeLines(branches []string, opts Options, eng engine.Engine, curre
 
 		if prInfo != nil && prInfo.Number != nil {
 			annotation.PRNumber = prInfo.Number
-			annotation.PRAction = "update"
+			if branchSet[branchName] {
+				annotation.PRAction = "update"
+			}
 			annotation.IsDraft = prInfo.IsDraft
-		} else {
+		} else if branchSet[branchName] {
 			annotation.PRAction = "create"
 			annotation.IsDraft = opts.Draft
 		}
@@ -579,5 +589,5 @@ func getStackTreeLines(branches []string, opts Options, eng engine.Engine, curre
 	}
 	renderer.SetAnnotations(annotations)
 
-	return renderer.RenderBranchList(branches)
+	return renderer, eng.Trunk()
 }

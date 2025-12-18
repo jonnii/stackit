@@ -51,12 +51,30 @@ clean:
 
 # Format code
 fmt:
-	go fmt ./...
+	@if command -v goimports >/dev/null 2>&1; then \
+		goimports -w .; \
+	elif [ -f "$(go env GOPATH)/bin/goimports" ]; then \
+		"$(go env GOPATH)/bin/goimports" -w .; \
+	else \
+		go fmt ./...; \
+	fi
 
 # Run linter (requires golangci-lint)
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
+	elif [ -f "$(go env GOPATH)/bin/golangci-lint" ]; then \
+		"$(go env GOPATH)/bin/golangci-lint" run; \
+	else \
+		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+	fi
+
+# Run linter and fix issues (if supported by the linter)
+lint-fix:
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --fix; \
+	elif [ -f "$(go env GOPATH)/bin/golangci-lint" ]; then \
+		"$(go env GOPATH)/bin/golangci-lint" run --fix; \
 	else \
 		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi

@@ -131,10 +131,10 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	if !opts.Force {
 		confirmed, err := tui.PromptConfirm("Apply these changes to the commits?", false)
 		if err != nil {
-			return fmt.Errorf("confirmation cancelled: %w", err)
+			return fmt.Errorf("confirmation canceled: %w", err)
 		}
 		if !confirmed {
-			splog.Info("Absorb cancelled")
+			splog.Info("Absorb canceled")
 			return nil
 		}
 	}

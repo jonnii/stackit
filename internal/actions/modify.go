@@ -180,7 +180,7 @@ func interactiveRebaseAction(ctx *runtime.Context, opts ModifyOptions) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Check if rebase is in progress (conflict or user cancelled)
+		// Check if rebase is in progress (conflict or user canceled)
 		if git.IsRebaseInProgress() {
 			return fmt.Errorf("interactive rebase paused. Resolve conflicts and run 'git rebase --continue' or 'git rebase --abort'")
 		}

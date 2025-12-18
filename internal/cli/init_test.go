@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/testhelpers"
 )

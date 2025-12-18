@@ -105,10 +105,10 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 	if opts.Confirm {
 		confirmed, err := tui.PromptConfirm("Proceed with merge?", false)
 		if err != nil {
-			return fmt.Errorf("confirmation cancelled: %w", err)
+			return fmt.Errorf("confirmation canceled: %w", err)
 		}
 		if !confirmed {
-			splog.Info("Merge cancelled")
+			splog.Info("Merge canceled")
 			return nil
 		}
 	}

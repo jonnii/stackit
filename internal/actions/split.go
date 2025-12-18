@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -84,11 +85,11 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 				Options: []string{"By commit - slice up the history of this branch", "By hunk - split into new single-commit branches", "Cancel"},
 			}
 			if err := survey.AskOne(prompt, &styleStr); err != nil {
-				return fmt.Errorf("cancelled")
+				return fmt.Errorf("canceled")
 			}
 
 			if strings.Contains(styleStr, "Cancel") {
-				return fmt.Errorf("cancelled")
+				return fmt.Errorf("canceled")
 			} else if strings.Contains(styleStr, "commit") {
 				style = SplitStyleCommit
 			} else if strings.Contains(styleStr, "hunk") {
@@ -278,7 +279,7 @@ func getBranchPoints(readableCommits []string, numChildren int, parentBranchName
 			Options: choices,
 		}
 		if err := survey.AskOne(prompt, &selected); err != nil {
-			return nil, fmt.Errorf("cancelled")
+			return nil, fmt.Errorf("canceled")
 		}
 
 		if selected == "Confirm" {
@@ -393,7 +394,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 		if err := git.StagePatch(); err != nil {
 			// If user cancels, restore branch
 			eng.ForceCheckoutBranch(branchToSplit)
-			return nil, fmt.Errorf("cancelled: no new branches created")
+			return nil, fmt.Errorf("canceled: no new branches created")
 		}
 
 		// Check if anything was staged
@@ -414,7 +415,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 			Default: true,
 		}
 		if err := survey.AskOne(prompt, &editMessage); err != nil {
-			return nil, fmt.Errorf("cancelled")
+			return nil, fmt.Errorf("canceled")
 		}
 
 		if editMessage {
@@ -426,7 +427,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 				Editor:   getEditor(),
 			}
 			if err := survey.AskOne(prompt, &commitMessage); err != nil {
-				return nil, fmt.Errorf("cancelled")
+				return nil, fmt.Errorf("canceled")
 			}
 		}
 
@@ -544,7 +545,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 		Default: defaultName,
 	}
 	if err := survey.AskOne(prompt, &branchName); err != nil {
-		return "", fmt.Errorf("cancelled")
+		return "", fmt.Errorf("canceled")
 	}
 
 	// Validate name - don't allow names already picked in this split session
@@ -602,7 +603,7 @@ func promptForFiles(branchToSplit string, eng engine.Engine, splog *tui.Splog) (
 		Options: changedFiles,
 	}
 	if err := survey.AskOne(prompt, &selectedFiles); err != nil {
-		return nil, fmt.Errorf("cancelled")
+		return nil, fmt.Errorf("canceled")
 	}
 
 	// Validate that not all files were selected

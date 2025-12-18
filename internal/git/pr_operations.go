@@ -287,7 +287,7 @@ func GetPRChecksStatus(branchName string) (bool, bool, error) {
 
 		if state == "PENDING" || state == "QUEUED" || state == "IN_PROGRESS" {
 			hasPending = true
-		} else if conclusion == "FAILURE" || conclusion == "CANCELLED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+		} else if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
 			hasFailing = true
 		}
 	}

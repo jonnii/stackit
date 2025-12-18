@@ -66,6 +66,10 @@ func (r *GitRunner) Run(ctx context.Context, args ...string) (string, error) {
 
 // runInternal is the internal implementation that handles directory and input
 func (r *GitRunner) runInternal(ctx context.Context, input string, trim bool, args ...string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// If no timeout/deadline is set in the context, add the default one
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc

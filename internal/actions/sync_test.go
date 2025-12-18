@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -69,7 +70,7 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
@@ -110,11 +111,11 @@ func TestSyncAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch2")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch2")
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
@@ -180,15 +181,15 @@ func TestSyncAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track all branches
-		err = eng.TrackBranch("stackA", "main")
+		err = eng.TrackBranch(context.Background(), "stackA", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackA-child1", "stackA")
+		err = eng.TrackBranch(context.Background(), "stackA-child1", "stackA")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackA-child2", "stackA")
+		err = eng.TrackBranch(context.Background(), "stackA-child2", "stackA")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackB", "main")
+		err = eng.TrackBranch(context.Background(), "stackB", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackB-child1", "stackB")
+		err = eng.TrackBranch(context.Background(), "stackB-child1", "stackB")
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)

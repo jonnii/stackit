@@ -118,7 +118,7 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild to see branch2 and branch3
-		err = eng.Rebuild("main")
+		err = eng.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
 		err = eng.TrackBranch(context.Background(), "branch2", "branch1")

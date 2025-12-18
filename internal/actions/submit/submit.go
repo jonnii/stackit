@@ -286,19 +286,6 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 	return submissionInfos, nil
 }
 
-// getRecursiveDescendants gets all descendants of a branch recursively
-func getRecursiveDescendants(eng engine.BranchReader, branchName string) []string {
-	var descendants []string
-	children := eng.GetChildren(branchName)
-	for _, child := range children {
-		descendants = append(descendants, child)
-		// Recursively get descendants of this child
-		childDescendants := getRecursiveDescendants(eng, child)
-		descendants = append(descendants, childDescendants...)
-	}
-	return descendants
-}
-
 // getBranchesToSubmit returns the list of branches to submit based on options
 func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	// Get branch scope
@@ -310,41 +297,23 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 		return nil, fmt.Errorf("not on a branch and no branch specified")
 	}
 
-	// Get stack of branches to submit
-	scope := engine.Scope{RecursiveParents: true}
-	var branches []string
+	var allBranches []string
 	if opts.Stack {
-		// Include descendants
-		allBranches := eng.GetRelativeStack(branchName, scope)
-		// Add the current branch itself
-		allBranches = append(allBranches, branchName)
-		// Also get descendants recursively
-		children := eng.GetChildren(branchName)
-		for _, child := range children {
-			// Add the child itself
-			allBranches = append(allBranches, child)
-			// Get all descendants of this child recursively
-			descendants := getRecursiveDescendants(eng, child)
-			allBranches = append(allBranches, descendants...)
-		}
-		// Remove duplicates and trunk
-		branchSet := make(map[string]bool)
-		for _, b := range allBranches {
-			if !eng.IsTrunk(b) && !branchSet[b] {
-				branches = append(branches, b)
-				branchSet[b] = true
-			}
-		}
+		// Include descendants and ancestors
+		allBranches = actions.GetFullStack(eng, branchName)
 	} else {
 		// Just ancestors (including current branch)
-		allBranches := eng.GetRelativeStack(branchName, scope)
-		// Add the current branch itself
+		allBranches = actions.GetDownstack(eng, branchName)
 		allBranches = append(allBranches, branchName)
-		// Filter out trunk
-		for _, b := range allBranches {
-			if !eng.IsTrunk(b) {
-				branches = append(branches, b)
-			}
+	}
+
+	// Remove duplicates and trunk
+	branches := []string{}
+	branchSet := make(map[string]bool)
+	for _, b := range allBranches {
+		if !eng.IsTrunk(b) && !branchSet[b] {
+			branches = append(branches, b)
+			branchSet[b] = true
 		}
 	}
 

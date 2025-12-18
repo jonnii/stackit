@@ -1,10 +1,8 @@
 package actions
 
 import (
-	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -33,11 +31,11 @@ type ModifyOptions struct {
 func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
-	context := ctx.Context
+	gctx := ctx.Context
 
-	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
-		return fmt.Errorf("not on a branch")
+	currentBranch, err := ValidateOnBranch(ctx)
+	if err != nil {
+		return err
 	}
 
 	// Check if we're on trunk
@@ -51,13 +49,13 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if git.IsRebaseInProgress(context) {
-		return fmt.Errorf("cannot modify while a rebase is in progress. Run 'stackit continue' or 'stackit abort'")
+	if err := CheckRebaseInProgress(gctx); err != nil {
+		return err
 	}
 
 	// Check if branch is empty when amending
 	if !opts.CreateCommit {
-		isEmpty, err := eng.IsBranchEmpty(context, currentBranch)
+		isEmpty, err := eng.IsBranchEmpty(gctx, currentBranch)
 		if err != nil {
 			return fmt.Errorf("failed to check if branch is empty: %w", err)
 		}
@@ -69,13 +67,18 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Stage changes based on flags
-	if err := stageChanges(context, opts); err != nil {
+	stagingOpts := StagingOptions{
+		All:    opts.All,
+		Update: opts.Update,
+		Patch:  opts.Patch,
+	}
+	if err := StageChanges(gctx, stagingOpts); err != nil {
 		return err
 	}
 
 	// Check if there are staged changes (for new commits)
 	if opts.CreateCommit {
-		hasStagedChanges, err := git.HasStagedChanges(context)
+		hasStagedChanges, err := git.HasStagedChanges(gctx)
 		if err != nil {
 			return fmt.Errorf("failed to check staged changes: %w", err)
 		}
@@ -106,16 +109,11 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Restack upstack branches
-	scope := engine.Scope{
-		RecursiveParents:  false,
-		IncludeCurrent:    false,
-		RecursiveChildren: true,
-	}
-	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
+	upstackBranches := GetUpstack(eng, currentBranch)
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}
@@ -123,36 +121,11 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	return nil
 }
 
-// stageChanges stages changes based on the options
-func stageChanges(ctx context.Context, opts ModifyOptions) error {
-	// Handle interactive patch staging first (takes precedence)
-	if opts.Patch && !opts.All {
-		return runInteractivePatch()
-	}
-
-	// Stage all changes (including untracked)
-	if opts.All {
-		return git.StageAll(ctx)
-	}
-
-	// Stage only tracked files
-	if opts.Update {
-		return git.StageTracked(ctx)
-	}
-
-	return nil
-}
-
-// runInteractivePatch runs git add -p interactively
-func runInteractivePatch() error {
-	return git.RunGitCommandInteractive("add", "-p")
-}
-
 // interactiveRebaseAction performs an interactive rebase on the branch's commits
 func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
-	context := ctx.Context
+	gctx := ctx.Context
 
 	currentBranch := eng.CurrentBranch()
 
@@ -169,7 +142,7 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	// Run interactive rebase
 	if err := git.RunGitCommandInteractive("rebase", "-i", parent); err != nil {
 		// Check if rebase is in progress (conflict or user canceled)
-		if git.IsRebaseInProgress(context) {
+		if git.IsRebaseInProgress(gctx) {
 			return fmt.Errorf("interactive rebase paused. Resolve conflicts and run 'git rebase --continue' or 'git rebase --abort'")
 		}
 		// Rebase might have been aborted by user
@@ -179,16 +152,11 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	splog.Info("Interactive rebase completed.")
 
 	// Restack upstack branches
-	scope := engine.Scope{
-		RecursiveParents:  false,
-		IncludeCurrent:    false,
-		RecursiveChildren: true,
-	}
-	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
+	upstackBranches := GetUpstack(eng, currentBranch)
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

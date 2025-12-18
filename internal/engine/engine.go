@@ -27,6 +27,8 @@ type BranchReader interface {
 	GetCommitDate(ctx context.Context, branchName string) (time.Time, error)
 	GetCommitAuthor(ctx context.Context, branchName string) (string, error)
 	GetRevision(ctx context.Context, branchName string) (string, error)
+	GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error)
+	FindBranchForCommit(ctx context.Context, commitSHA string) (string, error)
 
 	// Stack queries
 	GetRelativeStackUpstack(branchName string) []string
@@ -78,9 +80,6 @@ type SquashManager interface {
 // SplitManager provides operations for splitting branches
 // Thread-safe: All methods are safe for concurrent use
 type SplitManager interface {
-	// GetAllCommits returns commits for a branch in various formats
-	GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error)
-
 	// ApplySplitToCommits creates branches at specified commit points
 	ApplySplitToCommits(ctx context.Context, opts ApplySplitOptions) error
 

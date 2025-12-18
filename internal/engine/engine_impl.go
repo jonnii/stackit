@@ -1085,6 +1085,27 @@ func getBoolValue(b *bool) bool {
 	return *b
 }
 
+// FindBranchForCommit finds which branch a commit belongs to
+func (e *engineImpl) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	for _, branchName := range e.branches {
+		commits, err := e.GetAllCommits(ctx, branchName, CommitFormatSHA)
+		if err != nil {
+			continue
+		}
+
+		for _, sha := range commits {
+			if sha == commitSHA {
+				return branchName, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("commit %s not found in any branch", commitSHA)
+}
+
 // GetAllCommits returns commits for a branch in various formats
 func (e *engineImpl) GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error) {
 	e.mu.RLock()

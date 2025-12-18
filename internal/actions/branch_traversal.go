@@ -108,7 +108,7 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 
 // handleMultipleChildren prompts the user to select a branch when multiple children exist
 func handleMultipleChildren(children []string, ctx *runtime.Context) (string, error) {
-	if !isInteractive() {
+	if !IsInteractive() {
 		return "", fmt.Errorf("cannot get top branch in non-interactive mode; multiple choices available:\n%s", formatBranchList(children))
 	}
 

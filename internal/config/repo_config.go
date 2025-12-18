@@ -113,7 +113,7 @@ func AddTrunk(repoRoot string, trunkName string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	return os.WriteFile(configPath, configJSON, 0644)
+	return os.WriteFile(configPath, configJSON, 0600)
 }
 
 // contains checks if a string slice contains a value
@@ -155,5 +155,5 @@ func SetTrunk(repoRoot string, trunkName string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	return os.WriteFile(configPath, configJSON, 0644)
+	return os.WriteFile(configPath, configJSON, 0600)
 }

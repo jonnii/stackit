@@ -64,10 +64,7 @@ func CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error) {
 	}
 
 	// Parse commit diff to get line ranges for the same file
-	commitHunks, err := parseDiffHunks(commitDiff, hunk.File)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse commit diff: %w", err)
-	}
+	commitHunks := parseDiffHunks(commitDiff, hunk.File)
 
 	// If the file doesn't appear in the commit's diff at all, they commute
 	// Check if the file exists in the commit diff by searching for it
@@ -141,9 +138,9 @@ func GetParentCommitSHA(commitSHA string) (string, error) {
 }
 
 // parseDiffHunks parses a diff output and extracts hunks for a specific file
-func parseDiffHunks(diffOutput, targetFile string) ([]Hunk, error) {
+func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 	if strings.TrimSpace(diffOutput) == "" {
-		return []Hunk{}, nil
+		return []Hunk{}
 	}
 
 	var hunks []Hunk
@@ -226,7 +223,7 @@ func parseDiffHunks(diffOutput, targetFile string) ([]Hunk, error) {
 		}
 	}
 
-	return hunks, nil
+	return hunks
 }
 
 // ApplyHunksToCommit applies multiple hunks to a commit by rewriting it
@@ -275,7 +272,7 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	patchFile := filepath.Join(tmpDir, "hunks.patch")
 
@@ -303,7 +300,7 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 				}
 			}
 		}
-		if err := os.WriteFile(patchFile, []byte(patchContent.String()), 0644); err != nil {
+		if err := os.WriteFile(patchFile, []byte(patchContent.String()), 0600); err != nil {
 			return fmt.Errorf("failed to write patch file: %w", err)
 		}
 	} else {
@@ -326,7 +323,7 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 				filteredLines = append(filteredLines, line)
 			}
 		}
-		if err := os.WriteFile(patchFile, []byte(strings.Join(filteredLines, "\n")), 0644); err != nil {
+		if err := os.WriteFile(patchFile, []byte(strings.Join(filteredLines, "\n")), 0600); err != nil {
 			return fmt.Errorf("failed to write patch file: %w", err)
 		}
 	}
@@ -374,7 +371,7 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	// Create temporary file for commit diff
 	commitPatchFile := filepath.Join(tmpDir, "commit.patch")
 
-	if err := os.WriteFile(commitPatchFile, []byte(commitDiff), 0644); err != nil {
+	if err := os.WriteFile(commitPatchFile, []byte(commitDiff), 0600); err != nil {
 		// Restore branch
 		if currentBranch != "" {
 			_ = CheckoutBranch(currentBranch)

@@ -44,7 +44,7 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Initialize Git repository
 	repo, err := NewGitRepo(tmpDir)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create Git repo: %v", err)
 	}
 
@@ -56,31 +56,31 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 
 	// Change to temp directory
 	if err := os.Chdir(tmpDir); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to change directory: %v", err)
 	}
 
 	// Write default config files
 	if err := scene.writeDefaultConfigs(); err != nil {
-		os.Chdir(oldDir)
-		os.RemoveAll(tmpDir)
+		_ = os.Chdir(oldDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
 	// Run custom setup if provided
 	if setup != nil {
 		if err := setup(scene); err != nil {
-			os.Chdir(oldDir)
-			os.RemoveAll(tmpDir)
+			_ = os.Chdir(oldDir)
+			_ = os.RemoveAll(tmpDir)
 			t.Fatalf("Setup failed: %v", err)
 		}
 	}
 
 	// Register cleanup
 	t.Cleanup(func() {
-		os.Chdir(oldDir)
+		_ = os.Chdir(oldDir)
 		if os.Getenv("DEBUG") == "" {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
@@ -103,7 +103,7 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 	// Initialize Git repository
 	repo, err := NewGitRepo(tmpDir)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create Git repo: %v", err)
 	}
 
@@ -114,14 +114,14 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 
 	// Write default config files
 	if err := scene.writeDefaultConfigs(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
 	// Run custom setup if provided
 	if setup != nil {
 		if err := setup(scene); err != nil {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir)
 			t.Fatalf("Setup failed: %v", err)
 		}
 	}
@@ -129,7 +129,7 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 	// Register cleanup
 	t.Cleanup(func() {
 		if os.Getenv("DEBUG") == "" {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
@@ -145,7 +145,7 @@ func (s *Scene) writeDefaultConfigs() error {
   "isGithubIntegrationEnabled": false
 }
 `
-	if err := os.WriteFile(repoConfigPath, []byte(repoConfig), 0644); err != nil {
+	if err := os.WriteFile(repoConfigPath, []byte(repoConfig), 0600); err != nil {
 		return err
 	}
 
@@ -155,13 +155,13 @@ func (s *Scene) writeDefaultConfigs() error {
   "tips": false
 }
 `
-	if err := os.WriteFile(userConfigPath, []byte(userConfig), 0644); err != nil {
+	if err := os.WriteFile(userConfigPath, []byte(userConfig), 0600); err != nil {
 		return err
 	}
 
 	// Set environment variable for user config path
-	os.Setenv("STACKIT_USER_CONFIG_PATH", userConfigPath)
-	os.Setenv("STACKIT_PROFILE", "")
+	_ = os.Setenv("STACKIT_USER_CONFIG_PATH", userConfigPath)
+	_ = os.Setenv("STACKIT_PROFILE", "")
 
 	return nil
 }

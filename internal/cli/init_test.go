@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/testhelpers"
 )
@@ -27,7 +28,7 @@ func TestInitCommand(t *testing.T) {
 
 		// Remove existing config to test fresh init
 		configPath := filepath.Join(scene.Dir, ".git", ".stackit_config")
-		err = os.Remove(configPath)
+		_ = os.Remove(configPath)
 		// Ignore error if file doesn't exist
 
 		// Run init command

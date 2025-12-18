@@ -113,6 +113,6 @@ func parseInt(s string) int {
 		return 0
 	}
 	var result int
-	fmt.Sscanf(s, "%d", &result)
+	_, _ = fmt.Sscanf(s, "%d", &result)
 	return result
 }

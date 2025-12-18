@@ -126,9 +126,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		return nil
 	}
 
-	if opts.Confirm {
-		// TODO: Add interactive confirmation prompt
-	}
+	// TODO: Add interactive confirmation prompt if opts.Confirm is set
 
 	// Build progress items
 	progressItems := make([]tui.SubmitItem, len(submissionInfos))
@@ -162,8 +160,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 
 		var prURL string
-		if submissionInfo.Action == "create" {
-			prURL, err = createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
+		const (
+			actionCreate = "create"
+			actionUpdate = "update"
+		)
+		if submissionInfo.Action == actionCreate {
+			prURL, err = createPullRequestQuiet(submissionInfo, eng, githubCtx, githubClient, repoOwner, repoName)
 		} else {
 			prURL, err = updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 		}
@@ -185,9 +187,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Update PR body footers silently
-	if err := updatePRFootersQuiet(branches, eng, githubCtx, githubClient, repoOwner, repoName); err != nil {
-		splog.Debug("Failed to update PR footers: %v", err)
-	}
+	updatePRFootersQuiet(branches, eng, githubCtx, githubClient, repoOwner, repoName)
 
 	ui.Complete()
 
@@ -203,10 +203,14 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 		prInfo, _ := eng.GetPrInfo(branchName)
 
 		// Determine action
-		action := "create"
+		const (
+			actionCreate = "create"
+			actionUpdate = "update"
+		)
+		action := actionCreate
 		prNumber := (*int)(nil)
 		if prInfo != nil && prInfo.Number != nil {
-			action = "update"
+			action = actionUpdate
 			prNumber = prInfo.Number
 		}
 
@@ -371,23 +375,8 @@ func pushBranchIfNeeded(submissionInfo Info, opts Options, remote string, eng en
 	return nil
 }
 
-// createPullRequest creates a new pull request
-func createPullRequest(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
-	prURL, err := createPullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
-	if err != nil {
-		return "", err
-	}
-
-	splog.Info("%s: %s (%s)",
-		tui.ColorBranchName(submissionInfo.BranchName, true),
-		prURL,
-		tui.ColorDim("created"))
-
-	return prURL, nil
-}
-
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(submissionInfo Info, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	createOpts := git.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -405,7 +394,7 @@ func createPullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 	// Update PR info
 	prNumber := pr.Number
 	prURL := pr.HTMLURL
-	eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
 		Number:  &prNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -414,21 +403,6 @@ func createPullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 		Base:    submissionInfo.Base,
 		URL:     prURL,
 	})
-
-	return prURL, nil
-}
-
-// updatePullRequest updates an existing pull request
-func updatePullRequest(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) (string, error) {
-	prURL, err := updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
-	if err != nil {
-		return "", err
-	}
-
-	splog.Info("%s: %s (%s)",
-		tui.ColorBranchName(submissionInfo.BranchName, true),
-		prURL,
-		tui.ColorDim("updated"))
 
 	return prURL, nil
 }
@@ -475,7 +449,7 @@ func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 		}
 	}
 
-	eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
 		Number:  submissionInfo.PRNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -488,42 +462,8 @@ func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 	return prURL, nil
 }
 
-// updatePRFooters updates PR body footers with dependency trees
-func updatePRFooters(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string, splog *tui.Splog) error {
-	splog.Info("Updating dependency trees in PR bodies...")
-	for _, branchName := range branches {
-		prInfo, err := eng.GetPrInfo(branchName)
-		if err != nil || prInfo == nil || prInfo.Number == nil {
-			continue
-		}
-
-		footer := actions.CreatePRBodyFooter(branchName, eng)
-		updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
-
-		if updatedBody != prInfo.Body {
-			updateOpts := git.UpdatePROptions{
-				Body: &updatedBody,
-			}
-			if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
-				splog.Debug("Failed to update PR footer for %s: %v", branchName, err)
-				continue
-			}
-
-			prURL := ""
-			if prInfo.URL != "" {
-				prURL = prInfo.URL
-			}
-			splog.Info("%s: %s (%s)",
-				tui.ColorBranchName(branchName, true),
-				prURL,
-				tui.ColorDim("updated"))
-		}
-	}
-	return nil
-}
-
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) error {
+func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) {
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {
@@ -542,7 +482,6 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 			}
 		}
 	}
-	return nil
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
@@ -574,14 +513,17 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 			NeedsRestack: !eng.IsBranchFixed(branchName),
 		}
 
+		const actionUpdate = "update"
+		const actionCreate = "create"
+
 		if prInfo != nil && prInfo.Number != nil {
 			annotation.PRNumber = prInfo.Number
 			if branchSet[branchName] {
-				annotation.PRAction = "update"
+				annotation.PRAction = actionUpdate
 			}
 			annotation.IsDraft = prInfo.IsDraft
 		} else if branchSet[branchName] {
-			annotation.PRAction = "create"
+			annotation.PRAction = actionCreate
 			annotation.IsDraft = opts.Draft
 		}
 

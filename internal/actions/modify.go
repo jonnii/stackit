@@ -157,7 +157,7 @@ func runInteractivePatch() error {
 }
 
 // interactiveRebaseAction performs an interactive rebase on the branch's commits
-func interactiveRebaseAction(ctx *runtime.Context, opts ModifyOptions) error {
+func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
@@ -180,7 +180,7 @@ func interactiveRebaseAction(ctx *runtime.Context, opts ModifyOptions) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Check if rebase is in progress (conflict or user cancelled)
+		// Check if rebase is in progress (conflict or user canceled)
 		if git.IsRebaseInProgress() {
 			return fmt.Errorf("interactive rebase paused. Resolve conflicts and run 'git rebase --continue' or 'git rebase --abort'")
 		}

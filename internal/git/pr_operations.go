@@ -57,14 +57,10 @@ func CreatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 
 	// Add reviewers if specified
 	if len(opts.Reviewers) > 0 || len(opts.TeamReviewers) > 0 {
-		_, _, err = client.PullRequests.RequestReviewers(ctx, owner, repo, *createdPR.Number, github.ReviewersRequest{
+		_, _, _ = client.PullRequests.RequestReviewers(ctx, owner, repo, *createdPR.Number, github.ReviewersRequest{
 			Reviewers:     opts.Reviewers,
 			TeamReviewers: opts.TeamReviewers,
 		})
-		if err != nil {
-			// Non-fatal, log but continue
-			// We could return an error here, but for now we'll just continue
-		}
 	}
 
 	return createdPR, nil
@@ -119,13 +115,10 @@ func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 
 	// Update reviewers if specified
 	if len(opts.Reviewers) > 0 || len(opts.TeamReviewers) > 0 {
-		_, _, err = client.PullRequests.RequestReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
+		_, _, _ = client.PullRequests.RequestReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
 			Reviewers:     opts.Reviewers,
 			TeamReviewers: opts.TeamReviewers,
 		})
-		if err != nil {
-			// Non-fatal, log but continue
-		}
 	}
 
 	// Rerequest review if specified
@@ -143,16 +136,14 @@ func UpdatePullRequest(ctx context.Context, client *github.Client, owner, repo s
 			}
 			if len(reviewers) > 0 || len(teamReviewers) > 0 {
 				// Remove and re-add reviewers
-				_, err = client.PullRequests.RemoveReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
+				_, _ = client.PullRequests.RemoveReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
 					Reviewers:     reviewers,
 					TeamReviewers: teamReviewers,
 				})
-				if err == nil {
-					_, _, err = client.PullRequests.RequestReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
-						Reviewers:     reviewers,
-						TeamReviewers: teamReviewers,
-					})
-				}
+				_, _, _ = client.PullRequests.RequestReviewers(ctx, owner, repo, prNumber, github.ReviewersRequest{
+					Reviewers:     reviewers,
+					TeamReviewers: teamReviewers,
+				})
 			}
 		}
 	}
@@ -287,7 +278,7 @@ func GetPRChecksStatus(branchName string) (bool, bool, error) {
 
 		if state == "PENDING" || state == "QUEUED" || state == "IN_PROGRESS" {
 			hasPending = true
-		} else if conclusion == "FAILURE" || conclusion == "CANCELLED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+		} else if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
 			hasFailing = true
 		}
 	}
@@ -362,7 +353,7 @@ func updatePRDraftStatus(ctx context.Context, pullRequestID string, isDraft bool
 	if err != nil {
 		return fmt.Errorf("failed to execute GraphQL request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)

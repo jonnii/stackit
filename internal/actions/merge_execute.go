@@ -94,7 +94,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 }
 
 // executeStep executes a single step
-func executeStep(step MergePlanStep, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 

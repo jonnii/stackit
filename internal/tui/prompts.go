@@ -43,7 +43,7 @@ func (m textInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.done = true
 			return m, tea.Quit
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("cancelled")
+			m.err = fmt.Errorf("canceled")
 			m.done = true
 			return m, tea.Quit
 		}
@@ -81,7 +81,7 @@ func (m confirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.done = true
 			return m, tea.Quit
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("cancelled")
+			m.err = fmt.Errorf("canceled")
 			m.done = true
 			return m, tea.Quit
 		case tea.KeyRunes:
@@ -204,7 +204,7 @@ func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("cancelled")
+			m.err = fmt.Errorf("canceled")
 			m.done = true
 			return m, tea.Quit
 		case tea.KeyUp, tea.KeyShiftTab:
@@ -318,7 +318,7 @@ func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("cancelled")
+			m.err = fmt.Errorf("canceled")
 			m.done = true
 			return m, tea.Quit
 		case tea.KeyUp:

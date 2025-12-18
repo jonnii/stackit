@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 )

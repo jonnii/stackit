@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -110,10 +111,7 @@ func TestLogCommand(t *testing.T) {
 			t.Run(cmdStr, func(t *testing.T) {
 				args := append([]string{}, cmdStr)
 				// If cmdStr has a space, split it
-				if len(args) == 1 {
-					// handle "log short" as ["log", "short"]
-					// actually exec.Command handles it if we pass them as separate args
-				}
+				_ = args
 
 				var cmd *exec.Cmd
 				if len(cmdStr) > 3 && cmdStr[:3] == "log" {

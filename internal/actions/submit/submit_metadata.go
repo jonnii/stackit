@@ -65,17 +65,17 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *run
 	}
 
 	// Use editor for body editing
-	return editPRBodyInEditor(body, ctx)
+	return editPRBodyInEditor(body)
 }
 
 // editPRBodyInEditor opens an editor to edit the PR body
-func editPRBodyInEditor(initialBody string, ctx *runtime.Context) (string, error) {
+func editPRBodyInEditor(initialBody string) (string, error) {
 	// Create temporary file
 	tmpFile, err := os.CreateTemp("", "stackit-pr-description-*.md")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	// Write initial body
 	if _, err := tmpFile.WriteString(initialBody); err != nil {

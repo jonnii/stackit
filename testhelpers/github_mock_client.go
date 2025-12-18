@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/go-github/v62/github"
+
 	"stackit.dev/stackit/internal/git"
 )
 

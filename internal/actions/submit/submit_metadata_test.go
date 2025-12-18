@@ -5,10 +5,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/internal/actions/submit"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
+)
+
+const (
+	featureBranch = "feature"
 )
 
 func TestPreparePRMetadata_DraftStatus(t *testing.T) {
@@ -18,7 +23,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		opts := submit.MetadataOptions{
 			Draft: true,
@@ -35,7 +40,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		opts := submit.MetadataOptions{
 			Publish: true,
@@ -52,7 +57,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		opts := submit.MetadataOptions{
 			// No draft or publish flag - should default to published
@@ -69,7 +74,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		// Create existing PR info with draft status
 		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
@@ -106,7 +111,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		// Create existing PR info with non-draft status
 		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
@@ -131,7 +136,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		// Create existing PR info with draft status
 		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
@@ -162,7 +167,7 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
-		branchName := "feature"
+		branchName := featureBranch
 
 		// Create a commit with a subject
 		err = scene.Repo.CreateAndCheckoutBranch(branchName)

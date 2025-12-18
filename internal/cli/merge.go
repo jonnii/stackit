@@ -184,7 +184,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	selectedStrategy, err := tui.PromptSelect("Select merge strategy:", strategyOptions, 0)
 	if err != nil {
-		return fmt.Errorf("strategy selection cancelled: %w", err)
+		return fmt.Errorf("strategy selection canceled: %w", err)
 	}
 
 	var mergeStrategy actions.MergeStrategy
@@ -198,7 +198,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	splog.Newline()
 
 	// Recreate plan with selected strategy
-	plan, validation, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
+	plan, _, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
 		Strategy: mergeStrategy,
 		Force:    forceFlag,
 	})
@@ -223,10 +223,10 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	// Prompt for confirmation
 	confirmed, err := tui.PromptConfirm("Proceed with merge?", false)
 	if err != nil {
-		return fmt.Errorf("confirmation cancelled: %w", err)
+		return fmt.Errorf("confirmation canceled: %w", err)
 	}
 	if !confirmed {
-		splog.Info("Merge cancelled")
+		splog.Info("Merge canceled")
 		return nil
 	}
 

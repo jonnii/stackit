@@ -41,7 +41,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 		}
 
 		// Check if should delete
-		shouldDelete, _ := shouldDeleteBranch(branchName, eng, opts.Force, splog)
+		shouldDelete, _ := shouldDeleteBranch(branchName, eng, opts.Force)
 		if shouldDelete {
 			children := eng.GetChildren(branchName)
 			// Add children to process (DFS)
@@ -138,14 +138,18 @@ func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool
 }
 
 // shouldDeleteBranch checks if a branch should be deleted
-func shouldDeleteBranch(branchName string, eng engine.Engine, force bool, splog *tui.Splog) (bool, string) {
+func shouldDeleteBranch(branchName string, eng engine.Engine, force bool) (bool, string) {
 	// Check PR info
 	prInfo, err := eng.GetPrInfo(branchName)
 	if err == nil && prInfo != nil {
-		if prInfo.State == "CLOSED" {
+		const (
+			prStateClosed = "CLOSED"
+			prStateMerged = "MERGED"
+		)
+		if prInfo.State == prStateClosed {
 			return true, fmt.Sprintf("%s is closed on GitHub", branchName)
 		}
-		if prInfo.State == "MERGED" {
+		if prInfo.State == prStateMerged {
 			base := prInfo.Base
 			if base == "" {
 				base = eng.Trunk()

@@ -2,7 +2,6 @@ package demo
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
@@ -19,7 +18,9 @@ const (
 
 // simulateDelay adds a random delay around the base duration
 func simulateDelay(base time.Duration) {
-	jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+	// Use a fixed jitter for demo to avoid weak random number generator warnings
+	// and because true randomness isn't critical for demo simulation
+	jitter := time.Duration(base.Nanoseconds()%100) * time.Millisecond
 	time.Sleep(base + jitter)
 }
 

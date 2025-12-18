@@ -142,7 +142,7 @@ func (r *StackTreeRenderer) getUpstackExclusiveLines(args treeRenderArgs) []stri
 			childSteps = &nextStep
 		}
 
-		childIndent := args.indentLevel
+		var childIndent int
 		if args.reverse {
 			childIndent = args.indentLevel + (numChildren - i - 1)
 		} else {
@@ -368,7 +368,7 @@ func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 	return result
 }
 
-func (r *StackTreeRenderer) formatAnnotation(annotation BranchAnnotation, noStyle bool) string {
+func (r *StackTreeRenderer) formatAnnotation(annotation BranchAnnotation, _ bool) string {
 	var parts []string
 
 	if annotation.PRNumber != nil {

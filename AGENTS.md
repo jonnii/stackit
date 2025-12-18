@@ -3,8 +3,7 @@
 ## Project Overview
 
 Stackit is a Go-based CLI tool for managing stacked changes in Git repositories. The project uses:
--
- **Go 1.24.0** (see `go.mod`)
+- **Go 1.22** (see `go.mod`)
 - **Cobra** for CLI command structure
 - **Just** (justfile) for task automation
 - Standard Go testing with custom test helpers

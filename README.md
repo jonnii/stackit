@@ -27,7 +27,7 @@ Stacked changes (or stacked diffs) are a workflow where you break large features
 
 ### From Source
 
-Requires Go 1.25+:
+Requires Go 1.22+:
 
 ```bash
 git clone https://github.com/jonnii/stackit
@@ -250,7 +250,7 @@ stackit abort
 
 - Git 2.0+
 - GitHub CLI (`gh`) for PR operations
-- Go 1.25+ (for building from source)
+- Go 1.22+ (for building from source)
 
 ## Development
 

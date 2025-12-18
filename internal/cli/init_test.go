@@ -113,6 +113,19 @@ func TestInitCommand(t *testing.T) {
 		require.NotNil(t, cfg.Trunk)
 		require.Equal(t, "main", *cfg.Trunk)
 	})
+
+	t.Run("fails when not in git repository", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+
+		// Run init command
+		cmd := exec.Command(binaryPath, "init", "--no-interactive")
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+
+		require.Error(t, err, "init should fail when not in git repository")
+		require.Contains(t, string(output), "not a git repository")
+	})
 }
 
 // readRepoConfig reads and parses the repository config file

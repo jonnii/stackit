@@ -468,4 +468,123 @@ func TestCreateCommand(t *testing.T) {
 		require.NoError(t, err, "log command failed after auto-init: %s", string(output))
 		require.Contains(t, string(output), "feature")
 	})
+
+	t.Run("create uses branch name pattern from config", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Set branch name pattern to just {message} for deterministic testing
+		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{message}")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch from commit message
+		cmd = exec.Command(binaryPath, "create", "-m", "Add new feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create command failed: %s", string(output))
+
+		// Verify branch was created with expected name (just the message, no prefix)
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "Add-new-feature", currentBranch)
+	})
+
+	t.Run("create uses default pattern when none configured", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch from commit message (should use default pattern)
+		cmd = exec.Command(binaryPath, "create", "-m", "Add new feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create command failed: %s", string(output))
+
+		// Verify branch was created with default pattern (username/date/message)
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		// Should contain username, date, and message parts
+		require.Contains(t, currentBranch, "Add-new-feature")
+		// Should have slashes (from pattern)
+		require.Contains(t, currentBranch, "/")
+		// Should have Test User (from git config in test setup)
+		require.Contains(t, currentBranch, "Test-User")
+	})
+
+	t.Run("config get returns branch name pattern", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Set a custom pattern
+		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{username}/{date}/{message}")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Get the pattern back
+		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+		require.Equal(t, "{username}/{date}/{message}\n", string(output))
+	})
+
+	t.Run("config set rejects pattern without message placeholder", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Try to set a pattern without {message} (should fail)
+		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{username}/{date}")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.Error(t, err, "config set should fail without {message} placeholder")
+		require.Contains(t, string(output), "must contain {message}")
+	})
 }

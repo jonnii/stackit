@@ -234,3 +234,105 @@ func TestGenerateBranchNameFromMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessBranchNamePattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pattern  string
+		username string
+		date     string
+		message  string
+		expected string
+	}{
+		{
+			name:     "default pattern with all placeholders",
+			pattern:  "{username}/{date}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add new feature",
+			expected: "jonnii/251218/Add-new-feature",
+		},
+		{
+			name:     "pattern with only message",
+			pattern:  "{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add new feature",
+			expected: "Add-new-feature",
+		},
+		{
+			name:     "pattern with username and message",
+			pattern:  "{username}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add new feature",
+			expected: "jonnii/Add-new-feature",
+		},
+		{
+			name:     "pattern with date and message",
+			pattern:  "{date}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add new feature",
+			expected: "251218/Add-new-feature",
+		},
+		{
+			name:     "empty pattern uses message only",
+			pattern:  "",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add new feature",
+			expected: "Add-new-feature",
+		},
+		{
+			name:     "pattern with special characters in username",
+			pattern:  "{username}/{date}/{message}",
+			username: "john doe",
+			date:     "251218",
+			message:  "Add feature",
+			expected: "john-doe/251218/Add-feature",
+		},
+		{
+			name:     "pattern with conventional commit prefix in message",
+			pattern:  "{username}/{date}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "feat: add new feature",
+			expected: "jonnii/251218/add-new-feature",
+		},
+		{
+			name:     "pattern with multiple slashes",
+			pattern:  "{username}/dev/{date}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "Add feature",
+			expected: "jonnii/dev/251218/Add-feature",
+		},
+		{
+			name:     "pattern with empty username",
+			pattern:  "{username}/{date}/{message}",
+			username: "",
+			date:     "251218",
+			message:  "Add feature",
+			expected: "/251218/Add-feature",
+		},
+		{
+			name:     "pattern with empty message",
+			pattern:  "{username}/{date}/{message}",
+			username: "jonnii",
+			date:     "251218",
+			message:  "",
+			expected: "jonnii/251218",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := ProcessBranchNamePattern(tt.pattern, tt.username, tt.date, tt.message)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}

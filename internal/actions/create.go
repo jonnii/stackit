@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/branchutil"
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -39,7 +40,22 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		if opts.Message == "" {
 			return fmt.Errorf("must specify either a branch name or commit message")
 		}
-		branchName = branchutil.GenerateBranchNameFromMessage(opts.Message)
+		// Get pattern from config
+		pattern, err := config.GetBranchNamePattern(ctx.RepoRoot)
+		if err != nil {
+			return fmt.Errorf("failed to get branch name pattern: %w", err)
+		}
+
+		// Get username and date for pattern processing
+		username, err := git.GetUserName(ctx.Context)
+		if err != nil {
+			// If we can't get username, use empty string (will be sanitized)
+			username = ""
+		}
+		date := git.GetCurrentDate()
+
+		// Process the pattern
+		branchName = branchutil.ProcessBranchNamePattern(pattern, username, date, opts.Message)
 		if branchName == "" {
 			return fmt.Errorf("failed to generate branch name from commit message")
 		}

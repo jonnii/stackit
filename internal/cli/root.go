@@ -45,6 +45,7 @@ https://github.com/jonnii/stackit`,
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newTopCmd())
 	rootCmd.AddCommand(newTrunkCmd())
+	rootCmd.AddCommand(newConfigCmd())
 
 	return rootCmd
 }

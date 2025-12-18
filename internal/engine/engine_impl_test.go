@@ -30,7 +30,7 @@ func TestTrackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track branch
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Verify parent relationship
@@ -65,11 +65,11 @@ func TestTrackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track branch1 first
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Track branch2 (branch1 is now tracked and in the branch list)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Verify relationships
@@ -87,7 +87,7 @@ func TestTrackBranch(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("nonexistent", "main")
+		err = eng.TrackBranch(context.Background(), "nonexistent", "main")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "does not exist")
 	})
@@ -110,7 +110,7 @@ func TestTrackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to track with nonexistent parent - should fail
-		err = eng.TrackBranch("feature", "nonexistent")
+		err = eng.TrackBranch(context.Background(), "feature", "nonexistent")
 		require.Error(t, err)
 		// Error should mention the parent branch doesn't exist
 		require.Contains(t, err.Error(), "parent branch nonexistent does not exist")
@@ -147,18 +147,18 @@ func TestSetParent(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track branches
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Verify initial state
 		require.Equal(t, "branch1", eng.GetParent("branch2"))
 
 		// Change parent of branch2 to main
-		err = eng.SetParent("branch2", "main")
+		err = eng.SetParent(context.Background(), "branch2", "main")
 		require.NoError(t, err)
 
 		// Verify new parent
@@ -198,11 +198,11 @@ func TestDeleteBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track all branches
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Verify initial state
@@ -210,7 +210,7 @@ func TestDeleteBranch(t *testing.T) {
 		require.Contains(t, eng.GetChildren("branch1"), "branch3")
 
 		// Delete branch1
-		err = eng.DeleteBranch("branch1")
+		err = eng.DeleteBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 
 		// Verify branch1 is removed
@@ -232,7 +232,7 @@ func TestDeleteBranch(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.DeleteBranch("main")
+		err = eng.DeleteBranch(context.Background(), "main")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot delete trunk")
 	})
@@ -260,9 +260,9 @@ func TestGetRelativeStack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Get downstack from branch2 - should NOT include trunk (main)
@@ -300,11 +300,11 @@ func TestGetRelativeStack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Get upstack from branch1
@@ -364,11 +364,11 @@ func TestGetRelativeStack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch2")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch2")
 		require.NoError(t, err)
 
 		// Get full stack from branch2 - should NOT include trunk (main)
@@ -425,13 +425,13 @@ func TestGetRelativeStack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("stackA", "main")
+		err = eng.TrackBranch(context.Background(), "stackA", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackA-child", "stackA")
+		err = eng.TrackBranch(context.Background(), "stackA-child", "stackA")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackB", "main")
+		err = eng.TrackBranch(context.Background(), "stackB", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("stackB-child", "stackB")
+		err = eng.TrackBranch(context.Background(), "stackB-child", "stackB")
 		require.NoError(t, err)
 
 		// Get all descendants from trunk
@@ -490,9 +490,9 @@ func TestRestackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track branches
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Add commit to main (parent moves forward)
@@ -500,12 +500,12 @@ func TestRestackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Restack branch1 (should rebase onto new main)
-		result, err := eng.RestackBranch("branch1")
+		result, err := eng.RestackBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackDone, result.Result)
 
 		// Verify branch1 is now fixed
-		require.True(t, eng.IsBranchFixed("branch1"))
+		require.True(t, eng.IsBranchFixed(context.Background(), "branch1"))
 	})
 
 	t.Run("returns unneeded when branch is already fixed", func(t *testing.T) {
@@ -527,7 +527,7 @@ func TestRestackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch is already fixed (no changes to main)
-		result, err := eng.RestackBranch("branch1")
+		result, err := eng.RestackBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 	})
@@ -548,7 +548,7 @@ func TestRestackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Don't track the branch
-		result, err := eng.RestackBranch("branch1")
+		result, err := eng.RestackBranch(context.Background(), "branch1")
 		require.Error(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 		require.Contains(t, err.Error(), "not tracked")
@@ -588,7 +588,7 @@ func TestRebuild(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild should pick up new branch
-		err = eng.Rebuild("main")
+		err = eng.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
 		// New branch should be in list
@@ -715,7 +715,7 @@ func TestIsMergedIntoTrunk(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		merged, err := eng.IsMergedIntoTrunk("branch1")
+		merged, err := eng.IsMergedIntoTrunk(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.False(t, merged)
 	})
@@ -737,7 +737,7 @@ func TestIsBranchEmpty(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		empty, err := eng.IsBranchEmpty("branch1")
+		empty, err := eng.IsBranchEmpty(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.False(t, empty)
 	})
@@ -756,7 +756,7 @@ func TestIsBranchEmpty(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		empty, err := eng.IsBranchEmpty("branch1")
+		empty, err := eng.IsBranchEmpty(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.True(t, empty)
 	})
@@ -792,11 +792,11 @@ func TestUpsertPrInfo(t *testing.T) {
 			URL:     "https://github.com/owner/repo/pull/123",
 		}
 
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify PR info
-		retrieved, err := eng.GetPrInfo("branch1")
+		retrieved, err := eng.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, prNumber, *retrieved.Number)
@@ -830,17 +830,17 @@ func TestUpsertPrInfo(t *testing.T) {
 			IsDraft: false,
 		}
 
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Update PR info
 		prInfo.Title = "Updated Title"
 		prInfo.Body = "Updated body"
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify updated PR info
-		retrieved, err := eng.GetPrInfo("branch1")
+		retrieved, err := eng.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, "Updated Title", retrieved.Title)
@@ -877,11 +877,11 @@ func TestGetRelativeStackUpstack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		upstack := eng.GetRelativeStackUpstack("branch1")
@@ -912,7 +912,7 @@ func TestReset(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset with same trunk
-		err = eng.Reset("main")
+		err = eng.Reset(context.Background(), "main")
 		require.NoError(t, err)
 
 		// Branch should still exist but not be tracked
@@ -987,11 +987,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should match remote
-		matches, err := eng.BranchMatchesRemote("feature")
+		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.True(t, matches, "branch should match remote after push")
 	})
@@ -1027,11 +1027,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local has extra commit)
-		matches, err := eng.BranchMatchesRemote("feature")
+		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote with local changes")
 	})
@@ -1061,11 +1061,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (doesn't exist on remote)
-		matches, err := eng.BranchMatchesRemote("feature")
+		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match when it doesn't exist on remote")
 	})
@@ -1102,11 +1102,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local was amended)
-		matches, err := eng.BranchMatchesRemote("feature")
+		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote after amend")
 	})
@@ -1149,12 +1149,12 @@ func TestPopulateRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// All branches should match remote
 		for _, branch := range []string{"main", "feature1", "feature2"} {
-			matches, err := eng.BranchMatchesRemote(branch)
+			matches, err := eng.BranchMatchesRemote(context.Background(), branch)
 			require.NoError(t, err)
 			require.True(t, matches, "branch %s should match remote", branch)
 		}
@@ -1173,11 +1173,11 @@ func TestPopulateRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate should not fail
-		err = eng.PopulateRemoteShas()
+		err = eng.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branches should not match (nothing on remote)
-		matches, err := eng.BranchMatchesRemote("main")
+		matches, err := eng.BranchMatchesRemote(context.Background(), "main")
 		require.NoError(t, err)
 		require.False(t, matches, "main should not match empty remote")
 	})
@@ -1264,7 +1264,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges("feature")
+		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify HEAD is detached
@@ -1308,7 +1308,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges("feature")
+		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify we're at main
@@ -1346,13 +1346,13 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		// Create engine and track branches
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges on branch2
-		err = eng.DetachAndResetBranchChanges("branch2")
+		err = eng.DetachAndResetBranchChanges(context.Background(), "branch2")
 		require.NoError(t, err)
 
 		// Verify we're at branch1's commit (the parent)
@@ -1420,7 +1420,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges("feature")
+		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify we're at main

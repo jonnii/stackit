@@ -17,6 +17,8 @@ type SubmitItem struct {
 	Action     string // "create" or "update"
 	PRNumber   *int
 	Status     string // "pending", "submitting", "done", "error"
+	IsSkipped  bool
+	SkipReason string
 	URL        string
 	Error      error
 }

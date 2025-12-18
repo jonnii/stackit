@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -8,13 +9,13 @@ import (
 // Uses git cherry to detect if all commits are in trunk
 func IsMerged(branchName, trunkName string) (bool, error) {
 	// Get merge base
-	mergeBase, err := GetMergeBase(branchName, trunkName)
+	mergeBase, err := GetMergeBase(context.Background(), branchName, trunkName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get merge base: %w", err)
 	}
 
 	// Get branch revision
-	branchRev, err := GetRevision(branchName)
+	branchRev, err := GetRevision(context.Background(), branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get branch revision: %w", err)
 	}

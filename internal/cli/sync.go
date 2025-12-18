@@ -23,7 +23,7 @@ Restacks all branches in your repository that can be restacked without conflicts
 If trunk cannot be fast-forwarded to match remote, overwrites trunk with the remote version.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

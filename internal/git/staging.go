@@ -1,13 +1,14 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
 
 // StageAll stages all changes including untracked files
-func StageAll() error {
-	_, err := RunGitCommand("add", "-A")
+func StageAll(ctx context.Context) error {
+	_, err := RunGitCommandWithContext(ctx, "add", "-A")
 	if err != nil {
 		return fmt.Errorf("failed to stage all changes: %w", err)
 	}
@@ -15,13 +16,13 @@ func StageAll() error {
 }
 
 // AddAll is an alias for StageAll (for compatibility with continue command)
-func AddAll() error {
-	return StageAll()
+func AddAll(ctx context.Context) error {
+	return StageAll(ctx)
 }
 
 // StageTracked stages updates to tracked files only
-func StageTracked() error {
-	_, err := RunGitCommand("add", "-u")
+func StageTracked(ctx context.Context) error {
+	_, err := RunGitCommandWithContext(ctx, "add", "-u")
 	if err != nil {
 		return fmt.Errorf("failed to stage tracked changes: %w", err)
 	}
@@ -29,8 +30,9 @@ func StageTracked() error {
 }
 
 // StagePatch performs interactive patch staging
-func StagePatch() error {
+func StagePatch(ctx context.Context) error {
 	// Use interactive mode so stdin/stdout/stderr are connected to the terminal
+	// Note: RunGitCommandInteractive doesn't take context yet, but it's okay for now
 	err := RunGitCommandInteractive("add", "-p")
 	if err != nil {
 		return fmt.Errorf("failed to stage patch: %w", err)
@@ -39,8 +41,8 @@ func StagePatch() error {
 }
 
 // HasStagedChanges checks if there are staged changes
-func HasStagedChanges() (bool, error) {
-	output, err := RunGitCommand("diff", "--cached", "--shortstat")
+func HasStagedChanges(ctx context.Context) (bool, error) {
+	output, err := RunGitCommandWithContext(ctx, "diff", "--cached", "--shortstat")
 	if err != nil {
 		return false, fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -48,10 +50,10 @@ func HasStagedChanges() (bool, error) {
 }
 
 // HasUnstagedChanges checks if there are unstaged changes to tracked files
-func HasUnstagedChanges() (bool, error) {
+func HasUnstagedChanges(ctx context.Context) (bool, error) {
 	// Use git diff to check for unstaged changes to tracked files
 	// This is more reliable than parsing porcelain output which gets trimmed
-	output, err := RunGitCommand("diff", "--name-only")
+	output, err := RunGitCommandWithContext(ctx, "diff", "--name-only")
 	if err != nil {
 		return false, fmt.Errorf("failed to check unstaged changes: %w", err)
 	}
@@ -59,8 +61,8 @@ func HasUnstagedChanges() (bool, error) {
 }
 
 // HasUntrackedFiles checks if there are untracked files
-func HasUntrackedFiles() (bool, error) {
-	output, err := RunGitCommand("ls-files", "--others", "--exclude-standard")
+func HasUntrackedFiles(ctx context.Context) (bool, error) {
+	output, err := RunGitCommandWithContext(ctx, "ls-files", "--others", "--exclude-standard")
 	if err != nil {
 		return false, fmt.Errorf("failed to check untracked files: %w", err)
 	}

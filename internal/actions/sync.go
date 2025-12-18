@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -21,6 +22,7 @@ type SyncOptions struct {
 func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context
 
 	// Handle --all flag (stub for now)
 	if opts.All {
@@ -30,20 +32,20 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Check for uncommitted changes
-	if hasUncommittedChanges() {
+	if hasUncommittedChanges(context) {
 		return fmt.Errorf("you have uncommitted changes. Please commit or stash them before syncing")
 	}
 
 	// Pull trunk
 	splog.Info("Pulling %s from remote...", tui.ColorBranchName(eng.Trunk(), false))
-	pullResult, err := eng.PullTrunk()
+	pullResult, err := eng.PullTrunk(context)
 	if err != nil {
 		return fmt.Errorf("failed to pull trunk: %w", err)
 	}
 
 	switch pullResult {
 	case engine.PullDone:
-		rev, _ := eng.GetRevision(eng.Trunk())
+		rev, _ := eng.GetRevision(context, eng.Trunk())
 		revShort := rev
 		if len(rev) > 7 {
 			revShort = rev[:7]
@@ -65,10 +67,10 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 		}
 
 		if shouldReset {
-			if err := eng.ResetTrunkToRemote(); err != nil {
+			if err := eng.ResetTrunkToRemote(context); err != nil {
 				return fmt.Errorf("failed to reset trunk: %w", err)
 			}
-			rev, _ := eng.GetRevision(eng.Trunk())
+			rev, _ := eng.GetRevision(context, eng.Trunk())
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -81,9 +83,9 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Sync PR info
 	allBranches := eng.AllBranchNames()
-	repoOwner, repoName, _ := GetRepoInfo()
+	repoOwner, repoName, _ := GetRepoInfo(context)
 	if repoOwner != "" && repoName != "" {
-		if err := git.SyncPrInfo(allBranches, repoOwner, repoName); err != nil {
+		if err := git.SyncPrInfo(context, allBranches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}
@@ -142,7 +144,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Restack branches
 	if len(sortedBranches) > 0 {
-		if err := RestackBranches(sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(context, sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
@@ -152,7 +154,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 // sortBranchesTopologically sorts branches so parents come before children.
 // This ensures correct restack order (bottom of stack first).
-func sortBranchesTopologically(branches []string, eng engine.Engine) []string {
+func sortBranchesTopologically(branches []string, eng engine.BranchReader) []string {
 	if len(branches) == 0 {
 		return branches
 	}
@@ -203,9 +205,9 @@ func sortBranchesTopologically(branches []string, eng engine.Engine) []string {
 }
 
 // hasUncommittedChanges checks if there are uncommitted changes
-func hasUncommittedChanges() bool {
+func hasUncommittedChanges(ctx context.Context) bool {
 	// Check git status
-	output, err := git.RunGitCommand("status", "--porcelain")
+	output, err := git.RunGitCommandWithContext(ctx, "status", "--porcelain")
 	if err != nil {
 		return false
 	}
@@ -213,9 +215,9 @@ func hasUncommittedChanges() bool {
 }
 
 // getRepoInfo gets repository owner and name from git remote
-func GetRepoInfo() (string, string, error) {
+func GetRepoInfo(ctx context.Context) (string, string, error) {
 	// Get remote URL
-	url, err := git.RunGitCommand("config", "--get", "remote.origin.url")
+	url, err := git.RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
 	if err != nil {
 		return "", "", err
 	}

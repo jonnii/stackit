@@ -28,7 +28,7 @@ If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

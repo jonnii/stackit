@@ -3,6 +3,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -57,42 +58,42 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Create and checkout new branch
-	if err := git.CreateAndCheckoutBranch(branchName); err != nil {
+	if err := git.CreateAndCheckoutBranch(ctx.Context, branchName); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
 	// Handle staging
-	hasStaged, err := git.HasStagedChanges()
+	hasStaged, err := git.HasStagedChanges(ctx.Context)
 	if err != nil {
 		// Clean up branch on error
-		_ = git.DeleteBranch(branchName)
+		_ = git.DeleteBranch(ctx.Context, branchName)
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
 
 	// Stage changes based on flags
 	if opts.All {
-		if err := git.StageAll(); err != nil {
-			_ = git.DeleteBranch(branchName)
+		if err := git.StageAll(ctx.Context); err != nil {
+			_ = git.DeleteBranch(ctx.Context, branchName)
 			return fmt.Errorf("failed to stage all changes: %w", err)
 		}
 		hasStaged = true
 	} else if opts.Update {
-		if err := git.StageTracked(); err != nil {
-			_ = git.DeleteBranch(branchName)
+		if err := git.StageTracked(ctx.Context); err != nil {
+			_ = git.DeleteBranch(ctx.Context, branchName)
 			return fmt.Errorf("failed to stage tracked changes: %w", err)
 		}
 		hasStaged = true
 	} else if opts.Patch {
-		if err := git.StagePatch(); err != nil {
-			_ = git.DeleteBranch(branchName)
+		if err := git.StagePatch(ctx.Context); err != nil {
+			_ = git.DeleteBranch(ctx.Context, branchName)
 			return fmt.Errorf("failed to stage patch: %w", err)
 		}
 		hasStaged = true
 	} else {
 		// Check for unstaged changes and prompt if interactive
-		hasUnstaged, err := git.HasUnstagedChanges()
+		hasUnstaged, err := git.HasUnstagedChanges(ctx.Context)
 		if err != nil {
-			_ = git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(ctx.Context, branchName)
 			return fmt.Errorf("failed to check unstaged changes: %w", err)
 		}
 
@@ -103,8 +104,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 				var response string
 				_, _ = fmt.Scanln(&response)
 				if response == "y" || response == "Y" || response == "yes" {
-					if err := git.StageAll(); err != nil {
-						_ = git.DeleteBranch(branchName)
+					if err := git.StageAll(ctx.Context); err != nil {
+						_ = git.DeleteBranch(ctx.Context, branchName)
 						return fmt.Errorf("failed to stage changes: %w", err)
 					}
 					hasStaged = true
@@ -123,7 +124,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
-			_ = git.DeleteBranch(branchName)
+			_ = git.DeleteBranch(ctx.Context, branchName)
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
@@ -131,14 +132,14 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Track the branch with current branch as parent
-	if err := eng.TrackBranch(branchName, currentBranch); err != nil {
+	if err := eng.TrackBranch(ctx.Context, branchName, currentBranch); err != nil {
 		// Log error but don't fail - branch is created, just not tracked
 		splog.Info("Warning: failed to track branch: %v", err)
 	}
 
 	// Handle insert logic
 	if opts.Insert {
-		if err := handleInsert(branchName, currentBranch, ctx); err != nil {
+		if err := handleInsert(ctx.Context, branchName, currentBranch, ctx); err != nil {
 			splog.Info("Warning: failed to insert branch: %v", err)
 		}
 	} else {
@@ -159,8 +160,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 }
 
 // handleInsert moves children of the current branch to be children of the new branch
-func handleInsert(newBranch, currentBranch string, ctx *runtime.Context) error {
-	children := ctx.Engine.GetChildren(currentBranch)
+func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context) error {
+	children := runtimeCtx.Engine.GetChildren(currentBranch)
 	siblings := []string{}
 	for _, child := range children {
 		if child != newBranch {
@@ -175,11 +176,11 @@ func handleInsert(newBranch, currentBranch string, ctx *runtime.Context) error {
 	// If multiple children, prompt user to select which to move
 	var toMove []string
 	if len(siblings) > 1 && isInteractive() {
-		ctx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
+		runtimeCtx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
 		for i, child := range siblings {
-			ctx.Splog.Info("%d. %s", i+1, child)
+			runtimeCtx.Splog.Info("%d. %s", i+1, child)
 		}
-		ctx.Splog.Info("Enter numbers separated by commas (or 'all' for all): ")
+		runtimeCtx.Splog.Info("Enter numbers separated by commas (or 'all' for all): ")
 		var response string
 		_, _ = fmt.Scanln(&response)
 
@@ -197,7 +198,7 @@ func handleInsert(newBranch, currentBranch string, ctx *runtime.Context) error {
 
 	// Update parent for each child to move
 	for _, child := range toMove {
-		if err := ctx.Engine.TrackBranch(child, newBranch); err != nil {
+		if err := runtimeCtx.Engine.TrackBranch(ctx, child, newBranch); err != nil {
 			return fmt.Errorf("failed to update parent for %s: %w", child, err)
 		}
 	}

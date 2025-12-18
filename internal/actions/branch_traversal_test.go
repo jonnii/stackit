@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,9 +37,9 @@ func TestSwitchBranchAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Create context
@@ -90,7 +91,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Now create branch2
@@ -102,11 +103,11 @@ func TestSwitchBranchAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild to see branch2
-		err = eng.Rebuild("main")
+		err = eng.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
 		// Track branch2
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Create context
@@ -176,7 +177,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		splog := tui.NewSplog()
@@ -223,7 +224,7 @@ func TestSwitchBranchAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Switch to branch1 (top of stack)

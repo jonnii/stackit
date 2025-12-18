@@ -219,4 +219,56 @@ func TestAbsorbComplex(t *testing.T) {
 		cmd.Dir = scene.Dir
 		_ = cmd.Run()
 	})
+
+	t.Run("absorb into ancestor restacks all intermediate branches to tip", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
+				return err
+			}
+			cmd := exec.Command(binaryPath, "init")
+			cmd.Dir = s.Dir
+			require.NoError(t, cmd.Run())
+
+			// Stack: main -> branchA -> branchB (current)
+			if err := s.Repo.CreateChange("content A", "fileA", false); err != nil {
+				return err
+			}
+			cmd = exec.Command(binaryPath, "create", "branchA", "-m", "add fileA")
+			cmd.Dir = s.Dir
+			require.NoError(t, cmd.Run())
+
+			if err := s.Repo.CreateChange("content B", "fileB", false); err != nil {
+				return err
+			}
+			cmd = exec.Command(binaryPath, "create", "branchB", "-m", "add fileB")
+			cmd.Dir = s.Dir
+			require.NoError(t, cmd.Run())
+
+			// Stay on branchB. If we absorb into branchA, branchB MUST be restacked.
+			if err := s.Repo.CreateChange("content A fix", "fileA", false); err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		// Run absorb
+		cmd := exec.Command(binaryPath, "absorb", "--force")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "absorb failed: %s", string(output))
+
+		// Verify branchA was updated
+		cmd = exec.Command("git", "rev-parse", "branchA")
+		cmd.Dir = scene.Dir
+		afterSHA := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+
+		// Verify branchB was restacked onto new branchA
+		cmd = exec.Command("git", "merge-base", "branchA", "branchB")
+		cmd.Dir = scene.Dir
+		mergeBase := strings.TrimSpace(string(testhelpers.Must(cmd.CombinedOutput())))
+		require.Equal(t, afterSHA, mergeBase, "branchB should be restacked on updated branchA")
+	})
 }

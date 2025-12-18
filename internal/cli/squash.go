@@ -24,7 +24,7 @@ This command combines all commits in the current branch into a single commit. Af
 all upstack branches (children) are automatically restacked.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

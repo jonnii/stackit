@@ -1,10 +1,13 @@
 package git
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
 // PruneRemote prunes stale remote-tracking branches
-func PruneRemote(remote string) error {
-	_, err := RunGitCommand("remote", "prune", remote)
+func PruneRemote(ctx context.Context, remote string) error {
+	_, err := RunGitCommandWithContext(ctx, "remote", "prune", remote)
 	if err != nil {
 		// Prune is not critical, just log and continue
 		return nil
@@ -13,9 +16,9 @@ func PruneRemote(remote string) error {
 }
 
 // GetRemote returns the default remote name (usually "origin")
-func GetRemote() string {
+func GetRemote(ctx context.Context) string {
 	// Try to get remote from config
-	remote, err := RunGitCommand("config", "--get", "branch.$(git symbolic-ref --short HEAD).remote")
+	remote, err := RunGitCommandWithContext(ctx, "config", "--get", "branch.$(git symbolic-ref --short HEAD).remote")
 	if err == nil && remote != "" {
 		return remote
 	}
@@ -28,8 +31,8 @@ func GetRemote() string {
 // Returns a map of branch name -> SHA.
 // Sample git ls-remote output:
 // 7edb7094e4c66892d783c1effdd106df277a860e        refs/heads/main
-func FetchRemoteShas(remote string) (map[string]string, error) {
-	output, err := RunGitCommand("ls-remote", "--heads", remote)
+func FetchRemoteShas(ctx context.Context, remote string) (map[string]string, error) {
+	output, err := RunGitCommandWithContext(ctx, "ls-remote", "--heads", remote)
 	if err != nil {
 		return nil, err
 	}

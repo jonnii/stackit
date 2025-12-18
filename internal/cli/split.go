@@ -32,7 +32,7 @@ split without options will prompt for a splitting strategy.`,
 		DisableFlagParsing: false,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

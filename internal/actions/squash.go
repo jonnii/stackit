@@ -18,6 +18,7 @@ type SquashOptions struct {
 func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
@@ -26,7 +27,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 	}
 
 	// Squash current branch
-	if err := eng.SquashCurrentBranch(engine.SquashOptions{
+	if err := eng.SquashCurrentBranch(context, engine.SquashOptions{
 		Message: opts.Message,
 		NoEdit:  opts.NoEdit,
 	}); err != nil {
@@ -45,7 +46,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

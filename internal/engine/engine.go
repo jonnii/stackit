@@ -4,6 +4,7 @@
 package engine
 
 import (
+	"context"
 	"time"
 )
 
@@ -20,77 +21,77 @@ type BranchReader interface {
 	GetRelativeStack(branchName string, scope Scope) []string
 	IsTrunk(branchName string) bool
 	IsBranchTracked(branchName string) bool
-	IsBranchFixed(branchName string) bool
+	IsBranchFixed(ctx context.Context, branchName string) bool
 
 	// Commit information
-	GetCommitDate(branchName string) (time.Time, error)
-	GetCommitAuthor(branchName string) (string, error)
-	GetRevision(branchName string) (string, error)
+	GetCommitDate(ctx context.Context, branchName string) (time.Time, error)
+	GetCommitAuthor(ctx context.Context, branchName string) (string, error)
+	GetRevision(ctx context.Context, branchName string) (string, error)
 
 	// Stack queries
 	GetRelativeStackUpstack(branchName string) []string
-	IsMergedIntoTrunk(branchName string) (bool, error)
-	IsBranchEmpty(branchName string) (bool, error)
+	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
+	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
 }
 
 // BranchWriter provides write operations for branch management
 // Thread-safe: All methods are safe for concurrent use
 type BranchWriter interface {
 	// Branch tracking
-	TrackBranch(branchName string, parentBranchName string) error
-	SetParent(branchName string, parentBranchName string) error
-	DeleteBranch(branchName string) error
+	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
+	SetParent(ctx context.Context, branchName string, parentBranchName string) error
+	DeleteBranch(ctx context.Context, branchName string) error
 
 	// Initialization operations
-	Reset(newTrunkName string) error
-	Rebuild(newTrunkName string) error
+	Reset(ctx context.Context, newTrunkName string) error
+	Rebuild(ctx context.Context, newTrunkName string) error
 }
 
 // PRManager provides operations for managing pull request information
 // Thread-safe: All methods are safe for concurrent use
 type PRManager interface {
-	GetPrInfo(branchName string) (*PrInfo, error)
-	UpsertPrInfo(branchName string, prInfo *PrInfo) error
+	GetPrInfo(ctx context.Context, branchName string) (*PrInfo, error)
+	UpsertPrInfo(ctx context.Context, branchName string, prInfo *PrInfo) error
 }
 
 // SyncManager provides operations for syncing and restacking branches
 // Thread-safe: All methods are safe for concurrent use
 type SyncManager interface {
 	// Remote operations
-	BranchMatchesRemote(branchName string) (bool, error)
-	PopulateRemoteShas() error
-	PushBranch(branchName string, remote string, force bool, forceWithLease bool) error
+	BranchMatchesRemote(ctx context.Context, branchName string) (bool, error)
+	PopulateRemoteShas(ctx context.Context) error
+	PushBranch(ctx context.Context, branchName string, remote string, force bool, forceWithLease bool) error
 
 	// Sync operations
-	PullTrunk() (PullResult, error)
-	ResetTrunkToRemote() error
-	RestackBranch(branchName string) (RestackBranchResult, error)
-	ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error)
+	PullTrunk(ctx context.Context) (PullResult, error)
+	ResetTrunkToRemote(ctx context.Context) error
+	RestackBranch(ctx context.Context, branchName string) (RestackBranchResult, error)
+	ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error)
 }
 
 // SquashManager provides operations for squashing commits
 // Thread-safe: All methods are safe for concurrent use
 type SquashManager interface {
-	SquashCurrentBranch(opts SquashOptions) error
+	SquashCurrentBranch(ctx context.Context, opts SquashOptions) error
 }
 
 // SplitManager provides operations for splitting branches
 // Thread-safe: All methods are safe for concurrent use
 type SplitManager interface {
 	// GetAllCommits returns commits for a branch in various formats
-	GetAllCommits(branchName string, format CommitFormat) ([]string, error)
+	GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error)
 
 	// ApplySplitToCommits creates branches at specified commit points
-	ApplySplitToCommits(opts ApplySplitOptions) error
+	ApplySplitToCommits(ctx context.Context, opts ApplySplitOptions) error
 
 	// Detach detaches HEAD to a specific revision
-	Detach(revision string) error
+	Detach(ctx context.Context, revision string) error
 
 	// DetachAndResetBranchChanges detaches and resets branch changes
-	DetachAndResetBranchChanges(branchName string) error
+	DetachAndResetBranchChanges(ctx context.Context, branchName string) error
 
 	// ForceCheckoutBranch force checks out a branch
-	ForceCheckoutBranch(branchName string) error
+	ForceCheckoutBranch(ctx context.Context, branchName string) error
 }
 
 // CommitFormat specifies the format for commit output

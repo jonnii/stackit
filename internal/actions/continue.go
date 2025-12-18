@@ -42,7 +42,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		if parent == "" {
 			parent = eng.Trunk()
 		}
-		parentRev, err := eng.GetRevision(parent)
+		parentRev, err := eng.GetRevision(ctx.Context, parent)
 		if err != nil {
 			return fmt.Errorf("failed to get parent revision: %w", err)
 		}
@@ -55,13 +55,13 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 
 	// Stage all changes if --all flag is set
 	if opts.AddAll {
-		if err := git.AddAll(); err != nil {
+		if err := git.AddAll(ctx.Context); err != nil {
 			return fmt.Errorf("failed to stage changes: %w", err)
 		}
 	}
 
 	// Continue the rebase
-	result, err := eng.ContinueRebase(continuation.RebasedBranchBase)
+	result, err := eng.ContinueRebase(ctx.Context, continuation.RebasedBranchBase)
 	if err != nil {
 		return fmt.Errorf("failed to continue rebase: %w", err)
 	}
@@ -77,7 +77,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		if branchName == "" {
 			branchName = eng.CurrentBranch()
 		}
-		if err := PrintConflictStatus(branchName, eng, splog); err != nil {
+		if err := PrintConflictStatus(ctx.Context, branchName, eng, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)
 		}
 		return fmt.Errorf("rebase conflict is not yet resolved")
@@ -88,7 +88,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 
 	// Continue with remaining branches to restack
 	if len(continuation.BranchesToRestack) > 0 {
-		if err := RestackBranches(continuation.BranchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(ctx.Context, continuation.BranchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 			return err
 		}
 	}

@@ -18,7 +18,7 @@ func newLogCmd() *cobra.Command {
 		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
 		Aliases: []string{"l"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeLog(f, "FULL")
+			return executeLog(cmd, f, "FULL")
 		},
 	}
 
@@ -45,9 +45,9 @@ func addLogFlags(cmd *cobra.Command, f *logFlags) {
 	cmd.Flags().BoolVarP(&f.showUntracked, "show-untracked", "u", false, "Include untracked branches in interactive selection")
 }
 
-func executeLog(f *logFlags, style string) error {
+func executeLog(cmd *cobra.Command, f *logFlags, style string) error {
 	// Get context (demo or real)
-	ctx, err := runtime.GetContext()
+	ctx, err := runtime.GetContext(cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func newLogShortCmd() *cobra.Command {
 		Short:   "Log branches in a compact format",
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeLog(f, "SHORT")
+			return executeLog(cmd, f, "SHORT")
 		},
 	}
 	addLogFlags(cmd, f)
@@ -101,7 +101,7 @@ func newLogLongCmd() *cobra.Command {
 		Short:   "Log branches with full details",
 		Aliases: []string{"ll"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeLog(f, "FULL")
+			return executeLog(cmd, f, "FULL")
 		},
 	}
 	addLogFlags(cmd, f)
@@ -115,7 +115,7 @@ func newLsCmd() *cobra.Command {
 		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
 		Short:  "Alias for log short",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeLog(f, "SHORT")
+			return executeLog(cmd, f, "SHORT")
 		},
 	}
 	addLogFlags(cmd, f)
@@ -129,7 +129,7 @@ func newLlCmd() *cobra.Command {
 		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
 		Short:  "Alias for log long",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeLog(f, "FULL")
+			return executeLog(cmd, f, "FULL")
 		},
 	}
 	addLogFlags(cmd, f)

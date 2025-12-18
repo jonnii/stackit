@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -23,9 +24,9 @@ func isInteractive() bool {
 
 // inferTrunk attempts to infer the trunk branch name
 // Exported so it can be used by other commands
-func InferTrunk(branchNames []string) string {
+func InferTrunk(ctx context.Context, branchNames []string) string {
 	// First, try to find a remote branch (check origin)
-	remoteBranch, err := git.FindRemoteBranch("origin")
+	remoteBranch, err := git.FindRemoteBranch(ctx, "origin")
 	if err == nil && remoteBranch != "" {
 		// Validate it exists in branch list
 		for _, name := range branchNames {
@@ -69,7 +70,7 @@ func selectTrunkBranch(branchNames []string, inferredTrunk string, interactive b
 // EnsureInitialized initializes stackit if not already initialized.
 // Returns the repo root path. This is used by commands that need stackit
 // to be initialized but want to auto-initialize for convenience.
-func EnsureInitialized() (string, error) {
+func EnsureInitialized(ctx context.Context) (string, error) {
 	// Initialize git repository
 	if err := git.InitDefaultRepo(); err != nil {
 		return "", fmt.Errorf("not a git repository: %w", err)
@@ -97,7 +98,7 @@ func EnsureInitialized() (string, error) {
 		}
 
 		// Infer trunk
-		trunkName := InferTrunk(branchNames)
+		trunkName := InferTrunk(ctx, branchNames)
 		if trunkName == "" {
 			// Fallback to first branch or main
 			trunkName = "main"
@@ -162,7 +163,7 @@ func newInitCmd() *cobra.Command {
 			trunkName := trunk
 			if trunkName == "" {
 				// Try to infer trunk
-				inferredTrunk := InferTrunk(branchNames)
+				inferredTrunk := InferTrunk(cmd.Context(), branchNames)
 
 				// Select trunk (with interactive prompt if needed)
 				interactive := !noInteractive && isInteractive()
@@ -212,12 +213,12 @@ func newInitCmd() *cobra.Command {
 			}
 
 			if reset {
-				if err := eng.Reset(trunkName); err != nil {
+				if err := eng.Reset(cmd.Context(), trunkName); err != nil {
 					return fmt.Errorf("failed to reset branches: %w", err)
 				}
 				splog.Info("All branches have been untracked")
 			} else {
-				if err := eng.Rebuild(trunkName); err != nil {
+				if err := eng.Rebuild(cmd.Context(), trunkName); err != nil {
 					return fmt.Errorf("failed to rebuild engine: %w", err)
 				}
 				splog.Info("Stackit initialized successfully!")

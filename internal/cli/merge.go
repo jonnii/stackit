@@ -29,7 +29,7 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -83,7 +83,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	splog.Newline()
 
 	// Populate remote SHAs so we can accurately check if branches match remote
-	if err := eng.PopulateRemoteShas(); err != nil {
+	if err := eng.PopulateRemoteShas(ctx.Context); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
@@ -114,7 +114,9 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			eng.GetChildren,
 			eng.GetParent,
 			eng.IsTrunk,
-			eng.IsBranchFixed,
+			func(branchName string) bool {
+				return eng.IsBranchFixed(ctx.Context, branchName)
+			},
 		)
 
 		// Build annotations for branches to merge

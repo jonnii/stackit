@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -8,12 +9,12 @@ import (
 )
 
 // GetMergeBase returns the merge base between two branches
-func GetMergeBase(branch1, branch2 string) (string, error) {
-	return GetMergeBaseByRef("refs/heads/"+branch1, "refs/heads/"+branch2)
+func GetMergeBase(ctx context.Context, branch1, branch2 string) (string, error) {
+	return GetMergeBaseByRef(ctx, "refs/heads/"+branch1, "refs/heads/"+branch2)
 }
 
 // GetMergeBaseByRef returns the merge base between two refs (can be branches or remote refs)
-func GetMergeBaseByRef(ref1Name, ref2Name string) (string, error) {
+func GetMergeBaseByRef(ctx context.Context, ref1Name, ref2Name string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err

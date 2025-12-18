@@ -1,12 +1,13 @@
 package git
 
 import (
+	"context"
 	"fmt"
 )
 
 // CreateAndCheckoutBranch creates and checks out a new branch
-func CreateAndCheckoutBranch(branchName string) error {
-	_, err := RunGitCommand("checkout", "-b", branchName)
+func CreateAndCheckoutBranch(ctx context.Context, branchName string) error {
+	_, err := RunGitCommandWithContext(ctx, "checkout", "-b", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to create and checkout branch %s: %w", branchName, err)
 	}
@@ -14,8 +15,8 @@ func CreateAndCheckoutBranch(branchName string) error {
 }
 
 // CheckoutBranch checks out an existing branch
-func CheckoutBranch(branchName string) error {
-	_, err := RunGitCommand("checkout", branchName)
+func CheckoutBranch(ctx context.Context, branchName string) error {
+	_, err := RunGitCommandWithContext(ctx, "checkout", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
@@ -23,8 +24,8 @@ func CheckoutBranch(branchName string) error {
 }
 
 // DeleteBranch deletes a branch
-func DeleteBranch(branchName string) error {
-	_, err := RunGitCommand("branch", "-D", branchName)
+func DeleteBranch(ctx context.Context, branchName string) error {
+	_, err := RunGitCommandWithContext(ctx, "branch", "-D", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to delete branch %s: %w", branchName, err)
 	}

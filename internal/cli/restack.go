@@ -41,7 +41,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			}
 
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

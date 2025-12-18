@@ -18,7 +18,7 @@ This command navigates down the parent chain from the current branch until
 it reaches the first branch that has trunk as its parent (or trunk itself).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

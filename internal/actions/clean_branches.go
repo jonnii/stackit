@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
@@ -23,6 +24,7 @@ type CleanBranchesResult struct {
 func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranchesResult, error) {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	c := ctx.Context
 
 	// Start from trunk children
 	branchesToProcess := eng.GetChildren(eng.Trunk())
@@ -41,7 +43,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 		}
 
 		// Check if should delete
-		shouldDelete, _ := shouldDeleteBranch(branchName, eng, opts.Force)
+		shouldDelete, _ := shouldDeleteBranch(c, branchName, eng, opts.Force)
 		if shouldDelete {
 			children := eng.GetChildren(branchName)
 			// Add children to process (DFS)
@@ -79,7 +81,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 
 			// If parent changed, update it
 			if newParent != parent {
-				if err := eng.SetParent(branchName, newParent); err != nil {
+				if err := eng.SetParent(c, branchName, newParent); err != nil {
 					return nil, fmt.Errorf("failed to set parent for %s: %w", branchName, err)
 				}
 				splog.Info("Set parent of %s to %s.",
@@ -96,7 +98,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 		}
 
 		// Greedily delete unblocked branches
-		greedilyDeleteUnblockedBranches(branchesToDelete, eng, splog)
+		greedilyDeleteUnblockedBranches(c, branchesToDelete, eng, splog)
 	}
 
 	return &CleanBranchesResult{
@@ -105,7 +107,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 }
 
 // greedilyDeleteUnblockedBranches deletes branches that have no blockers
-func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool, eng engine.Engine, splog *tui.Splog) {
+func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[string]map[string]bool, eng engine.Engine, splog *tui.Splog) {
 	for branchName, blockers := range branchesToDelete {
 		if len(blockers) == 0 {
 			// No blockers, safe to delete
@@ -115,7 +117,7 @@ func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool
 			}
 
 			// Delete the branch
-			if err := eng.DeleteBranch(branchName); err != nil {
+			if err := eng.DeleteBranch(ctx, branchName); err != nil {
 				splog.Debug("Failed to delete %s: %v", branchName, err)
 				continue
 			}
@@ -132,15 +134,15 @@ func greedilyDeleteUnblockedBranches(branchesToDelete map[string]map[string]bool
 			}
 
 			// Recursively check if parent is now unblocked
-			greedilyDeleteUnblockedBranches(branchesToDelete, eng, splog)
+			greedilyDeleteUnblockedBranches(ctx, branchesToDelete, eng, splog)
 		}
 	}
 }
 
 // shouldDeleteBranch checks if a branch should be deleted
-func shouldDeleteBranch(branchName string, eng engine.Engine, force bool) (bool, string) {
+func shouldDeleteBranch(ctx context.Context, branchName string, eng engine.Engine, force bool) (bool, string) {
 	// Check PR info
-	prInfo, err := eng.GetPrInfo(branchName)
+	prInfo, err := eng.GetPrInfo(ctx, branchName)
 	if err == nil && prInfo != nil {
 		const (
 			prStateClosed = "CLOSED"
@@ -159,13 +161,13 @@ func shouldDeleteBranch(branchName string, eng engine.Engine, force bool) (bool,
 	}
 
 	// Check if merged into trunk
-	merged, err := eng.IsMergedIntoTrunk(branchName)
+	merged, err := eng.IsMergedIntoTrunk(ctx, branchName)
 	if err == nil && merged {
 		return true, fmt.Sprintf("%s is merged into %s", branchName, eng.Trunk())
 	}
 
 	// Check if empty
-	empty, err := eng.IsBranchEmpty(branchName)
+	empty, err := eng.IsBranchEmpty(ctx, branchName)
 	if err == nil && empty {
 		// Only delete empty branches if they have a PR
 		if prInfo != nil && prInfo.Number != nil {

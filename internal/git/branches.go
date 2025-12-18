@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -61,10 +62,10 @@ func GetCurrentBranch() (string, error) {
 
 // FindRemoteBranch finds the branch that tracks a remote branch
 // Returns the local branch name if found, empty string otherwise
-func FindRemoteBranch(remote string) (string, error) {
+func FindRemoteBranch(ctx context.Context, remote string) (string, error) {
 	// Get all branch configs that have this remote
 	// Format: "branch.<name>.remote <remote>"
-	output, err := RunGitCommand("config", "--get-regexp", "^branch\\..*\\.remote$")
+	output, err := RunGitCommandWithContext(ctx, "config", "--get-regexp", "^branch\\..*\\.remote$")
 	if err != nil {
 		return "", nil // No remote branches configured
 	}

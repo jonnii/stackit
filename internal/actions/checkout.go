@@ -22,8 +22,10 @@ type CheckoutOptions struct {
 func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context
+
 	// Populate remote SHAs if needed
-	if err := eng.PopulateRemoteShas(); err != nil {
+	if err := eng.PopulateRemoteShas(context); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
 	}
 
@@ -52,7 +54,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	}
 
 	// Checkout the branch
-	if err := git.CheckoutBranch(branchName); err != nil {
+	if err := git.CheckoutBranch(context, branchName); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
@@ -210,7 +212,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		return
 	}
 
-	if !ctx.Engine.IsBranchFixed(branchName) {
+	if !ctx.Engine.IsBranchFixed(ctx.Context, branchName) {
 		parent := ctx.Engine.GetParentPrecondition(branchName)
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
 			tui.ColorBranchName(parent, false),
@@ -229,7 +231,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 	// Reverse to check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {
 		ancestor := downstack[i]
-		if !ctx.Engine.IsBranchFixed(ancestor) {
+		if !ctx.Engine.IsBranchFixed(ctx.Context, ancestor) {
 			parent := ctx.Engine.GetParentPrecondition(ancestor)
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
 				tui.ColorBranchName(ancestor, false),

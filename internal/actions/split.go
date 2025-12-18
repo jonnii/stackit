@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,6 +40,7 @@ type SplitResult struct {
 func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
@@ -47,7 +49,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 	}
 
 	// Check for uncommitted tracked changes
-	hasUnstaged, err := git.HasUnstagedChanges()
+	hasUnstaged, err := git.HasUnstagedChanges(context)
 	if err != nil {
 		return fmt.Errorf("failed to check unstaged changes: %w", err)
 	}
@@ -63,7 +65,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 			// Try to find parent from git
 			parent = eng.Trunk()
 		}
-		if err := eng.TrackBranch(currentBranch, parent); err != nil {
+		if err := eng.TrackBranch(context, currentBranch, parent); err != nil {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 	}
@@ -72,7 +74,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 	style := opts.Style
 	if style == "" {
 		// Check if there's more than one commit
-		commits, err := eng.GetAllCommits(currentBranch, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(context, currentBranch, engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits: %w", err)
 		}
@@ -105,14 +107,14 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 	var result *SplitResult
 	switch style {
 	case SplitStyleCommit:
-		result, err = splitByCommit(currentBranch, eng, splog)
+		result, err = splitByCommit(context, currentBranch, eng, splog)
 	case SplitStyleHunk:
-		result, err = splitByHunk(currentBranch, eng, splog)
+		result, err = splitByHunk(context, currentBranch, eng, splog)
 	case SplitStyleFile:
 		pathspecs := opts.Pathspecs
 		// If no pathspecs provided, prompt interactively
 		if len(pathspecs) == 0 {
-			pathspecs, err = promptForFiles(currentBranch, eng, splog)
+			pathspecs, err = promptForFiles(context, currentBranch, eng, splog)
 			if err != nil {
 				return err
 			}
@@ -122,7 +124,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(currentBranch, pathspecs, eng)
+		_, err = splitByFile(context, currentBranch, pathspecs, eng)
 		if err != nil {
 			return err
 		}
@@ -134,7 +136,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 		}
 		upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 		if len(upstackBranches) > 0 {
-			if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -156,7 +158,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	// Apply the split
-	if err := eng.ApplySplitToCommits(engine.ApplySplitOptions{
+	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{
 		BranchToSplit: currentBranch,
 		BranchNames:   result.BranchNames,
 		BranchPoints:  result.BranchPoints,
@@ -166,7 +168,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}
@@ -175,9 +177,9 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 }
 
 // splitByCommit splits a branch by selecting commit points
-func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
+func splitByCommit(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
 	// Get readable commits
-	readableCommits, err := eng.GetAllCommits(branchToSplit, engine.CommitFormatReadable)
+	readableCommits, err := eng.GetAllCommits(ctx, branchToSplit, engine.CommitFormatReadable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commits: %w", err)
 	}
@@ -191,7 +193,7 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*
 
 	// Show instructions
 	splog.Info("Splitting the commits of %s into multiple branches.", tui.ColorBranchName(branchToSplit, true))
-	prInfo, _ := eng.GetPrInfo(branchToSplit)
+	prInfo, _ := eng.GetPrInfo(ctx, branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
 			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
@@ -224,7 +226,7 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*
 		}
 		splog.Info("")
 
-		branchName, err := promptBranchName(branchNames, branchToSplit, i+1, eng)
+		branchName, err := promptBranchName(ctx, branchNames, branchToSplit, i+1, eng)
 		if err != nil {
 			return nil, err
 		}
@@ -232,11 +234,11 @@ func splitByCommit(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*
 	}
 
 	// Detach HEAD to the branch revision
-	branchRevision, err := eng.GetRevision(branchToSplit)
+	branchRevision, err := eng.GetRevision(ctx, branchToSplit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branch revision: %w", err)
 	}
-	if err := eng.Detach(branchRevision); err != nil {
+	if err := eng.Detach(ctx, branchRevision); err != nil {
 		return nil, fmt.Errorf("failed to detach: %w", err)
 	}
 
@@ -339,16 +341,16 @@ func getBranchPoints(readableCommits []string, numChildren int, parentBranchName
 }
 
 // splitByHunk splits a branch by interactively staging hunks
-func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
+func splitByHunk(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
 	// Detach and reset branch changes
-	if err := eng.DetachAndResetBranchChanges(branchToSplit); err != nil {
+	if err := eng.DetachAndResetBranchChanges(ctx, branchToSplit); err != nil {
 		return nil, fmt.Errorf("failed to detach and reset: %w", err)
 	}
 
 	branchNames := []string{}
 
 	// Get default commit message
-	commitMessages, err := eng.GetAllCommits(branchToSplit, engine.CommitFormatMessage)
+	commitMessages, err := eng.GetAllCommits(ctx, branchToSplit, engine.CommitFormatMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit messages: %w", err)
 	}
@@ -356,7 +358,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 
 	// Show instructions
 	splog.Info("Splitting %s into multiple single-commit branches.", tui.ColorBranchName(branchToSplit, true))
-	prInfo, _ := eng.GetPrInfo(branchToSplit)
+	prInfo, _ := eng.GetPrInfo(ctx, branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
 			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
@@ -371,7 +373,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 
 	// Loop while there are unstaged changes
 	for {
-		hasUnstaged, err := git.HasUnstagedChanges()
+		hasUnstaged, err := git.HasUnstagedChanges(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check unstaged changes: %w", err)
 		}
@@ -380,7 +382,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 		}
 
 		// Show remaining changes
-		unstagedDiff, err := git.GetUnstagedDiff()
+		unstagedDiff, err := git.GetUnstagedDiff(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get unstaged diff: %w", err)
 		}
@@ -391,14 +393,14 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 		splog.Info("Stage changes for branch %d:", len(branchNames)+1)
 
 		// Stage patch interactively
-		if err := git.StagePatch(); err != nil {
+		if err := git.StagePatch(ctx); err != nil {
 			// If user cancels, restore branch
-			_ = eng.ForceCheckoutBranch(branchToSplit)
+			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 			return nil, fmt.Errorf("canceled: no new branches created")
 		}
 
 		// Check if anything was staged
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check staged changes: %w", err)
 		}
@@ -437,7 +439,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 		}
 
 		// Get branch name
-		branchName, err := promptBranchName(branchNames, branchToSplit, len(branchNames)+1, eng)
+		branchName, err := promptBranchName(ctx, branchNames, branchToSplit, len(branchNames)+1, eng)
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +453,7 @@ func splitByHunk(branchToSplit string, eng engine.Engine, splog *tui.Splog) (*Sp
 }
 
 // splitByFile splits a branch by extracting files to a new parent branch
-func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine) (*SplitResult, error) {
+func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng engine.Engine) (*SplitResult, error) {
 	// Get parent branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -463,50 +465,50 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine) (*
 	}
 
 	// First checkout the parent branch so the new branch starts from there
-	if err := git.CheckoutBranch(parentBranchName); err != nil {
+	if err := git.CheckoutBranch(ctx, parentBranchName); err != nil {
 		return nil, fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
 	// Create new branch from parent
-	if err := git.CreateAndCheckoutBranch(newBranchName); err != nil {
+	if err := git.CreateAndCheckoutBranch(ctx, newBranchName); err != nil {
 		return nil, fmt.Errorf("failed to create branch: %w", err)
 	}
 
 	// Checkout files from branchToSplit
 	args := append([]string{"checkout", branchToSplit, "--"}, pathspecs...)
-	if _, err := git.RunGitCommand(args...); err != nil {
+	if _, err := git.RunGitCommandWithContext(ctx, args...); err != nil {
 		// Cleanup: delete the new branch
-		_ = git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(ctx, newBranchName)
 		return nil, fmt.Errorf("failed to checkout files: %w", err)
 	}
 
 	// Stage all changes
-	if err := git.StageAll(); err != nil {
-		_ = git.DeleteBranch(newBranchName)
+	if err := git.StageAll(ctx); err != nil {
+		_ = git.DeleteBranch(ctx, newBranchName)
 		return nil, fmt.Errorf("failed to stage changes: %w", err)
 	}
 
 	// Commit
 	commitMessage := fmt.Sprintf("Extract %s from %s", strings.Join(pathspecs, ", "), branchToSplit)
 	if err := git.Commit(commitMessage, 0); err != nil {
-		_ = git.DeleteBranch(newBranchName)
+		_ = git.DeleteBranch(ctx, newBranchName)
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Track the new branch
-	if err := eng.TrackBranch(newBranchName, parentBranchName); err != nil {
-		_ = git.DeleteBranch(newBranchName)
+	if err := eng.TrackBranch(ctx, newBranchName, parentBranchName); err != nil {
+		_ = git.DeleteBranch(ctx, newBranchName)
 		return nil, fmt.Errorf("failed to track branch: %w", err)
 	}
 
 	// Checkout original branch and remove the files
-	if err := git.CheckoutBranch(branchToSplit); err != nil {
+	if err := git.CheckoutBranch(ctx, branchToSplit); err != nil {
 		return nil, fmt.Errorf("failed to checkout original branch: %w", err)
 	}
 
 	// Remove the files from the original branch (both index and working directory)
 	args = append([]string{"rm"}, pathspecs...)
-	if _, err := git.RunGitCommand(args...); err != nil {
+	if _, err := git.RunGitCommandWithContext(ctx, args...); err != nil {
 		return nil, fmt.Errorf("failed to remove files: %w", err)
 	}
 
@@ -518,7 +520,7 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine) (*
 
 	// Update original branch's parent to be the new split branch
 	// This creates the hierarchy: parent -> newBranch -> originalBranch
-	if err := eng.SetParent(branchToSplit, newBranchName); err != nil {
+	if err := eng.SetParent(ctx, branchToSplit, newBranchName); err != nil {
 		return nil, fmt.Errorf("failed to update parent: %w", err)
 	}
 
@@ -530,7 +532,7 @@ func splitByFile(branchToSplit string, pathspecs []string, eng engine.Engine) (*
 
 // Helper functions
 
-func promptBranchName(existingNames []string, originalBranchName string, branchNum int, eng engine.Engine) (string, error) {
+func promptBranchName(ctx context.Context, existingNames []string, originalBranchName string, branchNum int, eng engine.BranchReader) (string, error) {
 	defaultName := originalBranchName
 	if containsString(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"
@@ -566,18 +568,18 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 }
 
 // promptForFiles shows an interactive file selector for split --by-file
-func promptForFiles(branchToSplit string, eng engine.Engine, splog *tui.Splog) ([]string, error) {
+func promptForFiles(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) ([]string, error) {
 	// Get the parent branch to compare against
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
 	// Get merge base between branch and parent
-	mergeBase, err := git.GetMergeBase(branchToSplit, parentBranchName)
+	mergeBase, err := git.GetMergeBase(ctx, branchToSplit, parentBranchName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get merge base: %w", err)
 	}
 
 	// Get list of changed files
-	changedFiles, err := git.GetChangedFiles(mergeBase, branchToSplit)
+	changedFiles, err := git.GetChangedFiles(ctx, mergeBase, branchToSplit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get changed files: %w", err)
 	}

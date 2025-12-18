@@ -18,7 +18,7 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, ctx *r
 	title := existingTitle
 	if title == "" {
 		// Otherwise, use the subject of the oldest commit on the branch
-		subject, err := git.GetCommitSubject(branchName)
+		subject, err := git.GetCommitSubject(ctx.Context, branchName)
 		if err != nil {
 			// Non-fatal, use branch name as fallback
 			title = branchName
@@ -45,7 +45,7 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *run
 	body := existingBody
 	if body == "" {
 		// Infer from commit messages
-		messages, err := git.GetCommitMessages(branchName)
+		messages, err := git.GetCommitMessages(ctx.Context, branchName)
 		if err == nil && len(messages) > 0 {
 			if len(messages) == 1 {
 				// Single commit - use body (skip first line which is subject)
@@ -141,7 +141,7 @@ func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]strin
 
 // PreparePRMetadata prepares PR metadata for a branch
 func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engine, ctx *runtime.Context) (*PRMetadata, error) {
-	prInfo, _ := eng.GetPrInfo(branchName)
+	prInfo, _ := eng.GetPrInfo(ctx.Context, branchName)
 
 	metadata := &PRMetadata{
 		Title:   getStringValue(prInfo, "Title"),
@@ -201,7 +201,7 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	}
 
 	// Save metadata to engine (in case command fails)
-	if err := eng.UpsertPrInfo(branchName, &engine.PrInfo{
+	if err := eng.UpsertPrInfo(ctx.Context, branchName, &engine.PrInfo{
 		Title:   metadata.Title,
 		Body:    metadata.Body,
 		IsDraft: metadata.IsDraft,

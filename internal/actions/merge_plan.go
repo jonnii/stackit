@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -85,6 +86,7 @@ type CreateMergePlanOptions struct {
 func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergePlan, *MergePlanValidation, error) {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	c := ctx.Context
 
 	// 1. Get current branch, validate not on trunk
 	currentBranch := eng.CurrentBranch()
@@ -127,7 +129,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 
 	for _, branchName := range allBranches {
 		// Get PR info
-		prInfo, err := eng.GetPrInfo(branchName)
+		prInfo, err := eng.GetPrInfo(c, branchName)
 		if err != nil {
 			splog.Debug("Failed to get PR info for %s: %v", branchName, err)
 			validation.Valid = false
@@ -163,7 +165,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		// Check if local matches remote
 		// Only check if branch has a PR (meaning it exists on remote)
 		// If branch doesn't have a PR or doesn't exist on remote, don't warn
-		matchesRemote, err := eng.BranchMatchesRemote(branchName)
+		matchesRemote, err := eng.BranchMatchesRemote(c, branchName)
 		if err != nil {
 			splog.Debug("Failed to check if branch matches remote: %v", err)
 			matchesRemote = true // Assume matches if check fails
@@ -172,7 +174,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		// If branch doesn't exist on remote, that's fine (might be local-only or already merged)
 		if !matchesRemote && prInfo != nil && prInfo.Number != nil {
 			// Get detailed difference information
-			diffInfo := getBranchRemoteDifference(branchName, splog)
+			diffInfo := getBranchRemoteDifference(c, branchName, splog)
 			if diffInfo != "" {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s differs from remote: %s", branchName, diffInfo))
 			} else {
@@ -182,7 +184,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 
 		// Get CI check status
 		checksStatus := ChecksNone
-		passing, pending, err := git.GetPRChecksStatus(branchName)
+		passing, pending, err := git.GetPRChecksStatus(c, branchName)
 		if err != nil {
 			splog.Debug("Failed to get PR checks status for %s: %v", branchName, err)
 			// Don't fail on check status errors, just mark as none
@@ -452,20 +454,20 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 }
 
 // getBranchRemoteDifference returns a detailed description of how a branch differs from remote
-func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {
+func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.Splog) string {
 	// Get local SHA
-	localSha, err := git.GetRevision(branchName)
+	localSha, err := git.GetRevision(c, branchName)
 	if err != nil {
 		splog.Debug("Failed to get local SHA for %s: %v", branchName, err)
 		return ""
 	}
 
 	// Get remote SHA - try from remote tracking branch first, then fall back to ls-remote
-	remoteSha, err := git.GetRemoteRevision(branchName)
+	remoteSha, err := git.GetRemoteRevision(c, branchName)
 	if err != nil {
 		// Remote tracking branch doesn't exist locally, try fetching directly from remote
 		splog.Debug("Remote tracking branch not found for %s, fetching from remote: %v", branchName, err)
-		remoteShas, err := git.FetchRemoteShas("origin")
+		remoteShas, err := git.FetchRemoteShas(c, "origin")
 		if err != nil {
 			splog.Debug("Failed to fetch remote SHAs: %v", err)
 			localShort := localSha
@@ -503,7 +505,7 @@ func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {
 	// Try to determine relationship using git merge-base
 	// Use remote tracking branch reference
 	remoteBranchRef := "refs/remotes/origin/" + branchName
-	commonAncestor, err := git.GetMergeBaseByRef(branchName, remoteBranchRef)
+	commonAncestor, err := git.GetMergeBaseByRef(c, branchName, remoteBranchRef)
 	if err != nil {
 		// Can't determine relationship, just show SHAs
 		// Most common case: local is ahead (has unpushed commits)

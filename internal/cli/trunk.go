@@ -28,7 +28,7 @@ By default, displays the trunk branch that the current branch's stack is based o
 Use --all to see all configured trunk branches, or --add to add an additional trunk.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

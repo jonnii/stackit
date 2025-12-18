@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -17,8 +18,8 @@ type Hunk struct {
 }
 
 // ParseStagedHunks parses the output of `git diff --cached` into structured hunks
-func ParseStagedHunks() ([]Hunk, error) {
-	diffOutput, err := GetStagedDiff()
+func ParseStagedHunks(ctx context.Context) ([]Hunk, error) {
+	diffOutput, err := GetStagedDiff(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get staged diff: %w", err)
 	}

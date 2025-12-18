@@ -28,7 +28,7 @@ func NewRealGitHubClient(ctx context.Context) (*RealGitHubClient, error) {
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
-	owner, repo, err := getRepoInfo()
+	owner, repo, err := getRepoInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository info: %w", err)
 	}
@@ -172,13 +172,13 @@ func (c *RealGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 }
 
 // MergePullRequest merges a pull request
-func (c *RealGitHubClient) MergePullRequest(branchName string) error {
-	return MergePullRequest(branchName)
+func (c *RealGitHubClient) MergePullRequest(ctx context.Context, branchName string) error {
+	return MergePullRequest(ctx, branchName)
 }
 
 // GetPRChecksStatus returns the check status for a PR
-func (c *RealGitHubClient) GetPRChecksStatus(branchName string) (bool, bool, error) {
-	return GetPRChecksStatus(branchName)
+func (c *RealGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
+	return GetPRChecksStatus(ctx, branchName)
 }
 
 // toPullRequestInfo converts a github.PullRequest to PullRequestInfo

@@ -28,7 +28,7 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 
 	// 1. Populate remote SHAs so we can accurately check if branches match remote
 	// This must be called before creating the merge plan so BranchMatchesRemote works correctly
-	if err := eng.PopulateRemoteShas(); err != nil {
+	if err := eng.PopulateRemoteShas(ctx.Context); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 		// Continue anyway - we'll just have less accurate remote matching info
 	} else {
@@ -36,7 +36,7 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 	}
 
 	// 2. Check sync status
-	needsSync, staleBranches, err := CheckSyncStatus(eng, splog)
+	needsSync, staleBranches, err := CheckSyncStatus(ctx.Context, eng, splog)
 	if err != nil {
 		return fmt.Errorf("failed to check sync status: %w", err)
 	}

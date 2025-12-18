@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -170,19 +171,19 @@ func (e *DemoEngine) IsBranchTracked(branchName string) bool {
 	return exists
 }
 
-func (e *DemoEngine) IsBranchFixed(branchName string) bool {
+func (e *DemoEngine) IsBranchFixed(ctx context.Context, branchName string) bool {
 	return true // All demo branches are "fixed" (not needing restack)
 }
 
-func (e *DemoEngine) GetCommitDate(branchName string) (time.Time, error) {
+func (e *DemoEngine) GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
 	return time.Now().Add(-24 * time.Hour), nil
 }
 
-func (e *DemoEngine) GetCommitAuthor(branchName string) (string, error) {
+func (e *DemoEngine) GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
 	return "Demo User <demo@example.com>", nil
 }
 
-func (e *DemoEngine) GetRevision(branchName string) (string, error) {
+func (e *DemoEngine) GetRevision(ctx context.Context, branchName string) (string, error) {
 	// Return fake SHA based on branch name
 	return fmt.Sprintf("abc%x123", len(branchName)), nil
 }
@@ -191,51 +192,51 @@ func (e *DemoEngine) GetRelativeStackUpstack(branchName string) []string {
 	return e.getDescendants(branchName)
 }
 
-func (e *DemoEngine) IsMergedIntoTrunk(branchName string) (bool, error) {
+func (e *DemoEngine) IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error) {
 	return false, nil
 }
 
-func (e *DemoEngine) IsBranchEmpty(branchName string) (bool, error) {
+func (e *DemoEngine) IsBranchEmpty(ctx context.Context, branchName string) (bool, error) {
 	return false, nil
 }
 
 // BranchWriter interface implementation
 
-func (e *DemoEngine) TrackBranch(branchName string, parentBranchName string) error {
+func (e *DemoEngine) TrackBranch(ctx context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
 	e.childrenMap[parentBranchName] = append(e.childrenMap[parentBranchName], branchName)
 	return nil
 }
 
-func (e *DemoEngine) SetParent(branchName string, parentBranchName string) error {
+func (e *DemoEngine) SetParent(ctx context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
 	return nil
 }
 
-func (e *DemoEngine) DeleteBranch(branchName string) error {
+func (e *DemoEngine) DeleteBranch(ctx context.Context, branchName string) error {
 	delete(e.parentMap, branchName)
 	delete(e.prInfoMap, branchName)
 	return nil
 }
 
-func (e *DemoEngine) Reset(newTrunkName string) error {
+func (e *DemoEngine) Reset(ctx context.Context, newTrunkName string) error {
 	return nil
 }
 
-func (e *DemoEngine) Rebuild(newTrunkName string) error {
+func (e *DemoEngine) Rebuild(ctx context.Context, newTrunkName string) error {
 	return nil
 }
 
 // PRManager interface implementation
 
-func (e *DemoEngine) GetPrInfo(branchName string) (*engine.PrInfo, error) {
+func (e *DemoEngine) GetPrInfo(ctx context.Context, branchName string) (*engine.PrInfo, error) {
 	if info, exists := e.prInfoMap[branchName]; exists {
 		return info, nil
 	}
 	return nil, nil
 }
 
-func (e *DemoEngine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) error {
+func (e *DemoEngine) UpsertPrInfo(ctx context.Context, branchName string, prInfo *engine.PrInfo) error {
 	simulateDelay(delayLong) // GitHub API call to create/update PR
 	e.prInfoMap[branchName] = prInfo
 	return nil
@@ -243,37 +244,37 @@ func (e *DemoEngine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) erro
 
 // SyncManager interface implementation
 
-func (e *DemoEngine) BranchMatchesRemote(branchName string) (bool, error) {
+func (e *DemoEngine) BranchMatchesRemote(ctx context.Context, branchName string) (bool, error) {
 	return false, nil // Demo branches never match remote (so submit always has work to do)
 }
 
-func (e *DemoEngine) PopulateRemoteShas() error {
+func (e *DemoEngine) PopulateRemoteShas(ctx context.Context) error {
 	simulateDelay(delayMedium) // Fetching remote refs takes time
 	return nil
 }
 
-func (e *DemoEngine) PushBranch(branchName string, remote string, force bool, forceWithLease bool) error {
+func (e *DemoEngine) PushBranch(ctx context.Context, branchName string, remote string, force bool, forceWithLease bool) error {
 	simulateDelay(delayMedium) // Git push takes time
 	return nil
 }
 
-func (e *DemoEngine) PullTrunk() (engine.PullResult, error) {
+func (e *DemoEngine) PullTrunk(ctx context.Context) (engine.PullResult, error) {
 	simulateDelay(delayLong) // Git pull takes time
 	return engine.PullUnneeded, nil
 }
 
-func (e *DemoEngine) ResetTrunkToRemote() error {
+func (e *DemoEngine) ResetTrunkToRemote(ctx context.Context) error {
 	return nil
 }
 
-func (e *DemoEngine) RestackBranch(branchName string) (engine.RestackBranchResult, error) {
+func (e *DemoEngine) RestackBranch(ctx context.Context, branchName string) (engine.RestackBranchResult, error) {
 	simulateDelay(delayMedium) // Rebase operation takes time
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
 	}, nil
 }
 
-func (e *DemoEngine) ContinueRebase(rebasedBranchBase string) (engine.ContinueRebaseResult, error) {
+func (e *DemoEngine) ContinueRebase(ctx context.Context, rebasedBranchBase string) (engine.ContinueRebaseResult, error) {
 	return engine.ContinueRebaseResult{
 		Result:     0, // RebaseDone
 		BranchName: GetDemoCurrentBranch(),
@@ -282,34 +283,34 @@ func (e *DemoEngine) ContinueRebase(rebasedBranchBase string) (engine.ContinueRe
 
 // SquashManager interface implementation
 
-func (e *DemoEngine) SquashCurrentBranch(opts engine.SquashOptions) error {
+func (e *DemoEngine) SquashCurrentBranch(ctx context.Context, opts engine.SquashOptions) error {
 	simulateDelay(delayMedium) // Squash takes time
 	return nil
 }
 
 // SplitManager interface implementation
 
-func (e *DemoEngine) GetAllCommits(branchName string, format engine.CommitFormat) ([]string, error) {
+func (e *DemoEngine) GetAllCommits(ctx context.Context, branchName string, format engine.CommitFormat) ([]string, error) {
 	return []string{
 		"abc1234 Initial commit for " + branchName,
 		"def5678 Add feature implementation",
 	}, nil
 }
 
-func (e *DemoEngine) ApplySplitToCommits(opts engine.ApplySplitOptions) error {
+func (e *DemoEngine) ApplySplitToCommits(ctx context.Context, opts engine.ApplySplitOptions) error {
 	simulateDelay(delayLong) // Split involves multiple git operations
 	return nil
 }
 
-func (e *DemoEngine) Detach(revision string) error {
+func (e *DemoEngine) Detach(ctx context.Context, revision string) error {
 	return nil
 }
 
-func (e *DemoEngine) DetachAndResetBranchChanges(branchName string) error {
+func (e *DemoEngine) DetachAndResetBranchChanges(ctx context.Context, branchName string) error {
 	return nil
 }
 
-func (e *DemoEngine) ForceCheckoutBranch(branchName string) error {
+func (e *DemoEngine) ForceCheckoutBranch(ctx context.Context, branchName string) error {
 	simulateDelay(delayShort) // Checkout is fast
 	return nil
 }

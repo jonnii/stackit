@@ -3,25 +3,26 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 )
 
 // Sentinel errors for common conditions
 var (
 	// ErrNotOnBranch indicates that HEAD is not on a branch
-	ErrNotOnBranch = New("not on a branch")
+	ErrNotOnBranch = errors.New("not on a branch")
 
 	// ErrBranchNotFound indicates that a branch does not exist
-	ErrBranchNotFound = New("branch not found")
+	ErrBranchNotFound = errors.New("branch not found")
 
 	// ErrRebaseConflict indicates that a rebase operation encountered a conflict
-	ErrRebaseConflict = New("rebase conflict")
+	ErrRebaseConflict = errors.New("rebase conflict")
 
 	// ErrRebaseNotInProgress indicates that no rebase is currently in progress
-	ErrRebaseNotInProgress = New("no rebase in progress")
+	ErrRebaseNotInProgress = errors.New("no rebase in progress")
 
 	// ErrTrunkOperation indicates an invalid operation on the trunk branch
-	ErrTrunkOperation = New("invalid operation on trunk branch")
+	ErrTrunkOperation = errors.New("invalid operation on trunk branch")
 )
 
 // BranchNotFoundError represents an error when a branch is not found
@@ -31,6 +32,10 @@ type BranchNotFoundError struct {
 
 func (e *BranchNotFoundError) Error() string {
 	return fmt.Sprintf("branch %s does not exist", e.BranchName)
+}
+
+func (e *BranchNotFoundError) Is(target error) bool {
+	return target == ErrBranchNotFound
 }
 
 // NewBranchNotFoundError creates a new BranchNotFoundError
@@ -49,6 +54,10 @@ func (e *RebaseConflictError) Error() string {
 		return fmt.Sprintf("rebase conflict on branch %s: %s", e.BranchName, e.Message)
 	}
 	return fmt.Sprintf("rebase conflict on branch %s", e.BranchName)
+}
+
+func (e *RebaseConflictError) Is(target error) bool {
+	return target == ErrRebaseConflict
 }
 
 // NewRebaseConflictError creates a new RebaseConflictError
@@ -98,9 +107,4 @@ func NewGitCommandError(command string, args []string, stdout, stderr string, er
 		Stderr:  stderr,
 		Err:     err,
 	}
-}
-
-// New creates a new error with the given message
-func New(message string) error {
-	return fmt.Errorf("%s", message)
 }

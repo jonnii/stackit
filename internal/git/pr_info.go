@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/google/go-github/v62/github"
@@ -117,13 +116,12 @@ func getGitHubToken() (string, error) {
 	}
 
 	// Try gh CLI
-	cmd := exec.Command("gh", "auth", "token")
-	output, err := cmd.Output()
+	output, err := RunGHCommandWithContext(context.Background(), "auth", "token")
 	if err != nil {
 		return "", fmt.Errorf("failed to get GitHub token: %w", err)
 	}
 
-	token := strings.TrimSpace(string(output))
+	token := strings.TrimSpace(output)
 	if token == "" {
 		return "", fmt.Errorf("empty GitHub token")
 	}

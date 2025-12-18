@@ -17,10 +17,14 @@ func PruneRemote(ctx context.Context, remote string) error {
 
 // GetRemote returns the default remote name (usually "origin")
 func GetRemote(ctx context.Context) string {
-	// Try to get remote from config
-	remote, err := RunGitCommandWithContext(ctx, "config", "--get", "branch.$(git symbolic-ref --short HEAD).remote")
-	if err == nil && remote != "" {
-		return remote
+	// Try to get current branch
+	branchName, err := RunGitCommandWithContext(ctx, "symbolic-ref", "--short", "HEAD")
+	if err == nil && branchName != "" {
+		// Try to get remote for the current branch
+		remote, err := RunGitCommandWithContext(ctx, "config", "--get", "branch."+branchName+".remote")
+		if err == nil && remote != "" {
+			return remote
+		}
 	}
 
 	// Fallback to origin

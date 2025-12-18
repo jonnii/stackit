@@ -121,13 +121,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Print dry-run output or confirmation
 	if opts.DryRun {
-		return printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+		printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+		return nil
 	}
 
 	// Print what will be absorbed
-	if err := printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog); err != nil {
-		return err
-	}
+	printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
@@ -274,7 +273,7 @@ func findBranchForCommit(ctx context.Context, commitSHA string, branches []strin
 }
 
 // printDryRunOutput prints what would be absorbed in dry-run mode
-func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
+func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Would absorb the following changes:")
 	splog.Newline()
 
@@ -306,12 +305,10 @@ func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk,
 			splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}
 	}
-
-	return nil
 }
 
 // printAbsorbPlan prints the plan for absorbing changes
-func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
+func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Will absorb the following changes:")
 	splog.Newline()
 
@@ -334,8 +331,6 @@ func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, u
 			splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}
 	}
-
-	return nil
 }
 
 // checkRebaseInProgress checks if a rebase is in progress

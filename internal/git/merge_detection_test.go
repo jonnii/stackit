@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,7 @@ func TestIsMerged(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch is not merged
-		merged, err := git.IsMerged("branch1", "main")
+		merged, err := git.IsMerged(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 		require.False(t, merged)
 	})
@@ -55,7 +56,7 @@ func TestIsMerged(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch should be merged
-		merged, err := git.IsMerged("branch1", "main")
+		merged, err := git.IsMerged(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 		require.True(t, merged)
 	})

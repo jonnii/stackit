@@ -226,7 +226,7 @@ func splitByCommit(ctx context.Context, branchToSplit string, eng engine.Engine,
 		}
 		splog.Info("")
 
-		branchName, err := promptBranchName(ctx, branchNames, branchToSplit, i+1, eng)
+		branchName, err := promptBranchName(branchNames, branchToSplit, i+1, eng)
 		if err != nil {
 			return nil, err
 		}
@@ -439,7 +439,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng engine.Engine, s
 		}
 
 		// Get branch name
-		branchName, err := promptBranchName(ctx, branchNames, branchToSplit, len(branchNames)+1, eng)
+		branchName, err := promptBranchName(branchNames, branchToSplit, len(branchNames)+1, eng)
 		if err != nil {
 			return nil, err
 		}
@@ -532,7 +532,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 
 // Helper functions
 
-func promptBranchName(ctx context.Context, existingNames []string, originalBranchName string, branchNum int, eng engine.BranchReader) (string, error) {
+func promptBranchName(existingNames []string, originalBranchName string, branchNum int, eng engine.BranchReader) (string, error) {
 	defaultName := originalBranchName
 	if containsString(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"

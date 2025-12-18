@@ -229,7 +229,7 @@ func ParseReviewers(reviewersStr string) ([]string, []string) {
 // MergePullRequest merges a pull request using GitHub CLI
 func MergePullRequest(ctx context.Context, branchName string) error {
 	// Use gh CLI to merge the PR
-	_, err := RunGitCommandWithContext(ctx, "pr", "merge", branchName, "--merge")
+	_, err := RunGHCommandWithContext(ctx, "pr", "merge", branchName, "--merge")
 	if err != nil {
 		return fmt.Errorf("failed to merge PR for branch %s: %w", branchName, err)
 	}
@@ -242,7 +242,7 @@ func MergePullRequest(ctx context.Context, branchName string) error {
 // pending: true if any checks are still pending
 func GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
 	// Use gh CLI to get PR checks status
-	output, err := RunGitCommandWithContext(ctx, "pr", "checks", branchName, "--json", "name,state,conclusion")
+	output, err := RunGHCommandWithContext(ctx, "pr", "checks", branchName, "--json", "name,state,conclusion")
 	if err != nil {
 		// If the command fails, it might be because there are no checks
 		// or the PR doesn't exist. Return passing=true, pending=false as safe defaults

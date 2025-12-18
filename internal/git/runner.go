@@ -145,6 +145,37 @@ func RunGitCommandWithInputAndContext(ctx context.Context, input string, args ..
 	return defaultRunner.runInternal(ctx, input, true, args...)
 }
 
+// RunGHCommandWithContext executes a gh command with the given context.
+func RunGHCommandWithContext(ctx context.Context, args ...string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// If no timeout/deadline is set in the context, add the default one
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultCommandTimeout)
+		defer cancel()
+	}
+
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	if defaultRunner.workingDir != "" {
+		cmd.Dir = defaultRunner.workingDir
+	}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", stackiterrors.NewGitCommandError("gh", args, stdout.String(), stderr.String(), ctx.Err())
+		}
+		return "", stackiterrors.NewGitCommandError("gh", args, stdout.String(), stderr.String(), err)
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
 // RunGitCommandInteractive executes a git command interactively with stdin/stdout/stderr
 // connected to the terminal.
 func RunGitCommandInteractive(args ...string) error {

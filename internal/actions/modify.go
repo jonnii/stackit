@@ -51,7 +51,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if git.IsRebaseInProgress() {
+	if git.IsRebaseInProgress(context) {
 		return fmt.Errorf("cannot modify while a rebase is in progress. Run 'stackit continue' or 'stackit abort'")
 	}
 
@@ -169,7 +169,7 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	// Run interactive rebase
 	if err := git.RunGitCommandInteractive("rebase", "-i", parent); err != nil {
 		// Check if rebase is in progress (conflict or user canceled)
-		if git.IsRebaseInProgress() {
+		if git.IsRebaseInProgress(context) {
 			return fmt.Errorf("interactive rebase paused. Resolve conflicts and run 'git rebase --continue' or 'git rebase --abort'")
 		}
 		// Rebase might have been aborted by user

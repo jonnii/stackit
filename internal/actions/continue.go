@@ -20,7 +20,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 	splog := ctx.Splog
 
 	// Check if rebase is in progress
-	if !git.IsRebaseInProgress() {
+	if !git.IsRebaseInProgress(ctx.Context) {
 		// Clear any stale continuation state
 		_ = config.ClearContinuationState(ctx.RepoRoot)
 		return fmt.Errorf("no rebase in progress. Nothing to continue")

@@ -35,7 +35,7 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 	_, err = RunGitCommandWithContext(ctx, "rebase", "--onto", onto, from)
 	if err != nil {
 		// Check if rebase is in progress (conflict)
-		if IsRebaseInProgress() {
+		if IsRebaseInProgress(ctx) {
 			// Rebase is in progress, switch back
 			if currentBranch != "" && currentBranch != branchName {
 				_ = CheckoutBranch(ctx, currentBranch)
@@ -60,10 +60,10 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 }
 
 // IsRebaseInProgress checks if a rebase is currently in progress
-func IsRebaseInProgress() bool {
+func IsRebaseInProgress(ctx context.Context) bool {
 	// Check for .git/rebase-merge or .git/rebase-apply directories
 	// This is more reliable than checking REBASE_HEAD which can persist after rebase
-	output, err := RunGitCommand("rev-parse", "--git-dir")
+	output, err := RunGitCommandWithContext(ctx, "rev-parse", "--git-dir")
 	if err != nil {
 		return false
 	}
@@ -90,7 +90,7 @@ func RebaseContinue(ctx context.Context) (RebaseResult, error) {
 	_, err := RunGitCommandWithContext(ctx, "-c", "core.editor=true", "rebase", "--continue")
 	if err != nil {
 		// Check if rebase is still in progress (another conflict)
-		if IsRebaseInProgress() {
+		if IsRebaseInProgress(ctx) {
 			return RebaseConflict, nil
 		}
 		return RebaseConflict, fmt.Errorf("rebase continue failed: %w", err)

@@ -594,7 +594,7 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has been merged into trunk
-	merged, err := git.IsMerged(parentBranchName, e.trunk)
+	merged, err := git.IsMerged(ctx, parentBranchName, e.trunk)
 	if err == nil && merged {
 		return true
 	}
@@ -802,7 +802,7 @@ func (e *engineImpl) IsMergedIntoTrunk(ctx context.Context, branchName string) (
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
-	return git.IsMerged(branchName, trunk)
+	return git.IsMerged(ctx, branchName, trunk)
 }
 
 // IsBranchEmpty checks if a branch has no changes compared to its parent

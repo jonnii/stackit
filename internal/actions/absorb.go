@@ -32,7 +32,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if err := checkRebaseInProgress(); err != nil {
+	if err := checkRebaseInProgress(ctx.Context); err != nil {
 		return err
 	}
 
@@ -339,8 +339,8 @@ func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, u
 }
 
 // checkRebaseInProgress checks if a rebase is in progress
-func checkRebaseInProgress() error {
-	if git.IsRebaseInProgress() {
+func checkRebaseInProgress(ctx context.Context) error {
+	if git.IsRebaseInProgress(ctx) {
 		return fmt.Errorf("cannot absorb during a rebase. Please finish or abort the rebase first")
 	}
 	return nil

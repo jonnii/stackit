@@ -3,6 +3,7 @@ package actions
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -159,6 +160,16 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		}
 		return idxI > idxJ // Higher index = older commit
 	})
+
+	// Stash all changes (staged and unstaged) before starting to rewrite commits
+	// This ensures a clean working directory for checkouts and prevents losing changes
+	stashOutput, stashErr := git.RunGitCommand("stash", "push", "-u", "-m", "stackit-absorb-temp")
+	if stashErr == nil && !strings.Contains(stashOutput, "No local changes to save") {
+		defer func() {
+			// Restore stash after we're done
+			_, _ = git.RunGitCommand("stash", "pop")
+		}()
+	}
 
 	for _, commitSHA := range commitList {
 		hunks := hunksByCommit[commitSHA]

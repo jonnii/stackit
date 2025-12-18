@@ -155,7 +155,7 @@ func TestAddAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Use AddAll
-		err = git.AddAll()
+		err = git.AddAll(context.Background())
 		require.NoError(t, err)
 
 		// Verify changes are staged

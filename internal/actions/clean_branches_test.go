@@ -50,7 +50,7 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Track branch2
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged via PR info
@@ -121,9 +121,9 @@ func TestCleanBranches(t *testing.T) {
 		err = eng.Rebuild("main")
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged

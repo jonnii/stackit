@@ -330,7 +330,7 @@ func TestGetRelativeStack(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		scope := engine.Scope{IncludeCurrent: true}
@@ -523,7 +523,7 @@ func TestRestackBranch(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Branch is already fixed (no changes to main)
@@ -572,7 +572,7 @@ func TestRebuild(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Verify initial state
@@ -616,7 +616,7 @@ func TestIsBranchTracked(t *testing.T) {
 
 		require.False(t, eng.IsBranchTracked("branch1"))
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		require.True(t, eng.IsBranchTracked("branch1"))
@@ -671,7 +671,7 @@ func TestGetParentPrecondition(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		parent := eng.GetParentPrecondition("branch1")
@@ -778,7 +778,7 @@ func TestUpsertPrInfo(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		prNumber := 123
@@ -820,7 +820,7 @@ func TestUpsertPrInfo(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		prNumber := 123
@@ -908,7 +908,7 @@ func TestReset(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Reset with same trunk
@@ -937,7 +937,7 @@ func TestConcurrentAccess(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Concurrent reads should be safe
@@ -1229,7 +1229,7 @@ func TestEdgeCases(t *testing.T) {
 
 		// Track all branches
 		for _, branchName := range branchNames {
-			err = eng.TrackBranch(branchName, "main")
+			err = eng.TrackBranch(context.Background(), branchName, "main")
 			require.NoError(t, err)
 		}
 
@@ -1260,7 +1260,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		// Create engine and track branch
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
@@ -1304,7 +1304,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		// Create engine and track branch
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
@@ -1385,7 +1385,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges without tracking
-		err = eng.DetachAndResetBranchChanges("feature")
+		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Should use trunk (main) as the parent
@@ -1416,7 +1416,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		// Create engine and track branch
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges

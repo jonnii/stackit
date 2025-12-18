@@ -171,11 +171,11 @@ func TestConfigCommand(t *testing.T) {
 
 	t.Run("config get fails when not in git repository", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
+		tmpDir := t.TempDir()
 
 		// Don't initialize git or stackit - just try to run config get
 		cmd := exec.Command(binaryPath, "config", "get", "branch-name-pattern")
-		cmd.Dir = scene.Dir
+		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config get should fail when not in git repository")
 		require.Contains(t, string(output), "not a git repository")
@@ -183,11 +183,11 @@ func TestConfigCommand(t *testing.T) {
 
 	t.Run("config set fails when not in git repository", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
+		tmpDir := t.TempDir()
 
 		// Don't initialize git or stackit - just try to run config set
 		cmd := exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{message}")
-		cmd.Dir = scene.Dir
+		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config set should fail when not in git repository")
 		require.Contains(t, string(output), "not a git repository")

@@ -120,12 +120,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Print dry-run output or confirmation
 	if opts.DryRun {
-		printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+		printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, eng, splog)
 		return nil
 	}
 
 	// Print what will be absorbed
-	printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+	printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, eng, splog)
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {

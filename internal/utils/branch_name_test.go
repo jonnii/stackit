@@ -1,4 +1,4 @@
-package branchutil
+package utils
 
 import (
 	"strings"

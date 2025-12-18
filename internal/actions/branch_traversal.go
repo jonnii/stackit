@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // Direction represents the traversal direction
@@ -108,7 +109,7 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 
 // handleMultipleChildren prompts the user to select a branch when multiple children exist
 func handleMultipleChildren(children []string, ctx *runtime.Context) (string, error) {
-	if !IsInteractive() {
+	if !utils.IsInteractive() {
 		return "", fmt.Errorf("cannot get top branch in non-interactive mode; multiple choices available:\n%s", formatBranchList(children))
 	}
 

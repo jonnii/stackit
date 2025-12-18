@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // Options contains options for the submit command
@@ -181,7 +182,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 		// Open in browser if requested
 		if opts.View && prURL != "" {
-			if err := actions.OpenBrowser(prURL); err != nil {
+			if err := utils.OpenBrowser(prURL); err != nil {
 				splog.Debug("Failed to open browser: %v", err)
 			}
 		}
@@ -300,10 +301,10 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	var allBranches []string
 	if opts.Stack {
 		// Include descendants and ancestors
-		allBranches = actions.GetFullStack(eng, branchName)
+		allBranches = utils.GetFullStack(eng, branchName)
 	} else {
 		// Just ancestors (including current branch)
-		allBranches = actions.GetDownstack(eng, branchName)
+		allBranches = utils.GetDownstack(eng, branchName)
 		allBranches = append(allBranches, branchName)
 	}
 

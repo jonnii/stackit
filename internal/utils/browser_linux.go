@@ -1,6 +1,6 @@
 //go:build linux
 
-package actions
+package utils
 
 import (
 	"os/exec"

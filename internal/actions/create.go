@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/branchutil"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // CreateOptions contains options for the create command
@@ -29,7 +29,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	splog := ctx.Splog
 
 	// Get current branch
-	currentBranch, err := ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx)
 	if err != nil {
 		return err
 	}
@@ -55,13 +55,13 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		date := git.GetCurrentDate()
 
 		// Process the pattern
-		branchName = branchutil.ProcessBranchNamePattern(pattern, username, date, opts.Message)
+		branchName = utils.ProcessBranchNamePattern(pattern, username, date, opts.Message)
 		if branchName == "" {
 			return fmt.Errorf("failed to generate branch name from commit message")
 		}
 	} else {
 		// Sanitize provided branch name
-		branchName = branchutil.SanitizeBranchName(branchName)
+		branchName = utils.SanitizeBranchName(branchName)
 	}
 
 	// Check if branch already exists
@@ -87,12 +87,12 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Stage changes based on flags
-	stagingOpts := StagingOptions{
+	stagingOpts := utils.StagingOptions{
 		All:    opts.All,
 		Update: opts.Update,
 		Patch:  opts.Patch,
 	}
-	if err := StageChanges(ctx.Context, stagingOpts); err != nil {
+	if err := utils.StageChanges(ctx.Context, stagingOpts); err != nil {
 		_ = git.DeleteBranch(ctx.Context, branchName)
 		return err
 	}
@@ -113,7 +113,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 		if hasUnstaged && !hasStaged {
 			// Check if we're in an interactive terminal
-			if IsInteractive() {
+			if utils.IsInteractive() {
 				ctx.Splog.Info("You have unstaged changes. Would you like to stage them? (y/n): ")
 				var response string
 				_, _ = fmt.Scanln(&response)
@@ -191,7 +191,7 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 
 	// If multiple children, prompt user to select which to move
 	var toMove []string
-	if len(siblings) > 1 && IsInteractive() {
+	if len(siblings) > 1 && utils.IsInteractive() {
 		runtimeCtx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
 		for i, child := range siblings {
 			runtimeCtx.Splog.Info("%d. %s", i+1, child)

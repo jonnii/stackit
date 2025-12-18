@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // AbsorbOptions contains options for the absorb command
@@ -32,7 +33,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if err := CheckRebaseInProgress(ctx.Context); err != nil {
+	if err := utils.CheckRebaseInProgress(ctx.Context); err != nil {
 		return err
 	}
 
@@ -43,11 +44,11 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Handle staging flags
-	stagingOpts := StagingOptions{
+	stagingOpts := utils.StagingOptions{
 		All:   opts.All,
 		Patch: opts.Patch,
 	}
-	if err := StageChanges(ctx.Context, stagingOpts); err != nil {
+	if err := utils.StageChanges(ctx.Context, stagingOpts); err != nil {
 		return err
 	}
 
@@ -72,7 +73,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get all commits downstack from current branch
 	// We need commits from all branches downstack, not just current branch
-	downstackBranches := GetDownstack(eng, currentBranch)
+	downstackBranches := utils.GetDownstack(eng, currentBranch)
 	// Include current branch
 	downstackBranches = append([]string{currentBranch}, downstackBranches...)
 
@@ -208,7 +209,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Restack all branches above the oldest modified branch
 	if oldestModifiedBranch != "" {
-		upstackBranches := GetUpstack(eng, oldestModifiedBranch)
+		upstackBranches := utils.GetUpstack(eng, oldestModifiedBranch)
 
 		if len(upstackBranches) > 0 {
 			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {

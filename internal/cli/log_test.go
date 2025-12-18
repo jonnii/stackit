@@ -96,4 +96,38 @@ func TestLogCommand(t *testing.T) {
 		require.NoError(t, err, "log command failed: %s", string(output))
 		require.Contains(t, string(output), "feature")
 	})
+
+	t.Run("log subcommands and top-level aliases", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
+
+		// Create initial commit
+		err := scene.Repo.CreateChangeAndCommit("initial", "init")
+		require.NoError(t, err)
+
+		commands := []string{"log short", "log long", "ls", "ll", "log ls", "log ll"}
+		for _, cmdStr := range commands {
+			t.Run(cmdStr, func(t *testing.T) {
+				args := append([]string{}, cmdStr)
+				// If cmdStr has a space, split it
+				if len(args) == 1 {
+					// handle "log short" as ["log", "short"]
+					// actually exec.Command handles it if we pass them as separate args
+				}
+
+				var cmd *exec.Cmd
+				if len(cmdStr) > 3 && cmdStr[:3] == "log" {
+					parts := append([]string{}, "log", cmdStr[4:])
+					cmd = exec.Command(binaryPath, parts...)
+				} else {
+					cmd = exec.Command(binaryPath, cmdStr)
+				}
+
+				cmd.Dir = scene.Dir
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s command failed: %s", cmdStr, string(output))
+				require.Contains(t, string(output), "main")
+			})
+		}
+	})
 }

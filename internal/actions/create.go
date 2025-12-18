@@ -62,7 +62,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Handle staging
-	hasStaged, err := git.HasStagedChanges(ctx.Context)
+	var hasStaged bool
+	_, err = git.HasStagedChanges(ctx.Context)
 	if err != nil {
 		// Clean up branch on error
 		_ = git.DeleteBranch(ctx.Context, branchName)

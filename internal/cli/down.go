@@ -42,7 +42,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -84,7 +84,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Checkout the target branch
-			if err := git.CheckoutBranch(targetBranch); err != nil {
+			if err := git.CheckoutBranch(ctx.Context, targetBranch); err != nil {
 				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 			}
 

@@ -18,7 +18,7 @@ func newContinueCmd() *cobra.Command {
 This command will continue the rebase and resume restacking remaining branches.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

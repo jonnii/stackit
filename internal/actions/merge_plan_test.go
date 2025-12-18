@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,20 +32,20 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err = eng.UpsertPrInfo("branch1", &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
 			Number: &pr1,
 			State:  "OPEN",
 		})
 		require.NoError(t, err)
-		err = eng.UpsertPrInfo("branch2", &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), "branch2", &engine.PrInfo{
 			Number: &pr2,
 			State:  "OPEN",
 		})
@@ -89,12 +90,12 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Add draft PR
 		pr1 := 101
-		err = eng.UpsertPrInfo("branch1", &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
 			Number:  &pr1,
 			State:   "OPEN",
 			IsDraft: true,
@@ -136,12 +137,12 @@ func TestCreateMergePlan(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Add draft PR
 		pr1 := 101
-		err = eng.UpsertPrInfo("branch1", &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
 			Number:  &pr1,
 			State:   "OPEN",
 			IsDraft: true,

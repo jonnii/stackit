@@ -100,7 +100,7 @@ func (c *DemoGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 }
 
 // MergePullRequest simulates merging a pull request
-func (c *DemoGitHubClient) MergePullRequest(branchName string) error {
+func (c *DemoGitHubClient) MergePullRequest(ctx context.Context, branchName string) error {
 	simulateDelay(delayMedium)
 
 	if pr, ok := c.prs[branchName]; ok {
@@ -110,7 +110,7 @@ func (c *DemoGitHubClient) MergePullRequest(branchName string) error {
 }
 
 // GetPRChecksStatus returns simulated check status
-func (c *DemoGitHubClient) GetPRChecksStatus(branchName string) (bool, bool, error) {
+func (c *DemoGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
 	// Simulate a small delay
 	time.Sleep(50 * time.Millisecond)
 

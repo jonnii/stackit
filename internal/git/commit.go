@@ -1,9 +1,8 @@
 package git
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"os/exec"
 )
 
 // CommitOptions contains options for creating a commit
@@ -54,27 +53,17 @@ func CommitWithOptions(opts CommitOptions) error {
 	// If neither NoEdit nor Edit is set, and no message is provided,
 	// git will open the editor by default (no flag needed)
 
-	// Use exec.Command directly to allow for interactive commit if needed
-	cmd := exec.Command("git", args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
-	}
-	return nil
+	return RunGitCommandInteractive(args...)
 }
 
 // GetStagedDiff returns the unified diff of staged changes
-func GetStagedDiff(files ...string) (string, error) {
+func GetStagedDiff(ctx context.Context, files ...string) (string, error) {
 	args := []string{"diff", "--cached"}
 	if len(files) > 0 {
 		args = append(args, "--")
 		args = append(args, files...)
 	}
-	output, err := RunGitCommandRaw(args...)
+	output, err := RunGitCommandRawWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get staged diff: %w", err)
 	}
@@ -82,13 +71,13 @@ func GetStagedDiff(files ...string) (string, error) {
 }
 
 // GetUnstagedDiff returns the unified diff of unstaged changes
-func GetUnstagedDiff(files ...string) (string, error) {
+func GetUnstagedDiff(ctx context.Context, files ...string) (string, error) {
 	args := []string{"diff"}
 	if len(files) > 0 {
 		args = append(args, "--")
 		args = append(args, files...)
 	}
-	output, err := RunGitCommandRaw(args...)
+	output, err := RunGitCommandRawWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get unstaged diff: %w", err)
 	}

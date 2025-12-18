@@ -1,6 +1,7 @@
 package submit_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		// Track the branch in the engine
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Create mocked GitHub client
@@ -83,7 +84,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		// Track the branch in the engine
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
-		err = eng.TrackBranch("feature", "main")
+		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Create mocked GitHub client with existing PR
@@ -104,7 +105,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumber] = pr
 
 		// Store PR info in engine
-		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Number:  &prNumber,
 			Title:   prData.Title,
 			Body:    prData.Body,

@@ -12,7 +12,7 @@ import (
 )
 
 // SyncPrInfo syncs PR information for branches from GitHub
-func SyncPrInfo(branchNames []string, repoOwner, repoName string) error {
+func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName string) error {
 	// Get GitHub token
 	token, err := getGitHubToken()
 	if err != nil {
@@ -21,7 +21,6 @@ func SyncPrInfo(branchNames []string, repoOwner, repoName string) error {
 	}
 
 	// Create GitHub client
-	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
@@ -30,7 +29,7 @@ func SyncPrInfo(branchNames []string, repoOwner, repoName string) error {
 
 	// Get repository info if not provided
 	if repoOwner == "" || repoName == "" {
-		owner, name, err := getRepoInfo()
+		owner, name, err := getRepoInfo(ctx)
 		if err != nil {
 			return nil // Skip if can't determine repo
 		}
@@ -133,9 +132,9 @@ func getGitHubToken() (string, error) {
 }
 
 // getRepoInfo gets repository owner and name from git remote
-func getRepoInfo() (string, string, error) {
+func getRepoInfo(ctx context.Context) (string, string, error) {
 	// Get remote URL
-	url, err := RunGitCommand("config", "--get", "remote.origin.url")
+	url, err := RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
 	if err != nil {
 		return "", "", err
 	}

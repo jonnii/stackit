@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -31,32 +32,32 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if err := checkRebaseInProgress(); err != nil {
+	if err := checkRebaseInProgress(ctx.Context); err != nil {
 		return err
 	}
 
 	// Check if there are staged changes (before handling flags)
-	_, err := git.HasStagedChanges()
+	_, err := git.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
 
 	// Handle --all flag: stage all tracked changes
 	if opts.All {
-		if err := git.StageTracked(); err != nil {
+		if err := git.StageTracked(ctx.Context); err != nil {
 			return fmt.Errorf("failed to stage all changes: %w", err)
 		}
 	}
 
 	// Handle --patch flag: interactive patch staging
 	if opts.Patch {
-		if err := git.StagePatch(); err != nil {
+		if err := git.StagePatch(ctx.Context); err != nil {
 			return fmt.Errorf("failed to stage patch: %w", err)
 		}
 	}
 
 	// Re-check staged changes after flags
-	hasStaged, err := git.HasStagedChanges()
+	hasStaged, err := git.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -65,7 +66,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Parse staged hunks
-	hunks, err := git.ParseStagedHunks()
+	hunks, err := git.ParseStagedHunks(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to parse staged hunks: %w", err)
 	}
@@ -84,7 +85,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	downstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
 	// Get all commit SHAs from downstack branches (newest to oldest)
-	commitSHAs, err := getAllCommitSHAs(downstackBranches, eng)
+	commitSHAs, err := getAllCommitSHAs(ctx.Context, downstackBranches, eng)
 	if err != nil {
 		return fmt.Errorf("failed to get commit SHAs: %w", err)
 	}
@@ -94,7 +95,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	unabsorbedHunks := []git.Hunk{}
 
 	for _, hunk := range hunks {
-		commitSHA, commitIndex, err := git.FindTargetCommitForHunk(hunk, commitSHAs)
+		commitSHA, commitIndex, err := git.FindTargetCommitForHunk(ctx.Context, hunk, commitSHAs)
 		if err != nil {
 			return fmt.Errorf("failed to find target commit for hunk: %w", err)
 		}
@@ -120,13 +121,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Print dry-run output or confirmation
 	if opts.DryRun {
-		return printDryRunOutput(hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+		printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
+		return nil
 	}
 
 	// Print what will be absorbed
-	if err := printAbsorbPlan(hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog); err != nil {
-		return err
-	}
+	printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, downstackBranches, eng, splog)
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
@@ -161,13 +161,19 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		return idxI > idxJ // Higher index = older commit
 	})
 
+	// Track the oldest modified branch to know where to start restacking from
+	var oldestModifiedBranch string
+	if len(commitList) > 0 {
+		oldestModifiedBranch, _ = findBranchForCommit(ctx.Context, commitList[0], downstackBranches, eng)
+	}
+
 	// Stash all changes (staged and unstaged) before starting to rewrite commits
 	// This ensures a clean working directory for checkouts and prevents losing changes
-	stashOutput, stashErr := git.RunGitCommand("stash", "push", "-u", "-m", "stackit-absorb-temp")
+	stashOutput, stashErr := git.RunGitCommandWithContext(ctx.Context, "stash", "push", "-u", "-m", "stackit-absorb-temp")
 	if stashErr == nil && !strings.Contains(stashOutput, "No local changes to save") {
 		defer func() {
 			// Restore stash after we're done
-			_, _ = git.RunGitCommand("stash", "pop")
+			_, _ = git.RunGitCommandWithContext(ctx.Context, "stash", "pop")
 		}()
 	}
 
@@ -175,13 +181,13 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		hunks := hunksByCommit[commitSHA]
 
 		// Find branch for this commit
-		branchName, err := findBranchForCommit(commitSHA, downstackBranches, eng)
+		branchName, err := findBranchForCommit(ctx.Context, commitSHA, downstackBranches, eng)
 		if err != nil {
 			return fmt.Errorf("failed to find branch for commit: %w", err)
 		}
 
 		// Apply all hunks for this commit together
-		if err := git.ApplyHunksToCommit(hunks, commitSHA, branchName); err != nil {
+		if err := git.ApplyHunksToCommit(ctx.Context, hunks, commitSHA, branchName); err != nil {
 			return fmt.Errorf("failed to apply hunks to commit %s: %w", commitSHA[:8], err)
 		}
 
@@ -196,17 +202,32 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		}
 	}
 
-	// Restack upstack branches
-	scope = engine.Scope{
-		RecursiveParents:  false,
-		IncludeCurrent:    false,
-		RecursiveChildren: true,
+	// Refresh engine state after modifying branch references directly via git
+	if err := eng.Rebuild(ctx.Context, ""); err != nil {
+		return fmt.Errorf("failed to refresh engine after absorb: %w", err)
 	}
-	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 
-	if len(upstackBranches) > 0 {
-		if err := RestackBranches(upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
-			return fmt.Errorf("failed to restack upstack branches: %w", err)
+	// Restack all branches above the oldest modified branch
+	if oldestModifiedBranch != "" {
+		scope = engine.Scope{
+			RecursiveParents:  false,
+			IncludeCurrent:    true, // Include the current branch if it's upstack
+			RecursiveChildren: true,
+		}
+		branchesToRestack := eng.GetRelativeStack(oldestModifiedBranch, scope)
+
+		// Filter out the oldestModifiedBranch itself (we only want descendants)
+		var upstackBranches []string
+		for _, b := range branchesToRestack {
+			if b != oldestModifiedBranch {
+				upstackBranches = append(upstackBranches, b)
+			}
+		}
+
+		if len(upstackBranches) > 0 {
+			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+				return fmt.Errorf("failed to restack upstack branches: %w", err)
+			}
 		}
 	}
 
@@ -214,12 +235,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 }
 
 // getAllCommitSHAs gets all commit SHAs from a list of branches (newest to oldest)
-func getAllCommitSHAs(branches []string, eng engine.Engine) ([]string, error) {
+func getAllCommitSHAs(ctx context.Context, branches []string, eng engine.Engine) ([]string, error) {
 	var allSHAs []string
 
 	for _, branchName := range branches {
 		// Get commits for this branch
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatSHA)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
 		}
@@ -234,9 +255,9 @@ func getAllCommitSHAs(branches []string, eng engine.Engine) ([]string, error) {
 }
 
 // findBranchForCommit finds which branch a commit belongs to
-func findBranchForCommit(commitSHA string, branches []string, eng engine.Engine) (string, error) {
+func findBranchForCommit(ctx context.Context, commitSHA string, branches []string, eng engine.Engine) (string, error) {
 	for _, branchName := range branches {
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatSHA)
 		if err != nil {
 			continue
 		}
@@ -252,19 +273,19 @@ func findBranchForCommit(commitSHA string, branches []string, eng engine.Engine)
 }
 
 // printDryRunOutput prints what would be absorbed in dry-run mode
-func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
+func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Would absorb the following changes:")
 	splog.Newline()
 
 	// Get commit info for display
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := findBranchForCommit(commitSHA, branches, eng)
+		branchName, err := findBranchForCommit(ctx, commitSHA, branches, eng)
 		if err != nil {
 			branchName = "unknown"
 		}
 
 		// Get commit message - show first commit message from the branch
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
+		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
 			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])
@@ -284,17 +305,15 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 			splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}
 	}
-
-	return nil
 }
 
 // printAbsorbPlan prints the plan for absorbing changes
-func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) error {
+func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, branches []string, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Will absorb the following changes:")
 	splog.Newline()
 
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := findBranchForCommit(commitSHA, branches, eng)
+		branchName, err := findBranchForCommit(ctx, commitSHA, branches, eng)
 		if err != nil {
 			branchName = "unknown"
 		}
@@ -312,13 +331,11 @@ func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.
 			splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}
 	}
-
-	return nil
 }
 
 // checkRebaseInProgress checks if a rebase is in progress
-func checkRebaseInProgress() error {
-	if git.IsRebaseInProgress() {
+func checkRebaseInProgress(ctx context.Context) error {
+	if git.IsRebaseInProgress(ctx) {
 		return fmt.Errorf("cannot absorb during a rebase. Please finish or abort the rebase first")
 	}
 	return nil

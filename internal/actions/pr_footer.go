@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -13,10 +14,10 @@ const (
 )
 
 // CreatePRBodyFooter creates a PR body footer with dependency tree
-func CreatePRBodyFooter(branch string, eng engine.Engine) string {
+func CreatePRBodyFooter(ctx context.Context, branch string, eng engine.Engine) string {
 	terminalParent := findTerminalParent(branch, eng)
 
-	tree := buildBranchTree(eng, []string{terminalParent}, branch, 0)
+	tree := buildBranchTree(ctx, eng, []string{terminalParent}, branch, 0)
 
 	return footerTitle + tree + footerFooter
 }
@@ -46,7 +47,7 @@ func UpdatePRBodyFooter(existingBody, footer string) string {
 }
 
 // findTerminalParent finds the terminal parent (parent of trunk) for a branch
-func findTerminalParent(currentBranch string, eng engine.Engine) string {
+func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 	parent := eng.GetParent(currentBranch)
 	if parent == "" {
 		// No parent, use trunk
@@ -61,7 +62,7 @@ func findTerminalParent(currentBranch string, eng engine.Engine) string {
 }
 
 // buildBranchTree builds a tree representation of branch dependencies
-func buildBranchTree(eng engine.Engine, currentBranches []string, prBranch string, currentDepth int) string {
+func buildBranchTree(ctx context.Context, eng engine.Engine, currentBranches []string, prBranch string, currentDepth int) string {
 	var tree strings.Builder
 
 	for _, branch := range currentBranches {
@@ -69,14 +70,14 @@ func buildBranchTree(eng engine.Engine, currentBranches []string, prBranch strin
 			continue
 		}
 
-		leaf := buildLeaf(eng, branch, currentDepth, prBranch)
+		leaf := buildLeaf(ctx, eng, branch, currentDepth, prBranch)
 		if leaf != "" {
 			tree.WriteString(leaf)
 		}
 
 		children := eng.GetChildren(branch)
 		if len(children) > 0 {
-			childTree := buildBranchTree(eng, children, prBranch, currentDepth+1)
+			childTree := buildBranchTree(ctx, eng, children, prBranch, currentDepth+1)
 			tree.WriteString(childTree)
 		}
 	}
@@ -85,8 +86,8 @@ func buildBranchTree(eng engine.Engine, currentBranches []string, prBranch strin
 }
 
 // buildLeaf builds a single leaf in the tree
-func buildLeaf(eng engine.Engine, branch string, depth int, prBranch string) string {
-	prInfo, err := eng.GetPrInfo(branch)
+func buildLeaf(ctx context.Context, eng engine.PRManager, branch string, depth int, prBranch string) string {
+	prInfo, err := eng.GetPrInfo(ctx, branch)
 	if err != nil || prInfo == nil || prInfo.Number == nil {
 		return ""
 	}
@@ -101,13 +102,13 @@ func buildLeaf(eng engine.Engine, branch string, depth int, prBranch string) str
 }
 
 // isParentOrChild checks if branch1 is a parent or child of branch2
-func isParentOrChild(eng engine.Engine, branch1, branch2 string) bool {
+func isParentOrChild(eng engine.BranchReader, branch1, branch2 string) bool {
 	visited := make(map[string]bool)
 	return isParentOrChildRecursive(eng, branch1, branch2, visited)
 }
 
 // isParentOrChildRecursive is the recursive helper with cycle detection
-func isParentOrChildRecursive(eng engine.Engine, branch1, branch2 string, visited map[string]bool) bool {
+func isParentOrChildRecursive(eng engine.BranchReader, branch1, branch2 string, visited map[string]bool) bool {
 	// Prevent infinite recursion
 	if visited[branch1] {
 		return false

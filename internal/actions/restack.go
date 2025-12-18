@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 
 	"stackit.dev/stackit/internal/config"
@@ -10,14 +11,14 @@ import (
 )
 
 // RestackBranches restacks a list of branches
-func RestackBranches(branchNames []string, eng engine.Engine, splog *tui.Splog, repoRoot string) error {
+func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engine, splog *tui.Splog, repoRoot string) error {
 	for i, branchName := range branchNames {
 		if eng.IsTrunk(branchName) {
 			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
 			continue
 		}
 
-		result, err := eng.RestackBranch(branchName)
+		result, err := eng.RestackBranch(ctx, branchName)
 		if err != nil {
 			return fmt.Errorf("failed to restack %s: %w", branchName, err)
 		}
@@ -52,7 +53,7 @@ func RestackBranches(branchNames []string, eng engine.Engine, splog *tui.Splog, 
 			}
 
 			// Print conflict status
-			if err := PrintConflictStatus(branchName, eng, splog); err != nil {
+			if err := PrintConflictStatus(ctx, branchName, eng, splog); err != nil {
 				return fmt.Errorf("failed to print conflict status: %w", err)
 			}
 
@@ -91,5 +92,5 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	}
 
 	// Call RestackBranches
-	return RestackBranches(branches, eng, splog, ctx.RepoRoot)
+	return RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot)
 }

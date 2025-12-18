@@ -1,6 +1,7 @@
 package submit_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: true,
@@ -93,7 +94,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.True(t, metadata.IsDraft, "PR should preserve existing draft status")
 
 		// Test with non-draft existing PR
-		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: false,
@@ -114,7 +115,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with non-draft status
-		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: false,
@@ -139,7 +140,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err = eng.UpsertPrInfo(branchName, &engine.PrInfo{
+		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: true,

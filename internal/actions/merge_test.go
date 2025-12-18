@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -117,7 +118,7 @@ func TestMergeAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Switch to branch1
@@ -161,7 +162,7 @@ func TestMergeAction(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Add PR info
@@ -171,7 +172,7 @@ func TestMergeAction(t *testing.T) {
 			State:  "OPEN",
 			URL:    "https://github.com/owner/repo/pull/123",
 		}
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Switch to branch1
@@ -185,7 +186,7 @@ func TestMergeAction(t *testing.T) {
 
 		// Verify branch is tracked and has PR info
 		require.True(t, eng.IsBranchTracked("branch1"))
-		prInfo, err = eng.GetPrInfo("branch1")
+		prInfo, err = eng.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 

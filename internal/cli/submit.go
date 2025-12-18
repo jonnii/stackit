@@ -48,7 +48,7 @@ and fails if there are conflicts. Blocks force pushes to branches that overwrite
 you last submitted or got them. Opens an interactive prompt that allows you to input pull request metadata.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

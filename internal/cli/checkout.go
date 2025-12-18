@@ -26,7 +26,7 @@ The interactive selector allows you to navigate branches using arrow keys and fi
 by typing. Use flags to customize which branches are shown.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
-			ctx, err := runtime.GetContext()
+			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}

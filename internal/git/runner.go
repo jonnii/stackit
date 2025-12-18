@@ -1,61 +1,85 @@
+// Package git provides a wrapper around git commands and go-git for repository operations.
 package git
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"stackit.dev/stackit/internal/errors"
+	stackiterrors "stackit.dev/stackit/internal/errors"
 )
 
 // DefaultCommandTimeout is the default timeout for git commands
 const DefaultCommandTimeout = 5 * time.Minute
 
-// workingDir is an optional working directory for git commands.
-// When empty, commands run in the current working directory.
-// This can be set via SetWorkingDir for test isolation.
-var workingDir string
+// ErrStaleRemoteInfo indicates that a push failed because the remote has changed
+var ErrStaleRemoteInfo = errors.New("stale info")
 
-// SetWorkingDir sets the working directory for all git commands.
-// Pass empty string to use the current working directory.
-// This is primarily used for test isolation to enable parallel tests.
+// GitRunner handles execution of git commands
+type GitRunner struct {
+	workingDir string
+}
+
+// NewGitRunner creates a new GitRunner
+func NewGitRunner(workingDir string) *GitRunner {
+	return &GitRunner{workingDir: workingDir}
+}
+
+// defaultRunner is the global runner used by the package-level functions
+var defaultRunner = &GitRunner{}
+
+// SetWorkingDir sets the working directory for the default git runner.
 func SetWorkingDir(dir string) {
-	workingDir = dir
+	defaultRunner.workingDir = dir
 }
 
-// GetWorkingDir returns the current working directory setting.
+// GetWorkingDir returns the current working directory setting for the default runner.
 func GetWorkingDir() string {
-	return workingDir
+	return defaultRunner.workingDir
 }
 
-// RunGitCommand executes a git command and returns the output
+// RunGitCommand executes a git command using the default runner and returns the output.
 // It uses context.Background() with a default timeout.
 func RunGitCommand(args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
-	defer cancel()
-	return RunGitCommandWithContext(ctx, args...)
+	return defaultRunner.Run(context.Background(), args...)
 }
 
 // RunGitCommandInDir executes a git command in a specific directory and returns the output.
 func RunGitCommandInDir(dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
-	defer cancel()
-	return runGitCommandInternal(ctx, dir, "", true, args...)
+	runner := &GitRunner{workingDir: dir}
+	return runner.Run(context.Background(), args...)
 }
 
-// RunGitCommandWithContext executes a git command with the given context and returns the output
+// RunGitCommandWithContext executes a git command with the given context using the default runner.
 func RunGitCommandWithContext(ctx context.Context, args ...string) (string, error) {
-	return runGitCommandInternal(ctx, workingDir, "", true, args...)
+	return defaultRunner.Run(ctx, args...)
 }
 
-// runGitCommandInternal is the internal implementation that handles directory and input
-func runGitCommandInternal(ctx context.Context, dir string, input string, trim bool, args ...string) (string, error) {
+// Run executes a git command with the given context and returns the output
+func (r *GitRunner) Run(ctx context.Context, args ...string) (string, error) {
+	return r.runInternal(ctx, "", true, args...)
+}
+
+// runInternal is the internal implementation that handles directory and input
+func (r *GitRunner) runInternal(ctx context.Context, input string, trim bool, args ...string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// If no timeout/deadline is set in the context, add the default one
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultCommandTimeout)
+		defer cancel()
+	}
+
 	cmd := exec.CommandContext(ctx, "git", args...)
-	if dir != "" {
-		cmd.Dir = dir
+	if r.workingDir != "" {
+		cmd.Dir = r.workingDir
 	}
 	if input != "" {
 		cmd.Stdin = strings.NewReader(input)
@@ -67,9 +91,9 @@ func runGitCommandInternal(ctx context.Context, dir string, input string, trim b
 	err := cmd.Run()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", errors.NewGitCommandError("git", args, stdout.String(), stderr.String(), ctx.Err())
+			return "", stackiterrors.NewGitCommandError("git", args, stdout.String(), stderr.String(), ctx.Err())
 		}
-		return "", errors.NewGitCommandError("git", args, stdout.String(), stderr.String(), err)
+		return "", stackiterrors.NewGitCommandError("git", args, stdout.String(), stderr.String(), err)
 	}
 	if trim {
 		return strings.TrimSpace(stdout.String()), nil
@@ -77,14 +101,17 @@ func runGitCommandInternal(ctx context.Context, dir string, input string, trim b
 	return stdout.String(), nil
 }
 
-// RunGitCommandRaw executes a git command and returns the raw output (no trimming)
+// RunGitCommandRaw executes a git command using the default runner and returns the raw output (no trimming)
 func RunGitCommandRaw(args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
-	defer cancel()
-	return runGitCommandInternal(ctx, workingDir, "", false, args...)
+	return defaultRunner.runInternal(context.Background(), "", false, args...)
 }
 
-// RunGitCommandLines executes a git command and returns output as lines
+// RunGitCommandRawWithContext executes a git command using the default runner and returns the raw output (no trimming) with context
+func RunGitCommandRawWithContext(ctx context.Context, args ...string) (string, error) {
+	return defaultRunner.runInternal(ctx, "", false, args...)
+}
+
+// RunGitCommandLines executes a git command using the default runner and returns output as lines
 func RunGitCommandLines(args ...string) ([]string, error) {
 	output, err := RunGitCommand(args...)
 	if err != nil {
@@ -108,26 +135,22 @@ func RunGitCommandLinesWithContext(ctx context.Context, args ...string) ([]strin
 	return strings.Split(output, "\n"), nil
 }
 
-// RunGitCommandWithInput executes a git command with input and returns the output
-// It uses context.Background() with a default timeout.
+// RunGitCommandWithInput executes a git command with input using the default runner and returns the output
 func RunGitCommandWithInput(input string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultCommandTimeout)
-	defer cancel()
-	return runGitCommandInternal(ctx, workingDir, input, true, args...)
+	return defaultRunner.runInternal(context.Background(), input, true, args...)
 }
 
-// RunGitCommandWithInputAndContext executes a git command with input and context, returning the output
+// RunGitCommandWithInputAndContext executes a git command with input and context using the default runner
 func RunGitCommandWithInputAndContext(ctx context.Context, input string, args ...string) (string, error) {
-	return runGitCommandInternal(ctx, workingDir, input, true, args...)
+	return defaultRunner.runInternal(ctx, input, true, args...)
 }
 
 // RunGitCommandInteractive executes a git command interactively with stdin/stdout/stderr
-// connected to the terminal. This is needed for commands like `git add -p` that require
-// user interaction.
+// connected to the terminal.
 func RunGitCommandInteractive(args ...string) error {
 	cmd := exec.Command("git", args...)
-	if workingDir != "" {
-		cmd.Dir = workingDir
+	if defaultRunner.workingDir != "" {
+		cmd.Dir = defaultRunner.workingDir
 	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

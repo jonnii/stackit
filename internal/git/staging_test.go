@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,16 +25,16 @@ func TestStageAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify no staged changes initially
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.False(t, hasStaged)
 
 		// Stage all
-		err = git.StageAll()
+		err = git.StageAll(context.Background())
 		require.NoError(t, err)
 
 		// Verify changes are staged
-		hasStaged, err = git.HasStagedChanges()
+		hasStaged, err = git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasStaged)
 	})
@@ -55,11 +56,11 @@ func TestStageTracked(t *testing.T) {
 		require.NoError(t, err)
 
 		// Stage tracked only
-		err = git.StageTracked()
+		err = git.StageTracked(context.Background())
 		require.NoError(t, err)
 
 		// Verify tracked file is staged
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasStaged)
 	})
@@ -71,7 +72,7 @@ func TestHasStagedChanges(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.False(t, hasStaged)
 	})
@@ -85,7 +86,7 @@ func TestHasStagedChanges(t *testing.T) {
 		err := scene.Repo.CreateChange("new content", "test", false)
 		require.NoError(t, err)
 
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasStaged)
 	})
@@ -97,7 +98,7 @@ func TestHasUnstagedChanges(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
-		hasUnstaged, err := git.HasUnstagedChanges()
+		hasUnstaged, err := git.HasUnstagedChanges(context.Background())
 		require.NoError(t, err)
 		require.False(t, hasUnstaged)
 	})
@@ -111,7 +112,7 @@ func TestHasUnstagedChanges(t *testing.T) {
 		err := scene.Repo.CreateChange("modified", "test", true)
 		require.NoError(t, err)
 
-		hasUnstaged, err := git.HasUnstagedChanges()
+		hasUnstaged, err := git.HasUnstagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasUnstaged)
 	})
@@ -123,7 +124,7 @@ func TestHasUntrackedFiles(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
-		hasUntracked, err := git.HasUntrackedFiles()
+		hasUntracked, err := git.HasUntrackedFiles(context.Background())
 		require.NoError(t, err)
 		require.False(t, hasUntracked)
 	})
@@ -137,7 +138,7 @@ func TestHasUntrackedFiles(t *testing.T) {
 		err := scene.Repo.CreateChange("content", "newfile", true)
 		require.NoError(t, err)
 
-		hasUntracked, err := git.HasUntrackedFiles()
+		hasUntracked, err := git.HasUntrackedFiles(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasUntracked)
 	})
@@ -154,11 +155,11 @@ func TestAddAll(t *testing.T) {
 		require.NoError(t, err)
 
 		// Use AddAll
-		err = git.AddAll()
+		err = git.AddAll(context.Background())
 		require.NoError(t, err)
 
 		// Verify changes are staged
-		hasStaged, err := git.HasStagedChanges()
+		hasStaged, err := git.HasStagedChanges(context.Background())
 		require.NoError(t, err)
 		require.True(t, hasStaged)
 	})

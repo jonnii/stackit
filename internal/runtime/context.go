@@ -15,6 +15,7 @@ import (
 
 // Context provides access to engine and output for commands
 type Context struct {
+	context.Context
 	Engine       engine.Engine
 	Splog        *tui.Splog
 	RepoRoot     string
@@ -24,14 +25,16 @@ type Context struct {
 // NewContext creates a new context with the given engine
 func NewContext(eng engine.Engine) *Context {
 	return &Context{
-		Engine: eng,
-		Splog:  tui.NewSplog(),
+		Context: context.Background(),
+		Engine:  eng,
+		Splog:   tui.NewSplog(),
 	}
 }
 
 // NewContextWithRepoRoot creates a new context with the given engine and repo root
 func NewContextWithRepoRoot(eng engine.Engine, repoRoot string) *Context {
 	return &Context{
+		Context:  context.Background(),
 		Engine:   eng,
 		Splog:    tui.NewSplog(),
 		RepoRoot: repoRoot,
@@ -54,14 +57,15 @@ var DemoGitHubClientFactory func() git.GitHubClient
 // NewContextAuto creates a context automatically based on the environment.
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine
 // using the provided repoRoot.
-func NewContextAuto(repoRoot string) (*Context, error) {
+func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
 	if IsDemoMode() && DemoEngineFactory != nil {
 		eng := DemoEngineFactory()
-		ctx := NewContext(eng)
+		runtimeCtx := NewContext(eng)
+		runtimeCtx.Context = ctx
 		if DemoGitHubClientFactory != nil {
-			ctx.GitHubClient = DemoGitHubClientFactory()
+			runtimeCtx.GitHubClient = DemoGitHubClientFactory()
 		}
-		return ctx, nil
+		return runtimeCtx, nil
 	}
 
 	// Create real engine
@@ -70,23 +74,24 @@ func NewContextAuto(repoRoot string) (*Context, error) {
 		return nil, err
 	}
 
-	ctx := NewContextWithRepoRoot(eng, repoRoot)
+	runtimeCtx := NewContextWithRepoRoot(eng, repoRoot)
+	runtimeCtx.Context = ctx
 
 	// Try to create real GitHub client (may fail if no token)
-	ghClient, err := git.NewRealGitHubClient(context.Background())
+	ghClient, err := git.NewRealGitHubClient(ctx)
 	if err == nil {
-		ctx.GitHubClient = ghClient
+		runtimeCtx.GitHubClient = ghClient
 	}
 
-	return ctx, nil
+	return runtimeCtx, nil
 }
 
 // GetContext returns the appropriate context (demo or real) based on the environment.
 // This handles git initialization and config checks for real mode.
-func GetContext() (*Context, error) {
+func GetContext(ctx context.Context) (*Context, error) {
 	// Check for demo mode first
 	if IsDemoMode() {
-		return NewContextAuto("")
+		return NewContextAuto(ctx, "")
 	}
 
 	// Initialize git repository
@@ -105,5 +110,5 @@ func GetContext() (*Context, error) {
 		return nil, fmt.Errorf("stackit not initialized. Run 'stackit init' first")
 	}
 
-	return NewContextAuto(repoRoot)
+	return NewContextAuto(ctx, repoRoot)
 }

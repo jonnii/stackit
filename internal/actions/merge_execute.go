@@ -44,11 +44,12 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 // validateStepPreconditions validates that a step can be executed
 func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
 	eng := ctx.Engine
+	context := ctx.Context
 
 	switch step.StepType {
 	case StepMergePR:
 		// Validate PR still exists and is open
-		prInfo, err := eng.GetPrInfo(step.BranchName)
+		prInfo, err := eng.GetPrInfo(context, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -60,7 +61,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 		}
 		// Optionally check CI checks haven't changed to failing
 		if !opts.Force {
-			passing, _, err := git.GetPRChecksStatus(step.BranchName)
+			passing, _, err := git.GetPRChecksStatus(context, step.BranchName)
 			if err == nil && !passing {
 				return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
 			}
@@ -78,7 +79,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 
 	case StepUpdatePRBase:
 		// Validate PR exists
-		prInfo, err := eng.GetPrInfo(step.BranchName)
+		prInfo, err := eng.GetPrInfo(context, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -97,21 +98,22 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context
 
 	switch step.StepType {
 	case StepMergePR:
-		if err := git.MergePullRequest(step.BranchName); err != nil {
+		if err := git.MergePullRequest(context, step.BranchName); err != nil {
 			return fmt.Errorf("failed to merge PR: %w", err)
 		}
 
 	case StepPullTrunk:
-		pullResult, err := eng.PullTrunk()
+		pullResult, err := eng.PullTrunk(context)
 		if err != nil {
 			return fmt.Errorf("failed to pull trunk: %w", err)
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(eng.Trunk())
+			rev, _ := eng.GetRevision(context, eng.Trunk())
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -126,12 +128,12 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 	case StepRestack:
 		// Set parent to trunk first
 		trunk := eng.Trunk()
-		if err := eng.SetParent(step.BranchName, trunk); err != nil {
+		if err := eng.SetParent(context, step.BranchName, trunk); err != nil {
 			return fmt.Errorf("failed to set parent: %w", err)
 		}
 
 		// Restack the branch
-		result, err := eng.RestackBranch(step.BranchName)
+		result, err := eng.RestackBranch(context, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to restack: %w", err)
 		}
@@ -140,13 +142,13 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 		case engine.RestackDone:
 			// Success - now push the rebased branch and update PR base
 			// Force push is required since we rebased
-			if err := git.PushBranch(step.BranchName, git.GetRemote(), true, false); err != nil {
+			if err := git.PushBranch(context, step.BranchName, git.GetRemote(context), true, false); err != nil {
 				return fmt.Errorf("failed to push rebased branch %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
 
 			// Update the PR's base branch to trunk on GitHub
-			if err := updatePRBaseBranch(step.BranchName, trunk); err != nil {
+			if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
 				return fmt.Errorf("failed to update PR base for %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Updated PR base for %s to %s", step.BranchName, trunk)
@@ -164,11 +166,11 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 		case engine.RestackUnneeded:
 			// Already up to date, but still need to ensure PR base is correct
 			// Push in case local is ahead of remote
-			if err := git.PushBranch(step.BranchName, git.GetRemote(), true, false); err != nil {
+			if err := git.PushBranch(context, step.BranchName, git.GetRemote(context), true, false); err != nil {
 				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
 			}
 			// Update PR base to trunk
-			if err := updatePRBaseBranch(step.BranchName, trunk); err != nil {
+			if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
 				splog.Debug("Failed to update PR base for %s: %v", step.BranchName, err)
 			}
 		}
@@ -176,7 +178,7 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 	case StepDeleteBranch:
 		// Only delete if branch is tracked
 		if eng.IsBranchTracked(step.BranchName) {
-			if err := eng.DeleteBranch(step.BranchName); err != nil {
+			if err := eng.DeleteBranch(context, step.BranchName); err != nil {
 				// Non-fatal - branch might already be deleted
 				splog.Debug("Failed to delete branch %s (may already be deleted): %v", step.BranchName, err)
 			}
@@ -184,7 +186,7 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 
 	case StepUpdatePRBase:
 		// For top-down strategy: rebase branch onto trunk and update PR base
-		if err := executeUpdatePRBase(step, ctx); err != nil {
+		if err := executeUpdatePRBase(ctx, step); err != nil {
 			return err
 		}
 
@@ -197,9 +199,10 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 
 // executeUpdatePRBase handles the UPDATE_PR_BASE step
 // This is used in top-down strategy to rebase the current branch onto trunk
-func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
+func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	eng := ctx.Engine
 	trunk := eng.Trunk()
+	context := ctx.Context
 
 	// Get the parent revision (old base)
 	parent := eng.GetParent(step.BranchName)
@@ -208,7 +211,7 @@ func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
 	}
 
 	// Get the old parent revision
-	oldParentRev, err := eng.GetRevision(parent)
+	oldParentRev, err := eng.GetRevision(context, parent)
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}
@@ -216,11 +219,11 @@ func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
 	// If parent is already trunk, we might just need to update the PR base
 	if parent == trunk {
 		// Just update the PR base branch via GitHub API
-		return updatePRBaseBranch(step.BranchName, trunk)
+		return updatePRBaseBranch(context, step.BranchName, trunk)
 	}
 
 	// Rebase the branch onto trunk
-	gitResult, err := git.Rebase(step.BranchName, trunk, oldParentRev)
+	gitResult, err := git.Rebase(context, step.BranchName, trunk, oldParentRev)
 	if err != nil {
 		return fmt.Errorf("failed to rebase: %w", err)
 	}
@@ -230,17 +233,17 @@ func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
 	}
 
 	// Update parent to trunk
-	if err := eng.SetParent(step.BranchName, trunk); err != nil {
+	if err := eng.SetParent(context, step.BranchName, trunk); err != nil {
 		return fmt.Errorf("failed to update parent: %w", err)
 	}
 
 	// Update PR base branch via GitHub API
-	if err := updatePRBaseBranch(step.BranchName, trunk); err != nil {
+	if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 
 	// Rebuild engine to reflect changes
-	if err := eng.Rebuild(trunk); err != nil {
+	if err := eng.Rebuild(context, trunk); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -248,8 +251,7 @@ func executeUpdatePRBase(step MergePlanStep, ctx *runtime.Context) error {
 }
 
 // updatePRBaseBranch updates a PR's base branch via GitHub API
-func updatePRBaseBranch(branchName, newBase string) error {
-	ctx := context.Background()
+func updatePRBaseBranch(ctx context.Context, branchName, newBase string) error {
 	client, owner, repo, err := git.GetGitHubClient(ctx)
 	if err != nil {
 		// If we can't get GitHub client, skip this step (non-fatal)
@@ -276,12 +278,12 @@ func updatePRBaseBranch(branchName, newBase string) error {
 }
 
 // CheckSyncStatus checks if the repository is up to date with remote
-func CheckSyncStatus(eng engine.Engine, splog *tui.Splog) (bool, []string, error) {
+func CheckSyncStatus(ctx context.Context, eng engine.Engine, splog *tui.Splog) (bool, []string, error) {
 	needsSync := false
 	staleBranches := []string{}
 
 	// Check if trunk needs pulling
-	pullResult, err := eng.PullTrunk()
+	pullResult, err := eng.PullTrunk(ctx)
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to check trunk status: %w", err)
 	}
@@ -298,7 +300,7 @@ func CheckSyncStatus(eng engine.Engine, splog *tui.Splog) (bool, []string, error
 			continue
 		}
 
-		matchesRemote, err := eng.BranchMatchesRemote(branchName)
+		matchesRemote, err := eng.BranchMatchesRemote(ctx, branchName)
 		if err != nil {
 			splog.Debug("Failed to check if %s matches remote: %v", branchName, err)
 			continue

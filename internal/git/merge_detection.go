@@ -1,20 +1,21 @@
 package git
 
 import (
+	"context"
 	"fmt"
 )
 
 // IsMerged checks if a branch is merged into trunk
 // Uses git cherry to detect if all commits are in trunk
-func IsMerged(branchName, trunkName string) (bool, error) {
+func IsMerged(ctx context.Context, branchName, trunkName string) (bool, error) {
 	// Get merge base
-	mergeBase, err := GetMergeBase(branchName, trunkName)
+	mergeBase, err := GetMergeBase(ctx, branchName, trunkName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get merge base: %w", err)
 	}
 
 	// Get branch revision
-	branchRev, err := GetRevision(branchName)
+	branchRev, err := GetRevision(ctx, branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get branch revision: %w", err)
 	}
@@ -27,11 +28,11 @@ func IsMerged(branchName, trunkName string) (bool, error) {
 	// Use git cherry to check if all commits are in trunk
 	// git cherry <trunk> <branch> returns commits that are in branch but not in trunk
 	// If empty, all commits are merged
-	cherryOutput, err := RunGitCommand("cherry", trunkName, branchName)
+	cherryOutput, err := RunGitCommandWithContext(ctx, "cherry", trunkName, branchName)
 	if err != nil {
 		// If cherry fails, fall back to simpler check
 		// Check if branch tip is reachable from trunk
-		_, err = RunGitCommand("merge-base", "--is-ancestor", branchRev, trunkName)
+		_, err = RunGitCommandWithContext(ctx, "merge-base", "--is-ancestor", branchRev, trunkName)
 		return err == nil, nil
 	}
 

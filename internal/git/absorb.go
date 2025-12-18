@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,7 +20,7 @@ type HunkTarget struct {
 
 // FindTargetCommitForHunk finds the first commit downstack where the hunk doesn't commute
 // Returns the commit SHA and index, or empty string if hunk commutes with all commits
-func FindTargetCommitForHunk(hunk Hunk, commitSHAs []string) (string, int, error) {
+func FindTargetCommitForHunk(ctx context.Context, hunk Hunk, commitSHAs []string) (string, int, error) {
 	if len(commitSHAs) == 0 {
 		return "", -1, nil
 	}
@@ -27,14 +28,14 @@ func FindTargetCommitForHunk(hunk Hunk, commitSHAs []string) (string, int, error
 	// Iterate through commits from newest to oldest
 	for i, commitSHA := range commitSHAs {
 		// Get parent commit SHA
-		parentSHA, err := GetParentCommitSHA(commitSHA)
+		parentSHA, err := GetParentCommitSHA(ctx, commitSHA)
 		if err != nil {
 			// If we can't get parent, skip this commit
 			continue
 		}
 
 		// Check if hunk commutes with this commit
-		commutes, err := CheckCommutation(hunk, commitSHA, parentSHA)
+		commutes, err := CheckCommutation(ctx, hunk, commitSHA, parentSHA)
 		if err != nil {
 			return "", -1, fmt.Errorf("failed to check commutation: %w", err)
 		}
@@ -51,9 +52,9 @@ func FindTargetCommitForHunk(hunk Hunk, commitSHAs []string) (string, int, error
 
 // CheckCommutation checks if a hunk commutes with a commit
 // Two patches commute if they don't touch overlapping lines in the same file
-func CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error) {
+func CheckCommutation(ctx context.Context, hunk Hunk, commitSHA, parentSHA string) (bool, error) {
 	// Get the commit's diff to see what lines it touches
-	commitDiff, err := GetCommitDiff(commitSHA, parentSHA)
+	commitDiff, err := GetCommitDiff(ctx, commitSHA, parentSHA)
 	if err != nil {
 		return false, fmt.Errorf("failed to get commit diff: %w", err)
 	}
@@ -120,8 +121,8 @@ func hunkOverlaps(h1, h2 Hunk) bool {
 }
 
 // GetCommitDiff returns the diff for a commit
-func GetCommitDiff(commitSHA, parentSHA string) (string, error) {
-	output, err := RunGitCommandRaw("diff", parentSHA, commitSHA)
+func GetCommitDiff(ctx context.Context, commitSHA, parentSHA string) (string, error) {
+	output, err := RunGitCommandRawWithContext(ctx, "diff", parentSHA, commitSHA)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit diff: %w", err)
 	}
@@ -129,8 +130,8 @@ func GetCommitDiff(commitSHA, parentSHA string) (string, error) {
 }
 
 // GetParentCommitSHA returns the parent commit SHA of a commit
-func GetParentCommitSHA(commitSHA string) (string, error) {
-	output, err := RunGitCommand("rev-parse", commitSHA+"^")
+func GetParentCommitSHA(ctx context.Context, commitSHA string) (string, error) {
+	output, err := RunGitCommandWithContext(ctx, "rev-parse", commitSHA+"^")
 	if err != nil {
 		return "", fmt.Errorf("failed to get parent commit: %w", err)
 	}
@@ -228,7 +229,7 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 }
 
 // ApplyHunksToCommit applies multiple hunks to a commit by rewriting it
-func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error {
+func ApplyHunksToCommit(ctx context.Context, hunks []Hunk, commitSHA string, branchName string) error {
 	if len(hunks) == 0 {
 		return nil
 	}
@@ -246,24 +247,24 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	}
 
 	// Get commit's parent
-	parentSHA, err := GetParentCommitSHA(commitSHA)
+	parentSHA, err := GetParentCommitSHA(ctx, commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to get parent commit: %w", err)
 	}
 
 	// Get commit message
-	commitMessage, err := GetCommitMessage(commitSHA)
+	commitMessage, err := GetCommitMessage(ctx, commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to get commit message: %w", err)
 	}
 
 	// Get the commit author and date
-	author, err := GetCommitAuthorFromSHA(commitSHA)
+	author, err := GetCommitAuthorFromSHA(ctx, commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to get commit author: %w", err)
 	}
 
-	date, err := GetCommitDateFromSHA(commitSHA)
+	date, err := GetCommitDateFromSHA(ctx, commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to get commit date: %w", err)
 	}
@@ -306,10 +307,10 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	}
 
 	// Checkout parent commit (detached HEAD)
-	if err := CheckoutDetached(parentSHA); err != nil {
+	if err := CheckoutDetached(ctx, parentSHA); err != nil {
 		// Restore branch
 		if currentBranch != "" {
-			_ = CheckoutBranch(currentBranch)
+			_ = CheckoutBranch(ctx, currentBranch)
 		}
 		return fmt.Errorf("failed to checkout parent: %w", err)
 	}
@@ -317,18 +318,18 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	// Cleanup logic to ensure we always try to get back to original branch
 	defer func() {
 		// Use git command directly to avoid go-git caching issues
-		nowBranch, _ := RunGitCommand("branch", "--show-current")
+		nowBranch, _ := RunGitCommandWithContext(ctx, "branch", "--show-current")
 		nowBranch = strings.TrimSpace(nowBranch)
 
 		if nowBranch != currentBranch && currentBranch != "" {
 			// Clean up index/working tree if needed before checkout
-			_, _ = RunGitCommand("reset", "--hard", "HEAD")
-			_, _ = RunGitCommand("checkout", "-f", currentBranch)
+			_, _ = RunGitCommandWithContext(ctx, "reset", "--hard", "HEAD")
+			_ = CheckoutBranch(ctx, currentBranch)
 		}
 	}()
 
 	// First, apply the original commit's changes to the index
-	commitDiff, err := GetCommitDiff(commitSHA, parentSHA)
+	commitDiff, err := GetCommitDiff(ctx, commitSHA, parentSHA)
 	if err != nil {
 		return fmt.Errorf("failed to get commit diff: %w", err)
 	}
@@ -376,13 +377,13 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 	}
 
 	// Get new commit SHA
-	newCommitSHA, err := RunGitCommand("rev-parse", "HEAD")
+	newCommitSHA, err := RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
 	if err != nil {
 		return fmt.Errorf("failed to get new commit SHA: %w", err)
 	}
 
 	// Update branch to point to new commit
-	if err := UpdateBranchRef(branchName, strings.TrimSpace(newCommitSHA)); err != nil {
+	if err := UpdateBranchRef(ctx, branchName, strings.TrimSpace(newCommitSHA)); err != nil {
 		return fmt.Errorf("failed to update branch: %w", err)
 	}
 
@@ -390,8 +391,8 @@ func ApplyHunksToCommit(hunks []Hunk, commitSHA string, branchName string) error
 }
 
 // CheckoutDetached checks out a commit in detached HEAD state
-func CheckoutDetached(commitSHA string) error {
-	_, err := RunGitCommand("checkout", commitSHA)
+func CheckoutDetached(ctx context.Context, commitSHA string) error {
+	_, err := RunGitCommandWithContext(ctx, "checkout", commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to checkout commit: %w", err)
 	}
@@ -399,8 +400,8 @@ func CheckoutDetached(commitSHA string) error {
 }
 
 // GetCommitMessage returns the full commit message for a commit
-func GetCommitMessage(commitSHA string) (string, error) {
-	output, err := RunGitCommand("log", "-1", "--format=%B", commitSHA)
+func GetCommitMessage(ctx context.Context, commitSHA string) (string, error) {
+	output, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%B", commitSHA)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit message: %w", err)
 	}
@@ -414,13 +415,13 @@ type CommitAuthor struct {
 }
 
 // GetCommitAuthorFromSHA returns the author for a commit
-func GetCommitAuthorFromSHA(commitSHA string) (*CommitAuthor, error) {
-	name, err := RunGitCommand("log", "-1", "--format=%an", commitSHA)
+func GetCommitAuthorFromSHA(ctx context.Context, commitSHA string) (*CommitAuthor, error) {
+	name, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%an", commitSHA)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get author name: %w", err)
 	}
 
-	email, err := RunGitCommand("log", "-1", "--format=%ae", commitSHA)
+	email, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%ae", commitSHA)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get author email: %w", err)
 	}
@@ -432,10 +433,10 @@ func GetCommitAuthorFromSHA(commitSHA string) (*CommitAuthor, error) {
 }
 
 // GetCommitDateFromSHA returns the commit date
-func GetCommitDateFromSHA(commitSHA string) (time.Time, error) {
+func GetCommitDateFromSHA(ctx context.Context, commitSHA string) (time.Time, error) {
 	// Use git command to get the commit date (ISO 8601 format)
 	// This avoids using the global defaultRepo which can cause issues in parallel tests
-	output, err := RunGitCommand("log", "-1", "--format=%aI", commitSHA)
+	output, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%aI", commitSHA)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get commit date: %w", err)
 	}
@@ -455,8 +456,8 @@ func GetCommitDateFromSHA(commitSHA string) (time.Time, error) {
 }
 
 // UpdateBranchRef updates a branch reference to point to a new commit
-func UpdateBranchRef(branchName, commitSHA string) error {
-	_, err := RunGitCommand("update-ref", "refs/heads/"+branchName, commitSHA)
+func UpdateBranchRef(ctx context.Context, branchName, commitSHA string) error {
+	_, err := RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, commitSHA)
 	if err != nil {
 		return fmt.Errorf("failed to update branch ref: %w", err)
 	}

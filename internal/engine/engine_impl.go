@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -192,7 +193,7 @@ func (e *engineImpl) IsBranchTracked(branchName string) bool {
 
 // IsBranchFixed checks if a branch needs restacking
 // A branch is fixed if its parent revision matches the stored parent revision
-func (e *engineImpl) IsBranchFixed(branchName string) bool {
+func (e *engineImpl) IsBranchFixed(ctx context.Context, branchName string) bool {
 	if e.IsTrunk(branchName) {
 		return true
 	}
@@ -206,7 +207,7 @@ func (e *engineImpl) IsBranchFixed(branchName string) bool {
 	}
 
 	// Get current parent revision
-	parentRev, err := e.GetRevision(parent)
+	parentRev, err := git.GetRevision(ctx, parent)
 	if err != nil {
 		return false // Can't determine, assume needs restack
 	}
@@ -226,22 +227,22 @@ func (e *engineImpl) IsBranchFixed(branchName string) bool {
 }
 
 // GetCommitDate returns the commit date for a branch
-func (e *engineImpl) GetCommitDate(branchName string) (time.Time, error) {
-	return git.GetCommitDate(branchName)
+func (e *engineImpl) GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
+	return git.GetCommitDate(ctx, branchName)
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func (e *engineImpl) GetCommitAuthor(branchName string) (string, error) {
-	return git.GetCommitAuthor(branchName)
+func (e *engineImpl) GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
+	return git.GetCommitAuthor(ctx, branchName)
 }
 
 // GetRevision returns the SHA of a branch
-func (e *engineImpl) GetRevision(branchName string) (string, error) {
-	return git.GetRevision(branchName)
+func (e *engineImpl) GetRevision(ctx context.Context, branchName string) (string, error) {
+	return git.GetRevision(ctx, branchName)
 }
 
 // GetPrInfo returns PR information for a branch
-func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
+func (e *engineImpl) GetPrInfo(ctx context.Context, branchName string) (*PrInfo, error) {
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		return nil, err
@@ -265,7 +266,7 @@ func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
 }
 
 // UpsertPrInfo updates or creates PR information for a branch
-func (e *engineImpl) UpsertPrInfo(branchName string, prInfo *PrInfo) error {
+func (e *engineImpl) UpsertPrInfo(ctx context.Context, branchName string, prInfo *PrInfo) error {
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		meta = &git.Meta{}
@@ -311,12 +312,12 @@ func (e *engineImpl) GetParentPrecondition(branchName string) string {
 
 // BranchMatchesRemote checks if a branch matches its remote
 // For now, always return true (simplified)
-func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
+func (e *engineImpl) BranchMatchesRemote(ctx context.Context, branchName string) (bool, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	// Get local branch SHA
-	localSha, err := git.GetRevision(branchName)
+	localSha, err := e.GetRevision(ctx, branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get local revision for %s: %w", branchName, err)
 	}
@@ -332,7 +333,7 @@ func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
 }
 
 // PopulateRemoteShas populates remote branch information by fetching SHAs from remote
-func (e *engineImpl) PopulateRemoteShas() error {
+func (e *engineImpl) PopulateRemoteShas(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -341,7 +342,7 @@ func (e *engineImpl) PopulateRemoteShas() error {
 
 	// Fetch remote SHAs using git ls-remote
 	remote := "origin" // TODO: Get from config
-	remoteShas, err := git.FetchRemoteShas(remote)
+	remoteShas, err := git.FetchRemoteShas(ctx, remote)
 	if err != nil {
 		// Don't fail if we can't fetch remote SHAs (e.g., offline)
 		return nil
@@ -352,12 +353,12 @@ func (e *engineImpl) PopulateRemoteShas() error {
 }
 
 // PushBranch pushes a branch to the remote
-func (e *engineImpl) PushBranch(branchName string, remote string, force bool, forceWithLease bool) error {
-	return git.PushBranch(branchName, remote, force, forceWithLease)
+func (e *engineImpl) PushBranch(ctx context.Context, branchName string, remote string, force bool, forceWithLease bool) error {
+	return git.PushBranch(ctx, branchName, remote, force, forceWithLease)
 }
 
 // Reset clears all branch metadata and rebuilds with new trunk
-func (e *engineImpl) Reset(newTrunkName string) error {
+func (e *engineImpl) Reset(ctx context.Context, newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -382,7 +383,7 @@ func (e *engineImpl) Reset(newTrunkName string) error {
 }
 
 // Rebuild reloads branch cache with new trunk
-func (e *engineImpl) Rebuild(newTrunkName string) error {
+func (e *engineImpl) Rebuild(ctx context.Context, newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -424,7 +425,7 @@ func (e *engineImpl) rebuildInternal() error {
 }
 
 // TrackBranch tracks a branch with a parent branch
-func (e *engineImpl) TrackBranch(branchName string, parentBranchName string) error {
+func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentBranchName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -470,7 +471,7 @@ func (e *engineImpl) TrackBranch(branchName string, parentBranchName string) err
 	}
 
 	// Get merge base (parent revision)
-	parentRevision, err := git.GetMergeBase(branchName, parentBranchName)
+	parentRevision, err := git.GetMergeBase(ctx, branchName, parentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}
@@ -494,12 +495,12 @@ func (e *engineImpl) TrackBranch(branchName string, parentBranchName string) err
 }
 
 // PullTrunk pulls the trunk branch from remote
-func (e *engineImpl) PullTrunk() (PullResult, error) {
-	remote := git.GetRemote()
+func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
+	remote := git.GetRemote(ctx)
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
-	gitResult, err := git.PullBranch(remote, trunk)
+	gitResult, err := git.PullBranch(ctx, remote, trunk)
 	if err != nil {
 		return PullConflict, err
 	}
@@ -526,8 +527,8 @@ func (e *engineImpl) PullTrunk() (PullResult, error) {
 }
 
 // ResetTrunkToRemote resets trunk to match remote
-func (e *engineImpl) ResetTrunkToRemote() error {
-	remote := git.GetRemote()
+func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
+	remote := git.GetRemote(ctx)
 
 	e.mu.RLock()
 	trunk := e.trunk
@@ -535,28 +536,28 @@ func (e *engineImpl) ResetTrunkToRemote() error {
 	e.mu.RUnlock()
 
 	// Get remote SHA
-	remoteSha, err := git.GetRemoteSha(remote, trunk)
+	remoteSha, err := git.GetRemoteSha(ctx, remote, trunk)
 	if err != nil {
 		return fmt.Errorf("failed to get remote SHA: %w", err)
 	}
 
 	// Checkout trunk
-	if err := git.CheckoutBranch(trunk); err != nil {
+	if err := git.CheckoutBranch(ctx, trunk); err != nil {
 		return fmt.Errorf("failed to checkout trunk: %w", err)
 	}
 
 	// Hard reset to remote
-	if err := git.HardReset(remoteSha); err != nil {
+	if err := git.HardReset(ctx, remoteSha); err != nil {
 		// Try to switch back
 		if currentBranch != "" {
-			_ = git.CheckoutBranch(currentBranch)
+			_ = git.CheckoutBranch(ctx, currentBranch)
 		}
 		return fmt.Errorf("failed to reset trunk: %w", err)
 	}
 
 	// Switch back to original branch
 	if currentBranch != "" && currentBranch != trunk {
-		if err := git.CheckoutBranch(currentBranch); err != nil {
+		if err := git.CheckoutBranch(ctx, currentBranch); err != nil {
 			return fmt.Errorf("failed to switch back: %w", err)
 		}
 	}
@@ -574,7 +575,7 @@ func (e *engineImpl) ResetTrunkToRemote() error {
 // - No longer exists locally
 // - Has been merged into trunk
 // - Has a "MERGED" PR state in metadata
-func (e *engineImpl) shouldReparentBranch(parentBranchName string) bool {
+func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string) bool {
 	// Check if parent is trunk (no need to reparent)
 	if parentBranchName == e.trunk {
 		return false
@@ -593,13 +594,13 @@ func (e *engineImpl) shouldReparentBranch(parentBranchName string) bool {
 	}
 
 	// Check if parent has been merged into trunk
-	merged, err := git.IsMerged(parentBranchName, e.trunk)
+	merged, err := git.IsMerged(ctx, parentBranchName, e.trunk)
 	if err == nil && merged {
 		return true
 	}
 
 	// Check if parent has "MERGED" PR state in metadata
-	prInfo, err := e.GetPrInfo(parentBranchName)
+	prInfo, err := e.GetPrInfo(ctx, parentBranchName)
 	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
 		return true
 	}
@@ -609,11 +610,11 @@ func (e *engineImpl) shouldReparentBranch(parentBranchName string) bool {
 
 // findNearestValidAncestor finds the nearest ancestor that hasn't been merged/deleted
 // Returns trunk if all ancestors have been merged
-func (e *engineImpl) findNearestValidAncestor(branchName string) string {
+func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string) string {
 	current := e.parentMap[branchName]
 
 	for current != "" && current != e.trunk {
-		if !e.shouldReparentBranch(current) {
+		if !e.shouldReparentBranch(ctx, current) {
 			return current
 		}
 		// Move to the next parent
@@ -629,7 +630,7 @@ func (e *engineImpl) findNearestValidAncestor(branchName string) string {
 
 // RestackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
-func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, error) {
+func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (RestackBranchResult, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	e.mu.RUnlock()
@@ -644,7 +645,7 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 
 	// Check if parent needs reparenting (merged, deleted, or has MERGED PR state)
 	e.mu.RLock()
-	needsReparent := e.shouldReparentBranch(parent)
+	needsReparent := e.shouldReparentBranch(ctx, parent)
 	e.mu.RUnlock()
 
 	if needsReparent {
@@ -652,11 +653,11 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 
 		// Find nearest valid ancestor
 		e.mu.RLock()
-		newParent := e.findNearestValidAncestor(branchName)
+		newParent := e.findNearestValidAncestor(ctx, branchName)
 		e.mu.RUnlock()
 
 		// Reparent to the nearest valid ancestor
-		if err := e.SetParent(branchName, newParent); err != nil {
+		if err := e.SetParent(ctx, branchName, newParent); err != nil {
 			return RestackBranchResult{Result: RestackConflict}, fmt.Errorf("failed to reparent %s to %s: %w", branchName, newParent, err)
 		}
 		parent = newParent
@@ -664,13 +665,13 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 	}
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
-	parentRev, err := e.GetRevision(parent)
+	parentRev, err := e.GetRevision(ctx, parent)
 	if err != nil {
 		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
 	}
 
 	// Check if branch needs restacking
-	if e.IsBranchFixed(branchName) {
+	if e.IsBranchFixed(ctx, branchName) {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
 			RebasedBranchBase: parentRev,
@@ -703,7 +704,7 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 	}
 
 	// Perform rebase
-	gitResult, err := git.Rebase(branchName, parent, oldParentRev)
+	gitResult, err := git.Rebase(ctx, branchName, parent, oldParentRev)
 	if err != nil {
 		return RestackBranchResult{
 			Result:            RestackConflict,
@@ -757,9 +758,9 @@ func (e *engineImpl) RestackBranch(branchName string) (RestackBranchResult, erro
 }
 
 // ContinueRebase continues an in-progress rebase
-func (e *engineImpl) ContinueRebase(rebasedBranchBase string) (ContinueRebaseResult, error) {
+func (e *engineImpl) ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error) {
 	// Call git rebase --continue
-	result, err := git.RebaseContinue()
+	result, err := git.RebaseContinue(ctx)
 	if err != nil {
 		return ContinueRebaseResult{Result: int(git.RebaseConflict)}, err
 	}
@@ -797,15 +798,15 @@ func (e *engineImpl) ContinueRebase(rebasedBranchBase string) (ContinueRebaseRes
 }
 
 // IsMergedIntoTrunk checks if a branch is merged into trunk
-func (e *engineImpl) IsMergedIntoTrunk(branchName string) (bool, error) {
+func (e *engineImpl) IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error) {
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
-	return git.IsMerged(branchName, trunk)
+	return git.IsMerged(ctx, branchName, trunk)
 }
 
 // IsBranchEmpty checks if a branch has no changes compared to its parent
-func (e *engineImpl) IsBranchEmpty(branchName string) (bool, error) {
+func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool, error) {
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	trunk := e.trunk
@@ -817,16 +818,16 @@ func (e *engineImpl) IsBranchEmpty(branchName string) (bool, error) {
 	}
 
 	// Get parent revision
-	parentRev, err := e.GetRevision(parent)
+	parentRev, err := e.GetRevision(ctx, parent)
 	if err != nil {
 		return false, fmt.Errorf("failed to get parent revision: %w", err)
 	}
 
-	return git.IsDiffEmpty(branchName, parentRev)
+	return git.IsDiffEmpty(ctx, branchName, parentRev)
 }
 
 // DeleteBranch deletes a branch and its metadata
-func (e *engineImpl) DeleteBranch(branchName string) error {
+func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error {
 	if e.IsTrunk(branchName) {
 		return fmt.Errorf("cannot delete trunk branch")
 	}
@@ -844,7 +845,7 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 	}
 
 	// Delete git branch
-	if err := git.DeleteBranch(branchName); err != nil {
+	if err := git.DeleteBranch(ctx, branchName); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 
@@ -853,7 +854,7 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 
 	// Update children to point to parent
 	for _, child := range children {
-		if err := e.setParentInternal(child, parent); err != nil {
+		if err := e.setParentInternal(ctx, child, parent); err != nil {
 			// Log error but continue
 			continue
 		}
@@ -888,16 +889,16 @@ func (e *engineImpl) DeleteBranch(branchName string) error {
 }
 
 // SetParent updates a branch's parent
-func (e *engineImpl) SetParent(branchName string, parentBranchName string) error {
+func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBranchName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.setParentInternal(branchName, parentBranchName)
+	return e.setParentInternal(ctx, branchName, parentBranchName)
 }
 
 // setParentInternal updates parent without locking (caller must hold lock)
-func (e *engineImpl) setParentInternal(branchName string, parentBranchName string) error {
+func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, parentBranchName string) error {
 	// Get new parent revision
-	parentRev, err := git.GetMergeBase(branchName, parentBranchName)
+	parentRev, err := git.GetMergeBase(ctx, branchName, parentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}
@@ -987,7 +988,7 @@ func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
 }
 
 // SquashCurrentBranch squashes all commits in the current branch into a single commit
-func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
+func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -1015,13 +1016,13 @@ func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
 	parentBranchRevision := *meta.ParentBranchRevision
 
 	// Get current branch revision
-	branchRevision, err := git.GetRevision(branchName)
+	branchRevision, err := e.GetRevision(ctx, branchName)
 	if err != nil {
 		return fmt.Errorf("failed to get branch revision: %w", err)
 	}
 
 	// Get commit range SHAs from parent to current branch
-	commitSHAs, err := git.GetCommitRangeSHAs(parentBranchRevision, branchRevision)
+	commitSHAs, err := git.GetCommitRangeSHAs(ctx, parentBranchRevision, branchRevision)
 	if err != nil {
 		return fmt.Errorf("failed to get commit range: %w", err)
 	}
@@ -1038,7 +1039,7 @@ func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
 
 	// Soft reset to the oldest commit (keeps all changes staged)
 	// This moves HEAD to the oldest commit, staging all changes from newer commits
-	if err := git.SoftReset(oldestCommitSHA); err != nil {
+	if err := git.SoftReset(ctx, oldestCommitSHA); err != nil {
 		return fmt.Errorf("failed to soft reset: %w", err)
 	}
 
@@ -1054,7 +1055,7 @@ func (e *engineImpl) SquashCurrentBranch(opts SquashOptions) error {
 
 	if err := git.CommitWithOptions(commitOpts); err != nil {
 		// Try to rollback on error
-		if rollbackErr := git.SoftReset(branchRevision); rollbackErr != nil {
+		if rollbackErr := git.SoftReset(ctx, branchRevision); rollbackErr != nil {
 			// Log rollback error but return original error
 			return fmt.Errorf("failed to commit and failed to rollback: commit error: %w, rollback error: %v", err, rollbackErr)
 		}
@@ -1085,14 +1086,14 @@ func getBoolValue(b *bool) bool {
 }
 
 // GetAllCommits returns commits for a branch in various formats
-func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]string, error) {
+func (e *engineImpl) GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	// Check if branch is trunk
 	if branchName == e.trunk {
 		// For trunk, get just the one commit
-		branchRevision, err := git.GetRevision(branchName)
+		branchRevision, err := e.GetRevision(ctx, branchName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get branch revision: %w", err)
 		}
@@ -1106,7 +1107,7 @@ func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]st
 	}
 
 	// Get branch revision
-	branchRevision, err := git.GetRevision(branchName)
+	branchRevision, err := e.GetRevision(ctx, branchName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branch revision: %w", err)
 	}
@@ -1121,7 +1122,7 @@ func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]st
 }
 
 // ApplySplitToCommits creates branches at specified commit points
-func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
+func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOptions) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -1162,7 +1163,7 @@ func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
 		}
 
 		// Create branch at that SHA
-		_, err = git.RunGitCommand("branch", "-f", branchName, branchRevision)
+		_, err = git.RunGitCommandWithContext(ctx, "branch", "-f", branchName, branchRevision)
 		if err != nil {
 			return fmt.Errorf("failed to create branch %s: %w", branchName, err)
 		}
@@ -1170,7 +1171,7 @@ func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
 		// Preserve PR info if branch name matches original
 		var prInfo *PrInfo
 		if branchName == opts.BranchToSplit {
-			prInfo, _ = e.GetPrInfo(opts.BranchToSplit)
+			prInfo, _ = e.GetPrInfo(ctx, opts.BranchToSplit)
 		}
 
 		// Track branch with parent
@@ -1208,7 +1209,7 @@ func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
 	// Update children to point to last branch
 	if lastBranchName != opts.BranchToSplit {
 		for _, childBranchName := range children {
-			if err := e.SetParent(childBranchName, lastBranchName); err != nil {
+			if err := e.SetParent(ctx, childBranchName, lastBranchName); err != nil {
 				return fmt.Errorf("failed to update parent for %s: %w", childBranchName, err)
 			}
 		}
@@ -1216,14 +1217,14 @@ func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
 
 	// Delete original branch if not in branchNames
 	if !contains(opts.BranchNames, opts.BranchToSplit) {
-		if err := e.DeleteBranch(opts.BranchToSplit); err != nil {
+		if err := e.DeleteBranch(ctx, opts.BranchToSplit); err != nil {
 			return fmt.Errorf("failed to delete original branch: %w", err)
 		}
 	}
 
 	// Checkout last branch
 	e.currentBranch = lastBranchName
-	if err := git.CheckoutBranch(lastBranchName); err != nil {
+	if err := git.CheckoutBranch(ctx, lastBranchName); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", lastBranchName, err)
 	}
 
@@ -1231,12 +1232,12 @@ func (e *engineImpl) ApplySplitToCommits(opts ApplySplitOptions) error {
 }
 
 // Detach detaches HEAD to a specific revision
-func (e *engineImpl) Detach(revision string) error {
+func (e *engineImpl) Detach(ctx context.Context, revision string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	// Checkout the revision in detached HEAD state
-	_, err := git.RunGitCommand("checkout", "--detach", revision)
+	_, err := git.RunGitCommandWithContext(ctx, "checkout", "--detach", revision)
 	if err != nil {
 		return fmt.Errorf("failed to detach HEAD: %w", err)
 	}
@@ -1248,12 +1249,12 @@ func (e *engineImpl) Detach(revision string) error {
 // DetachAndResetBranchChanges detaches HEAD and soft resets to the parent's merge base,
 // leaving the branch's changes as unstaged modifications. This is used by split --by-hunk
 // to allow the user to interactively re-stage changes into new branches.
-func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
+func (e *engineImpl) DetachAndResetBranchChanges(ctx context.Context, branchName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	// Get branch revision
-	branchRevision, err := git.GetRevision(branchName)
+	branchRevision, err := e.GetRevision(ctx, branchName)
 	if err != nil {
 		return fmt.Errorf("failed to get branch revision: %w", err)
 	}
@@ -1265,20 +1266,20 @@ func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
 	}
 
 	// Get the merge base between this branch and its parent
-	mergeBase, err := git.GetMergeBase(branchName, parentBranchName)
+	mergeBase, err := git.GetMergeBase(ctx, branchName, parentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}
 
 	// Detach HEAD to the branch revision first
-	_, err = git.RunGitCommand("checkout", "--detach", branchRevision)
+	_, err = git.RunGitCommandWithContext(ctx, "checkout", "--detach", branchRevision)
 	if err != nil {
 		return fmt.Errorf("failed to detach HEAD: %w", err)
 	}
 
 	// Soft reset to the merge base - this keeps all the branch's changes
 	// but unstages them, allowing the user to re-stage them interactively
-	_, err = git.RunGitCommand("reset", mergeBase)
+	_, err = git.RunGitCommandWithContext(ctx, "reset", mergeBase)
 	if err != nil {
 		return fmt.Errorf("failed to soft reset: %w", err)
 	}
@@ -1287,12 +1288,12 @@ func (e *engineImpl) DetachAndResetBranchChanges(branchName string) error {
 	return nil
 }
 
-// ForceCheckoutBranch force checks out a branch
-func (e *engineImpl) ForceCheckoutBranch(branchName string) error {
+// CheckoutBranch checks out a branch
+func (e *engineImpl) ForceCheckoutBranch(ctx context.Context, branchName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	_, err := git.RunGitCommand("checkout", "-f", branchName)
+	_, err := git.RunGitCommandWithContext(ctx, "checkout", "-f", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to force checkout branch: %w", err)
 	}

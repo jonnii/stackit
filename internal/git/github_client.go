@@ -28,11 +28,11 @@ type GitHubClient interface {
 	GetPullRequestByBranch(ctx context.Context, owner, repo, branchName string) (*PullRequestInfo, error)
 
 	// MergePullRequest merges a pull request
-	MergePullRequest(branchName string) error
+	MergePullRequest(ctx context.Context, branchName string) error
 
 	// GetPRChecksStatus returns the check status for a PR
 	// Returns (passing, pending, error)
-	GetPRChecksStatus(branchName string) (passing bool, pending bool, err error)
+	GetPRChecksStatus(ctx context.Context, branchName string) (passing bool, pending bool, err error)
 
 	// GetOwnerRepo returns the repository owner and name
 	GetOwnerRepo() (owner, repo string)

@@ -2,8 +2,8 @@ package submit
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
@@ -59,6 +59,7 @@ type Info struct {
 func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
+	context := ctx.Context // Use context from runtime context
 
 	// Create UI early - all output goes through this
 	ui := tui.NewSubmitUI(splog)
@@ -81,12 +82,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 	currentBranch := eng.CurrentBranch()
 
 	// Populate remote SHAs early for accurate display
-	if err := eng.PopulateRemoteShas(); err != nil {
+	if err := eng.PopulateRemoteShas(context); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
 	// Display the stack tree with PR annotations
-	renderer, rootBranch := getStackTreeRenderer(branches, opts, eng, currentBranch)
+	renderer, rootBranch := getStackTreeRenderer(context, branches, opts, eng, currentBranch)
 	ui.ShowStack(renderer, rootBranch)
 
 	// Restack if requested
@@ -96,7 +97,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if repoRoot == "" {
 			repoRoot, _ = git.GetRepoRoot()
 		}
-		if err := actions.RestackBranches(branches, eng, splog, repoRoot); err != nil {
+		if err := actions.RestackBranches(context, branches, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 		ui.ShowRestackComplete()
@@ -105,12 +106,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Validate and prepare branches
 	ui.ShowPreparing()
 
-	if err := ValidateBranchesToSubmit(branches, eng, ctx); err != nil {
+	if err := ValidateBranchesToSubmit(context, branches, eng, ctx); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch, ui)
+	submissionInfos, err := prepareBranchesForSubmit(context, branches, opts, eng, ctx, currentBranch, ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -142,7 +143,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Start submission phase
 	ui.StartSubmitting(progressItems)
 
-	githubCtx := context.Background()
+	githubCtx := context
 	githubClient, err := getGitHubClient(ctx)
 	if err != nil {
 		return err
@@ -153,7 +154,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	for _, submissionInfo := range submissionInfos {
 		ui.UpdateSubmitItem(submissionInfo.BranchName, "submitting", "", nil)
 
-		if err := pushBranchIfNeeded(submissionInfo, opts, remote, eng); err != nil {
+		if err := pushBranchIfNeeded(context, submissionInfo, opts, remote, eng); err != nil {
 			ui.UpdateSubmitItem(submissionInfo.BranchName, "error", "", err)
 			ui.Complete()
 			return err
@@ -165,9 +166,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 			actionUpdate = "update"
 		)
 		if submissionInfo.Action == actionCreate {
-			prURL, err = createPullRequestQuiet(submissionInfo, eng, githubCtx, githubClient, repoOwner, repoName)
+			prURL, err = createPullRequestQuiet(context, submissionInfo, eng, githubCtx, githubClient, repoOwner, repoName)
 		} else {
-			prURL, err = updatePullRequestQuiet(submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
+			prURL, err = updatePullRequestQuiet(context, submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
 		}
 
 		if err != nil {
@@ -187,7 +188,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Update PR body footers silently
-	updatePRFootersQuiet(branches, eng, githubCtx, githubClient, repoOwner, repoName)
+	updatePRFootersQuiet(context, branches, eng, githubCtx, githubClient, repoOwner, repoName)
 
 	ui.Complete()
 
@@ -195,12 +196,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 }
 
 // prepareBranchesForSubmit prepares submission info for each branch, outputting via UI
-func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine, ctx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
+func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
 	var submissionInfos []Info
 
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
-		prInfo, _ := eng.GetPrInfo(branchName)
+		prInfo, _ := eng.GetPrInfo(ctx, branchName)
 
 		// Determine action
 		const (
@@ -225,7 +226,7 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 		// Check if branch needs update
 		if action == "update" {
 			baseChanged := prInfo.Base != parentBranchName
-			branchChanged, _ := eng.BranchMatchesRemote(branchName)
+			branchChanged, _ := eng.BranchMatchesRemote(ctx, branchName)
 
 			// Check if draft status needs to change
 			draftStatusNeedsChange := false
@@ -257,14 +258,14 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 			ReviewersPrompt:   opts.Reviewers == "" && opts.Edit,
 		}
 
-		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, ctx)
+		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, runtimeCtx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare metadata for %s: %w", branchName, err)
 		}
 
 		// Get SHAs
-		headSHA, _ := eng.GetRevision(branchName)
-		baseSHA, _ := eng.GetRevision(parentBranchName)
+		headSHA, _ := eng.GetRevision(ctx, branchName)
+		baseSHA, _ := eng.GetRevision(ctx, parentBranchName)
 
 		submissionInfo := Info{
 			BranchName: branchName,
@@ -286,7 +287,7 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 }
 
 // getRecursiveDescendants gets all descendants of a branch recursively
-func getRecursiveDescendants(eng engine.Engine, branchName string) []string {
+func getRecursiveDescendants(eng engine.BranchReader, branchName string) []string {
 	var descendants []string
 	children := eng.GetChildren(branchName)
 	for _, child := range children {
@@ -359,15 +360,15 @@ func getGitHubClient(ctx *runtime.Context) (git.GitHubClient, error) {
 }
 
 // pushBranchIfNeeded pushes a branch to remote if needed
-func pushBranchIfNeeded(submissionInfo Info, opts Options, remote string, eng engine.Engine) error {
+func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, remote string, eng engine.SyncManager) error {
 	// Skip if dry run or skip push is set
 	if opts.DryRun || opts.SkipPush {
 		return nil
 	}
 
 	forceWithLease := !opts.Force
-	if err := eng.PushBranch(submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
-		if strings.Contains(err.Error(), "stale info") {
+	if err := eng.PushBranch(ctx, submissionInfo.BranchName, remote, opts.Force, forceWithLease); err != nil {
+		if errors.Is(err, git.ErrStaleRemoteInfo) {
 			return fmt.Errorf("force-with-lease push of %s failed due to external changes to the remote branch. If you are collaborating on this stack, try 'stackit sync' to pull in changes. Alternatively, use the --force option to bypass the stale info warning", submissionInfo.BranchName)
 		}
 		return fmt.Errorf("failed to push branch %s: %w", submissionInfo.BranchName, err)
@@ -376,7 +377,7 @@ func pushBranchIfNeeded(submissionInfo Info, opts Options, remote string, eng en
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(submissionInfo Info, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	createOpts := git.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -394,7 +395,7 @@ func createPullRequestQuiet(submissionInfo Info, eng engine.Engine, githubCtx co
 	// Update PR info
 	prNumber := pr.Number
 	prURL := pr.HTMLURL
-	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(ctx, submissionInfo.BranchName, &engine.PrInfo{
 		Number:  &prNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -408,9 +409,9 @@ func createPullRequestQuiet(submissionInfo Info, eng engine.Engine, githubCtx co
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
 	// Check if base changed
-	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
+	prInfo, _ := eng.GetPrInfo(ctx, submissionInfo.BranchName)
 	baseChanged := false
 	if prInfo != nil && prInfo.Base != submissionInfo.Base {
 		baseChanged = true
@@ -437,7 +438,7 @@ func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 	}
 
 	// Get PR URL
-	prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
+	prInfo, _ = eng.GetPrInfo(ctx, submissionInfo.BranchName)
 	var prURL string
 	if prInfo != nil && prInfo.URL != "" {
 		prURL = prInfo.URL
@@ -449,7 +450,7 @@ func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 		}
 	}
 
-	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(ctx, submissionInfo.BranchName, &engine.PrInfo{
 		Number:  submissionInfo.PRNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -463,14 +464,14 @@ func updatePullRequestQuiet(submissionInfo Info, opts Options, eng engine.Engine
 }
 
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) {
+func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) {
 	for _, branchName := range branches {
-		prInfo, err := eng.GetPrInfo(branchName)
+		prInfo, err := eng.GetPrInfo(ctx, branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {
 			continue
 		}
 
-		footer := actions.CreatePRBodyFooter(branchName, eng)
+		footer := actions.CreatePRBodyFooter(ctx, branchName, eng)
 		updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
 
 		if updatedBody != prInfo.Body {
@@ -485,7 +486,7 @@ func updatePRFootersQuiet(branches []string, eng engine.Engine, githubCtx contex
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
-func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, currentBranch string) (*tui.StackTreeRenderer, string) {
+func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, eng engine.Engine, currentBranch string) (*tui.StackTreeRenderer, string) {
 	// Create the tree renderer
 	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
@@ -493,7 +494,9 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		eng.GetChildren,
 		eng.GetParent,
 		eng.IsTrunk,
-		eng.IsBranchFixed,
+		func(branchName string) bool {
+			return eng.IsBranchFixed(ctx, branchName)
+		},
 	)
 
 	// Build annotations for each branch
@@ -504,13 +507,13 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 	}
 
 	for _, branchName := range eng.AllBranchNames() {
-		prInfo, _ := eng.GetPrInfo(branchName)
+		prInfo, _ := eng.GetPrInfo(ctx, branchName)
 		if prInfo == nil && !branchSet[branchName] {
 			continue
 		}
 
 		annotation := tui.BranchAnnotation{
-			NeedsRestack: !eng.IsBranchFixed(branchName),
+			NeedsRestack: !eng.IsBranchFixed(ctx, branchName),
 		}
 
 		const actionUpdate = "update"

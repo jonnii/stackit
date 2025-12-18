@@ -1,6 +1,7 @@
 package actions_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestCleanBranches(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Now create branch2
@@ -45,11 +46,11 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild to see branch2
-		err = eng.Rebuild("main")
+		err = eng.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
 		// Track branch2
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged via PR info
@@ -59,7 +60,7 @@ func TestCleanBranches(t *testing.T) {
 			State:  "MERGED",
 			Base:   "main",
 		}
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
@@ -93,7 +94,7 @@ func TestCleanBranches(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Create branch2
@@ -117,12 +118,12 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild to see branch2 and branch3
-		err = eng.Rebuild("main")
+		err = eng.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch2", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch("branch3", "branch1")
+		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged
@@ -131,7 +132,7 @@ func TestCleanBranches(t *testing.T) {
 			Number: &prNumber,
 			State:  "MERGED",
 		}
-		err = eng.UpsertPrInfo("branch1", prInfo)
+		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)
@@ -164,7 +165,7 @@ func TestCleanBranches(t *testing.T) {
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)
 
-		err = eng.TrackBranch("branch1", "main")
+		err = eng.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		ctx := runtime.NewContext(eng)

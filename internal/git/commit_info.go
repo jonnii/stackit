@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -9,7 +10,7 @@ import (
 )
 
 // GetCommitDate returns the commit date for a branch
-func GetCommitDate(branchName string) (time.Time, error) {
+func GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return time.Time{}, err
@@ -29,7 +30,7 @@ func GetCommitDate(branchName string) (time.Time, error) {
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func GetCommitAuthor(branchName string) (string, error) {
+func GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -49,7 +50,7 @@ func GetCommitAuthor(branchName string) (string, error) {
 }
 
 // GetRevision returns the SHA of a branch
-func GetRevision(branchName string) (string, error) {
+func GetRevision(ctx context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -64,7 +65,7 @@ func GetRevision(branchName string) (string, error) {
 }
 
 // GetRemoteRevision returns the SHA of a remote branch (e.g., origin/branchName)
-func GetRemoteRevision(branchName string) (string, error) {
+func GetRemoteRevision(ctx context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -81,7 +82,7 @@ func GetRemoteRevision(branchName string) (string, error) {
 }
 
 // GetCommitMessages returns all commit messages for a branch (excluding parent)
-func GetCommitMessages(branchName string) ([]string, error) {
+func GetCommitMessages(ctx context.Context, branchName string) ([]string, error) {
 	// Get parent branch to determine range
 	meta, err := ReadMetadataRef(branchName)
 	if err != nil {
@@ -97,7 +98,7 @@ func GetCommitMessages(branchName string) ([]string, error) {
 		args = []string{"log", "--format=%B", branchName}
 	}
 
-	output, err := RunGitCommand(args...)
+	output, err := RunGitCommandWithContext(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit messages: %w", err)
 	}
@@ -120,7 +121,7 @@ func GetCommitMessages(branchName string) ([]string, error) {
 }
 
 // GetCommitSubject returns the subject (first line) of the oldest commit on a branch
-func GetCommitSubject(branchName string) (string, error) {
+func GetCommitSubject(ctx context.Context, branchName string) (string, error) {
 	// Get parent branch to determine range
 	meta, err := ReadMetadataRef(branchName)
 	if err != nil {
@@ -132,11 +133,11 @@ func GetCommitSubject(branchName string) (string, error) {
 		// Get oldest commit subject from parent to branch
 		args = []string{"log", "--format=%s", "-1", fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
 	} else {
-		// No parent, get oldest commit from branch
+		// No parent, get all commits from branch
 		args = []string{"log", "--format=%s", "-1", branchName}
 	}
 
-	subject, err := RunGitCommand(args...)
+	subject, err := RunGitCommandWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit subject: %w", err)
 	}
@@ -145,9 +146,9 @@ func GetCommitSubject(branchName string) (string, error) {
 }
 
 // GetCommitRangeSHAs returns the commit SHAs between two revisions (base..head)
-func GetCommitRangeSHAs(base, head string) ([]string, error) {
+func GetCommitRangeSHAs(ctx context.Context, base, head string) ([]string, error) {
 	args := []string{"log", "--format=%H", fmt.Sprintf("%s..%s", base, head)}
-	output, err := RunGitCommand(args...)
+	output, err := RunGitCommandWithContext(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit range: %w", err)
 	}

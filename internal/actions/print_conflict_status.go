@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
@@ -9,13 +10,13 @@ import (
 )
 
 // PrintConflictStatus displays conflict information and instructions to the user
-func PrintConflictStatus(branchName string, eng engine.Engine, splog *tui.Splog) error {
+func PrintConflictStatus(ctx context.Context, branchName string, eng engine.Engine, splog *tui.Splog) error {
 	msg := tui.ColorRed(fmt.Sprintf("Hit conflict restacking %s", branchName))
 	splog.Info("%s", msg)
 	splog.Newline()
 
 	// Get unmerged files
-	unmergedFiles, err := git.GetUnmergedFiles()
+	unmergedFiles, err := git.GetUnmergedFiles(ctx)
 	if err == nil && len(unmergedFiles) > 0 {
 		splog.Info("%s", tui.ColorYellow("Unmerged files:"))
 		for _, file := range unmergedFiles {
@@ -25,7 +26,7 @@ func PrintConflictStatus(branchName string, eng engine.Engine, splog *tui.Splog)
 	}
 
 	// Get rebase head
-	rebaseHead, err := git.GetRebaseHead()
+	rebaseHead, err := git.GetRebaseHead(ctx)
 	if err == nil && rebaseHead != "" {
 		rebaseHeadShort := rebaseHead
 		if len(rebaseHead) > 7 {

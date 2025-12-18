@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os/exec"
 	"strings"
 
 	"github.com/google/go-github/v62/github"
@@ -189,7 +188,7 @@ func GetGitHubClient(ctx context.Context) (*github.Client, string, string, error
 	client := github.NewClient(tc)
 
 	// Get repository info
-	owner, repo, err := getRepoInfo()
+	owner, repo, err := getRepoInfo(ctx)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get repository info: %w", err)
 	}
@@ -228,12 +227,11 @@ func ParseReviewers(reviewersStr string) ([]string, []string) {
 }
 
 // MergePullRequest merges a pull request using GitHub CLI
-func MergePullRequest(branchName string) error {
+func MergePullRequest(ctx context.Context, branchName string) error {
 	// Use gh CLI to merge the PR
-	cmd := exec.Command("gh", "pr", "merge", branchName, "--merge")
-	output, err := cmd.CombinedOutput()
+	_, err := RunGitCommandWithContext(ctx, "pr", "merge", branchName, "--merge")
 	if err != nil {
-		return fmt.Errorf("failed to merge PR for branch %s: %w (output: %s)", branchName, err, string(output))
+		return fmt.Errorf("failed to merge PR for branch %s: %w", branchName, err)
 	}
 	return nil
 }
@@ -242,10 +240,9 @@ func MergePullRequest(branchName string) error {
 // Returns (passing, pending, error)
 // passing: true if all checks are passing, false if any are failing
 // pending: true if any checks are still pending
-func GetPRChecksStatus(branchName string) (bool, bool, error) {
+func GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
 	// Use gh CLI to get PR checks status
-	cmd := exec.Command("gh", "pr", "checks", branchName, "--json", "name,state,conclusion")
-	output, err := cmd.CombinedOutput()
+	output, err := RunGitCommandWithContext(ctx, "pr", "checks", branchName, "--json", "name,state,conclusion")
 	if err != nil {
 		// If the command fails, it might be because there are no checks
 		// or the PR doesn't exist. Return passing=true, pending=false as safe defaults
@@ -259,7 +256,7 @@ func GetPRChecksStatus(branchName string) (bool, bool, error) {
 		Conclusion string `json:"conclusion"`
 	}
 
-	if err := json.Unmarshal(output, &checks); err != nil {
+	if err := json.Unmarshal([]byte(output), &checks); err != nil {
 		// If we can't parse, assume checks are passing
 		return true, false, nil
 	}

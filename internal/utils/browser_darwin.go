@@ -1,6 +1,6 @@
 //go:build darwin
 
-package actions
+package utils
 
 import (
 	"os/exec"

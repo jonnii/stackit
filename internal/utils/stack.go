@@ -1,4 +1,4 @@
-package actions
+package utils
 
 import (
 	"stackit.dev/stackit/internal/engine"

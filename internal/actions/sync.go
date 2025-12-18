@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // SyncOptions contains options for the sync command
@@ -30,7 +31,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Check for uncommitted changes
-	if HasUncommittedChanges(gctx) {
+	if utils.HasUncommittedChanges(gctx) {
 		return fmt.Errorf("you have uncommitted changes. Please commit or stash them before syncing")
 	}
 
@@ -81,7 +82,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Sync PR info
 	allBranches := eng.AllBranchNames()
-	repoOwner, repoName, _ := GetRepoInfo(gctx)
+	repoOwner, repoName, _ := utils.GetRepoInfo(gctx)
 	if repoOwner != "" && repoName != "" {
 		if err := git.SyncPrInfo(gctx, allBranches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
@@ -116,7 +117,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	currentBranch := eng.CurrentBranch()
 	if currentBranch != "" && eng.IsBranchTracked(currentBranch) {
 		// Get full stack (up to trunk)
-		stack := GetFullStack(eng, currentBranch)
+		stack := utils.GetFullStack(eng, currentBranch)
 		// Add branches to restack list
 		branchesToRestack = append(branchesToRestack, stack...)
 	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
@@ -136,7 +137,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Sort branches topologically (parents before children) for correct restack order
-	sortedBranches := SortBranchesTopologically(uniqueBranches, eng)
+	sortedBranches := utils.SortBranchesTopologically(uniqueBranches, eng)
 
 	// Restack branches
 	if len(sortedBranches) > 0 {

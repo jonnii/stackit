@@ -1,6 +1,6 @@
 //go:build windows
 
-package actions
+package utils
 
 import (
 	"os/exec"

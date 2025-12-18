@@ -1,6 +1,5 @@
-// Package branchutil provides utilities for sanitizing and generating branch names
-// from commit messages and other sources.
-package branchutil
+// Package utils provides common utility functions for the stackit project.
+package utils
 
 import (
 	"regexp"

@@ -6,6 +6,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // ModifyOptions contains options for the modify command
@@ -33,7 +34,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	splog := ctx.Splog
 	gctx := ctx.Context
 
-	currentBranch, err := ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx)
 	if err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Check if rebase is in progress
-	if err := CheckRebaseInProgress(gctx); err != nil {
+	if err := utils.CheckRebaseInProgress(gctx); err != nil {
 		return err
 	}
 
@@ -67,12 +68,12 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Stage changes based on flags
-	stagingOpts := StagingOptions{
+	stagingOpts := utils.StagingOptions{
 		All:    opts.All,
 		Update: opts.Update,
 		Patch:  opts.Patch,
 	}
-	if err := StageChanges(gctx, stagingOpts); err != nil {
+	if err := utils.StageChanges(gctx, stagingOpts); err != nil {
 		return err
 	}
 
@@ -109,7 +110,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Restack upstack branches
-	upstackBranches := GetUpstack(eng, currentBranch)
+	upstackBranches := utils.GetUpstack(eng, currentBranch)
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
@@ -152,7 +153,7 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	splog.Info("Interactive rebase completed.")
 
 	// Restack upstack branches
-	upstackBranches := GetUpstack(eng, currentBranch)
+	upstackBranches := utils.GetUpstack(eng, currentBranch)
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))

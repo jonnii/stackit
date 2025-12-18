@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // ValidateBranchesToSubmit validates that branches are ready to submit
 func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
 	// Sync PR info first
-	repoOwner, repoName, _ := actions.GetRepoInfo(ctx)
+	repoOwner, repoName, _ := utils.GetRepoInfo(ctx)
 	if repoOwner != "" && repoName != "" {
 		if err := git.SyncPrInfo(ctx, branches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue

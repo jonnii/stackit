@@ -13,6 +13,17 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	// GitHub check conclusion and status constants
+	checkConclusionFailure        = "FAILURE"
+	checkConclusionCanceled       = "CANCELED"
+	checkConclusionTimedOut       = "TIMED_OUT"
+	checkConclusionActionRequired = "ACTION_REQUIRED"
+	checkStateFailure             = "FAILURE"
+	checkStateError               = "ERROR"
+	checkStatePending             = "PENDING"
+)
+
 // CreatePROptions contains options for creating a pull request
 type CreatePROptions struct {
 	Title         string
@@ -181,19 +192,17 @@ func GetGitHubClient(ctx context.Context) (*github.Client, string, string, error
 		return nil, "", "", fmt.Errorf("failed to get GitHub token: %w", err)
 	}
 
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	// Get repository info
-	owner, repo, err := getRepoInfo(ctx)
+	repoInfo, err := getRepoInfoWithHostname(ctx)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get repository info: %w", err)
 	}
 
-	return client, owner, repo, nil
+	client, err := createGitHubClient(ctx, repoInfo.Hostname, token)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	return client, repoInfo.Owner, repoInfo.Repo, nil
 }
 
 // ParseReviewers parses a comma-separated string of reviewers
@@ -299,7 +308,7 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 		}
 		if run.Conclusion != nil {
 			conclusion := strings.ToUpper(*run.Conclusion)
-			if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+			if conclusion == checkConclusionFailure || conclusion == checkConclusionCanceled || conclusion == checkConclusionTimedOut || conclusion == checkConclusionActionRequired {
 				hasFailing = true
 			}
 		}
@@ -309,9 +318,9 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 	if combinedStatus != nil {
 		if combinedStatus.State != nil {
 			state := strings.ToUpper(*combinedStatus.State)
-			if state == "PENDING" {
+			if state == checkStatePending {
 				hasPending = true
-			} else if state == "FAILURE" || state == "ERROR" {
+			} else if state == checkStateFailure || state == checkStateError {
 				hasFailing = true
 			}
 		}
@@ -333,8 +342,8 @@ func getCombinedStatus(ctx context.Context, client *github.Client, owner, repo, 
 	}
 
 	state := strings.ToUpper(*combinedStatus.State)
-	hasPending := state == "PENDING"
-	hasFailing := state == "FAILURE" || state == "ERROR"
+	hasPending := state == checkStatePending
+	hasFailing := state == checkStateFailure || state == checkStateError
 
 	return !hasFailing, hasPending, nil
 }
@@ -353,7 +362,7 @@ func evaluateCheckRuns(checkRuns []*github.CheckRun) (bool, bool) {
 		}
 		if run.Conclusion != nil {
 			conclusion := strings.ToUpper(*run.Conclusion)
-			if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+			if conclusion == checkConclusionFailure || conclusion == checkConclusionCanceled || conclusion == checkConclusionTimedOut || conclusion == checkConclusionActionRequired {
 				hasFailing = true
 			}
 		}
@@ -368,6 +377,21 @@ func updatePRDraftStatus(ctx context.Context, pullRequestID string, isDraft bool
 	token, err := getGitHubToken()
 	if err != nil {
 		return fmt.Errorf("failed to get GitHub token: %w", err)
+	}
+
+	// Get repository info to determine hostname
+	repoInfo, err := getRepoInfoWithHostname(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get repository info: %w", err)
+	}
+
+	// Construct GraphQL endpoint URL
+	var graphqlURL string
+	if repoInfo.Hostname == "github.com" {
+		graphqlURL = "https://api.github.com/graphql"
+	} else {
+		// GitHub Enterprise: https://hostname/api/graphql
+		graphqlURL = fmt.Sprintf("https://%s/api/graphql", repoInfo.Hostname)
 	}
 
 	// Create authenticated HTTP client
@@ -415,7 +439,7 @@ func updatePRDraftStatus(ctx context.Context, pullRequestID string, isDraft bool
 	}
 
 	// Make GraphQL request
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.github.com/graphql", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", graphqlURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create GraphQL request: %w", err)
 	}

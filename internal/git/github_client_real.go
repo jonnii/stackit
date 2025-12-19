@@ -173,12 +173,12 @@ func (c *RealGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 
 // MergePullRequest merges a pull request
 func (c *RealGitHubClient) MergePullRequest(ctx context.Context, branchName string) error {
-	return MergePullRequest(ctx, branchName)
+	return MergePullRequest(ctx, c.client, c.owner, c.repo, branchName)
 }
 
 // GetPRChecksStatus returns the check status for a PR
 func (c *RealGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
-	return GetPRChecksStatus(ctx, branchName)
+	return GetPRChecksStatus(ctx, c.client, c.owner, c.repo, branchName)
 }
 
 // toPullRequestInfo converts a github.PullRequest to PullRequestInfo

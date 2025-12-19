@@ -60,8 +60,8 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
 		}
 		// Optionally check CI checks haven't changed to failing
-		if !opts.Force {
-			passing, _, err := git.GetPRChecksStatus(context, step.BranchName)
+		if !opts.Force && ctx.GitHubClient != nil {
+			passing, _, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
 			if err == nil && !passing {
 				return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
 			}
@@ -102,7 +102,10 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 
 	switch step.StepType {
 	case StepMergePR:
-		if err := git.MergePullRequest(context, step.BranchName); err != nil {
+		if ctx.GitHubClient == nil {
+			return fmt.Errorf("GitHub client not available")
+		}
+		if err := ctx.GitHubClient.MergePullRequest(context, step.BranchName); err != nil {
 			return fmt.Errorf("failed to merge PR: %w", err)
 		}
 

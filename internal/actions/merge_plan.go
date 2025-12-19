@@ -184,23 +184,27 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 
 		// Get CI check status
 		checksStatus := ChecksNone
-		passing, pending, err := git.GetPRChecksStatus(c, branchName)
-		if err != nil {
-			splog.Debug("Failed to get PR checks status for %s: %v", branchName, err)
-			// Don't fail on check status errors, just mark as none
-		} else if pending {
-			checksStatus = ChecksPending
-			if !opts.Force {
-				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s PR #%d has pending CI checks", branchName, *prInfo.Number))
+		var passing, pending bool
+		if ctx.GitHubClient != nil {
+			var checkErr error
+			passing, pending, checkErr = ctx.GitHubClient.GetPRChecksStatus(c, branchName)
+			if checkErr != nil {
+				splog.Debug("Failed to get PR checks status for %s: %v", branchName, checkErr)
+				// Don't fail on check status errors, just mark as none
+			} else if pending {
+				checksStatus = ChecksPending
+				if !opts.Force {
+					validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s PR #%d has pending CI checks", branchName, *prInfo.Number))
+				}
+			} else if !passing {
+				checksStatus = ChecksFailing
+				if !opts.Force {
+					validation.Valid = false
+					validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number))
+				}
+			} else {
+				checksStatus = ChecksPassing
 			}
-		} else if !passing {
-			checksStatus = ChecksFailing
-			if !opts.Force {
-				validation.Valid = false
-				validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number))
-			}
-		} else {
-			checksStatus = ChecksPassing
 		}
 
 		branchesToMerge = append(branchesToMerge, BranchMergeInfo{

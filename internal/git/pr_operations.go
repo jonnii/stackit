@@ -226,12 +226,24 @@ func ParseReviewers(reviewersStr string) ([]string, []string) {
 	return reviewers, teamReviewers
 }
 
-// MergePullRequest merges a pull request using GitHub CLI
-func MergePullRequest(ctx context.Context, branchName string) error {
-	// Use gh CLI to merge the PR
-	_, err := RunGHCommandWithContext(ctx, "pr", "merge", branchName, "--merge")
+// MergePullRequest merges a pull request using the GitHub API
+func MergePullRequest(ctx context.Context, client *github.Client, owner, repo, branchName string) error {
+	// First, get the PR for this branch
+	pr, err := GetPullRequestByBranch(ctx, client, owner, repo, branchName)
 	if err != nil {
-		return fmt.Errorf("failed to merge PR for branch %s: %w", branchName, err)
+		return fmt.Errorf("failed to get PR for branch %s: %w", branchName, err)
+	}
+	if pr == nil {
+		return fmt.Errorf("no PR found for branch %s", branchName)
+	}
+
+	// Merge the PR using merge method
+	mergeRequest := &github.PullRequestOptions{
+		MergeMethod: "merge",
+	}
+	_, _, err = client.PullRequests.Merge(ctx, owner, repo, *pr.Number, "", mergeRequest)
+	if err != nil {
+		return fmt.Errorf("failed to merge PR #%d for branch %s: %w", *pr.Number, branchName, err)
 	}
 	return nil
 }
@@ -240,49 +252,114 @@ func MergePullRequest(ctx context.Context, branchName string) error {
 // Returns (passing, pending, error)
 // passing: true if all checks are passing, false if any are failing
 // pending: true if any checks are still pending
-func GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
-	// Use gh CLI to get PR checks status
-	output, err := RunGHCommandWithContext(ctx, "pr", "checks", branchName, "--json", "name,state,conclusion")
+func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, branchName string) (bool, bool, error) {
+	// First, get the PR for this branch to get the head SHA
+	pr, err := GetPullRequestByBranch(ctx, client, owner, repo, branchName)
 	if err != nil {
-		// If the command fails, it might be because there are no checks
-		// or the PR doesn't exist. Return passing=true, pending=false as safe defaults
+		// If we can't get the PR, assume checks are passing (safe default)
+		return true, false, nil
+	}
+	if pr == nil || pr.Head == nil || pr.Head.SHA == nil {
+		// No PR found or no head SHA, assume passing
 		return true, false, nil
 	}
 
-	// Parse JSON output
-	var checks []struct {
-		Name       string `json:"name"`
-		State      string `json:"state"`
-		Conclusion string `json:"conclusion"`
+	headSHA := *pr.Head.SHA
+
+	// Get check runs for the head commit
+	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, owner, repo, headSHA, &github.ListCheckRunsOptions{
+		ListOptions: github.ListOptions{
+			PerPage: 100, // Get up to 100 check runs
+		},
+	})
+	if err != nil {
+		// If we can't get check runs, also try combined status
+		return getCombinedStatus(ctx, client, owner, repo, headSHA)
 	}
 
-	if err := json.Unmarshal([]byte(output), &checks); err != nil {
-		// If we can't parse, assume checks are passing
-		return true, false, nil
+	// Also get combined status for a complete picture
+	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, headSHA, nil)
+	if err != nil {
+		// If we can't get combined status, just use check runs
+		passing, pending := evaluateCheckRuns(checkRuns.CheckRuns)
+		return passing, pending, nil
 	}
 
-	if len(checks) == 0 {
-		// No checks found, assume passing
-		return true, false, nil
-	}
-
+	// Combine results from both check runs and status
 	hasPending := false
 	hasFailing := false
 
-	for _, check := range checks {
-		state := strings.ToUpper(check.State)
-		conclusion := strings.ToUpper(check.Conclusion)
-
-		if state == "PENDING" || state == "QUEUED" || state == "IN_PROGRESS" {
-			hasPending = true
-		} else if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
-			hasFailing = true
+	// Process check runs
+	for _, run := range checkRuns.CheckRuns {
+		if run.Status != nil {
+			status := strings.ToUpper(*run.Status)
+			if status == "QUEUED" || status == "IN_PROGRESS" {
+				hasPending = true
+			}
+		}
+		if run.Conclusion != nil {
+			conclusion := strings.ToUpper(*run.Conclusion)
+			if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+				hasFailing = true
+			}
 		}
 	}
 
-	// If any checks are failing, return passing=false
-	// If any checks are pending, return pending=true
+	// Process combined status
+	if combinedStatus != nil {
+		if combinedStatus.State != nil {
+			state := strings.ToUpper(*combinedStatus.State)
+			if state == "PENDING" {
+				hasPending = true
+			} else if state == "FAILURE" || state == "ERROR" {
+				hasFailing = true
+			}
+		}
+	}
+
 	return !hasFailing, hasPending, nil
+}
+
+// getCombinedStatus is a fallback that only uses combined status
+func getCombinedStatus(ctx context.Context, client *github.Client, owner, repo, ref string) (bool, bool, error) {
+	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, ref, nil)
+	if err != nil {
+		// If we can't get status, assume passing (safe default)
+		return true, false, nil
+	}
+
+	if combinedStatus == nil || combinedStatus.State == nil {
+		return true, false, nil
+	}
+
+	state := strings.ToUpper(*combinedStatus.State)
+	hasPending := state == "PENDING"
+	hasFailing := state == "FAILURE" || state == "ERROR"
+
+	return !hasFailing, hasPending, nil
+}
+
+// evaluateCheckRuns evaluates check runs and returns (passing, pending)
+func evaluateCheckRuns(checkRuns []*github.CheckRun) (bool, bool) {
+	hasPending := false
+	hasFailing := false
+
+	for _, run := range checkRuns {
+		if run.Status != nil {
+			status := strings.ToUpper(*run.Status)
+			if status == "QUEUED" || status == "IN_PROGRESS" {
+				hasPending = true
+			}
+		}
+		if run.Conclusion != nil {
+			conclusion := strings.ToUpper(*run.Conclusion)
+			if conclusion == "FAILURE" || conclusion == "CANCELED" || conclusion == "TIMED_OUT" || conclusion == "ACTION_REQUIRED" {
+				hasFailing = true
+			}
+		}
+	}
+
+	return !hasFailing, hasPending
 }
 
 // updatePRDraftStatus updates the draft status of a PR using GitHub's GraphQL API

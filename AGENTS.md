@@ -18,6 +18,7 @@ The project uses a `justfile` for build automation. The main entry point is `cmd
 
 ```bash
 just build
+```
 
 **Install dependencies first:**
 
@@ -35,12 +36,65 @@ go mod tidy
 
 ## Testing Instructions
 
-You should run tests after each set of changes to validate your change.
+⚠️ **IMPORTANT: You MUST run tests after each set of changes to validate your work.**
 
-**Run all tests (default):**
+### Quick Test Command
+
+**If `just` is available:**
+
 ```bash
 just test
 ```
+
+**If `just` is NOT available (use this as fallback):**
+
+```bash
+STACKIT_TEST_NO_INTERACTIVE=1 go test ./...
+```
+
+### Test Environment Variables
+
+- `STACKIT_TEST_NO_INTERACTIVE=1` - Required for all tests to prevent interactive prompts during test execution
+
+### Additional Test Commands
+
+**Run tests without cache (for debugging flaky tests):**
+
+```bash
+STACKIT_TEST_NO_INTERACTIVE=1 go test ./... -count=1
+```
+
+**Run tests with verbose output:**
+
+```bash
+STACKIT_TEST_NO_INTERACTIVE=1 go test -v ./...
+```
+
+**Run tests for a specific package:**
+
+```bash
+STACKIT_TEST_NO_INTERACTIVE=1 go test -v ./internal/cli
+```
+
+**Run tests with race detection:**
+
+```bash
+STACKIT_TEST_NO_INTERACTIVE=1 go test -race ./...
+```
+
+### Test Success Criteria
+
+- All tests must pass (no failures)
+- Exit code must be 0
+- No race conditions detected (when running with `-race`)
+
+## Agent Test Running Rules
+
+1. **ALWAYS** run `go mod tidy` before running tests to ensure dependencies are up to date
+2. **ALWAYS** set `STACKIT_TEST_NO_INTERACTIVE=1` environment variable when running tests
+3. **ALWAYS** use the fallback Go command if `just` is not available
+4. **VERIFY** that tests pass after making any code changes
+5. If tests fail, analyze the output and fix the issues before considering the task complete
 
 
 

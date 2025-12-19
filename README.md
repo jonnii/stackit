@@ -25,13 +25,19 @@ Stacked changes (or stacked diffs) are a workflow where you break large features
 
 ## Installation
 
+### Homebrew (macOS and Linux)
+
+```bash
+brew install jonnii/tap/stackit
+```
+
 ### From Source
 
 Requires Go 1.22+:
 
 ```bash
 git clone https://github.com/jonnii/stackit
-cd stackit/stackit
+cd stackit
 go build -o stackit ./cmd/stackit
 
 # Move to your PATH

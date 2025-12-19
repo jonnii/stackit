@@ -56,7 +56,7 @@ changelog:
 brews:
   - repository:
       owner: jonnii
-      name: tap
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/jonnii/stackit"

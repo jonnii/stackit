@@ -221,6 +221,17 @@ func (e *DemoEngine) TrackBranch(ctx context.Context, branchName string, parentB
 	return nil
 }
 
+func (e *DemoEngine) UntrackBranch(ctx context.Context, branchName string) error {
+	delete(e.parentMap, branchName)
+	// Rebuild children map (simplified for demo)
+	newChildrenMap := make(map[string][]string)
+	for branch, parent := range e.parentMap {
+		newChildrenMap[parent] = append(newChildrenMap[parent], branch)
+	}
+	e.childrenMap = newChildrenMap
+	return nil
+}
+
 func (e *DemoEngine) SetParent(ctx context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
 	return nil

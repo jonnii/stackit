@@ -509,6 +509,24 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 	return nil
 }
 
+// UntrackBranch stops tracking a branch by deleting its metadata
+func (e *engineImpl) UntrackBranch(ctx context.Context, branchName string) error {
+	if e.IsTrunk(branchName) {
+		return fmt.Errorf("cannot untrack trunk branch")
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Delete metadata
+	if err := git.DeleteMetadataRef(branchName); err != nil {
+		return fmt.Errorf("failed to delete metadata ref: %w", err)
+	}
+
+	// Rebuild cache (already holding lock, so call rebuildInternal)
+	return e.rebuildInternal()
+}
+
 // PullTrunk pulls the trunk branch from remote
 func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
 	remote := git.GetRemote(ctx)

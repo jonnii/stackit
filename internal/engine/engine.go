@@ -42,6 +42,7 @@ type BranchReader interface {
 type BranchWriter interface {
 	// Branch tracking
 	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
+	UntrackBranch(ctx context.Context, branchName string) error
 	SetParent(ctx context.Context, branchName string, parentBranchName string) error
 	DeleteBranch(ctx context.Context, branchName string) error
 

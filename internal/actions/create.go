@@ -5,11 +5,13 @@ package actions
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -37,36 +39,55 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		return err
 	}
 
-	// If AI is enabled and no branch name/message provided, generate commit message first
-	commitMessage := opts.Message
-	if opts.AI && opts.AIClient != nil && opts.BranchName == "" && commitMessage == "" {
-		// Stage changes first to get diff for AI
-		// Check if we have any changes to stage
+	// Handle staging first if we might need the message to name the branch
+	// or if AI is enabled
+	hasStaged, err := git.HasStagedChanges(ctx.Context)
+	if err != nil {
+		return fmt.Errorf("failed to check staged changes: %w", err)
+	}
+
+	// Stage changes based on flags or prompt
+	if opts.All || opts.Update || opts.Patch {
+		stagingOpts := utils.StagingOptions{
+			All:    opts.All,
+			Update: opts.Update,
+			Patch:  opts.Patch,
+		}
+		if err := utils.StageChanges(ctx.Context, stagingOpts); err != nil {
+			return err
+		}
+		hasStaged = true
+	} else if !hasStaged && utils.IsInteractive() {
 		hasUnstaged, err := git.HasUnstagedChanges(ctx.Context)
 		if err != nil {
 			return fmt.Errorf("failed to check unstaged changes: %w", err)
 		}
 
-		hasUntracked, err := git.HasUntrackedFiles(ctx.Context)
-		if err != nil {
-			return fmt.Errorf("failed to check untracked files: %w", err)
+		if hasUnstaged {
+			confirmed, err := tui.PromptConfirm("You have unstaged changes. Would you like to stage them?", false)
+			if err == nil && confirmed {
+				if err := git.StageAll(ctx.Context); err != nil {
+					return fmt.Errorf("failed to stage changes: %w", err)
+				}
+				hasStaged = true
+			}
 		}
+	}
 
-		hasStaged, err := git.HasStagedChanges(ctx.Context)
-		if err != nil {
-			return fmt.Errorf("failed to check staged changes: %w", err)
-		}
-
-		if !hasStaged && !hasUnstaged && !hasUntracked {
-			return fmt.Errorf("no changes to commit. Stage some changes first or provide a branch name or commit message")
-		}
-
-		// Stage changes if needed
-		if !hasStaged && hasUnstaged {
-			// Auto-stage all changes for AI generation
+	// If AI is enabled and no branch name/message provided, generate commit message
+	commitMessage := opts.Message
+	if opts.AI && opts.AIClient != nil && opts.BranchName == "" && commitMessage == "" {
+		if !hasStaged {
+			hasUntracked, _ := git.HasUntrackedFiles(ctx.Context)
+			hasUnstaged, _ := git.HasUnstagedChanges(ctx.Context)
+			if !hasUntracked && !hasUnstaged {
+				return fmt.Errorf("no changes to commit. Stage some changes first or provide a branch name or commit message")
+			}
+			// Auto-stage all changes for AI generation if not staged already
 			if err := git.StageAll(ctx.Context); err != nil {
 				return fmt.Errorf("failed to stage changes for AI: %w", err)
 			}
+			hasStaged = true
 			splog.Debug("Staged changes for AI commit message generation")
 		}
 
@@ -99,11 +120,24 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	branchName := opts.BranchName
 	if branchName == "" {
 		if commitMessage == "" {
-			if opts.AI && opts.AIClient != nil {
-				return fmt.Errorf("must specify either a branch name, commit message, or use --ai with staged changes")
+			if !utils.IsInteractive() {
+				if opts.AI && opts.AIClient != nil {
+					return fmt.Errorf("must specify either a branch name, commit message, or use --ai with staged changes")
+				}
+				return fmt.Errorf("must specify either a branch name or commit message")
 			}
-			return fmt.Errorf("must specify either a branch name or commit message")
+
+			// Interactive: get commit message from editor
+			msg, err := getCommitMessage(ctx.Context)
+			if err != nil {
+				return err
+			}
+			if msg == "" {
+				return fmt.Errorf("aborting due to empty commit message")
+			}
+			commitMessage = msg
 		}
+
 		// Get pattern from config
 		pattern, err := config.GetBranchNamePattern(ctx.RepoRoot)
 		if err != nil {
@@ -141,80 +175,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
-	// Handle staging (skip if AI already staged changes)
-	var hasStaged bool
-	var alreadyStagedByAI bool
-	if opts.AI && opts.AIClient != nil && opts.BranchName == "" && opts.Message == "" {
-		// AI already staged changes, check if we have staged changes
-		hasStaged, err = git.HasStagedChanges(ctx.Context)
-		if err != nil {
-			_ = git.DeleteBranch(ctx.Context, branchName)
-			return fmt.Errorf("failed to check staged changes: %w", err)
-		}
-		alreadyStagedByAI = hasStaged
-	}
-
-	if !alreadyStagedByAI {
-		// Check staged changes
-		_, err = git.HasStagedChanges(ctx.Context)
-		if err != nil {
-			// Clean up branch on error
-			_ = git.DeleteBranch(ctx.Context, branchName)
-			return fmt.Errorf("failed to check staged changes: %w", err)
-		}
-
-		// Stage changes based on flags
-		stagingOpts := utils.StagingOptions{
-			All:    opts.All,
-			Update: opts.Update,
-			Patch:  opts.Patch,
-		}
-		if err := utils.StageChanges(ctx.Context, stagingOpts); err != nil {
-			_ = git.DeleteBranch(ctx.Context, branchName)
-			return err
-		}
-
-		// If no staging flags, check for unstaged changes and prompt if interactive
-		if !opts.All && !opts.Update && !opts.Patch {
-			hasStaged, err = git.HasStagedChanges(ctx.Context)
-			if err != nil {
-				_ = git.DeleteBranch(ctx.Context, branchName)
-				return fmt.Errorf("failed to check staged changes: %w", err)
-			}
-
-			hasUnstaged, err := git.HasUnstagedChanges(ctx.Context)
-			if err != nil {
-				_ = git.DeleteBranch(ctx.Context, branchName)
-				return fmt.Errorf("failed to check unstaged changes: %w", err)
-			}
-
-			if hasUnstaged && !hasStaged {
-				// Check if we're in an interactive terminal
-				if utils.IsInteractive() {
-					ctx.Splog.Info("You have unstaged changes. Would you like to stage them? (y/n): ")
-					var response string
-					_, _ = fmt.Scanln(&response)
-					if response == "y" || response == "Y" || response == yesResponse {
-						if err := git.StageAll(ctx.Context); err != nil {
-							_ = git.DeleteBranch(ctx.Context, branchName)
-							return fmt.Errorf("failed to stage changes: %w", err)
-						}
-						hasStaged = true
-					}
-				}
-			}
-		} else {
-			hasStaged = true
-		}
-	}
-
 	// Commit if there are staged changes
 	if hasStaged {
-		if commitMessage == "" {
-			// Try to get message from environment or prompt
-			commitMessage = getCommitMessage()
-		}
-
 		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
 			_ = git.DeleteBranch(ctx.Context, branchName)
@@ -252,8 +214,6 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	return nil
 }
 
-const yesResponse = "yes"
-
 // handleInsert moves children of the current branch to be children of the new branch
 func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context) error {
 	children := runtimeCtx.Engine.GetChildren(currentBranch)
@@ -272,14 +232,12 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	var toMove []string
 	if len(siblings) > 1 && utils.IsInteractive() {
 		runtimeCtx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
-		for i, child := range siblings {
-			runtimeCtx.Splog.Info("%d. %s", i+1, child)
+		response, err := tui.PromptTextInput("Enter numbers separated by commas (or 'all' for all):", "all")
+		if err != nil {
+			return err
 		}
-		runtimeCtx.Splog.Info("Enter numbers separated by commas (or 'all' for all): ")
-		var response string
-		_, _ = fmt.Scanln(&response)
 
-		if response == "all" || response == "All" || response == "ALL" {
+		if strings.ToLower(response) == "all" {
 			toMove = siblings
 		} else {
 			// Parse comma-separated numbers
@@ -301,9 +259,17 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	return nil
 }
 
-// getCommitMessage gets commit message from environment or prompts user
-func getCommitMessage() string {
-	// Try GIT_EDITOR or fallback to prompting
-	// For now, return empty and let git handle it
-	return ""
+// getCommitMessage gets commit message from editor
+func getCommitMessage(ctx context.Context) (string, error) {
+	template, err := git.GetCommitTemplate(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	msg, err := tui.OpenEditor(template, "COMMIT_EDITMSG-*")
+	if err != nil {
+		return "", err
+	}
+
+	return utils.CleanCommitMessage(msg), nil
 }

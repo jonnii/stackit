@@ -3,8 +3,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -13,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // SplitStyle specifies the split mode
@@ -422,15 +421,11 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng engine.Engine, s
 
 		if editMessage {
 			// Get message from user
-			prompt := &survey.Editor{
-				Message:  "Commit message:",
-				Default:  defaultCommitMessage,
-				FileName: "*.md",
-				Editor:   getEditor(),
+			msg, err := tui.OpenEditor(defaultCommitMessage, "COMMIT_EDITMSG-*")
+			if err != nil {
+				return nil, err
 			}
-			if err := survey.AskOne(prompt, &commitMessage); err != nil {
-				return nil, fmt.Errorf("canceled")
-			}
+			commitMessage = utils.CleanCommitMessage(msg)
 		}
 
 		// Create commit
@@ -638,22 +633,4 @@ func makeRange(n int) []int {
 		result[i] = i
 	}
 	return result
-}
-
-func getEditor() string {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = os.Getenv("GIT_EDITOR")
-	}
-	if editor == "" {
-		// Try to get from git config
-		output, err := exec.Command("git", "config", "--get", "core.editor").Output()
-		if err == nil {
-			editor = strings.TrimSpace(string(output))
-		}
-	}
-	if editor == "" {
-		editor = "vi" // Default fallback
-	}
-	return editor
 }

@@ -285,8 +285,8 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 func promptTrackChild(childName, parentName string) (bool, error) {
 	message := fmt.Sprintf("Found untracked child branch %s of %s. Track it?", tui.ColorBranchName(childName, false), tui.ColorBranchName(parentName, false))
 	options := []tui.SelectOption{
-		{Label: "Yes", Value: "yes"},
-		{Label: "No", Value: "no"},
+		{Label: "Yes", Value: yesResponse},
+		{Label: "No", Value: noResponse},
 	}
 
 	selected, err := tui.PromptSelect(message, options, 0)
@@ -294,5 +294,5 @@ func promptTrackChild(childName, parentName string) (bool, error) {
 		return false, err
 	}
 
-	return selected == "yes", nil
+	return selected == yesResponse, nil
 }

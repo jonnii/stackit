@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -97,7 +98,7 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 		nextBranch = children[0]
 	} else {
 		// Multiple children, prompt user
-		nextBranch, err = handleMultipleChildren(children, ctx)
+		nextBranch, err = handleMultipleChildren(children)
 		if err != nil {
 			return "", err
 		}
@@ -108,28 +109,25 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 }
 
 // handleMultipleChildren prompts the user to select a branch when multiple children exist
-func handleMultipleChildren(children []string, ctx *runtime.Context) (string, error) {
+func handleMultipleChildren(children []string) (string, error) {
 	if !utils.IsInteractive() {
-		return "", fmt.Errorf("cannot get top branch in non-interactive mode; multiple choices available:\n%s", formatBranchList(children))
+		return "", fmt.Errorf("Multiple branches found; cannot get top branch in non-interactive mode. Multiple choices available:\n%s", formatBranchList(children))
 	}
 
-	ctx.Splog.Info("Multiple branches found at the same level. Select a branch to guide the navigation:")
+	options := make([]tui.SelectOption, len(children))
 	for i, child := range children {
-		ctx.Splog.Info("%d. %s", i+1, child)
+		options[i] = tui.SelectOption{
+			Label: child,
+			Value: child,
+		}
 	}
-	ctx.Splog.Info("Enter number (1-%d): ", len(children))
 
-	var choice int
-	_, err := fmt.Scanln(&choice)
+	selected, err := tui.PromptSelect("Multiple branches found at the same level. Select a branch to guide the navigation:", options, 0)
 	if err != nil {
-		return "", fmt.Errorf("failed to read selection: %w", err)
+		return "", err
 	}
 
-	if choice < 1 || choice > len(children) {
-		return "", fmt.Errorf("invalid selection: %d (must be between 1 and %d)", choice, len(children))
-	}
-
-	return children[choice-1], nil
+	return selected, nil
 }
 
 // formatBranchList formats a list of branches for error messages

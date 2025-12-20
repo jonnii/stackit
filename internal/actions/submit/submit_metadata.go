@@ -2,8 +2,6 @@ package submit
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"stackit.dev/stackit/internal/ai"
@@ -76,49 +74,7 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *run
 	}
 
 	// Use editor for body editing
-	return editPRBodyInEditor(body)
-}
-
-// editPRBodyInEditor opens an editor to edit the PR body
-func editPRBodyInEditor(initialBody string) (string, error) {
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "stackit-pr-description-*.md")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() { _ = os.Remove(tmpFile.Name()) }()
-
-	// Write initial body
-	if _, err := tmpFile.WriteString(initialBody); err != nil {
-		return "", fmt.Errorf("failed to write temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return "", fmt.Errorf("failed to close temp file: %w", err)
-	}
-
-	// Get editor from environment
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi" // Default to vi
-	}
-
-	// Open editor
-	cmd := exec.Command(editor, tmpFile.Name())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("editor exited with error: %w", err)
-	}
-
-	// Read edited content
-	content, err := os.ReadFile(tmpFile.Name())
-	if err != nil {
-		return "", fmt.Errorf("failed to read edited file: %w", err)
-	}
-
-	return strings.TrimSpace(string(content)), nil
+	return tui.OpenEditor(body, "stackit-pr-description-*.md")
 }
 
 // GetReviewers gets reviewers from flag or prompts user

@@ -12,7 +12,7 @@ import (
 // IsInteractive checks if we're in an interactive terminal
 func IsInteractive() bool {
 	// Allow forcing non-interactive mode via environment variable
-	if os.Getenv("STACKIT_NON_INTERACTIVE") != "" {
+	if os.Getenv("STACKIT_NON_INTERACTIVE") != "" || os.Getenv("STACKIT_TEST_NO_INTERACTIVE") != "" {
 		return false
 	}
 

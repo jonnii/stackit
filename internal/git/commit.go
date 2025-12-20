@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // CommitOptions contains options for creating a commit
@@ -68,6 +69,28 @@ func GetStagedDiff(ctx context.Context, files ...string) (string, error) {
 		return "", fmt.Errorf("failed to get staged diff: %w", err)
 	}
 	return output, nil
+}
+
+// GetCommitTemplate returns a string suitable for a commit message template
+func GetCommitTemplate(ctx context.Context) (string, error) {
+	status, err := RunGitCommandWithContext(ctx, "status")
+	if err != nil {
+		return "", fmt.Errorf("failed to get git status: %w", err)
+	}
+
+	lines := strings.Split(status, "\n")
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString("# Please enter the commit message for your changes. Lines starting\n")
+	sb.WriteString("# with '#' will be ignored, and an empty message aborts the commit.\n")
+	sb.WriteString("#\n")
+	for _, line := range lines {
+		sb.WriteString("# ")
+		sb.WriteString(line)
+		sb.WriteString("\n")
+	}
+
+	return sb.String(), nil
 }
 
 // GetUnstagedDiff returns the unified diff of unstaged changes

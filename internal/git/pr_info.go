@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -19,21 +20,27 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		return nil
 	}
 
-	// Create GitHub client
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
 	// Get repository info if not provided
+	var repoInfo *GitHubRepoInfo
 	if repoOwner == "" || repoName == "" {
-		owner, name, err := getRepoInfo(ctx)
+		repoInfo, err = getRepoInfoWithHostname(ctx)
 		if err != nil {
 			return nil // Skip if can't determine repo
 		}
-		repoOwner = owner
-		repoName = name
+		repoOwner = repoInfo.Owner
+		repoName = repoInfo.Repo
+	} else {
+		// Still need hostname for client configuration
+		repoInfo, err = getRepoInfoWithHostname(ctx)
+		if err != nil {
+			return nil // Skip if can't determine repo
+		}
+	}
+
+	// Create GitHub client with Enterprise support
+	client, err := createGitHubClient(ctx, repoInfo.Hostname, token)
+	if err != nil {
+		return nil // Skip if can't create client
 	}
 
 	// Fetch PR info for each branch
@@ -108,6 +115,37 @@ func getPRInfoForBranch(ctx context.Context, client *github.Client, owner, repo,
 	return prs[0], nil
 }
 
+// createGitHubClient creates a GitHub client configured for the given hostname
+// Supports both github.com and GitHub Enterprise instances
+func createGitHubClient(ctx context.Context, hostname, token string) (*github.Client, error) {
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	// Configure for GitHub Enterprise if not github.com
+	if hostname != "github.com" {
+		// GitHub Enterprise API endpoints
+		// REST API: https://hostname/api/v3/
+		// Upload API: https://hostname/api/uploads/
+		baseURL, err := url.Parse(fmt.Sprintf("https://%s/api/v3/", hostname))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse base URL for hostname %s: %w", hostname, err)
+		}
+		uploadURL, err := url.Parse(fmt.Sprintf("https://%s/api/uploads/", hostname))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse upload URL for hostname %s: %w", hostname, err)
+		}
+
+		client.BaseURL = baseURL
+		client.UploadURL = uploadURL
+	}
+	// For github.com, the default URLs are already correct
+
+	return client, nil
+}
+
 // getGitHubToken gets GitHub token from environment or gh CLI
 func getGitHubToken() (string, error) {
 	// Try environment variable first
@@ -129,40 +167,95 @@ func getGitHubToken() (string, error) {
 	return token, nil
 }
 
-// getRepoInfo gets repository owner and name from git remote
-func getRepoInfo(ctx context.Context) (string, string, error) {
-	// Get remote URL
-	url, err := RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
-	if err != nil {
-		return "", "", err
-	}
+// GitHubRepoInfo contains parsed information from a git remote URL
+type GitHubRepoInfo struct {
+	Hostname string
+	Owner    string
+	Repo     string
+}
 
-	// Parse URL (handles both https and ssh formats)
-	// https://github.com/owner/repo.git
-	// git@github.com:owner/repo.git
-	url = strings.TrimSuffix(url, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("invalid remote URL")
-	}
+// ParseGitHubRemoteURL parses a git remote URL and extracts hostname, owner, and repo
+// Supports both github.com and GitHub Enterprise URLs
+// Examples:
+//   - https://github.com/owner/repo.git
+//   - git@github.com:owner/repo.git
+//   - https://github.company.com/owner/repo.git
+//   - git@github.company.com:owner/repo.git
+func ParseGitHubRemoteURL(remoteURL string) (*GitHubRepoInfo, error) {
+	remoteURL = strings.TrimSpace(remoteURL)
+	remoteURL = strings.TrimSuffix(remoteURL, ".git")
 
-	repoName := parts[len(parts)-1]
-	var owner string
-	if strings.Contains(url, "@") {
-		// SSH format: git@github.com:owner/repo
-		sshParts := strings.Split(url, ":")
-		if len(sshParts) < 2 {
-			return "", "", fmt.Errorf("invalid SSH remote URL")
+	var hostname, owner, repo string
+
+	if strings.Contains(remoteURL, "@") {
+		// SSH format: git@hostname:owner/repo or git@hostname/owner/repo
+		// Split on @ first
+		parts := strings.SplitN(remoteURL, "@", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid SSH remote URL format")
 		}
-		pathParts := strings.Split(sshParts[1], "/")
+
+		// Get hostname and path
+		hostAndPath := parts[1]
+
+		// Handle both : and / separators after hostname
+		var path string
+		if strings.Contains(hostAndPath, ":") {
+			// Format: git@hostname:owner/repo
+			hostPathParts := strings.SplitN(hostAndPath, ":", 2)
+			hostname = hostPathParts[0]
+			path = hostPathParts[1]
+		} else {
+			// Format: git@hostname/owner/repo (less common)
+			pathParts := strings.SplitN(hostAndPath, "/", 2)
+			if len(pathParts) < 2 {
+				return nil, fmt.Errorf("invalid SSH remote URL: missing path")
+			}
+			hostname = pathParts[0]
+			path = pathParts[1]
+		}
+
+		// Parse owner/repo from path
+		pathParts := strings.Split(path, "/")
 		if len(pathParts) < 2 {
-			return "", "", fmt.Errorf("invalid SSH remote URL")
+			return nil, fmt.Errorf("invalid SSH remote URL: path must be owner/repo")
 		}
 		owner = pathParts[0]
+		repo = pathParts[len(pathParts)-1]
 	} else {
-		// HTTPS format: https://github.com/owner/repo
+		// HTTPS format: https://hostname/owner/repo
+		// Remove protocol
+		remoteURL = strings.TrimPrefix(remoteURL, "https://")
+		remoteURL = strings.TrimPrefix(remoteURL, "http://")
+
+		parts := strings.Split(remoteURL, "/")
+		if len(parts) < 3 {
+			return nil, fmt.Errorf("invalid HTTPS remote URL: must be protocol://hostname/owner/repo")
+		}
+
+		hostname = parts[0]
 		owner = parts[len(parts)-2]
+		repo = parts[len(parts)-1]
 	}
 
-	return owner, repoName, nil
+	if hostname == "" || owner == "" || repo == "" {
+		return nil, fmt.Errorf("failed to parse hostname, owner, or repo from remote URL")
+	}
+
+	return &GitHubRepoInfo{
+		Hostname: hostname,
+		Owner:    owner,
+		Repo:     repo,
+	}, nil
+}
+
+// getRepoInfoWithHostname gets repository hostname, owner, and name from git remote
+func getRepoInfoWithHostname(ctx context.Context) (*GitHubRepoInfo, error) {
+	// Get remote URL
+	remoteURL, err := RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote URL: %w", err)
+	}
+
+	return ParseGitHubRemoteURL(remoteURL)
 }

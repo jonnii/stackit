@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v62/github"
-	"golang.org/x/oauth2"
 )
 
 // RealGitHubClient implements GitHubClient using the real GitHub API
@@ -22,21 +21,20 @@ func NewRealGitHubClient(ctx context.Context) (*RealGitHubClient, error) {
 		return nil, fmt.Errorf("failed to get GitHub token: %w", err)
 	}
 
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	owner, repo, err := getRepoInfo(ctx)
+	repoInfo, err := getRepoInfoWithHostname(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository info: %w", err)
 	}
 
+	client, err := createGitHubClient(ctx, repoInfo.Hostname, token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
 	return &RealGitHubClient{
 		client: client,
-		owner:  owner,
-		repo:   repo,
+		owner:  repoInfo.Owner,
+		repo:   repoInfo.Repo,
 	}, nil
 }
 

@@ -223,11 +223,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	}
 
 	// 4. Detect branching stacks (siblings)
-	// Check if current branch has siblings
-	currentChildren := eng.GetChildren(currentBranch)
-	if len(currentChildren) > 0 {
-		validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s has %d child branch(es) that will be restacked: %v", currentBranch, len(currentChildren), currentChildren))
-	}
+	// Note: Child branches will be restacked automatically - this is expected behavior, not a warning
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}

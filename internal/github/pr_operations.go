@@ -298,10 +298,12 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 	hasPending := false
 	hasFailing := false
 
-	// Process check runs
+	// Process check runs - these are the most accurate source of truth
 	for _, run := range checkRuns.CheckRuns {
 		if run.Status != nil {
 			status := strings.ToUpper(*run.Status)
+			// Only consider a check as pending if it's actively queued or in progress
+			// If status is "COMPLETED", it's not pending regardless of conclusion
 			if status == "QUEUED" || status == "IN_PROGRESS" {
 				hasPending = true
 			}
@@ -314,15 +316,26 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 		}
 	}
 
-	// Process combined status
-	if combinedStatus != nil {
-		if combinedStatus.State != nil {
-			state := strings.ToUpper(*combinedStatus.State)
+	// Process combined status as a fallback
+	// Only use combined status if we don't have check runs data or if it indicates failure
+	// Combined status can be stale, so we prioritize check runs above
+	if combinedStatus != nil && combinedStatus.State != nil {
+		state := strings.ToUpper(*combinedStatus.State)
+		// Only trust combined status for pending if we have no check runs or if check runs also indicate pending
+		// This prevents false positives from stale combined status
+		if len(checkRuns.CheckRuns) == 0 {
+			// No check runs available, use combined status
 			if state == checkStatePending {
 				hasPending = true
 			} else if state == checkStateFailure || state == checkStateError {
 				hasFailing = true
 			}
+		} else {
+			// We have check runs, only use combined status for failures (more reliable)
+			if state == checkStateFailure || state == checkStateError {
+				hasFailing = true
+			}
+			// Don't use combined status for pending if we have check runs - check runs are more accurate
 		}
 	}
 

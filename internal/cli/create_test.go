@@ -483,7 +483,7 @@ func TestCreateCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set branch name pattern to just {message} for deterministic testing
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{message}")
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", "{message}")
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -554,13 +554,13 @@ func TestCreateCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set a custom pattern
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{username}/{date}/{message}")
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", "{username}/{date}/{message}")
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)
 
 		// Get the pattern back
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -581,7 +581,7 @@ func TestCreateCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to set a pattern without {message} (should fail)
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{username}/{date}")
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", "{username}/{date}")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config set should fail without {message} placeholder")

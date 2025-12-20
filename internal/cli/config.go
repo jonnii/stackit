@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
@@ -13,19 +14,47 @@ import (
 
 // newConfigCmd creates the config command
 func newConfigCmd() *cobra.Command {
+	var listFlag bool
+
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Get and set repository configuration",
 		Long: `Get and set repository configuration values.
 
+When run without subcommands, opens an interactive TUI for editing configuration.
+Use --list to print all configuration values instead.
+
 Examples:
-  stackit config get branch-name-pattern
-  stackit config set branch-name-pattern "{username}/{date}/{message}"
+  stackit config                    # Interactive TUI
+  stackit config --list             # Print all config values
+  stackit config get branch.pattern
+  stackit config set branch.pattern "{username}/{date}/{message}"
   stackit config get create.ai
   stackit config set create.ai true
   stackit config get submit.footer
   stackit config set submit.footer false`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get repo root
+			if err := git.InitDefaultRepo(); err != nil {
+				return fmt.Errorf("not a git repository: %w", err)
+			}
+
+			repoRoot, err := git.GetRepoRoot()
+			if err != nil {
+				return fmt.Errorf("failed to get repo root: %w", err)
+			}
+
+			// If --list flag is set, or terminal is not interactive, show list
+			if listFlag || !tui.IsTTY() {
+				return actions.ConfigListAction(repoRoot)
+			}
+
+			// Otherwise, show interactive TUI
+			return actions.ConfigTUIAction(repoRoot)
+		},
 	}
+
+	cmd.Flags().BoolVarP(&listFlag, "list", "l", false, "Print all configuration values instead of opening interactive TUI")
 
 	cmd.AddCommand(newConfigGetCmd())
 	cmd.AddCommand(newConfigSetCmd())
@@ -52,10 +81,10 @@ func newConfigGetCmd() *cobra.Command {
 
 			key := args[0]
 			switch key {
-			case "branch-name-pattern":
+			case "branch.pattern":
 				pattern, err := config.GetBranchNamePattern(repoRoot)
 				if err != nil {
-					return fmt.Errorf("failed to get branch-name-pattern: %w", err)
+					return fmt.Errorf("failed to get branch.pattern: %w", err)
 				}
 				fmt.Println(pattern)
 			case "create.ai":
@@ -104,11 +133,11 @@ func newConfigSetCmd() *cobra.Command {
 			splog := tui.NewSplog()
 
 			switch key {
-			case "branch-name-pattern":
+			case "branch.pattern":
 				if err := config.SetBranchNamePattern(repoRoot, value); err != nil {
-					return fmt.Errorf("failed to set branch-name-pattern: %w", err)
+					return fmt.Errorf("failed to set branch.pattern: %w", err)
 				}
-				splog.Info("Set branch-name-pattern to: %s", value)
+				splog.Info("Set branch.pattern to: %s", value)
 			case "create.ai":
 				enabled, err := strconv.ParseBool(value)
 				if err != nil {

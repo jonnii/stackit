@@ -9,6 +9,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
 )
@@ -19,9 +20,15 @@ func TestMergeAction(t *testing.T) {
 			return s.Repo.CreateChangeAndCommit("initial", "init")
 		})
 
-		// Detach HEAD
-		err := scene.Repo.RunGitCommand("checkout", "HEAD~0")
+		// Detach HEAD by checking out a commit directly
+		// Get the current commit SHA first
+		commitSHA, err := scene.Repo.RunGitCommandAndGetOutput("rev-parse", "HEAD")
 		require.NoError(t, err)
+		err = scene.Repo.RunGitCommand("checkout", "--detach", commitSHA)
+		require.NoError(t, err)
+
+		// Reset default repo to ensure it sees the detached HEAD state
+		git.ResetDefaultRepo()
 
 		eng, err := engine.NewEngine(scene.Dir)
 		require.NoError(t, err)

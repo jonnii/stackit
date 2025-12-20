@@ -1,0 +1,89 @@
+package actions
+
+import (
+	"fmt"
+
+	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
+)
+
+// PopOptions contains options for the pop command
+type PopOptions struct {
+	// Currently no options, but structure is here for future extensibility
+}
+
+// PopAction deletes the current branch but retains the state of files in the working tree
+func PopAction(ctx *runtime.Context, opts PopOptions) error {
+	eng := ctx.Engine
+	splog := ctx.Splog
+
+	// Validate we're on a branch
+	currentBranch, err := utils.ValidateOnBranch(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Check if on trunk
+	if eng.IsTrunk(currentBranch) {
+		return fmt.Errorf("cannot pop trunk branch")
+	}
+
+	// Check if branch is tracked
+	if !eng.IsBranchTracked(currentBranch) {
+		return fmt.Errorf("cannot pop untracked branch %s", currentBranch)
+	}
+
+	// Check if rebase is in progress
+	if err := utils.CheckRebaseInProgress(ctx.Context); err != nil {
+		return err
+	}
+
+	// Check for uncommitted changes
+	if utils.HasUncommittedChanges(ctx.Context) {
+		return fmt.Errorf("cannot pop with uncommitted changes. Please commit or stash them first")
+	}
+
+	// Get parent branch
+	parent := eng.GetParent(currentBranch)
+	if parent == "" {
+		parent = eng.Trunk()
+	}
+
+	// Get parent branch revision
+	parentRev, err := eng.GetRevision(ctx.Context, parent)
+	if err != nil {
+		return fmt.Errorf("failed to get parent revision: %w", err)
+	}
+
+	// Soft reset to parent - this uncommits the current branch's changes
+	// and stages them, keeping the working tree unchanged
+	if err := git.SoftReset(ctx.Context, parentRev); err != nil {
+		return fmt.Errorf("failed to reset to parent: %w", err)
+	}
+
+	// Checkout parent branch
+	if err := git.CheckoutBranch(ctx.Context, parent); err != nil {
+		return fmt.Errorf("failed to checkout parent branch: %w", err)
+	}
+
+	// Delete the old branch (this will also reparent any children)
+	if err := eng.DeleteBranch(ctx.Context, currentBranch); err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
+	}
+
+	// Check how many changes are staged
+	hasStaged, err := git.HasStagedChanges(ctx.Context)
+	if err == nil && hasStaged {
+		splog.Info("Popped branch %s. Changes are now staged on %s.",
+			tui.ColorBranchName(currentBranch, false),
+			tui.ColorBranchName(parent, false))
+	} else {
+		splog.Info("Popped branch %s. Switched to %s.",
+			tui.ColorBranchName(currentBranch, false),
+			tui.ColorBranchName(parent, false))
+	}
+
+	return nil
+}

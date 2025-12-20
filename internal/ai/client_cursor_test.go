@@ -109,6 +109,58 @@ func TestBuildCommitMessagePrompt(t *testing.T) {
 	if !strings.Contains(prompt, "Conventional Commits") {
 		t.Error("Prompt should mention Conventional Commits")
 	}
+
+	if !strings.Contains(prompt, "no markdown") {
+		t.Error("Prompt should explicitly request no markdown formatting")
+	}
+}
+
+func TestStripMarkdownCodeBlocks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no markdown",
+			input:    "feat: add new feature",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "with code block",
+			input:    "```\nfeat: add new feature\n```",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "with language in code block",
+			input:    "```text\nfeat: add new feature\n```",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "with single backticks",
+			input:    "`feat: add new feature`",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "multiline with code block",
+			input:    "```\nfix: enhance error reporting\nwith detailed output\n```",
+			expected: "fix: enhance error reporting\nwith detailed output",
+		},
+		{
+			name:     "code block with extra whitespace",
+			input:    "```\n  feat: add feature  \n```",
+			expected: "feat: add feature",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripMarkdownCodeBlocks(tt.input)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
 }
 
 func TestEnsureConventionalCommitFormat(t *testing.T) {

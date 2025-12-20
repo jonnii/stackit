@@ -170,13 +170,42 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
 			return "", fmt.Errorf("cursor-agent not found in PATH. Install it or set CURSOR_API_KEY for API mode")
 		}
-		return "", fmt.Errorf("cursor-agent failed: %w, stderr: %s", err, stderr.String())
+
+		// Capture full output for debugging
+		stdoutStr := stdout.String()
+		stderrStr := stderr.String()
+
+		// Build detailed error message
+		var errorMsg strings.Builder
+		errorMsg.WriteString("cursor-agent failed with exit code")
+		if exitError, ok := err.(*exec.ExitError); ok {
+			errorMsg.WriteString(fmt.Sprintf(" %d", exitError.ExitCode()))
+		}
+		errorMsg.WriteString(fmt.Sprintf(": %v\n", err))
+
+		if stderrStr != "" {
+			errorMsg.WriteString("\nstderr:\n")
+			errorMsg.WriteString(stderrStr)
+		}
+
+		if stdoutStr != "" {
+			errorMsg.WriteString("\nstdout:\n")
+			errorMsg.WriteString(stdoutStr)
+		}
+
+		// Also log to stderr for immediate visibility
+		_, _ = fmt.Fprintf(os.Stderr, "\n=== cursor-agent error ===\n%s\n", errorMsg.String())
+
+		return "", fmt.Errorf("%s", errorMsg.String())
 	}
 
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
 		return "", fmt.Errorf("cursor-agent returned empty output")
 	}
+
+	// Strip markdown code blocks if present
+	output = stripMarkdownCodeBlocks(output)
 
 	// Extract just the commit message from the output
 	// cursor-agent might return additional formatting, so we clean it up
@@ -196,10 +225,33 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 
 	result := strings.Join(messageLines, "\n")
 	if result == "" {
-		return output, nil // Fall back to raw output if cleaning removed everything
+		result = output // Fall back to raw output if cleaning removed everything
 	}
 
-	return result, nil
+	// Take only the first line (subject line) - commit messages should be single line
+	firstLine := strings.Split(result, "\n")[0]
+	firstLine = strings.TrimSpace(firstLine)
+
+	// If the first line is too long, truncate it (but try to preserve the type: prefix)
+	if len(firstLine) > 72 {
+		// Try to preserve "type: " prefix if present
+		if colonIdx := strings.Index(firstLine, ":"); colonIdx > 0 && colonIdx < 20 {
+			prefix := firstLine[:colonIdx+1]
+			description := firstLine[colonIdx+1:]
+			description = strings.TrimSpace(description)
+			// Truncate description to fit in 72 chars total
+			maxDescLen := 72 - len(prefix) - 1 // -1 for space
+			if len(description) > maxDescLen {
+				description = description[:maxDescLen-3] + "..."
+			}
+			firstLine = prefix + " " + description
+		} else {
+			// No type prefix, just truncate
+			firstLine = firstLine[:69] + "..."
+		}
+	}
+
+	return firstLine, nil
 }
 
 // callCursorAPI makes a request to the Cursor API
@@ -273,7 +325,10 @@ func (c *CursorAgentClient) callCursorAPI(ctx context.Context, prompt string) (s
 		return "", fmt.Errorf("no choices in API response")
 	}
 
-	return apiResponse.Choices[0].Message.Content, nil
+	content := apiResponse.Choices[0].Message.Content
+	// Strip markdown code blocks if present
+	content = stripMarkdownCodeBlocks(content)
+	return content, nil
 }
 
 // BuildCommitMessagePrompt creates a prompt for commit message generation
@@ -289,13 +344,41 @@ func BuildCommitMessagePrompt(diff string) string {
 
 Requirements:
 - Use appropriate type: feat, fix, docs, style, refactor, perf, test, chore, or ci
-- Keep it concise (under 72 characters for the first line)
-- Accurately describe the changes
+- Keep it SHORT and concise (50-72 characters total, single line only)
+- Use imperative mood (e.g., "add feature" not "added feature" or "adds feature")
+- Accurately describe the changes in the diff
+- Return ONLY a single line of plain text, no markdown formatting, no code blocks, no quotes, no line breaks, no additional text
 
 Git diff:
 %s
 
-Return only the commit message, no additional text.`, diff)
+Return only a single line commit message in the format: <type>[optional scope]: <short description>`, diff)
+}
+
+// stripMarkdownCodeBlocks removes markdown code blocks from the output
+func stripMarkdownCodeBlocks(text string) string {
+	// Remove triple backtick code blocks
+	text = strings.TrimSpace(text)
+
+	// Remove opening ```language or just ```
+	if strings.HasPrefix(text, "```") {
+		// Find the first newline after ```
+		firstNewline := strings.Index(text, "\n")
+		if firstNewline > 0 {
+			text = text[firstNewline+1:]
+		} else {
+			// No newline, just remove the ```
+			text = strings.TrimPrefix(text, "```")
+		}
+	}
+
+	// Remove closing ```
+	text = strings.TrimSuffix(text, "```")
+
+	// Also handle single backticks that might wrap the entire message
+	text = strings.Trim(text, "`")
+
+	return strings.TrimSpace(text)
 }
 
 // ensureConventionalCommitFormat ensures the message follows conventional commit format

@@ -194,7 +194,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 					ctx.Splog.Info("You have unstaged changes. Would you like to stage them? (y/n): ")
 					var response string
 					_, _ = fmt.Scanln(&response)
-					if response == "y" || response == "Y" || response == "yes" {
+					if response == "y" || response == "Y" || response == yesResponse {
 						if err := git.StageAll(ctx.Context); err != nil {
 							_ = git.DeleteBranch(ctx.Context, branchName)
 							return fmt.Errorf("failed to stage changes: %w", err)
@@ -251,6 +251,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 	return nil
 }
+
+const yesResponse = "yes"
 
 // handleInsert moves children of the current branch to be children of the new branch
 func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context) error {

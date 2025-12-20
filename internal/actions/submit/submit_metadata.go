@@ -8,6 +8,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -118,7 +119,7 @@ func GetReviewers(reviewersFlag string, ctx *runtime.Context) ([]string, []strin
 	}
 
 	// Parse reviewers
-	reviewers, teamReviewers := git.ParseReviewers(reviewersFlag)
+	reviewers, teamReviewers := github.ParseReviewers(reviewersFlag)
 	return reviewers, teamReviewers, nil
 }
 
@@ -135,7 +136,7 @@ func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]strin
 	}
 
 	// Parse reviewers
-	reviewers, teamReviewers := git.ParseReviewers(reviewersFlag)
+	reviewers, teamReviewers := github.ParseReviewers(reviewersFlag)
 	return reviewers, teamReviewers, nil
 }
 

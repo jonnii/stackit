@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
@@ -84,7 +84,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	allBranches := eng.AllBranchNames()
 	repoOwner, repoName, _ := utils.GetRepoInfo(gctx)
 	if repoOwner != "" && repoName != "" {
-		if err := git.SyncPrInfo(gctx, allBranches, repoOwner, repoName); err != nil {
+		if err := github.SyncPrInfo(gctx, allBranches, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}

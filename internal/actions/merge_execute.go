@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -255,25 +256,25 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 
 // updatePRBaseBranch updates a PR's base branch via GitHub API
 func updatePRBaseBranch(ctx context.Context, branchName, newBase string) error {
-	client, owner, repo, err := git.GetGitHubClient(ctx)
+	client, owner, repo, err := github.GetGitHubClient(ctx)
 	if err != nil {
 		// If we can't get GitHub client, skip this step (non-fatal)
 		return nil
 	}
 
 	// Get PR for this branch
-	pr, err := git.GetPullRequestByBranch(ctx, client, owner, repo, branchName)
+	pr, err := github.GetPullRequestByBranch(ctx, client, owner, repo, branchName)
 	if err != nil || pr == nil {
 		// PR not found or error - non-fatal
 		return nil
 	}
 
 	// Update PR base
-	updateOpts := git.UpdatePROptions{
+	updateOpts := github.UpdatePROptions{
 		Base: &newBase,
 	}
 
-	if err := git.UpdatePullRequest(ctx, client, owner, repo, *pr.Number, updateOpts); err != nil {
+	if err := github.UpdatePullRequest(ctx, client, owner, repo, *pr.Number, updateOpts); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 

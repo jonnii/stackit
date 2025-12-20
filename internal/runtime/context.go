@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -19,7 +20,7 @@ type Context struct {
 	Engine       engine.Engine
 	Splog        *tui.Splog
 	RepoRoot     string
-	GitHubClient git.GitHubClient
+	GitHubClient github.GitHubClient
 }
 
 // NewContext creates a new context with the given engine
@@ -52,7 +53,7 @@ var DemoEngineFactory func() engine.Engine
 
 // DemoGitHubClientFactory is a function that creates a demo GitHub client.
 // This is set by the demo package to avoid circular imports.
-var DemoGitHubClientFactory func() git.GitHubClient
+var DemoGitHubClientFactory func() github.GitHubClient
 
 // NewContextAuto creates a context automatically based on the environment.
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine
@@ -78,7 +79,7 @@ func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
 	runtimeCtx.Context = ctx
 
 	// Try to create real GitHub client (may fail if no token)
-	ghClient, err := git.NewRealGitHubClient(ctx)
+	ghClient, err := github.NewRealGitHubClient(ctx)
 	if err == nil {
 		runtimeCtx.GitHubClient = ghClient
 	}

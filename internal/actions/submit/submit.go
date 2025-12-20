@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
@@ -322,7 +323,7 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 }
 
 // getGitHubClient returns the GitHub client from context
-func getGitHubClient(ctx *runtime.Context) (git.GitHubClient, error) {
+func getGitHubClient(ctx *runtime.Context) (github.GitHubClient, error) {
 	if ctx.GitHubClient != nil {
 		return ctx.GitHubClient, nil
 	}
@@ -347,8 +348,8 @@ func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, 
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
-	createOpts := git.CreatePROptions{
+func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
+	createOpts := github.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
 		Head:          submissionInfo.Head,
@@ -379,7 +380,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
 	// Check if base changed
 	prInfo, _ := eng.GetPrInfo(ctx, submissionInfo.BranchName)
 	baseChanged := false
@@ -387,7 +388,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		baseChanged = true
 	}
 
-	updateOpts := git.UpdatePROptions{
+	updateOpts := github.UpdatePROptions{
 		Title:           &submissionInfo.Metadata.Title,
 		Body:            &submissionInfo.Metadata.Body,
 		Reviewers:       submissionInfo.Metadata.Reviewers,
@@ -434,7 +435,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 }
 
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubCtx context.Context, githubClient git.GitHubClient, repoOwner, repoName string) {
+func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) {
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(ctx, branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {
@@ -445,7 +446,7 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 		updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
 
 		if updatedBody != prInfo.Body {
-			updateOpts := git.UpdatePROptions{
+			updateOpts := github.UpdatePROptions{
 				Body: &updatedBody,
 			}
 			if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {

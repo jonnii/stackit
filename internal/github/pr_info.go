@@ -1,4 +1,4 @@
-package git
+package github
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/go-github/v62/github"
 	"golang.org/x/oauth2"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // SyncPrInfo syncs PR information for branches from GitHub
@@ -53,13 +55,13 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 
 		if prInfo != nil {
 			// Update metadata
-			meta, err := ReadMetadataRef(branchName)
+			meta, err := git.ReadMetadataRef(branchName)
 			if err != nil {
-				meta = &Meta{}
+				meta = &git.Meta{}
 			}
 
 			if meta.PrInfo == nil {
-				meta.PrInfo = &PrInfo{}
+				meta.PrInfo = &git.PrInfo{}
 			}
 
 			// Update PR info
@@ -87,7 +89,7 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 			}
 
 			// Write updated metadata
-			_ = WriteMetadataRef(branchName, meta)
+			_ = git.WriteMetadataRef(branchName, meta)
 		}
 	}
 
@@ -154,7 +156,7 @@ func getGitHubToken() (string, error) {
 	}
 
 	// Try gh CLI
-	output, err := RunGHCommandWithContext(context.Background(), "auth", "token")
+	output, err := git.RunGHCommandWithContext(context.Background(), "auth", "token")
 	if err != nil {
 		return "", fmt.Errorf("failed to get GitHub token: %w", err)
 	}
@@ -252,7 +254,7 @@ func ParseGitHubRemoteURL(remoteURL string) (*GitHubRepoInfo, error) {
 // getRepoInfoWithHostname gets repository hostname, owner, and name from git remote
 func getRepoInfoWithHostname(ctx context.Context) (*GitHubRepoInfo, error) {
 	// Get remote URL
-	remoteURL, err := RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
+	remoteURL, err := git.RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote URL: %w", err)
 	}

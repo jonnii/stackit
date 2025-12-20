@@ -31,8 +31,8 @@ func UntrackAction(ctx *runtime.Context, opts UntrackOptions) error {
 		message := fmt.Sprintf("Branch %s has %d tracked descendants. Untrack all of them?",
 			tui.ColorBranchName(branchName, false), len(descendants))
 		options := []tui.SelectOption{
-			{Label: "Yes", Value: "yes"},
-			{Label: "No", Value: "no"},
+			{Label: "Yes", Value: yesResponse},
+			{Label: "No", Value: noResponse},
 		}
 
 		selected, err := tui.PromptSelect(message, options, 0)
@@ -40,7 +40,7 @@ func UntrackAction(ctx *runtime.Context, opts UntrackOptions) error {
 			return err
 		}
 
-		if selected != "yes" {
+		if selected != yesResponse {
 			ctx.Splog.Info("Untrack canceled.")
 			return nil
 		}

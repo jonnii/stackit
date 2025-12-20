@@ -1,97 +1,35 @@
 package ai
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
 
 // NOTE: These tests do NOT make real API calls or invoke cursor-agent CLI.
 // They only test:
-// - Client creation logic (struct initialization, option parsing)
+// - Client creation logic (struct initialization)
 // - Helper functions (prompt building, formatting, parsing)
 //
 // Tests that would require real API calls (GenerateCommitMessage, GeneratePRDescription)
-// are not included here to avoid network dependencies and API costs.
+// are not included here to avoid dependencies on external binaries.
 
 func TestNewCursorAgentClient(t *testing.T) {
-	// These tests only verify client creation logic, not actual API calls
-	t.Run("creates client with API key from environment", func(t *testing.T) {
-		// Set a test API key
-		originalKey := os.Getenv("CURSOR_API_KEY")
-		defer func() {
-			if originalKey != "" {
-				os.Setenv("CURSOR_API_KEY", originalKey)
-			} else {
-				os.Unsetenv("CURSOR_API_KEY")
-			}
-		}()
-
-		os.Setenv("CURSOR_API_KEY", "test-api-key")
-
-		opts := &CursorAgentOptions{
-			UseCLI: false, // Force API mode
-		}
-
-		client, err := NewCursorAgentClient(opts)
+	// These tests only verify client creation logic, not actual CLI calls
+	t.Run("creates client when cursor-agent is available", func(t *testing.T) {
+		// Since we can't easily mock isCursorAgentAvailable without refactoring,
+		// and we know it's available in the environment where this test runs,
+		// we just check if it works or fails gracefully.
+		client, err := NewCursorAgentClient()
 		if err != nil {
-			t.Fatalf("Failed to create client: %v", err)
+			// If it's not available in the test environment, that's fine too
+			t.Logf("cursor-agent not available: %v", err)
+			return
 		}
 
 		if client == nil {
 			t.Fatal("Client is nil")
 		}
-
-		if client.useCLI {
-			t.Error("Expected API mode, got CLI mode")
-		}
-
-		if client.apiKey != "test-api-key" {
-			t.Errorf("Expected API key 'test-api-key', got '%s'", client.apiKey)
-		}
 	})
-
-	t.Run("fails when no API key and CLI not available", func(t *testing.T) {
-		// Unset API key
-		originalKey := os.Getenv("CURSOR_API_KEY")
-		defer func() {
-			if originalKey != "" {
-				os.Setenv("CURSOR_API_KEY", originalKey)
-			} else {
-				os.Unsetenv("CURSOR_API_KEY")
-			}
-		}()
-
-		os.Unsetenv("CURSOR_API_KEY")
-
-		opts := &CursorAgentOptions{
-			UseCLI: false, // Force API mode
-		}
-
-		_, err := NewCursorAgentClient(opts)
-		if err == nil {
-			t.Fatal("Expected error when no API key and CLI not available")
-		}
-	})
-
-	t.Run("uses provided API key", func(t *testing.T) {
-		opts := &CursorAgentOptions{
-			UseCLI: false,
-			APIKey: "provided-key",
-		}
-
-		client, err := NewCursorAgentClient(opts)
-		if err != nil {
-			t.Fatalf("Failed to create client: %v", err)
-		}
-
-		if client.apiKey != "provided-key" {
-			t.Errorf("Expected API key 'provided-key', got '%s'", client.apiKey)
-		}
-	})
-
-	// Note: We do NOT test actual API calls or CLI invocations in unit tests.
-	// Those would require real credentials and network access.
 }
 
 func TestBuildCommitMessagePrompt(t *testing.T) {

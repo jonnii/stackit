@@ -82,7 +82,7 @@ If no branch is specified, uses the current branch.`,
 
 				// Create AI client
 				var aiClient ai.AIClient
-				cursorClient, err := ai.NewCursorAgentClient(nil)
+				cursorClient, err := ai.NewCursorAgentClient()
 				if err != nil {
 					// Fall back to mock for demonstration
 					_, _ = fmt.Fprintf(cmd.OutOrStderr(), "Warning: cursor-agent not available, using mock client for demonstration\n\n")

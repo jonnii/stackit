@@ -31,6 +31,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(newCreateCmd())
 	rootCmd.AddCommand(newDebugPromptCmd())
 	rootCmd.AddCommand(newDeleteCmd())
+	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(newDownCmd())
 	rootCmd.AddCommand(newFoldCmd())
 	rootCmd.AddCommand(newInfoCmd())

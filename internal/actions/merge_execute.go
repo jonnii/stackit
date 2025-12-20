@@ -130,16 +130,21 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 		}
 
 	case StepRestack:
-		// Set parent to trunk first
-		trunk := eng.Trunk()
-		if err := eng.SetParent(context, step.BranchName, trunk); err != nil {
-			return fmt.Errorf("failed to set parent: %w", err)
-		}
-
-		// Restack the branch
+		// Restack the branch - RestackBranch will automatically handle reparenting
+		// if the parent has been merged/deleted
 		result, err := eng.RestackBranch(context, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to restack: %w", err)
+		}
+
+		// Get the actual parent after restacking (may have been reparented)
+		// Use NewParent from result if reparented, otherwise get from engine
+		actualParent := result.NewParent
+		if actualParent == "" {
+			actualParent = eng.GetParent(step.BranchName)
+		}
+		if actualParent == "" {
+			actualParent = eng.Trunk()
 		}
 
 		switch result.Result {
@@ -151,11 +156,11 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 			}
 			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
 
-			// Update the PR's base branch to trunk on GitHub
-			if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
+			// Update the PR's base branch to the actual parent (not always trunk)
+			if err := updatePRBaseBranchFromContext(ctx, step.BranchName, actualParent); err != nil {
 				return fmt.Errorf("failed to update PR base for %s: %w", step.BranchName, err)
 			}
-			splog.Debug("Updated PR base for %s to %s", step.BranchName, trunk)
+			splog.Debug("Updated PR base for %s to %s", step.BranchName, actualParent)
 
 		case engine.RestackConflict:
 			// Save continuation state
@@ -173,8 +178,8 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 			if err := git.PushBranch(context, step.BranchName, git.GetRemote(context), true, false); err != nil {
 				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
 			}
-			// Update PR base to trunk
-			if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
+			// Update PR base to the actual parent (not always trunk)
+			if err := updatePRBaseBranchFromContext(ctx, step.BranchName, actualParent); err != nil {
 				splog.Debug("Failed to update PR base for %s: %v", step.BranchName, err)
 			}
 		}
@@ -223,7 +228,7 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	// If parent is already trunk, we might just need to update the PR base
 	if parent == trunk {
 		// Just update the PR base branch via GitHub API
-		return updatePRBaseBranch(context, step.BranchName, trunk)
+		return updatePRBaseBranchFromContext(ctx, step.BranchName, trunk)
 	}
 
 	// Rebase the branch onto trunk
@@ -242,7 +247,7 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	}
 
 	// Update PR base branch via GitHub API
-	if err := updatePRBaseBranch(context, step.BranchName, trunk); err != nil {
+	if err := updatePRBaseBranchFromContext(ctx, step.BranchName, trunk); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 
@@ -254,16 +259,17 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	return nil
 }
 
-// updatePRBaseBranch updates a PR's base branch via GitHub API
-func updatePRBaseBranch(ctx context.Context, branchName, newBase string) error {
-	client, owner, repo, err := github.GetGitHubClient(ctx)
-	if err != nil {
+// updatePRBaseBranchFromContext updates a PR's base branch via GitHub API using the runtime context's GitHubClient
+func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase string) error {
+	if ctx.GitHubClient == nil {
 		// If we can't get GitHub client, skip this step (non-fatal)
 		return nil
 	}
 
+	owner, repo := ctx.GitHubClient.GetOwnerRepo()
+
 	// Get PR for this branch
-	pr, err := github.GetPullRequestByBranch(ctx, client, owner, repo, branchName)
+	pr, err := ctx.GitHubClient.GetPullRequestByBranch(ctx.Context, owner, repo, branchName)
 	if err != nil || pr == nil {
 		// PR not found or error - non-fatal
 		return nil
@@ -274,7 +280,7 @@ func updatePRBaseBranch(ctx context.Context, branchName, newBase string) error {
 		Base: &newBase,
 	}
 
-	if err := github.UpdatePullRequest(ctx, client, owner, repo, *pr.Number, updateOpts); err != nil {
+	if err := ctx.GitHubClient.UpdatePullRequest(ctx.Context, owner, repo, pr.Number, updateOpts); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 

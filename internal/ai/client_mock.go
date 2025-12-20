@@ -13,10 +13,13 @@ type MockClient struct {
 	mockTitle         string
 	mockBody          string
 	mockCommitMessage string
+	mockSuggestion    *StackSuggestion
 	mockError         error
 	mockCommitError   error
+	mockSuggestError  error
 	callCount         int
 	commitCallCount   int
+	suggestCallCount  int
 	lastContext       *PRContext
 	callContexts      []*PRContext
 	lastDiff          string
@@ -77,10 +80,13 @@ func (m *MockClient) Reset() {
 	m.mockTitle = ""
 	m.mockBody = ""
 	m.mockCommitMessage = ""
+	m.mockSuggestion = nil
 	m.mockError = nil
 	m.mockCommitError = nil
+	m.mockSuggestError = nil
 	m.callCount = 0
 	m.commitCallCount = 0
+	m.suggestCallCount = 0
 	m.lastContext = nil
 	m.lastDiff = ""
 	m.callContexts = make([]*PRContext, 0)
@@ -134,6 +140,48 @@ func (m *MockClient) LastDiff() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.lastDiff
+}
+
+// GenerateStackSuggestion implements AIClient interface.
+func (m *MockClient) GenerateStackSuggestion(ctx context.Context, diff string) (*StackSuggestion, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.suggestCallCount++
+	m.lastDiff = diff
+
+	if m.mockSuggestError != nil {
+		return nil, m.mockSuggestError
+	}
+
+	if m.mockSuggestion == nil {
+		return nil, fmt.Errorf("no mock suggestion set, use SetMockSuggestion()")
+	}
+
+	return m.mockSuggestion, nil
+}
+
+// SetMockSuggestion sets the mock suggestion to return for GenerateStackSuggestion.
+func (m *MockClient) SetMockSuggestion(suggestion *StackSuggestion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mockSuggestion = suggestion
+	m.mockSuggestError = nil
+}
+
+// SetMockSuggestError sets the mock error to return for GenerateStackSuggestion.
+func (m *MockClient) SetMockSuggestError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mockSuggestError = err
+	m.mockSuggestion = nil
+}
+
+// SuggestCallCount returns the number of times GenerateStackSuggestion has been called.
+func (m *MockClient) SuggestCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.suggestCallCount
 }
 
 // CallCount returns the number of times GeneratePRDescription has been called.

@@ -184,3 +184,121 @@ func TestParsePRResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestParseStackSuggestion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected *StackSuggestion
+	}{
+		{
+			name: "single branch",
+			input: `- branch: refactor-user
+  files: [user.go, user_test.go]
+  rationale: Moving logic to user model
+  message: "refactor: move logic to user model"`,
+			expected: &StackSuggestion{
+				Layers: []StackLayer{
+					{
+						BranchName:    "refactor-user",
+						Files:         []string{"user.go", "user_test.go"},
+						Rationale:     "Moving logic to user model",
+						CommitMessage: "refactor: move logic to user model",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple branches with list format",
+			input: `- branch: refactor-user
+  files:
+    - user.go
+    - user_test.go
+  rationale: Moving logic to user model
+  message: "refactor: move logic to user model"
+- branch: add-prefs
+  files: [prefs.go]
+  rationale: New preferences feature
+  message: "feat: add user preferences"`,
+			expected: &StackSuggestion{
+				Layers: []StackLayer{
+					{
+						BranchName:    "refactor-user",
+						Files:         []string{"user.go", "user_test.go"},
+						Rationale:     "Moving logic to user model",
+						CommitMessage: "refactor: move logic to user model",
+					},
+					{
+						BranchName:    "add-prefs",
+						Files:         []string{"prefs.go"},
+						Rationale:     "New preferences feature",
+						CommitMessage: "feat: add user preferences",
+					},
+				},
+			},
+		},
+		{
+			name: "variation with commit instead of message",
+			input: `- branch: feature-x
+  files:
+    - x.go
+  rationale: x
+  commit: "feat: x"`,
+			expected: &StackSuggestion{
+				Layers: []StackLayer{
+					{
+						BranchName:    "feature-x",
+						Files:         []string{"x.go"},
+						Rationale:     "x",
+						CommitMessage: "feat: x",
+					},
+				},
+			},
+		},
+		{
+			name:  "with markdown code blocks",
+			input: "```yaml\n- branch: branch1\n  files: [file1]\n  rationale: rat1\n  message: msg1\n```",
+			expected: &StackSuggestion{
+				Layers: []StackLayer{
+					{
+						BranchName:    "branch1",
+						Files:         []string{"file1"},
+						Rationale:     "rat1",
+						CommitMessage: "msg1",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseStackSuggestion(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if len(result.Layers) != len(tt.expected.Layers) {
+				t.Fatalf("Expected %d layers, got %d", len(tt.expected.Layers), len(result.Layers))
+			}
+			for i := range result.Layers {
+				if result.Layers[i].BranchName != tt.expected.Layers[i].BranchName {
+					t.Errorf("Layer %d: expected branch %s, got %s", i, tt.expected.Layers[i].BranchName, result.Layers[i].BranchName)
+				}
+				if len(result.Layers[i].Files) != len(tt.expected.Layers[i].Files) {
+					t.Errorf("Layer %d: expected %d files, got %d", i, len(tt.expected.Layers[i].Files), len(result.Layers[i].Files))
+				}
+				for j := range result.Layers[i].Files {
+					if result.Layers[i].Files[j] != tt.expected.Layers[i].Files[j] {
+						t.Errorf("Layer %d file %d: expected %s, got %s", i, j, tt.expected.Layers[i].Files[j], result.Layers[i].Files[j])
+					}
+				}
+				if result.Layers[i].Rationale != tt.expected.Layers[i].Rationale {
+					t.Errorf("Layer %d: expected rationale %s, got %s", i, tt.expected.Layers[i].Rationale, result.Layers[i].Rationale)
+				}
+				if result.Layers[i].CommitMessage != tt.expected.Layers[i].CommitMessage {
+					t.Errorf("Layer %d: expected message %s, got %s", i, tt.expected.Layers[i].CommitMessage, result.Layers[i].CommitMessage)
+				}
+			}
+		})
+	}
+}

@@ -70,6 +70,27 @@ func (c *CursorAgentClient) GeneratePRDescription(ctx context.Context, prContext
 	return title, body, nil
 }
 
+// GenerateStackSuggestion suggests a stack structure for staged changes using cursor-agent
+func (c *CursorAgentClient) GenerateStackSuggestion(ctx context.Context, diff string) (*StackSuggestion, error) {
+	// Build prompt for stack suggestion generation
+	prompt := BuildStackSuggestionPrompt(diff)
+
+	// Use cursor-agent CLI
+	response, err := c.callCursorAgentCLI(ctx, prompt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate stack suggestion: %w", err)
+	}
+
+	// Parse YAML-like response
+	suggestion, err := parseStackSuggestion(response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse stack suggestion: %w", err)
+	}
+
+	return suggestion, nil
+}
+
 // callCursorAgentCLI calls cursor-agent CLI tool
 func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt string) (string, error) {
 	// Use cursor-agent CLI with the prompt
@@ -284,4 +305,112 @@ func parsePRResponse(response string) (string, string) {
 	body = strings.TrimPrefix(body, "Description: ")
 
 	return title, body
+}
+
+// parseStackSuggestion parses the YAML-like response from AI
+func parseStackSuggestion(response string) (*StackSuggestion, error) {
+	response = stripMarkdownCodeBlocks(response)
+	lines := strings.Split(response, "\n")
+	suggestion := &StackSuggestion{Layers: []StackLayer{}}
+
+	var currentLayer *StackLayer
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// New branch starts with "- branch:" or "branch:"
+		if strings.HasPrefix(trimmed, "- branch:") || (strings.HasPrefix(trimmed, "branch:") && currentLayer == nil) {
+			if currentLayer != nil {
+				suggestion.Layers = append(suggestion.Layers, *currentLayer)
+			}
+			branchName := ""
+			if strings.HasPrefix(trimmed, "- branch:") {
+				branchName = strings.TrimSpace(strings.TrimPrefix(trimmed, "- branch:"))
+			} else {
+				branchName = strings.TrimSpace(strings.TrimPrefix(trimmed, "branch:"))
+			}
+			branchName = strings.Trim(branchName, `"'`)
+			currentLayer = &StackLayer{BranchName: branchName}
+			continue
+		}
+
+		if currentLayer == nil {
+			continue
+		}
+
+		// Files: "files: [file1, file2]" or "files:" or "- files:"
+		if strings.HasPrefix(trimmed, "files:") || strings.HasPrefix(trimmed, "- files:") {
+			filesStr := ""
+			if strings.HasPrefix(trimmed, "files:") {
+				filesStr = strings.TrimSpace(strings.TrimPrefix(trimmed, "files:"))
+			} else {
+				filesStr = strings.TrimSpace(strings.TrimPrefix(trimmed, "- files:"))
+			}
+
+			if strings.HasPrefix(filesStr, "[") && strings.HasSuffix(filesStr, "]") {
+				filesStr = strings.Trim(filesStr, "[]")
+				parts := strings.Split(filesStr, ",")
+				for _, p := range parts {
+					file := strings.TrimSpace(p)
+					file = strings.Trim(file, `"'`)
+					if file != "" {
+						currentLayer.Files = append(currentLayer.Files, file)
+					}
+				}
+			}
+			continue
+		}
+
+		// Rationale: "rationale: ..." or "- rationale: ..."
+		if strings.HasPrefix(trimmed, "rationale:") || strings.HasPrefix(trimmed, "- rationale:") {
+			rationale := ""
+			if strings.HasPrefix(trimmed, "rationale:") {
+				rationale = strings.TrimSpace(strings.TrimPrefix(trimmed, "rationale:"))
+			} else {
+				rationale = strings.TrimSpace(strings.TrimPrefix(trimmed, "- rationale:"))
+			}
+			currentLayer.Rationale = strings.Trim(rationale, `"'`)
+			continue
+		}
+
+		// Message: "message: ..." or "commit: ..." or "- message: ..."
+		if strings.HasPrefix(trimmed, "message:") || strings.HasPrefix(trimmed, "commit:") || strings.HasPrefix(trimmed, "- message:") || strings.HasPrefix(trimmed, "- commit:") {
+			message := ""
+			if strings.HasPrefix(trimmed, "message:") {
+				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "message:"))
+			} else if strings.HasPrefix(trimmed, "commit:") {
+				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "commit:"))
+			} else if strings.HasPrefix(trimmed, "- message:") {
+				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- message:"))
+			} else {
+				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- commit:"))
+			}
+			currentLayer.CommitMessage = strings.Trim(message, `"'`)
+			continue
+		}
+
+		// Handle list items for files if they are on separate lines
+		if strings.HasPrefix(trimmed, "- ") && !strings.HasPrefix(trimmed, "- branch:") {
+			file := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			file = strings.Trim(file, `"'`)
+			if file != "" {
+				// Avoid adding rationale/message as files if they happen to start with "- "
+				if !strings.HasPrefix(file, "rationale:") && !strings.HasPrefix(file, "message:") && !strings.HasPrefix(file, "commit:") {
+					currentLayer.Files = append(currentLayer.Files, file)
+				}
+			}
+		}
+	}
+
+	if currentLayer != nil {
+		suggestion.Layers = append(suggestion.Layers, *currentLayer)
+	}
+
+	if len(suggestion.Layers) == 0 {
+		return nil, fmt.Errorf("no valid stack layers found in AI response")
+	}
+
+	return suggestion, nil
 }

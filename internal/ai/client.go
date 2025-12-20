@@ -6,18 +6,18 @@ import (
 	"context"
 )
 
+type StackLayer struct {
+	BranchName    string
+	Files         []string
+	Rationale     string
+	CommitMessage string
+}
+
+type StackSuggestion struct {
+	Layers []StackLayer
+}
+
 // AIClient defines the interface for AI-powered PR description generation.
-// Implementations should use the provided PRContext to generate a title and body
-// for a pull request description.
-//
-// The GeneratePRDescription method should:
-// - Use the PRContext to build a comprehensive prompt
-// - Call the AI service (e.g., Claude/Cursor API)
-// - Parse the response to extract title and body
-// - Return structured output suitable for PR creation
-//
-// Implementations may handle rate limiting, retries, and error handling
-// as appropriate for their specific AI service.
 type AIClient interface {
 	// GeneratePRDescription generates a PR title and body from the provided context.
 	// The context parameter is used for cancellation and timeout handling.
@@ -37,4 +37,13 @@ type AIClient interface {
 	//   - message: A commit message following conventional commit format (e.g., "feat: add feature")
 	//   - err: Any error that occurred during generation or parsing
 	GenerateCommitMessage(ctx context.Context, diff string) (message string, err error)
+
+	// GenerateStackSuggestion suggests a stack structure for staged changes.
+	// The context parameter is used for cancellation and timeout handling.
+	// The diff contains the staged changes to analyze.
+	//
+	// Returns:
+	//   - suggestion: A structured stack suggestion
+	//   - err: Any error that occurred during generation or parsing
+	GenerateStackSuggestion(ctx context.Context, diff string) (suggestion *StackSuggestion, err error)
 }

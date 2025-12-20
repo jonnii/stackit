@@ -50,6 +50,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(newSubmitCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newTopCmd())
+	rootCmd.AddCommand(newTrackCmd())
 	rootCmd.AddCommand(newTrunkCmd())
 	rootCmd.AddCommand(newConfigCmd())
 

@@ -32,8 +32,7 @@ func IsMerged(ctx context.Context, branchName, trunkName string) (bool, error) {
 	if err != nil {
 		// If cherry fails, fall back to simpler check
 		// Check if branch tip is reachable from trunk
-		_, err = RunGitCommandWithContext(ctx, "merge-base", "--is-ancestor", branchRev, trunkName)
-		return err == nil, nil
+		return IsAncestor(ctx, branchRev, trunkName)
 	}
 
 	// If cherry output is empty or all lines start with '-', branch is merged

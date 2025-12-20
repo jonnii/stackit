@@ -466,7 +466,22 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 			}
 		}
 		if !parentExists {
-			return fmt.Errorf("parent branch %s does not exist", parentBranchName)
+			// Refresh branches list to check again
+			branches, err := git.GetAllBranchNames()
+			if err != nil {
+				return fmt.Errorf("failed to get branches: %w", err)
+			}
+			e.branches = branches
+			parentExists = false
+			for _, name := range e.branches {
+				if name == parentBranchName {
+					parentExists = true
+					break
+				}
+			}
+			if !parentExists {
+				return fmt.Errorf("parent branch %s does not exist", parentBranchName)
+			}
 		}
 	}
 
@@ -824,6 +839,67 @@ func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool
 	}
 
 	return git.IsDiffEmpty(ctx, branchName, parentRev)
+}
+
+// FindMostRecentTrackedAncestors finds the most recent tracked ancestors of a branch
+// by checking the branch's commit history against tracked branch tips.
+// Returns a slice of branch names that point to the most recent tracked commit in history.
+func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	trunk := e.trunk
+
+	// Map of commit SHA to slice of tracked branch names
+	trackedBranchTips := make(map[string][]string)
+
+	// Add trunk tip
+	trunkRev, err := git.GetRevision(ctx, trunk)
+	if err == nil {
+		trackedBranchTips[trunkRev] = append(trackedBranchTips[trunkRev], trunk)
+	}
+
+	// Get all tracked branches and their tips
+	for _, candidate := range e.branches {
+		// Skip the branch itself and trunk (already handled)
+		if candidate == branchName || candidate == trunk {
+			continue
+		}
+
+		// Only consider tracked branches
+		if _, ok := e.parentMap[candidate]; !ok {
+			continue
+		}
+
+		// Skip branches merged into trunk
+		if merged, err := git.IsMerged(ctx, candidate, trunk); err == nil && merged {
+			continue
+		}
+
+		// Get candidate revision
+		candidateRev, err := git.GetRevision(ctx, candidate)
+		if err != nil {
+			continue
+		}
+
+		trackedBranchTips[candidateRev] = append(trackedBranchTips[candidateRev], candidate)
+	}
+
+	// Get history of the branch we're tracking
+	history, err := git.GetCommitHistorySHAs(ctx, branchName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get branch history: %w", err)
+	}
+
+	// Iterate through history (newest to oldest) and find the first tracked tip(s)
+	for _, sha := range history {
+		if ancestors, ok := trackedBranchTips[sha]; ok {
+			// Found the most recent tracked commit(s)
+			return ancestors, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no tracked ancestor found for branch %s", branchName)
 }
 
 // DeleteBranch deletes a branch and its metadata

@@ -3,6 +3,7 @@ package actions
 import (
 	"fmt"
 
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -119,6 +120,16 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 		Force: opts.Force,
 	}); err != nil {
 		return fmt.Errorf("merge execution failed: %w", err)
+	}
+
+	// 8. Checkout trunk after successful merge
+	trunk := eng.Trunk()
+	if eng.CurrentBranch() != trunk {
+		if err := git.CheckoutBranch(ctx.Context, trunk); err != nil {
+			splog.Warn("Failed to checkout trunk branch %s: %v", trunk, err)
+		} else {
+			splog.Info("Checked out %s.", tui.ColorBranchName(trunk, false))
+		}
 	}
 
 	splog.Info("Merge completed successfully")

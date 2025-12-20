@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+const testDiff = "diff --git a/file.go b/file.go\n+new code"
+
 func TestMockClient_GeneratePRDescription(t *testing.T) {
 	mock := NewMockClient()
 	mock.SetMockResponse("Test Title", "Test Body")
@@ -179,5 +181,58 @@ func TestMockClient_SetMockError_ClearsResponse(t *testing.T) {
 	_, _, err = mock.GeneratePRDescription(context.Background(), prCtx)
 	if err == nil {
 		t.Error("Expected error after setting error")
+	}
+}
+
+func TestMockClient_GenerateCommitMessage(t *testing.T) {
+	mock := NewMockClient()
+	mock.SetMockCommitMessage("feat: add new feature")
+
+	diff := testDiff
+	message, err := mock.GenerateCommitMessage(context.Background(), diff)
+	if err != nil {
+		t.Fatalf("GenerateCommitMessage failed: %v", err)
+	}
+
+	if message != "feat: add new feature" {
+		t.Errorf("Expected message 'feat: add new feature', got '%s'", message)
+	}
+
+	if mock.CommitCallCount() != 1 {
+		t.Errorf("Expected commit call count 1, got %d", mock.CommitCallCount())
+	}
+
+	if mock.LastDiff() != diff {
+		t.Errorf("Expected last diff to match, got '%s'", mock.LastDiff())
+	}
+}
+
+func TestMockClient_GenerateCommitMessage_Error(t *testing.T) {
+	mock := NewMockClient()
+	expectedErr := errors.New("commit generation error")
+	mock.SetMockCommitError(expectedErr)
+
+	diff := testDiff
+	_, err := mock.GenerateCommitMessage(context.Background(), diff)
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	if err != expectedErr {
+		t.Errorf("Expected error '%v', got '%v'", expectedErr, err)
+	}
+}
+
+func TestMockClient_GenerateCommitMessage_NoResponseSet(t *testing.T) {
+	mock := NewMockClient()
+
+	diff := testDiff
+	_, err := mock.GenerateCommitMessage(context.Background(), diff)
+	if err == nil {
+		t.Fatal("Expected error when no mock commit message set, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "no mock commit message set") {
+		t.Errorf("Expected error about no mock commit message, got: %v", err)
 	}
 }

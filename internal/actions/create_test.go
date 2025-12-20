@@ -1,0 +1,157 @@
+package actions_test
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/ai"
+	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/testhelpers"
+)
+
+func TestCreateAction_AI(t *testing.T) {
+	t.Run("generates commit message and branch name with --ai", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		ctx.Context = context.Background()
+
+		// Create a tracked file first, then modify it unstaged
+		err = scene.Repo.CreateChangeAndCommit("initial content", "test")
+		require.NoError(t, err)
+
+		// Now create unstaged changes to the tracked file
+		err = scene.Repo.CreateChange("modified content", "test", true)
+		require.NoError(t, err)
+
+		// Create mock AI client
+		mockClient := ai.NewMockClient()
+		mockClient.SetMockCommitMessage("feat: add new feature")
+
+		opts := actions.CreateOptions{
+			AI:       true,
+			AIClient: mockClient,
+		}
+
+		err = actions.CreateAction(ctx, opts)
+		require.NoError(t, err)
+
+		// Verify AI was called
+		require.Equal(t, 1, mockClient.CommitCallCount(), "AI should be called once")
+
+		// Verify branch was created with name generated from AI message
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Contains(t, currentBranch, "add-new-feature", "Branch name should be generated from AI commit message")
+
+		// Verify commit was created with AI message
+		commits, err := scene.Repo.ListCurrentBranchCommitMessages()
+		require.NoError(t, err)
+		require.Contains(t, commits, "feat: add new feature")
+	})
+
+	t.Run("fails when AI generation fails", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		ctx.Context = context.Background()
+
+		// Create a tracked file first, then modify it unstaged
+		err = scene.Repo.CreateChangeAndCommit("initial content", "test")
+		require.NoError(t, err)
+
+		// Now create unstaged changes to the tracked file
+		err = scene.Repo.CreateChange("modified content", "test", true)
+		require.NoError(t, err)
+
+		// Create mock AI client with error
+		mockClient := ai.NewMockClient()
+		mockClient.SetMockCommitError(fmt.Errorf("AI service unavailable"))
+
+		opts := actions.CreateOptions{
+			AI:       true,
+			AIClient: mockClient,
+		}
+
+		err = actions.CreateAction(ctx, opts)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to generate commit message with AI")
+	})
+
+	t.Run("fails when no changes available for AI", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		ctx.Context = context.Background()
+
+		// Create mock AI client
+		mockClient := ai.NewMockClient()
+		mockClient.SetMockCommitMessage("feat: add feature")
+
+		opts := actions.CreateOptions{
+			AI:       true,
+			AIClient: mockClient,
+		}
+
+		// No changes staged or unstaged
+		err = actions.CreateAction(ctx, opts)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no changes to commit")
+	})
+
+	t.Run("works with branch name and --ai (no message generation)", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		ctx.Context = context.Background()
+
+		// Create mock AI client (should not be called when branch name provided)
+		mockClient := ai.NewMockClient()
+
+		opts := actions.CreateOptions{
+			BranchName: "feature",
+			AI:         true,
+			AIClient:   mockClient,
+		}
+
+		err = actions.CreateAction(ctx, opts)
+		require.NoError(t, err)
+
+		// Verify AI was not called (branch name provided, so no message generation)
+		require.Equal(t, 0, mockClient.CommitCallCount(), "AI should not be called when branch name provided")
+
+		// Verify branch was created
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "feature", currentBranch)
+	})
+}

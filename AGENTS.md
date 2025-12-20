@@ -42,6 +42,41 @@ You should run tests after each set of changes to validate your change.
 just test
 ```
 
+## Commit Message Guidelines
 
+This project uses **Conventional Commits** for commit messages. This standardizes commit history and enables automated tooling.
+
+### Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Commit Types
+
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Code style changes (formatting, missing semicolons, etc.)
+- **refactor**: Code refactoring without changing functionality
+- **perf**: Performance improvements
+- **test**: Adding or updating tests
+- **chore**: Maintenance tasks, dependency updates, build changes
+- **ci**: Changes to CI configuration files and scripts
+
+### Examples
+
+```
+feat: add branch traversal functionality
+fix: resolve merge conflict detection issue
+docs: update AGENTS.md with commit guidelines
+refactor: simplify merge plan logic
+test: add integration tests for sync command
+chore: update go.mod dependencies
+```
 
 

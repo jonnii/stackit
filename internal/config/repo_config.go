@@ -17,6 +17,7 @@ type RepoConfig struct {
 	IsGithubIntegrationEnabled *bool    `json:"isGithubIntegrationEnabled,omitempty"`
 	BranchNamePattern          *string  `json:"branchNamePattern,omitempty"`
 	CreateAI                   *bool    `json:"create.ai,omitempty"`
+	SubmitFooter               *bool    `json:"submit.footer,omitempty"`
 }
 
 // GetRepoConfig reads the repository configuration
@@ -207,12 +208,7 @@ func GetCreateAI(repoRoot string) (bool, error) {
 		return false, err
 	}
 
-	if config.CreateAI != nil {
-		return *config.CreateAI, nil
-	}
-
-	// Default to false
-	return false, nil
+	return config.CreateAI != nil && *config.CreateAI, nil
 }
 
 // SetCreateAI updates the create.ai configuration
@@ -230,6 +226,45 @@ func SetCreateAI(repoRoot string, enabled bool) error {
 	}
 
 	config.CreateAI = &enabled
+
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return os.WriteFile(configPath, configJSON, 0600)
+}
+
+// GetSubmitFooter returns whether PR footer is enabled, or true by default
+func GetSubmitFooter(repoRoot string) (bool, error) {
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		return true, err
+	}
+
+	if config.SubmitFooter != nil {
+		return *config.SubmitFooter, nil
+	}
+
+	// Default to true
+	return true, nil
+}
+
+// SetSubmitFooter updates the submit.footer configuration
+func SetSubmitFooter(repoRoot string, enabled bool) error {
+	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
+
+	// Validate repo root exists
+	if _, err := os.Stat(repoRoot); err != nil {
+		return fmt.Errorf("repository root does not exist: %w", err)
+	}
+
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		config = &RepoConfig{}
+	}
+
+	config.SubmitFooter = &enabled
 
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

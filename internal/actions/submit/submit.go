@@ -193,7 +193,20 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Update PR body footers silently
-	updatePRFootersQuiet(context, branches, eng, githubCtx, githubClient, repoOwner, repoName)
+	footerEnabled := true
+	repoRoot := ctx.RepoRoot
+	if repoRoot == "" {
+		repoRoot, _ = git.GetRepoRoot()
+	}
+	if repoRoot != "" {
+		if enabled, err := config.GetSubmitFooter(repoRoot); err == nil {
+			footerEnabled = enabled
+		}
+	}
+
+	if footerEnabled {
+		updatePRFootersQuiet(context, branches, eng, githubCtx, githubClient, repoOwner, repoName)
+	}
 
 	ui.Complete()
 

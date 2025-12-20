@@ -36,8 +36,6 @@ Date:    ` + date,
 	rootCmd.AddCommand(newInfoCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newLogCmd())
-	rootCmd.AddCommand(newLsCmd())
-	rootCmd.AddCommand(newLlCmd())
 	rootCmd.AddCommand(newMergeCmd())
 	rootCmd.AddCommand(newModifyCmd())
 	rootCmd.AddCommand(newMoveCmd())
@@ -54,6 +52,11 @@ Date:    ` + date,
 	rootCmd.AddCommand(newUntrackCmd())
 	rootCmd.AddCommand(newTrunkCmd())
 	rootCmd.AddCommand(newConfigCmd())
+
+	// Add aliases
+	rootCmd.AddCommand(newLsCmd())
+	rootCmd.AddCommand(newLlCmd())
+	rootCmd.AddCommand(newSsCmd())
 
 	return rootCmd
 }

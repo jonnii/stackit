@@ -938,6 +938,14 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 		parent = e.trunk
 	}
 
+	// If deleting current branch, switch to trunk first
+	if branchName == e.currentBranch {
+		if err := git.CheckoutBranch(ctx, e.trunk); err != nil {
+			return fmt.Errorf("failed to switch to trunk before deleting current branch: %w", err)
+		}
+		e.currentBranch = e.trunk
+	}
+
 	// Delete git branch
 	if err := git.DeleteBranch(ctx, branchName); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)

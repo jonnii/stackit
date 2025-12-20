@@ -56,8 +56,17 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *run
 					body = strings.Join(lines[1:], "\n")
 				}
 			} else {
-				// Multiple commits - join all messages
-				body = strings.Join(messages, "\n\n")
+				// Multiple commits - format as a bulleted list of subjects in chronological order
+				var sb strings.Builder
+				for i := len(messages) - 1; i >= 0; i-- {
+					msg := messages[i]
+					// Get just the subject (first line)
+					subject := strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
+					if subject != "" {
+						sb.WriteString(subject + "\n")
+					}
+				}
+				body = strings.TrimSpace(sb.String())
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -10,14 +9,14 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newDebugContextCmd creates the debug context command
-func newDebugContextCmd() *cobra.Command {
+// newDebugPromptCmd creates the debug prompt command
+func newDebugPromptCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "debug-context [branch]",
-		Short: "Output all context collected for AI-powered PR description generation",
-		Long: `Output all context collected for AI-powered PR description generation.
-This command collects commit messages, code diffs, branch relationships, and project conventions
-but does not perform any AI generation. Useful for debugging and testing context collection.
+		Use:   "debug-prompt [branch]",
+		Short: "Output the full prompt that will be passed to the AI for PR description generation",
+		Long: `Output the full prompt that will be passed to the AI for PR description generation.
+This command collects all context (commit messages, code diffs, branch relationships, etc.)
+and formats it as the complete prompt that would be sent to the AI service.
 
 If no branch is specified, uses the current branch.`,
 		Args: cobra.MaximumNArgs(1),
@@ -45,13 +44,9 @@ If no branch is specified, uses the current branch.`,
 				return fmt.Errorf("failed to collect PR context: %w", err)
 			}
 
-			// Output as JSON for easy parsing
-			output, err := json.MarshalIndent(prCtx, "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to marshal context: %w", err)
-			}
-
-			fmt.Println(string(output))
+			// Build and output the full prompt
+			prompt := ai.BuildPrompt(prCtx)
+			fmt.Println(prompt)
 			return nil
 		},
 	}

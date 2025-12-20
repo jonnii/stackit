@@ -34,6 +34,7 @@ type BranchReader interface {
 	GetRelativeStackUpstack(branchName string) []string
 	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
+	FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error)
 }
 
 // BranchWriter provides write operations for branch management

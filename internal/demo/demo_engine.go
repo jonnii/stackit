@@ -205,6 +205,14 @@ func (e *DemoEngine) IsBranchEmpty(ctx context.Context, branchName string) (bool
 	return false, nil
 }
 
+func (e *DemoEngine) FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error) {
+	parent := e.parentMap[branchName]
+	if parent == "" {
+		return nil, fmt.Errorf("no tracked ancestor found for branch %s", branchName)
+	}
+	return []string{parent}, nil
+}
+
 // BranchWriter interface implementation
 
 func (e *DemoEngine) TrackBranch(ctx context.Context, branchName string, parentBranchName string) error {

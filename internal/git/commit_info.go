@@ -157,3 +157,16 @@ func GetCommitRangeSHAs(ctx context.Context, base, head string) ([]string, error
 	}
 	return strings.Split(strings.TrimSpace(output), "\n"), nil
 }
+
+// GetCommitHistorySHAs returns the commit SHAs for a branch
+func GetCommitHistorySHAs(ctx context.Context, branchName string) ([]string, error) {
+	args := []string{"log", "--format=%H", branchName}
+	output, err := RunGitCommandWithContext(ctx, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit history: %w", err)
+	}
+	if output == "" {
+		return []string{}, nil
+	}
+	return strings.Split(strings.TrimSpace(output), "\n"), nil
+}

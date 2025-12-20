@@ -54,3 +54,14 @@ func GetMergeBaseByRef(ctx context.Context, ref1Name, ref2Name string) (string, 
 
 	return mergeBases[0].Hash.String(), nil
 }
+
+// IsAncestor checks if the first ref is an ancestor of the second ref
+func IsAncestor(ctx context.Context, ancestor, descendant string) (bool, error) {
+	// We can use the shell command here as it's very efficient and handles various ref types
+	_, err := RunGitCommandWithContext(ctx, "merge-base", "--is-ancestor", ancestor, descendant)
+	if err == nil {
+		return true, nil
+	}
+	// Exit code 1 means it's not an ancestor
+	return false, nil
+}

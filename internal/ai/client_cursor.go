@@ -3,84 +3,23 @@ package ai
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
-// CursorAgentClient implements AIClient using cursor-agent CLI or Cursor API
-type CursorAgentClient struct {
-	useCLI     bool
-	apiURL     string
-	apiKey     string
-	httpClient *http.Client
-}
-
-// CursorAgentOptions contains configuration for CursorAgentClient
-type CursorAgentOptions struct {
-	UseCLI  bool          // Use cursor-agent CLI instead of API (default: true if CLI available)
-	APIURL  string        // Optional: custom API URL (defaults to Cursor API)
-	APIKey  string        // Optional: API key (defaults to reading from environment)
-	Timeout time.Duration // Optional: request timeout (defaults to 30s)
-}
+// CursorAgentClient implements AIClient using cursor-agent CLI
+type CursorAgentClient struct{}
 
 // NewCursorAgentClient creates a new CursorAgentClient
-// If options are nil, uses defaults (tries CLI first, falls back to API)
-func NewCursorAgentClient(opts *CursorAgentOptions) (*CursorAgentClient, error) {
-	useCLI := true
-	if opts != nil {
-		useCLI = opts.UseCLI
-	}
-
+func NewCursorAgentClient() (*CursorAgentClient, error) {
 	// Check if cursor-agent CLI is available
-	if useCLI {
-		if !isCursorAgentAvailable() {
-			useCLI = false
-		}
+	if !isCursorAgentAvailable() {
+		return nil, fmt.Errorf("cursor-agent CLI not available in PATH")
 	}
 
-	var apiURL, apiKey string
-	var httpClient *http.Client
-
-	// If not using CLI, set up API client
-	if !useCLI {
-		apiURL = "https://api.cursor.com/v1/chat/completions"
-		if opts != nil && opts.APIURL != "" {
-			apiURL = opts.APIURL
-		}
-
-		apiKey = ""
-		if opts != nil {
-			apiKey = opts.APIKey
-		}
-		if apiKey == "" {
-			apiKey = os.Getenv("CURSOR_API_KEY")
-			if apiKey == "" {
-				return nil, fmt.Errorf("CURSOR_API_KEY environment variable not set and cursor-agent CLI not available")
-			}
-		}
-
-		timeout := 30 * time.Second
-		if opts != nil && opts.Timeout > 0 {
-			timeout = opts.Timeout
-		}
-
-		httpClient = &http.Client{
-			Timeout: timeout,
-		}
-	}
-
-	return &CursorAgentClient{
-		useCLI:     useCLI,
-		apiURL:     apiURL,
-		apiKey:     apiKey,
-		httpClient: httpClient,
-	}, nil
+	return &CursorAgentClient{}, nil
 }
 
 // isCursorAgentAvailable checks if cursor-agent CLI is available
@@ -95,16 +34,8 @@ func (c *CursorAgentClient) GenerateCommitMessage(ctx context.Context, diff stri
 	// Build prompt for commit message generation
 	prompt := BuildCommitMessagePrompt(diff)
 
-	var message string
-	var err error
-
-	if c.useCLI {
-		// Use cursor-agent CLI
-		message, err = c.callCursorAgentCLI(ctx, prompt)
-	} else {
-		// Use Cursor API
-		message, err = c.callCursorAPI(ctx, prompt)
-	}
+	// Use cursor-agent CLI
+	message, err := c.callCursorAgentCLI(ctx, prompt)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to generate commit message: %w", err)
@@ -127,16 +58,8 @@ func (c *CursorAgentClient) GeneratePRDescription(ctx context.Context, prContext
 	// Build prompt for PR description generation
 	prompt := BuildPrompt(prContext)
 
-	var response string
-	var err error
-
-	if c.useCLI {
-		// Use cursor-agent CLI
-		response, err = c.callCursorAgentCLI(ctx, prompt)
-	} else {
-		// Use Cursor API
-		response, err = c.callCursorAPI(ctx, prompt)
-	}
+	// Use cursor-agent CLI
+	response, err := c.callCursorAgentCLI(ctx, prompt)
 
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate PR description: %w", err)
@@ -168,7 +91,7 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	if err != nil {
 		// Check if cursor-agent is not found
 		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
-			return "", fmt.Errorf("cursor-agent not found in PATH. Install it or set CURSOR_API_KEY for API mode")
+			return "", fmt.Errorf("cursor-agent not found in PATH")
 		}
 
 		// Capture full output for debugging
@@ -252,83 +175,6 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	}
 
 	return firstLine, nil
-}
-
-// callCursorAPI makes a request to the Cursor API
-func (c *CursorAgentClient) callCursorAPI(ctx context.Context, prompt string) (string, error) {
-	// Prepare request body
-	requestBody := map[string]interface{}{
-		"model": "claude-3-5-sonnet-20241022", // Cursor's default model
-		"messages": []map[string]string{
-			{
-				"role":    "user",
-				"content": prompt,
-			},
-		},
-		"max_tokens":  1000,
-		"temperature": 0.7,
-	}
-
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "POST", c.apiURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var apiResponse struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-
-	if err := json.Unmarshal(body, &apiResponse); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if apiResponse.Error.Message != "" {
-		return "", fmt.Errorf("API error: %s", apiResponse.Error.Message)
-	}
-
-	if len(apiResponse.Choices) == 0 {
-		return "", fmt.Errorf("no choices in API response")
-	}
-
-	content := apiResponse.Choices[0].Message.Content
-	// Strip markdown code blocks if present
-	content = stripMarkdownCodeBlocks(content)
-	return content, nil
 }
 
 // BuildCommitMessagePrompt creates a prompt for commit message generation

@@ -46,7 +46,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			var aiClient ai.AIClient
 			if aiFlag {
 				// Try to create real cursor-agent client, fall back to mock if unavailable
-				cursorClient, err := ai.NewCursorAgentClient(nil)
+				cursorClient, err := ai.NewCursorAgentClient()
 				if err != nil {
 					// Fall back to mock client if cursor-agent is not available
 					ctx.Splog.Debug("cursor-agent not available, using mock client: %v", err)

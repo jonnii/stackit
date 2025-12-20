@@ -129,4 +129,55 @@ func TestSubmitCommand(t *testing.T) {
 		require.Contains(t, outputStr, "branch2", "should include current branch")
 		require.Contains(t, outputStr, "branch3", "should include descendant branch with --stack")
 	})
+
+	t.Run("ss alias works like submit --stack", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
+
+		// Create initial commit
+		err := scene.Repo.CreateChangeAndCommit("initial", "init")
+		require.NoError(t, err)
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		initOutput, err := cmd.CombinedOutput()
+		require.NoError(t, err, "init failed: %s", string(initOutput))
+
+		// Create a stack: main -> branch1 -> branch2 (current) -> branch3
+		cmd = exec.Command(binaryPath, "create", "branch1")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		cmd = exec.Command(binaryPath, "create", "branch2")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		cmd = exec.Command(binaryPath, "create", "branch3")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Go back to branch2
+		err = scene.Repo.CheckoutBranch("branch2")
+		require.NoError(t, err)
+
+		// Run ss command (alias for submit --stack) with --dry-run, --no-edit, and --draft
+		cmd = exec.Command(binaryPath, "ss", "--dry-run", "--no-edit", "--draft")
+		cmd.Dir = scene.Dir
+		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
+		output, err := cmd.CombinedOutput()
+
+		// Should succeed
+		require.NoError(t, err, "ss alias failed: %s", string(output))
+
+		outputStr := string(output)
+
+		// Verify all branches are in the output (ancestors, current, and descendants)
+		require.Contains(t, outputStr, "branch1", "should include parent branch")
+		require.Contains(t, outputStr, "branch2", "should include current branch")
+		require.Contains(t, outputStr, "branch3", "should include descendant branch with ss")
+	})
 }

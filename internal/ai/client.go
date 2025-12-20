@@ -28,4 +28,13 @@ type AIClient interface {
 	//   - body: A formatted PR body with summary, details, and related PRs
 	//   - err: Any error that occurred during generation or parsing
 	GeneratePRDescription(ctx context.Context, prContext *PRContext) (title string, body string, err error)
+
+	// GenerateCommitMessage generates a commit message from staged changes.
+	// The context parameter is used for cancellation and timeout handling.
+	// The diff contains the staged changes to analyze.
+	//
+	// Returns:
+	//   - message: A commit message following conventional commit format (e.g., "feat: add feature")
+	//   - err: Any error that occurred during generation or parsing
+	GenerateCommitMessage(ctx context.Context, diff string) (message string, err error)
 }

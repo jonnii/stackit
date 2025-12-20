@@ -11,6 +11,7 @@ import (
 // newSubmitCmd creates the submit command
 func newSubmitCmd() *cobra.Command {
 	var (
+		ai                   bool
 		branch               string
 		stack                bool
 		force                bool
@@ -80,11 +81,13 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 				Comment:              comment,
 				TargetTrunk:          targetTrunk,
 				IgnoreOutOfSyncTrunk: ignoreOutOfSyncTrunk,
+				AI:                   ai,
 			})
 		},
 	}
 
 	// Add flags
+	cmd.Flags().BoolVar(&ai, "ai", false, "Enable AI-powered PR description generation")
 	cmd.Flags().StringVar(&branch, "branch", "", "Which branch to run this command from. Defaults to the current branch.")
 	cmd.Flags().BoolVarP(&stack, "stack", "s", false, "Submit descendants of the current branch in addition to its ancestors.")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force push: overwrites the remote branch with your local branch. Otherwise defaults to --force-with-lease.")

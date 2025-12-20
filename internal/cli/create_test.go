@@ -587,4 +587,53 @@ func TestCreateCommand(t *testing.T) {
 		require.Error(t, err, "config set should fail without {message} placeholder")
 		require.Contains(t, string(output), "must contain {message}")
 	})
+
+	t.Run("create with --ai requires staged changes or branch name", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Try to create with --ai but no changes and no branch name
+		cmd = exec.Command(binaryPath, "create", "--ai")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.Error(t, err, "create with --ai should fail when no changes")
+		require.Contains(t, string(output), "no changes to commit")
+	})
+
+	t.Run("create with --ai and branch name works without message", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a new branch with --ai flag and branch name (no message needed)
+		cmd = exec.Command(binaryPath, "create", "feature", "--ai")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create with branch name and --ai should work")
+		require.Contains(t, string(output), "No staged changes")
+
+		// Verify branch was created
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "feature", currentBranch)
+	})
 }

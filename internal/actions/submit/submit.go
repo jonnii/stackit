@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/ai"
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
@@ -41,6 +43,7 @@ type Options struct {
 	Comment              string
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
+	AI                   bool
 	// SkipPush skips pushing branches to remote (for testing)
 	SkipPush bool
 }
@@ -201,6 +204,35 @@ func Action(ctx *runtime.Context, opts Options) error {
 func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
 	var submissionInfos []Info
 
+	// Determine AI preference: flag takes precedence, then config default
+	aiEnabled := opts.AI
+	if !aiEnabled {
+		// Check config default
+		repoRoot := runtimeCtx.RepoRoot
+		if repoRoot == "" {
+			var err error
+			repoRoot, err = git.GetRepoRoot()
+			if err == nil {
+				configAI, err := config.GetCreateAI(repoRoot)
+				if err == nil {
+					aiEnabled = configAI
+				}
+			}
+		} else {
+			configAI, err := config.GetCreateAI(repoRoot)
+			if err == nil {
+				aiEnabled = configAI
+			}
+		}
+	}
+
+	// Create AI client if enabled
+	var aiClient ai.AIClient
+	if aiEnabled {
+		aiClient = ai.NewMockClient()
+		runtimeCtx.Splog.Debug("AI-powered PR description generation enabled")
+	}
+
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
 		prInfo, _ := eng.GetPrInfo(ctx, branchName)
@@ -258,6 +290,8 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 			Publish:           opts.Publish,
 			Reviewers:         opts.Reviewers,
 			ReviewersPrompt:   opts.Reviewers == "" && opts.Edit,
+			AI:                aiEnabled,
+			AIClient:          aiClient,
 		}
 
 		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, runtimeCtx)

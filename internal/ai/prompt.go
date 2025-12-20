@@ -236,6 +236,43 @@ func buildConventionsSection(conventions string) string {
 	return strings.Join(lines, "\n")
 }
 
+// BuildStackSuggestionPrompt creates a prompt for stack suggestion generation
+func BuildStackSuggestionPrompt(diff string) string {
+	// Truncate diff if too long
+	maxDiffLength := 20000 // More context for analysis
+	if len(diff) > maxDiffLength {
+		diff = diff[:maxDiffLength] + "\n... (diff truncated)"
+	}
+
+	return fmt.Sprintf(`Analyze the following git diff and suggest how it should be split into a "stack" of logical branches (stacked changes).
+
+Each branch in the stack should represent a single, reviewable unit of work. Consider:
+- Logical dependencies (refactors before new features)
+- Domain boundaries (backend vs frontend, data model vs UI)
+- Reviewability (keep branches focused and manageable in size)
+- Testing boundaries
+
+Output your suggestion in the following YAML format:
+
+- branch: <branch-name>
+  files:
+    - <file1>
+    - <file2>
+  rationale: <brief explanation of why these changes are grouped together>
+  message: <suggested conventional commit message for this layer>
+
+Rules:
+- Use branch names that are descriptive and hyphenated (e.g., "refactor-user-model").
+- Use conventional commit format for messages (e.g., "feat: add user preferences").
+- Every file changed in the diff must be assigned to at least one branch.
+- Return ONLY the YAML structure, no additional text, explanations, or markdown formatting (unless specifically asked for code blocks).
+- Order branches from bottom to top (base dependencies first).
+- DO NOT use markdown code blocks in your response.
+
+Git diff:
+%s`, diff)
+}
+
 // buildOutputFormatSection provides instructions for structured output
 func buildOutputFormatSection() string {
 	return `## Output Format

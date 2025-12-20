@@ -24,6 +24,7 @@ Date:    ` + date,
 	// Add subcommands
 	rootCmd.AddCommand(newAbortCmd())
 	rootCmd.AddCommand(newAbsorbCmd())
+	rootCmd.AddCommand(newAnalyzeCmd())
 	rootCmd.AddCommand(newBottomCmd())
 	rootCmd.AddCommand(newCheckoutCmd())
 	rootCmd.AddCommand(newChildrenCmd())

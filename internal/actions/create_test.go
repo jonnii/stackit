@@ -154,4 +154,59 @@ func TestCreateAction_AI(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "feature", currentBranch)
 	})
+
+	t.Run("generates branch name from AI commit message when no branch name provided", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		ctx.Context = context.Background()
+
+		// Set up branch name pattern config
+		err = scene.Repo.RunGitCommand("config", "--local", "stackit.branchNamePattern", "{message}")
+		require.NoError(t, err)
+
+		// Create a tracked file first, then modify it unstaged
+		err = scene.Repo.CreateChangeAndCommit("initial content", "test")
+		require.NoError(t, err)
+
+		// Now create unstaged changes to the tracked file
+		err = scene.Repo.CreateChange("modified content", "test", true)
+		require.NoError(t, err)
+
+		// Create mock AI client with a realistic commit message
+		mockClient := ai.NewMockClient()
+		mockClient.SetMockCommitMessage("feat: add new authentication feature")
+
+		opts := actions.CreateOptions{
+			AI:       true,
+			AIClient: mockClient,
+		}
+
+		err = actions.CreateAction(ctx, opts)
+		require.NoError(t, err, "CreateAction should succeed with AI-generated commit message")
+
+		// Verify AI was called
+		require.Equal(t, 1, mockClient.CommitCallCount(), "AI should be called once")
+
+		// Verify branch was created with name generated from AI message
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Contains(t, currentBranch, "add-new-authentication-feature", "Branch name should be generated from AI commit message")
+
+		// Verify commit was created with AI message
+		commits, err := scene.Repo.ListCurrentBranchCommitMessages()
+		require.NoError(t, err)
+		require.Contains(t, commits, "feat: add new authentication feature")
+	})
+
+	// Note: Markdown stripping is tested in the ai package (TestStripMarkdownCodeBlocks).
+	// The mock client returns messages directly without markdown, so we don't test
+	// markdown stripping here. The real CursorAgentClient handles markdown stripping
+	// in callCursorAgentCLI and callCursorAPI methods.
 }

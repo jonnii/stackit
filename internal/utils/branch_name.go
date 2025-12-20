@@ -56,8 +56,24 @@ func GenerateBranchNameFromMessage(message string) string {
 	lines := strings.Split(message, "\n")
 	subject := strings.TrimSpace(lines[0])
 
-	// Remove common prefixes like "feat:", "fix:", etc. if present
-	subject = regexp.MustCompile(`^(feat|fix|chore|docs|style|refactor|perf|test|build|ci):\s*`).ReplaceAllString(subject, "")
+	// Remove common prefixes like "feat:", "fix:", etc. if present (with optional scope)
+	subject = regexp.MustCompile(`^(feat|fix|chore|docs|style|refactor|perf|test|build|ci)(\([^)]+\))?:\s*`).ReplaceAllString(subject, "")
+
+	// Truncate to a reasonable length for branch names (before sanitization)
+	// Aim for ~50 characters to leave room for username/date prefixes
+	maxSubjectLength := 50
+	if len(subject) > maxSubjectLength {
+		// Try to truncate at word boundary
+		truncated := subject[:maxSubjectLength]
+		lastSpace := strings.LastIndex(truncated, " ")
+		if lastSpace > maxSubjectLength/2 {
+			// If we can find a space in the second half, truncate there
+			subject = truncated[:lastSpace]
+		} else {
+			// Otherwise just truncate
+			subject = truncated
+		}
+	}
 
 	// Sanitize and return
 	return SanitizeBranchName(subject)

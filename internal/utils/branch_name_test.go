@@ -224,6 +224,16 @@ func TestGenerateBranchNameFromMessage(t *testing.T) {
 			message:  "feat:add feature",
 			expected: "add-feature",
 		},
+		{
+			name:     "long message gets truncated",
+			message:  "feat: add a very long feature description that should be truncated to fit in branch names",
+			expected: "add-a-very-long-feature-description-that-should",
+		},
+		{
+			name:     "message with scope prefix",
+			message:  "fix(ai): enhance error reporting",
+			expected: "enhance-error-reporting",
+		},
 	}
 
 	for _, tt := range tests {

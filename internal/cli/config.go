@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -19,7 +20,9 @@ func newConfigCmd() *cobra.Command {
 
 Examples:
   stackit config get branch-name-pattern
-  stackit config set branch-name-pattern "{username}/{date}/{message}"`,
+  stackit config set branch-name-pattern "{username}/{date}/{message}"
+  stackit config get create.ai
+  stackit config set create.ai true`,
 	}
 
 	cmd.AddCommand(newConfigGetCmd())
@@ -53,6 +56,12 @@ func newConfigGetCmd() *cobra.Command {
 					return fmt.Errorf("failed to get branch-name-pattern: %w", err)
 				}
 				fmt.Println(pattern)
+			case "create.ai":
+				enabled, err := config.GetCreateAI(repoRoot)
+				if err != nil {
+					return fmt.Errorf("failed to get create.ai: %w", err)
+				}
+				fmt.Println(enabled)
 			default:
 				return fmt.Errorf("unknown configuration key: %s", key)
 			}
@@ -92,6 +101,15 @@ func newConfigSetCmd() *cobra.Command {
 					return fmt.Errorf("failed to set branch-name-pattern: %w", err)
 				}
 				splog.Info("Set branch-name-pattern to: %s", value)
+			case "create.ai":
+				enabled, err := strconv.ParseBool(value)
+				if err != nil {
+					return fmt.Errorf("invalid value for create.ai: %s (must be 'true' or 'false')", value)
+				}
+				if err := config.SetCreateAI(repoRoot, enabled); err != nil {
+					return fmt.Errorf("failed to set create.ai: %w", err)
+				}
+				splog.Info("Set create.ai to: %v", enabled)
 			default:
 				return fmt.Errorf("unknown configuration key: %s", key)
 			}

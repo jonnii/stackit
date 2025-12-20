@@ -179,6 +179,10 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		err = scene.Repo.CreateChangeAndCommit("feat: test feature", "change")
 		require.NoError(t, err)
 
+		// Track the branch so GetCommitSubject knows the range
+		err = eng.TrackBranch(context.Background(), branchName, "main")
+		require.NoError(t, err)
+
 		opts := submit.MetadataOptions{
 			NoEdit: true,
 		}
@@ -288,6 +292,10 @@ func TestPreparePRMetadata_AI(t *testing.T) {
 		err = scene.Repo.CreateChangeAndCommit("feat: add feature", "change")
 		require.NoError(t, err)
 
+		// Track the branch
+		err = eng.TrackBranch(context.Background(), branchName, "main")
+		require.NoError(t, err)
+
 		opts := submit.MetadataOptions{
 			AI:       false, // AI disabled
 			AIClient: nil,
@@ -335,5 +343,40 @@ func TestPreparePRMetadata_AI(t *testing.T) {
 		require.Equal(t, "Existing Body", metadata.Body)
 		// AI should not be called since body already exists
 		require.Equal(t, 0, mockClient.CallCount(), "AI client should not be called when body exists")
+	})
+}
+
+func TestGetPRBody_MultipleCommits(t *testing.T) {
+	t.Run("returns a bulleted list of subjects for multiple commits", func(t *testing.T) {
+		// Set environment variable to force non-interactive mode
+		os.Setenv("STACKIT_NON_INTERACTIVE", "1")
+		defer os.Unsetenv("STACKIT_NON_INTERACTIVE")
+
+		scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		branchName := "feature"
+
+		// Create multiple commits
+		err = scene.Repo.CreateAndCheckoutBranch(branchName)
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feat: commit 1", "change1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("feat: commit 2\n\nwith body", "change2")
+		require.NoError(t, err)
+
+		// Track the branch
+		err = eng.TrackBranch(context.Background(), branchName, "main")
+		require.NoError(t, err)
+
+		// Get PR body (should not prompt due to STACKIT_NON_INTERACTIVE)
+		body, err := submit.GetPRBody(branchName, false, "", ctx)
+		require.NoError(t, err)
+
+		// Note: GetPRBody formats as a list of subjects
+		expectedBody := "feat: commit 1\nfeat: commit 2"
+		require.Equal(t, expectedBody, body)
 	})
 }

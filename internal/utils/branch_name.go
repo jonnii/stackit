@@ -66,7 +66,7 @@ func GenerateBranchNameFromMessage(message string) string {
 // ProcessBranchNamePattern processes a branch name pattern by replacing placeholders
 // Supported placeholders:
 //   - {username}: The sanitized Git username
-//   - {date}: Current date in YYMMDD format
+//   - {date}: Current date and time in yyyyMMddHHmmss format in UTC
 //   - {message}: The sanitized commit message subject (required)
 //
 // The pattern must contain {message} placeholder. The pattern is processed and then

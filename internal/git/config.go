@@ -17,8 +17,8 @@ func GetUserName(ctx context.Context) (string, error) {
 	return username, nil
 }
 
-// GetCurrentDate returns the current date in YYMMDD format
+// GetCurrentDate returns the current date and time in yyyyMMddHHmmss format in UTC
 func GetCurrentDate() string {
-	now := time.Now()
-	return now.Format("060102")
+	now := time.Now().UTC()
+	return now.Format("20060102150405")
 }

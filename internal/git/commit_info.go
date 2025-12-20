@@ -89,13 +89,14 @@ func GetCommitMessages(ctx context.Context, branchName string) ([]string, error)
 		return nil, err
 	}
 
+	const delimiter = "---STACKIT-COMMIT-END---"
 	var args []string
 	if meta.ParentBranchRevision != nil {
 		// Get commits from parent to branch
-		args = []string{"log", "--format=%B", fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
+		args = []string{"log", "--format=%B" + delimiter, fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
 	} else {
 		// No parent, get all commits from branch
-		args = []string{"log", "--format=%B", branchName}
+		args = []string{"log", "--format=%B" + delimiter, branchName}
 	}
 
 	output, err := RunGitCommandWithContext(ctx, args...)
@@ -107,8 +108,8 @@ func GetCommitMessages(ctx context.Context, branchName string) ([]string, error)
 		return []string{}, nil
 	}
 
-	// Split by double newline (commit separator) and filter empty
-	commits := strings.Split(output, "\n\n")
+	// Split by delimiter and filter empty
+	commits := strings.Split(output, delimiter)
 	var messages []string
 	for _, commit := range commits {
 		commit = strings.TrimSpace(commit)
@@ -131,18 +132,24 @@ func GetCommitSubject(ctx context.Context, branchName string) (string, error) {
 	var args []string
 	if meta.ParentBranchRevision != nil {
 		// Get oldest commit subject from parent to branch
-		args = []string{"log", "--format=%s", "-1", fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
+		args = []string{"log", "--format=%s", "--reverse", fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
 	} else {
 		// No parent, get all commits from branch
-		args = []string{"log", "--format=%s", "-1", branchName}
+		args = []string{"log", "--format=%s", "--reverse", branchName}
 	}
 
-	subject, err := RunGitCommandWithContext(ctx, args...)
+	output, err := RunGitCommandWithContext(ctx, args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit subject: %w", err)
 	}
 
-	return strings.TrimSpace(subject), nil
+	if output == "" {
+		return "", nil
+	}
+
+	// Take the first line (oldest subject due to --reverse)
+	lines := strings.Split(output, "\n")
+	return strings.TrimSpace(lines[0]), nil
 }
 
 // GetCommitRangeSHAs returns the commit SHAs between two revisions (base..head)

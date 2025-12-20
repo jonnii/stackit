@@ -1,0 +1,196 @@
+package ai
+
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+// NOTE: These tests do NOT make real API calls or invoke cursor-agent CLI.
+// They only test:
+// - Client creation logic (struct initialization, option parsing)
+// - Helper functions (prompt building, formatting, parsing)
+//
+// Tests that would require real API calls (GenerateCommitMessage, GeneratePRDescription)
+// are not included here to avoid network dependencies and API costs.
+
+func TestNewCursorAgentClient(t *testing.T) {
+	// These tests only verify client creation logic, not actual API calls
+	t.Run("creates client with API key from environment", func(t *testing.T) {
+		// Set a test API key
+		originalKey := os.Getenv("CURSOR_API_KEY")
+		defer func() {
+			if originalKey != "" {
+				os.Setenv("CURSOR_API_KEY", originalKey)
+			} else {
+				os.Unsetenv("CURSOR_API_KEY")
+			}
+		}()
+
+		os.Setenv("CURSOR_API_KEY", "test-api-key")
+
+		opts := &CursorAgentOptions{
+			UseCLI: false, // Force API mode
+		}
+
+		client, err := NewCursorAgentClient(opts)
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+
+		if client == nil {
+			t.Fatal("Client is nil")
+		}
+
+		if client.useCLI {
+			t.Error("Expected API mode, got CLI mode")
+		}
+
+		if client.apiKey != "test-api-key" {
+			t.Errorf("Expected API key 'test-api-key', got '%s'", client.apiKey)
+		}
+	})
+
+	t.Run("fails when no API key and CLI not available", func(t *testing.T) {
+		// Unset API key
+		originalKey := os.Getenv("CURSOR_API_KEY")
+		defer func() {
+			if originalKey != "" {
+				os.Setenv("CURSOR_API_KEY", originalKey)
+			} else {
+				os.Unsetenv("CURSOR_API_KEY")
+			}
+		}()
+
+		os.Unsetenv("CURSOR_API_KEY")
+
+		opts := &CursorAgentOptions{
+			UseCLI: false, // Force API mode
+		}
+
+		_, err := NewCursorAgentClient(opts)
+		if err == nil {
+			t.Fatal("Expected error when no API key and CLI not available")
+		}
+	})
+
+	t.Run("uses provided API key", func(t *testing.T) {
+		opts := &CursorAgentOptions{
+			UseCLI: false,
+			APIKey: "provided-key",
+		}
+
+		client, err := NewCursorAgentClient(opts)
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+
+		if client.apiKey != "provided-key" {
+			t.Errorf("Expected API key 'provided-key', got '%s'", client.apiKey)
+		}
+	})
+
+	// Note: We do NOT test actual API calls or CLI invocations in unit tests.
+	// Those would require real credentials and network access.
+}
+
+func TestBuildCommitMessagePrompt(t *testing.T) {
+	diff := "diff --git a/file.go b/file.go\n+new code"
+	prompt := BuildCommitMessagePrompt(diff)
+
+	if prompt == "" {
+		t.Fatal("Prompt should not be empty")
+	}
+
+	if !strings.Contains(prompt, diff) {
+		t.Error("Prompt should contain the diff")
+	}
+
+	if !strings.Contains(prompt, "Conventional Commits") {
+		t.Error("Prompt should mention Conventional Commits")
+	}
+}
+
+func TestEnsureConventionalCommitFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "already formatted",
+			input:    "feat: add new feature",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "fix type",
+			input:    "fix bug in code",
+			expected: "fix: fix bug in code",
+		},
+		{
+			name:     "no type",
+			input:    "add new feature",
+			expected: "feat: add new feature",
+		},
+		{
+			name:     "with scope",
+			input:    "feat(api): add endpoint",
+			expected: "feat(api): add endpoint",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ensureConventionalCommitFormat(tt.input)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestParsePRResponse(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectedTitle string
+		expectedBody  string
+	}{
+		{
+			name:          "simple response",
+			input:         "Title\nBody content",
+			expectedTitle: "Title",
+			expectedBody:  "Body content",
+		},
+		{
+			name:          "with title prefix",
+			input:         "Title: My Title\nBody",
+			expectedTitle: "My Title",
+			expectedBody:  "Body",
+		},
+		{
+			name:          "with markdown header",
+			input:         "# My Title\nBody content",
+			expectedTitle: "My Title",
+			expectedBody:  "Body content",
+		},
+		{
+			name:          "single line",
+			input:         "Just a title",
+			expectedTitle: "Just a title",
+			expectedBody:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			title, body := parsePRResponse(tt.input)
+			if title != tt.expectedTitle {
+				t.Errorf("Expected title '%s', got '%s'", tt.expectedTitle, title)
+			}
+			if body != tt.expectedBody {
+				t.Errorf("Expected body '%s', got '%s'", tt.expectedBody, body)
+			}
+		})
+	}
+}

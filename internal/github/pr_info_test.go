@@ -1,4 +1,4 @@
-package git_test
+package github_test
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/git"
+	githubpkg "stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/testhelpers"
 )
 
 func TestParseGitHubRemoteURL(t *testing.T) {
 	t.Run("parses HTTPS github.com URL", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.com/owner/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.com/owner/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.com", info.Hostname)
@@ -21,7 +22,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses HTTPS github.com URL without .git suffix", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.com/owner/repo")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.com/owner/repo")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.com", info.Hostname)
@@ -30,7 +31,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses SSH github.com URL", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("git@github.com:owner/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("git@github.com:owner/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.com", info.Hostname)
@@ -39,7 +40,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses SSH github.com URL without .git suffix", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("git@github.com:owner/repo")
+		info, err := githubpkg.ParseGitHubRemoteURL("git@github.com:owner/repo")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.com", info.Hostname)
@@ -48,7 +49,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses HTTPS GitHub Enterprise URL", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.company.com/owner/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.company.com/owner/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.company.com", info.Hostname)
@@ -57,7 +58,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses SSH GitHub Enterprise URL", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("git@github.company.com:owner/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("git@github.company.com:owner/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.company.com", info.Hostname)
@@ -66,7 +67,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses HTTP URL (non-HTTPS)", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("http://github.company.com/owner/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("http://github.company.com/owner/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.company.com", info.Hostname)
@@ -75,7 +76,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("parses Enterprise GitHub URL with simple hostname", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://my-internal-github/org/repo")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://my-internal-github/org/repo")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "my-internal-github", info.Hostname)
@@ -84,7 +85,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("handles URLs with extra path segments", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.company.com/org/team/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.company.com/org/team/repo.git")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.company.com", info.Hostname)
@@ -93,7 +94,7 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("handles URLs with whitespace", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("  https://github.com/owner/repo.git  ")
+		info, err := githubpkg.ParseGitHubRemoteURL("  https://github.com/owner/repo.git  ")
 		require.NoError(t, err)
 		require.NotNil(t, info)
 		require.Equal(t, "github.com", info.Hostname)
@@ -102,27 +103,27 @@ func TestParseGitHubRemoteURL(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid SSH URL format", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("git@github.com")
+		info, err := githubpkg.ParseGitHubRemoteURL("git@github.com")
 		require.Error(t, err)
 		require.Nil(t, info)
 		require.Contains(t, err.Error(), "invalid SSH remote URL")
 	})
 
 	t.Run("returns error for invalid HTTPS URL format", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.com")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.com")
 		require.Error(t, err)
 		require.Nil(t, info)
 		require.Contains(t, err.Error(), "invalid HTTPS remote URL")
 	})
 
 	t.Run("returns error for empty URL", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("")
+		info, err := githubpkg.ParseGitHubRemoteURL("")
 		require.Error(t, err)
 		require.Nil(t, info)
 	})
 
 	t.Run("returns error for URL missing owner", func(t *testing.T) {
-		info, err := git.ParseGitHubRemoteURL("https://github.com/repo.git")
+		info, err := githubpkg.ParseGitHubRemoteURL("https://github.com/repo.git")
 		require.Error(t, err)
 		require.Nil(t, info)
 	})
@@ -170,7 +171,7 @@ func TestGetGitHubClient(t *testing.T) {
 		// Mock token by setting environment variable
 		t.Setenv("GITHUB_TOKEN", "test-token")
 
-		client, owner, repo, err := git.GetGitHubClient(context.Background())
+		client, owner, repo, err := githubpkg.GetGitHubClient(context.Background())
 		// Note: This may fail if gh CLI is not available, but that's okay for testing the logic
 		if err != nil {
 			// If it fails due to token issues, that's expected in test environment
@@ -216,7 +217,7 @@ func TestGetGitHubClient(t *testing.T) {
 		// Mock token
 		t.Setenv("GITHUB_TOKEN", "test-token")
 
-		client, owner, repo, err := git.GetGitHubClient(context.Background())
+		client, owner, repo, err := githubpkg.GetGitHubClient(context.Background())
 		if err != nil {
 			// If it fails due to token issues, that's expected in test environment
 			require.Contains(t, err.Error(), "token")
@@ -262,7 +263,7 @@ func TestGetGitHubClient(t *testing.T) {
 		// Mock token
 		t.Setenv("GITHUB_TOKEN", "test-token")
 
-		client, owner, repo, err := git.GetGitHubClient(context.Background())
+		client, owner, repo, err := githubpkg.GetGitHubClient(context.Background())
 		if err != nil {
 			// If it fails due to token issues, that's expected in test environment
 			require.Contains(t, err.Error(), "token")

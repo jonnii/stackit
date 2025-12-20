@@ -5,10 +5,10 @@ import (
 
 	"github.com/google/go-github/v62/github"
 
-	"stackit.dev/stackit/internal/git"
+	githubpkg "stackit.dev/stackit/internal/github"
 )
 
-// MockGitHubClient implements git.GitHubClient using the mock server
+// MockGitHubClient implements githubpkg.GitHubClient using the mock server
 type MockGitHubClient struct {
 	client *github.Client
 	owner  string
@@ -18,7 +18,7 @@ type MockGitHubClient struct {
 
 // NewMockGitHubClientInterface creates a GitHubClient interface implementation
 // using the mock server
-func NewMockGitHubClientInterface(client *github.Client, owner, repo string, config *MockGitHubServerConfig) git.GitHubClient {
+func NewMockGitHubClientInterface(client *github.Client, owner, repo string, config *MockGitHubServerConfig) githubpkg.GitHubClient {
 	return &MockGitHubClient{
 		client: client,
 		owner:  owner,
@@ -33,7 +33,7 @@ func (c *MockGitHubClient) GetOwnerRepo() (string, string) {
 }
 
 // CreatePullRequest creates a new pull request
-func (c *MockGitHubClient) CreatePullRequest(ctx context.Context, owner, repo string, opts git.CreatePROptions) (*git.PullRequestInfo, error) {
+func (c *MockGitHubClient) CreatePullRequest(ctx context.Context, owner, repo string, opts githubpkg.CreatePROptions) (*githubpkg.PullRequestInfo, error) {
 	pr := &github.NewPullRequest{
 		Title: github.String(opts.Title),
 		Head:  github.String(opts.Head),
@@ -54,7 +54,7 @@ func (c *MockGitHubClient) CreatePullRequest(ctx context.Context, owner, repo st
 }
 
 // UpdatePullRequest updates an existing pull request
-func (c *MockGitHubClient) UpdatePullRequest(ctx context.Context, owner, repo string, prNumber int, opts git.UpdatePROptions) error {
+func (c *MockGitHubClient) UpdatePullRequest(ctx context.Context, owner, repo string, prNumber int, opts githubpkg.UpdatePROptions) error {
 	update := &github.PullRequest{}
 
 	if opts.Title != nil {
@@ -74,7 +74,7 @@ func (c *MockGitHubClient) UpdatePullRequest(ctx context.Context, owner, repo st
 }
 
 // GetPullRequestByBranch gets a pull request for a branch
-func (c *MockGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, repo, branchName string) (*git.PullRequestInfo, error) {
+func (c *MockGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, repo, branchName string) (*githubpkg.PullRequestInfo, error) {
 	prs, _, err := c.client.PullRequests.List(ctx, owner, repo, &github.PullRequestListOptions{
 		Head:  owner + ":" + branchName,
 		State: "all",
@@ -105,13 +105,13 @@ func (c *MockGitHubClient) GetPRChecksStatus(ctx context.Context, branchName str
 	return true, false, nil
 }
 
-// toPullRequestInfo converts a github.PullRequest to git.PullRequestInfo
-func toPullRequestInfo(pr *github.PullRequest) *git.PullRequestInfo {
+// toPullRequestInfo converts a github.PullRequest to githubpkg.PullRequestInfo
+func toPullRequestInfo(pr *github.PullRequest) *githubpkg.PullRequestInfo {
 	if pr == nil {
 		return nil
 	}
 
-	info := &git.PullRequestInfo{}
+	info := &githubpkg.PullRequestInfo{}
 
 	if pr.Number != nil {
 		info.Number = *pr.Number

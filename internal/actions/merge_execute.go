@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
@@ -12,10 +13,23 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
+const (
+	prStateOpen = "OPEN"
+)
+
+// MergeProgressReporter is an interface for reporting merge progress
+type MergeProgressReporter interface {
+	StepStarted(stepIndex int, description string)
+	StepCompleted(stepIndex int)
+	StepFailed(stepIndex int, err error)
+	StepWaiting(stepIndex int, elapsed, timeout time.Duration)
+}
+
 // ExecuteMergePlanOptions contains options for executing a merge plan
 type ExecuteMergePlanOptions struct {
-	Plan  *MergePlan
-	Force bool
+	Plan     *MergePlan
+	Force    bool
+	Reporter MergeProgressReporter // Optional progress reporter
 }
 
 // ExecuteMergePlan executes a validated merge plan step by step
@@ -23,19 +37,89 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 	plan := opts.Plan
 	splog := ctx.Splog
 
+	// If no reporter provided and we're in a TTY, use TUI
+	if opts.Reporter == nil && tui.IsTTY() {
+		reporter := tui.NewChannelMergeProgressReporter()
+		defer reporter.Close()
+
+		// Extract step descriptions
+		stepDescriptions := make([]string, len(plan.Steps))
+		for i, step := range plan.Steps {
+			stepDescriptions[i] = step.Description
+		}
+
+		// Start TUI in a goroutine
+		done := make(chan bool, 1)
+		tuiErr := make(chan error, 1)
+		go func() {
+			err := tui.RunMergeTUI(stepDescriptions, reporter.Updates(), done)
+			if err != nil {
+				tuiErr <- err
+			}
+		}()
+
+		// Update opts to use the reporter
+		opts.Reporter = reporter
+
+		// Execute plan (this will send updates to the reporter)
+		err := executeMergePlanSteps(ctx, opts)
+
+		// Close reporter to signal TUI to finish
+		reporter.Close()
+
+		// Wait for TUI to finish or error
+		select {
+		case <-done:
+			// TUI finished normally
+		case err := <-tuiErr:
+			if err != nil {
+				splog.Debug("TUI error: %v", err)
+			}
+		}
+
+		return err
+	}
+
+	// Execute without TUI
+	return executeMergePlanSteps(ctx, opts)
+}
+
+// executeMergePlanSteps executes the merge plan steps
+func executeMergePlanSteps(ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+	plan := opts.Plan
+	splog := ctx.Splog
+
 	for i, step := range plan.Steps {
+		// Report step started
+		if opts.Reporter != nil {
+			opts.Reporter.StepStarted(i, step.Description)
+		}
+
 		// 1. Re-validate preconditions for this step
 		if err := validateStepPreconditions(step, ctx, opts); err != nil {
+			if opts.Reporter != nil {
+				opts.Reporter.StepFailed(i, err)
+			}
 			return fmt.Errorf("step %d (%s) failed precondition: %w", i+1, step.Description, err)
 		}
 
-		// 2. Execute the step
-		if err := executeStep(step, ctx, opts); err != nil {
+		// 2. Execute the step (with progress reporting for wait steps)
+		if err := executeStepWithProgress(step, i, ctx, opts); err != nil {
+			if opts.Reporter != nil {
+				opts.Reporter.StepFailed(i, err)
+			}
 			return fmt.Errorf("step %d (%s) failed: %w", i+1, step.Description, err)
 		}
 
-		// 3. Log progress
-		splog.Info("✓ %s", step.Description)
+		// 3. Report step completed
+		if opts.Reporter != nil {
+			opts.Reporter.StepCompleted(i)
+		}
+
+		// 4. Log progress (if no reporter, use simple logging)
+		if opts.Reporter == nil {
+			splog.Info("✓ %s", step.Description)
+		}
 	}
 
 	return nil
@@ -56,7 +140,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 		if prInfo == nil || prInfo.Number == nil {
 			return fmt.Errorf("PR not found for branch %s", step.BranchName)
 		}
-		if prInfo.State != "OPEN" {
+		if prInfo.State != prStateOpen {
 			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
 		}
 		// Optionally check CI checks haven't changed to failing
@@ -89,9 +173,31 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 
 	case StepPullTrunk:
 		// No preconditions needed
+
+	case StepWaitCI:
+		// Validate PR exists and is open
+		prInfo, err := eng.GetPrInfo(context, step.BranchName)
+		if err != nil {
+			return fmt.Errorf("failed to get PR info: %w", err)
+		}
+		if prInfo == nil || prInfo.Number == nil {
+			return fmt.Errorf("PR not found for branch %s", step.BranchName)
+		}
+		if prInfo.State != prStateOpen {
+			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
+		}
 	}
 
 	return nil
+}
+
+// executeStepWithProgress executes a step with progress reporting
+func executeStepWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+	// Special handling for wait steps to report progress
+	if step.StepType == StepWaitCI {
+		return executeWaitCIWithProgress(step, stepIndex, ctx, opts)
+	}
+	return executeStep(step, ctx, opts)
 }
 
 // executeStep executes a single step
@@ -198,6 +304,11 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 			return err
 		}
 
+	case StepWaitCI:
+		// StepWaitCI should be handled by executeStepWithProgress, not executeStep
+		// This case should never be reached, but if it is, return an error
+		return fmt.Errorf("StepWaitCI should be handled by executeStepWithProgress")
+
 	default:
 		return fmt.Errorf("unknown step type: %s", step.StepType)
 	}
@@ -284,6 +395,85 @@ func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase str
 	}
 
 	return nil
+}
+
+// executeWaitCIWithProgress waits for CI checks with progress reporting
+func executeWaitCIWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+	if ctx.GitHubClient == nil {
+		return fmt.Errorf("GitHub client not available")
+	}
+
+	timeout := step.WaitTimeout
+	if timeout == 0 {
+		timeout = 10 * time.Minute // Default timeout
+	}
+
+	pollInterval := 15 * time.Second    // Poll every 15 seconds
+	progressInterval := 1 * time.Second // Report progress every second
+	startTime := time.Now()
+	deadline := startTime.Add(timeout)
+	lastProgressReport := startTime
+
+	splog := ctx.Splog
+	context := ctx.Context
+
+	// Get PR info for better error messages
+	eng := ctx.Engine
+	prInfo, err := eng.GetPrInfo(context, step.BranchName)
+	if err != nil {
+		return fmt.Errorf("failed to get PR info: %w", err)
+	}
+	prNumber := step.PRNumber
+	if prInfo != nil && prInfo.Number != nil {
+		prNumber = *prInfo.Number
+	}
+
+	if opts.Reporter == nil {
+		splog.Info("Waiting for CI checks on PR #%d (%s)...", prNumber, step.BranchName)
+	}
+
+	for {
+		// Check if we've exceeded the timeout
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for CI checks on PR #%d (%s) after %v", prNumber, step.BranchName, timeout)
+		}
+
+		// Report progress periodically
+		now := time.Now()
+		if opts.Reporter != nil && now.Sub(lastProgressReport) >= progressInterval {
+			elapsed := now.Sub(startTime)
+			opts.Reporter.StepWaiting(stepIndex, elapsed, timeout)
+			lastProgressReport = now
+		}
+
+		// Check CI status
+		passing, pending, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
+		if err != nil {
+			// Log error but continue polling (might be transient)
+			splog.Debug("Error checking CI status: %v", err)
+		} else {
+			if !passing {
+				// CI checks failed
+				return fmt.Errorf("CI checks failed on PR #%d (%s)", prNumber, step.BranchName)
+			}
+			if !pending {
+				// All checks passed and none are pending
+				elapsed := time.Since(startTime)
+				if opts.Reporter == nil {
+					splog.Info("CI checks passed on PR #%d (%s) after %v", prNumber, step.BranchName, elapsed.Round(time.Second))
+				}
+				return nil
+			}
+		}
+
+		// Wait before next poll
+		remaining := time.Until(deadline)
+		if remaining < pollInterval {
+			time.Sleep(remaining)
+		} else {
+			time.Sleep(pollInterval)
+		}
+	}
 }
 
 // CheckSyncStatus checks if the repository is up to date with remote

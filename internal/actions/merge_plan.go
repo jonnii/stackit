@@ -35,6 +35,8 @@ const (
 	StepUpdatePRBase StepType = "UPDATE_PR_BASE"
 	// StepPullTrunk represents pulling the trunk branch
 	StepPullTrunk StepType = "PULL_TRUNK"
+	// StepWaitCI represents waiting for CI checks to complete
+	StepWaitCI StepType = "WAIT_CI"
 )
 
 // ChecksStatus represents the CI check status for a PR
@@ -66,7 +68,8 @@ type MergePlanStep struct {
 	StepType    StepType
 	BranchName  string
 	PRNumber    int
-	Description string // Human-readable description for display
+	Description string        // Human-readable description for display
+	WaitTimeout time.Duration // Timeout for waiting steps (e.g., CI checks)
 }
 
 // MergePlan is the complete plan for a merge operation
@@ -205,9 +208,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 				// Don't fail on check status errors, just mark as none
 			case pending:
 				checksStatus = ChecksPending
-				if !opts.Force {
-					validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s PR #%d has pending CI checks", branchName, *prInfo.Number))
-				}
+				// Don't warn about pending CI checks - the CI wait step will handle waiting for them
 			case !passing:
 				checksStatus = ChecksFailing
 				if !opts.Force {
@@ -273,9 +274,22 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 // buildBottomUpSteps builds steps for bottom-up merge strategy
 func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []string) []MergePlanStep {
 	steps := []MergePlanStep{}
+	defaultTimeout := 10 * time.Minute
 
 	for i, branchInfo := range branchesToMerge {
-		// 1. Merge PR
+		// 1. If not the first PR, wait for CI checks on the current PR before merging
+		// (The first PR's CI was already checked during plan validation)
+		if i > 0 {
+			steps = append(steps, MergePlanStep{
+				StepType:    StepWaitCI,
+				BranchName:  branchInfo.BranchName,
+				PRNumber:    branchInfo.PRNumber,
+				Description: fmt.Sprintf("Wait for CI checks on PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
+				WaitTimeout: defaultTimeout,
+			})
+		}
+
+		// 2. Merge PR
 		steps = append(steps, MergePlanStep{
 			StepType:    StepMergePR,
 			BranchName:  branchInfo.BranchName,
@@ -283,7 +297,7 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 			Description: fmt.Sprintf("Merge PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
 		})
 
-		// 2. Pull trunk
+		// 3. Pull trunk
 		steps = append(steps, MergePlanStep{
 			StepType:    StepPullTrunk,
 			BranchName:  "",
@@ -291,7 +305,7 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 			Description: "Pull trunk to get merged changes",
 		})
 
-		// 3. If not the last branch, restack the next one
+		// 4. If not the last branch, restack the next one
 		if i < len(branchesToMerge)-1 {
 			nextBranch := branchesToMerge[i+1].BranchName
 			steps = append(steps, MergePlanStep{

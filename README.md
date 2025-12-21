@@ -44,6 +44,22 @@ go build -o stackit ./cmd/stackit
 mv stackit /usr/local/bin/
 ```
 
+### Shell Completion
+
+Stackit supports shell completion for Bash, Zsh, Fish, and PowerShell. To enable it:
+
+**Zsh**
+Add this to your `~/.zshrc`:
+```bash
+source <(stackit completion zsh)
+```
+
+**Bash**
+Add this to your `~/.bashrc`:
+```bash
+source <(stackit completion bash)
+```
+
 ### Using Just
 
 If you have [just](https://github.com/casey/just) installed:

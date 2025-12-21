@@ -17,7 +17,8 @@ func newUntrackCmd() *cobra.Command {
 		Short: "Stop tracking a branch with stackit",
 		Long: `Stop tracking the current (or provided) branch with stackit.
 If the branch has children, they will also be untracked.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())

@@ -130,6 +130,8 @@ the --to flag is used to specify a target branch to navigate towards.`,
 	cmd.Flags().IntVarP(&steps, "steps", "n", 1, "The number of levels to traverse upstack.")
 	cmd.Flags().StringVar(&toBranch, "to", "", "Target branch to navigate towards. When multiple children exist, selects the path leading to this branch.")
 
+	_ = cmd.RegisterFlagCompletionFunc("to", completeBranches)
+
 	return cmd
 }
 

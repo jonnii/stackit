@@ -24,7 +24,8 @@ func newInfoCmd() *cobra.Command {
 PR status, and optionally diffs or patches.
 
 If no branch is specified, displays information about the current branch.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

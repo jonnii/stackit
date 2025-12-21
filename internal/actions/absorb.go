@@ -58,7 +58,8 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
 	if !hasStaged {
-		return fmt.Errorf("no staged changes to absorb. Use --all to stage all changes or --patch to interactively stage changes")
+		splog.Info("Nothing to absorb.")
+		return nil
 	}
 
 	// Parse staged hunks
@@ -68,7 +69,8 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	if len(hunks) == 0 {
-		return fmt.Errorf("no hunks found in staged changes")
+		splog.Info("Nothing to absorb.")
+		return nil
 	}
 
 	// Get all commits downstack from current branch
@@ -117,6 +119,18 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	hunksByCommit := make(map[string][]git.Hunk)
 	for _, target := range hunkTargets {
 		hunksByCommit[target.CommitSHA] = append(hunksByCommit[target.CommitSHA], target.Hunk)
+	}
+
+	if len(hunksByCommit) == 0 {
+		if len(unabsorbedHunks) > 0 {
+			splog.Warn("The following hunks could not be absorbed (they commute with all commits):")
+			for _, hunk := range unabsorbedHunks {
+				splog.Info("  %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
+			}
+		} else {
+			splog.Info("Nothing to absorb.")
+		}
+		return nil
 	}
 
 	// Print dry-run output or confirmation

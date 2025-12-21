@@ -713,7 +713,19 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	e.mu.RUnlock()
 
 	if !ok {
-		return RestackBranchResult{Result: RestackUnneeded}, fmt.Errorf("branch %s is not tracked", branchName)
+		// RESILIENCY: Try to auto-discover parent if branch is not tracked
+		ancestors, err := e.FindMostRecentTrackedAncestors(ctx, branchName)
+		if err == nil && len(ancestors) > 0 {
+			parent = ancestors[0]
+			// Auto-track the branch
+			if err := e.TrackBranch(ctx, branchName, parent); err == nil {
+				ok = true
+			}
+		}
+
+		if !ok {
+			return RestackBranchResult{Result: RestackUnneeded}, fmt.Errorf("branch %s is not tracked", branchName)
+		}
 	}
 
 	// Track reparenting info
@@ -767,6 +779,22 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	oldParentRev := parentRev
 	if meta.ParentBranchRevision != nil {
 		oldParentRev = *meta.ParentBranchRevision
+	}
+
+	// RESILIENCY: If oldParentRev is no longer an ancestor of branchName,
+	// or if it's empty, find the actual merge base. This handles cases where
+	// the parent was amended or rebased outside of stackit.
+	if oldParentRev != "" {
+		if isAncestor, _ := git.IsAncestor(ctx, oldParentRev, branchName); !isAncestor {
+			if mergeBase, err := git.GetMergeBase(ctx, branchName, parent); err == nil {
+				oldParentRev = mergeBase
+			}
+		}
+	} else {
+		// No old parent revision in metadata, try to find merge base
+		if mergeBase, err := git.GetMergeBase(ctx, branchName, parent); err == nil {
+			oldParentRev = mergeBase
+		}
 	}
 
 	// If parent hasn't changed, no need to restack

@@ -2,7 +2,7 @@
 
 Go-based CLI tool for managing stacked changes in Git repositories.
 
-**Tech stack:** Go 1.24, Cobra, Just (justfile)
+**Tech stack:** Go 1.25, Cobra, Just (justfile)
 
 ## Architecture
 

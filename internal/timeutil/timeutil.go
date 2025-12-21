@@ -13,7 +13,14 @@ func FormatTimeAgo(timestamp time.Time) string {
 
 	switch {
 	case diff < time.Minute:
-		return "just now"
+		seconds := int(diff.Seconds())
+		if seconds <= 0 {
+			return "0 seconds ago"
+		}
+		if seconds == 1 {
+			return "1 second ago"
+		}
+		return fmt.Sprintf("%d seconds ago", seconds)
 	case diff < time.Hour:
 		minutes := int(diff.Minutes())
 		if minutes == 1 {

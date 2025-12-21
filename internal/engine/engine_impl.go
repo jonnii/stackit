@@ -78,6 +78,15 @@ func (e *engineImpl) AllBranchNames() []string {
 
 // CurrentBranch returns the current branch name
 func (e *engineImpl) CurrentBranch() string {
+	e.mu.Lock()
+	if current, err := git.GetCurrentBranch(); err == nil {
+		e.currentBranch = current
+	} else {
+		// Not on a branch (e.g., detached HEAD)
+		e.currentBranch = ""
+	}
+	e.mu.Unlock()
+
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.currentBranch
@@ -472,6 +481,11 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Update current branch if it changed
+	if current, err := git.GetCurrentBranch(); err == nil {
+		e.currentBranch = current
+	}
+
 	// Validate branch exists
 	branchExists := false
 	for _, name := range e.branches {
@@ -528,28 +542,7 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 		}
 	}
 
-	// Get merge base (parent revision)
-	parentRevision, err := git.GetMergeBase(ctx, branchName, parentBranchName)
-	if err != nil {
-		return fmt.Errorf("failed to get merge base: %w", err)
-	}
-
-	// Create metadata
-	meta := &git.Meta{
-		ParentBranchName:     &parentBranchName,
-		ParentBranchRevision: &parentRevision,
-	}
-
-	// Write metadata ref
-	if err := git.WriteMetadataRef(branchName, meta); err != nil {
-		return fmt.Errorf("failed to write metadata ref: %w", err)
-	}
-
-	// Update in-memory cache
-	e.parentMap[branchName] = parentBranchName
-	e.childrenMap[parentBranchName] = append(e.childrenMap[parentBranchName], branchName)
-
-	return nil
+	return e.setParentInternal(ctx, branchName, parentBranchName)
 }
 
 // UntrackBranch stops tracking a branch by deleting its metadata

@@ -7,23 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestSyncAction(t *testing.T) {
 	t.Run("syncs when trunk is up to date", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err := actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: false,
@@ -32,20 +24,10 @@ func TestSyncAction(t *testing.T) {
 	})
 
 	t.Run("fails when there are uncommitted changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithUncommittedChange("unstaged")
 
-		// Create uncommitted change
-		err := scene.Repo.CreateChange("unstaged", "test", true)
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err := actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: false,
@@ -55,27 +37,12 @@ func TestSyncAction(t *testing.T) {
 	})
 
 	t.Run("syncs with restack flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, nil).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
-		// Create branch
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err := actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
@@ -85,42 +52,14 @@ func TestSyncAction(t *testing.T) {
 	})
 
 	t.Run("restacks branches in topological order (parents before children)", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, nil).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+				"branch3": "branch2",
+			})
 
-		// Create stack: main -> branch1 -> branch2 -> branch3
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch2")
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err := actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
@@ -130,222 +69,97 @@ func TestSyncAction(t *testing.T) {
 	})
 
 	t.Run("restacks branching stacks in topological order", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, nil).
+			WithStack(map[string]string{
+				"stackA":        "main",
+				"stackA-child1": "stackA",
+				"stackA-child2": "stackA",
+				"stackB":        "main",
+				"stackB-child1": "stackB",
+			})
 
-		// Create branching stack structure:
-		// main
-		// ├── stackA
-		// │   ├── stackA-child1
-		// │   └── stackA-child2
-		// └── stackB
-		//     └── stackB-child1
-
-		// First stack: main -> stackA -> stackA-child1
-		err := scene.Repo.CreateAndCheckoutBranch("stackA")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackA change", "sA")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("stackA-child1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackA-child1 change", "sAc1")
-		require.NoError(t, err)
-
-		// Branch off stackA for stackA-child2
-		err = scene.Repo.CheckoutBranch("stackA")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("stackA-child2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackA-child2 change", "sAc2")
-		require.NoError(t, err)
-
-		// Second stack: main -> stackB -> stackB-child1
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("stackB")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackB change", "sB")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("stackB-child1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackB-child1 change", "sBc1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		// Track all branches
-		err = eng.TrackBranch(context.Background(), "stackA", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackA-child1", "stackA")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackA-child2", "stackA")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackB", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackB-child1", "stackB")
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err := actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     false,
 			Force:   false,
 			Restack: true,
 		})
 		// Should succeed - branches should be restacked with parents before children
-		// Order should be something like: stackA, stackA-child1, stackA-child2, stackB, stackB-child1
-		// (exact sibling order may vary, but parents must come before their children)
 		require.NoError(t, err)
 
 		// Verify all branches still exist and are properly tracked
-		require.True(t, eng.IsBranchTracked("stackA"))
-		require.True(t, eng.IsBranchTracked("stackA-child1"))
-		require.True(t, eng.IsBranchTracked("stackA-child2"))
-		require.True(t, eng.IsBranchTracked("stackB"))
-		require.True(t, eng.IsBranchTracked("stackB-child1"))
-
-		// Verify parent relationships are preserved
-		require.Equal(t, "main", eng.GetParent("stackA"))
-		require.Equal(t, "stackA", eng.GetParent("stackA-child1"))
-		require.Equal(t, "stackA", eng.GetParent("stackA-child2"))
-		require.Equal(t, "main", eng.GetParent("stackB"))
-		require.Equal(t, "stackB", eng.GetParent("stackB-child1"))
+		s.ExpectStackStructure(map[string]string{
+			"stackA":        "main",
+			"stackA-child1": "stackA",
+			"stackA-child2": "stackA",
+			"stackB":        "main",
+			"stackB-child1": "stackB",
+		})
 	})
 
 	t.Run("restacks multiple deep subtrees correctly", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create deep branching structure:
-		// main
-		// └── P
-		//     ├── C1
-		//     │   └── GC1
-		//     └── C2
-		//         └── GC2
-
-		err := scene.Repo.CreateAndCheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("P change", "p")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("C1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("GC1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("GC1 change", "gc1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("C2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("GC2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("GC2 change", "gc2")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "P", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C1", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "GC1", "C1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C2", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "GC2", "C2")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, nil).
+			WithStack(map[string]string{
+				"P":   "main",
+				"C1":  "P",
+				"GC1": "C1",
+				"C2":  "P",
+				"GC2": "C2",
+			})
 
 		// Modify P to trigger restacking of all descendants
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("P updated", "p2")
-		require.NoError(t, err)
+		s.Checkout("P").
+			Commit("P updated")
 
 		// Refresh engine
-		err = eng.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		err = actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     true,
 			Restack: true,
 		})
 		require.NoError(t, err)
 
 		// Verify all branches are fixed
-		require.True(t, eng.IsBranchFixed(context.Background(), "C1"))
-		require.True(t, eng.IsBranchFixed(context.Background(), "GC1"))
-		require.True(t, eng.IsBranchFixed(context.Background(), "C2"))
-		require.True(t, eng.IsBranchFixed(context.Background(), "GC2"))
+		s.ExpectBranchFixed("C1").
+			ExpectBranchFixed("GC1").
+			ExpectBranchFixed("C2").
+			ExpectBranchFixed("GC2")
 	})
 
 	t.Run("partial success in branching restack (one child succeeds, one fails)", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create: main -> P -> [C1, C2]
-		err := scene.Repo.CreateAndCheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("P change", "p")
-		require.NoError(t, err)
+		s.CreateBranch("P").
+			Commit("P change").
+			TrackBranch("P", "main")
 
 		// C1 will restack successfully
-		err = scene.Repo.CreateAndCheckoutBranch("C1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
-		require.NoError(t, err)
+		s.Checkout("P").
+			CreateBranch("C1").
+			Commit("C1 change").
+			TrackBranch("C1", "P")
 
 		// C2 will have a conflict
-		err = scene.Repo.CheckoutBranch("P")
+		s.Checkout("P").
+			CreateBranch("C2")
+		err := s.Scene.Repo.CreateChangeAndCommit("initial content", "conflict")
 		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("C2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("initial content", "conflict")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "P", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C1", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C2", "P")
-		require.NoError(t, err)
+		s.TrackBranch("C2", "P")
 
 		// Modify P with a change that conflicts with C2 but not C1
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("conflicting content", "conflict")
+		s.Checkout("P")
+		err = s.Scene.Repo.CreateChangeAndCommit("conflicting content", "conflict")
 		require.NoError(t, err)
 
 		// Refresh engine
-		err = eng.Rebuild(context.Background(), "main")
+		err = s.Engine.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.SyncAction(ctx, actions.SyncOptions{
+		s.Checkout("P")
+
+		err = actions.SyncAction(s.Context, actions.SyncOptions{
 			All:     true,
 			Restack: true,
 		})
@@ -355,8 +169,8 @@ func TestSyncAction(t *testing.T) {
 		require.Contains(t, err.Error(), "conflict")
 
 		// C1 should still have been restacked successfully
-		require.True(t, eng.IsBranchFixed(context.Background(), "C1"))
+		s.ExpectBranchFixed("C1")
 		// C2 should NOT be fixed
-		require.False(t, eng.IsBranchFixed(context.Background(), "C2"))
+		s.ExpectBranchNotFixed("C2")
 	})
 }

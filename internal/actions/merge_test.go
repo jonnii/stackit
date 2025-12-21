@@ -9,33 +9,18 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestMergeAction(t *testing.T) {
 	t.Run("fails when not on a branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		// Detach HEAD by checking out a commit directly
-		// Get the current commit SHA first
-		commitSHA, err := scene.Repo.RunGitCommandAndGetOutput("rev-parse", "HEAD")
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("checkout", "--detach", commitSHA)
-		require.NoError(t, err)
+		// Detach HEAD
+		s.RunGit("checkout", "HEAD~0").Rebuild()
 
-		// Reset default repo to ensure it sees the detached HEAD state
-		git.ResetDefaultRepo()
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.MergeAction(ctx, actions.MergeOptions{
+		err := actions.MergeAction(s.Context, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
@@ -45,24 +30,15 @@ func TestMergeAction(t *testing.T) {
 	})
 
 	t.Run("fails when on trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Make sure we're on main
-		err := scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine (will see we're on main)
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("main")
 
 		// Verify we're on trunk
-		require.True(t, eng.IsTrunk(eng.CurrentBranch()))
+		require.True(t, s.Engine.IsTrunk(s.Engine.CurrentBranch()))
 
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.MergeAction(ctx, actions.MergeOptions{
+		err := actions.MergeAction(s.Context, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
@@ -72,35 +48,13 @@ func TestMergeAction(t *testing.T) {
 	})
 
 	t.Run("fails when branch is not tracked", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create branch before engine
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		// Create engine (will see branch1 but not track it)
-		_, err = engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		// Switch to branch1
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-
-		// Create new engine to get updated current branch
-		// Note: The branch won't be tracked in the new engine since we didn't track it
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("untracked")
 
 		// Verify branch is not tracked
-		require.False(t, eng.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.IsBranchTracked("untracked"))
 
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.MergeAction(ctx, actions.MergeOptions{
+		err := actions.MergeAction(s.Context, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
@@ -110,40 +64,18 @@ func TestMergeAction(t *testing.T) {
 	})
 
 	t.Run("returns early when no PRs to merge", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create branch before engine
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine (will see branch1)
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Switch to branch1
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
+		s.Checkout("branch1")
 
-		// Create new engine to get updated current branch
-		// The engine will rebuild and should see the tracked branch from metadata
-		eng, err = engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		// Verify branch is tracked
+		require.True(t, s.Engine.IsBranchTracked("branch1"))
 
-		// Verify branch is tracked (metadata should persist)
-		require.True(t, eng.IsBranchTracked("branch1"))
-
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.MergeAction(ctx, actions.MergeOptions{
+		err := actions.MergeAction(s.Context, actions.MergeOptions{
 			DryRun:   false,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
@@ -154,24 +86,10 @@ func TestMergeAction(t *testing.T) {
 	})
 
 	t.Run("dry run mode reports PRs without merging", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create branch before engine
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine (will see branch1)
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Add PR info
 		prNumber := 123
@@ -180,27 +98,19 @@ func TestMergeAction(t *testing.T) {
 			State:  "OPEN",
 			URL:    "https://github.com/owner/repo/pull/123",
 		}
-		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Switch to branch1
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-
-		// Create new engine to get updated current branch
-		// The engine will rebuild and should see the tracked branch and PR info from metadata
-		eng, err = engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("branch1")
 
 		// Verify branch is tracked and has PR info
-		require.True(t, eng.IsBranchTracked("branch1"))
-		prInfo, err = eng.GetPrInfo(context.Background(), "branch1")
+		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		prInfo, err = s.Engine.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		err = actions.MergeAction(ctx, actions.MergeOptions{
+		err = actions.MergeAction(s.Context, actions.MergeOptions{
 			DryRun:   true,
 			Confirm:  false,
 			Strategy: actions.MergeStrategyBottomUp,
@@ -209,41 +119,12 @@ func TestMergeAction(t *testing.T) {
 	})
 
 	t.Run("preserves stack structure when merging bottom PR", func(t *testing.T) {
-		// This test verifies the fix for the bug where merging the bottom PR
-		// would unstack all remaining PRs (making them all point to main).
-		// After merging branch-a, branch-b should point to main, and branch-c
-		// should point to branch-b (not main).
-
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create stack: main → branch-a → branch-b → branch-c
-		err := scene.Repo.CreateAndCheckoutBranch("branch-a")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch-a change", "a")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch-b")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch-b change", "b")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch-c")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch-c change", "c")
-		require.NoError(t, err)
-
-		// Create engine and track branches
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch-a", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch-b", "branch-a")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch-c", "branch-b")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch-a": "main",
+				"branch-b": "branch-a",
+				"branch-c": "branch-b",
+			})
 
 		// Set up mock GitHub server with PRs
 		config := testhelpers.NewMockGitHubServerConfig()
@@ -277,7 +158,7 @@ func TestMergeAction(t *testing.T) {
 
 		// Add PR info to engine
 		prA := 101
-		err = eng.UpsertPrInfo(context.Background(), "branch-a", &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo(context.Background(), "branch-a", &engine.PrInfo{
 			Number: &prA,
 			State:  "OPEN",
 			Base:   "main",
@@ -286,7 +167,7 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 
 		prB := 102
-		err = eng.UpsertPrInfo(context.Background(), "branch-b", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo(context.Background(), "branch-b", &engine.PrInfo{
 			Number: &prB,
 			State:  "OPEN",
 			Base:   "branch-a",
@@ -295,7 +176,7 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 
 		prC := 103
-		err = eng.UpsertPrInfo(context.Background(), "branch-c", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo(context.Background(), "branch-c", &engine.PrInfo{
 			Number: &prC,
 			State:  "OPEN",
 			Base:   "branch-b",
@@ -304,20 +185,13 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Switch to branch-a (the bottom PR we'll merge)
-		err = scene.Repo.CheckoutBranch("branch-a")
-		require.NoError(t, err)
-
-		// Rebuild engine to get updated current branch
-		eng, err = engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("branch-a")
 
 		// Create context with GitHub client
-		ctx := runtime.NewContext(eng)
-		ctx.RepoRoot = scene.Dir
-		ctx.GitHubClient = githubClient
+		s.Context.GitHubClient = githubClient
 
 		// Execute merge plan (merge branch-a)
-		plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
+		plan, validation, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
 			Strategy: actions.MergeStrategyBottomUp,
 			Force:    true,
 		})
@@ -330,47 +204,29 @@ func TestMergeAction(t *testing.T) {
 		require.Contains(t, plan.UpstackBranches, "branch-c")
 
 		// Set up a remote so PullTrunk can work
-		// Create a bare repo to use as remote
 		remoteDir, err := os.MkdirTemp("", "stackit-test-remote-*")
 		require.NoError(t, err)
 		defer os.RemoveAll(remoteDir)
 
-		err = scene.Repo.RunGitCommand("init", "--bare", remoteDir)
-		require.NoError(t, err)
+		s.RunGit("init", "--bare", remoteDir)
 
 		// Add remote and push main
-		err = scene.Repo.RunGitCommand("remote", "add", "origin", remoteDir)
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("push", "-u", "origin", "main")
-		require.NoError(t, err)
-
-		// Push all branches to remote
-		err = scene.Repo.RunGitCommand("push", "-u", "origin", "branch-a")
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("push", "-u", "origin", "branch-b")
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("push", "-u", "origin", "branch-c")
-		require.NoError(t, err)
+		s.RunGit("remote", "add", "origin", remoteDir).
+			RunGit("push", "-u", "origin", "main").
+			RunGit("push", "-u", "origin", "branch-a").
+			RunGit("push", "-u", "origin", "branch-b").
+			RunGit("push", "-u", "origin", "branch-c")
 
 		// Now merge branch-a into main locally and push to simulate the PR merge
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("merge", "branch-a", "--no-ff", "-m", "Merge branch-a")
-		require.NoError(t, err)
-		err = scene.Repo.RunGitCommand("push", "origin", "main")
-		require.NoError(t, err)
+		s.Checkout("main").
+			RunGit("merge", "branch-a", "--no-ff", "-m", "Merge branch-a").
+			RunGit("push", "origin", "main")
 
 		// Switch back to branch-a for the merge execution
-		err = scene.Repo.CheckoutBranch("branch-a")
-		require.NoError(t, err)
-
-		// Rebuild engine after the merge
-		eng, err = engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		ctx.Engine = eng
+		s.Checkout("branch-a")
 
 		// Execute the merge plan
-		err = actions.ExecuteMergePlan(ctx, actions.ExecuteMergePlanOptions{
+		err = actions.ExecuteMergePlan(s.Context, actions.ExecuteMergePlanOptions{
 			Plan:  plan,
 			Force: true,
 		})

@@ -1,41 +1,26 @@
 package actions
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"stackit.dev/stackit/internal/ai"
-	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestAnalyzeAction(t *testing.T) {
-	scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
+	s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 	// Create some staged changes
-	filePath := filepath.Join(scene.Dir, "user.go")
+	filePath := filepath.Join(s.Scene.Dir, "user.go")
 	if err := os.WriteFile(filePath, []byte("package user"), 0644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	if err := scene.Repo.RunGitCommand("add", "user.go"); err != nil {
-		t.Fatalf("Failed to stage: %v", err)
-	}
-
-	eng, err := engine.NewEngine(scene.Dir)
-	if err != nil {
-		t.Fatalf("Failed to create engine: %v", err)
-	}
-
-	ctx := &runtime.Context{
-		Context:  context.Background(),
-		Engine:   eng,
-		RepoRoot: scene.Dir,
-		Splog:    tui.NewSplog(),
-	}
+	s.RunGit("add", "user.go")
 
 	mockAI := ai.NewMockClient()
 	suggestion := &ai.StackSuggestion{
@@ -54,10 +39,8 @@ func TestAnalyzeAction(t *testing.T) {
 		AIClient: mockAI,
 	}
 
-	result, err := AnalyzeAction(ctx, opts)
-	if err != nil {
-		t.Fatalf("AnalyzeAction failed: %v", err)
-	}
+	result, err := AnalyzeAction(s.Context, opts)
+	require.NoError(t, err)
 
 	if len(result.Layers) != 1 {
 		t.Errorf("Expected 1 layer, got %d", len(result.Layers))
@@ -68,30 +51,16 @@ func TestAnalyzeAction(t *testing.T) {
 }
 
 func TestCreateStackAction(t *testing.T) {
-	scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
+	s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 	// Create multiple changes
-	if err := os.WriteFile(filepath.Join(scene.Dir, "user.go"), []byte("package user"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.Scene.Dir, "user.go"), []byte("package user"), 0644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(scene.Dir, "api.go"), []byte("package api"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.Scene.Dir, "api.go"), []byte("package api"), 0644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	if err := scene.Repo.RunGitCommand("add", "."); err != nil {
-		t.Fatalf("Failed to stage: %v", err)
-	}
-
-	eng, err := engine.NewEngine(scene.Dir)
-	if err != nil {
-		t.Fatalf("Failed to create engine: %v", err)
-	}
-
-	ctx := &runtime.Context{
-		Context:  context.Background(),
-		Engine:   eng,
-		RepoRoot: scene.Dir,
-		Splog:    tui.NewSplog(),
-	}
+	s.RunGit("add", ".")
 
 	suggestion := &ai.StackSuggestion{
 		Layers: []ai.StackLayer{
@@ -110,49 +79,33 @@ func TestCreateStackAction(t *testing.T) {
 		},
 	}
 
-	err = CreateStackAction(ctx, suggestion, 0)
-	if err != nil {
-		t.Fatalf("CreateStackAction failed: %v", err)
-	}
+	err := CreateStackAction(s.Context, suggestion, 0)
+	require.NoError(t, err)
 
 	// Verify branches were created and tracked
-	output, _ := scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "refactor-user")
+	output, _ := s.Scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "refactor-user")
 	if output == "" {
 		t.Error("Branch refactor-user should exist")
 	}
-	output, _ = scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "add-api")
+	output, _ = s.Scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "add-api")
 	if output == "" {
 		t.Error("Branch add-api should exist")
 	}
 
-	parent := eng.GetParent("add-api")
+	parent := s.Engine.GetParent("add-api")
 	if parent != "refactor-user" {
 		t.Errorf("Expected parent of add-api to be refactor-user, got %s", parent)
 	}
 }
 
 func TestCreateStackAction_EmptyLayer(t *testing.T) {
-	scene := testhelpers.NewScene(t, testhelpers.BasicSceneSetup)
+	s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 	// Create some staged changes
-	if err := os.WriteFile(filepath.Join(scene.Dir, "user.go"), []byte("package user"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.Scene.Dir, "user.go"), []byte("package user"), 0644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	if err := scene.Repo.RunGitCommand("add", "."); err != nil {
-		t.Fatalf("Failed to stage: %v", err)
-	}
-
-	eng, err := engine.NewEngine(scene.Dir)
-	if err != nil {
-		t.Fatalf("Failed to create engine: %v", err)
-	}
-
-	ctx := &runtime.Context{
-		Context:  context.Background(),
-		Engine:   eng,
-		RepoRoot: scene.Dir,
-		Splog:    tui.NewSplog(),
-	}
+	s.RunGit("add", ".")
 
 	suggestion := &ai.StackSuggestion{
 		Layers: []ai.StackLayer{
@@ -165,12 +118,10 @@ func TestCreateStackAction_EmptyLayer(t *testing.T) {
 		},
 	}
 
-	err = CreateStackAction(ctx, suggestion, 0)
-	if err != nil {
-		t.Fatalf("CreateStackAction failed: %v", err)
-	}
+	err := CreateStackAction(s.Context, suggestion, 0)
+	require.NoError(t, err)
 
-	output, _ := scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "empty-layer")
+	output, _ := s.Scene.Repo.RunGitCommandAndGetOutput("branch", "--list", "empty-layer")
 	if output == "" {
 		t.Error("Branch empty-layer should exist")
 	}

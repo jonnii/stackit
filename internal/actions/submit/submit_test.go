@@ -8,37 +8,19 @@ import (
 
 	"stackit.dev/stackit/internal/actions/submit"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestActionWithMockedGitHub(t *testing.T) {
 	t.Run("creates PR for branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
-
-		// Initialize stackit by setting trunk in config
-		// The engine will read this when created
-		err = scene.Repo.RunGitCommand("config", "--local", "stackit.trunk", "main")
-		require.NoError(t, err)
-
-		// Create a feature branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-
-		// Track the branch in the engine
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "feature", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"feature": "main",
+			})
 
 		// Create a local remote to push to
-		_, err = scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Create mocked GitHub client
@@ -47,8 +29,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
 
 		// Create context with mocked client
-		ctx := runtime.NewContext(eng)
-		ctx.GitHubClient = githubClient
+		s.Context.GitHubClient = githubClient
 		opts := submit.Options{
 			DryRun: false, // We want to test actual PR creation
 			NoEdit: true,  // Skip interactive prompts
@@ -56,7 +37,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = submit.Action(ctx, opts)
+		err = submit.Action(s.Context, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was created in the mock
@@ -68,30 +49,13 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		// Skip this test for now - branch tracking issue needs to be resolved separately
 		t.Skip("Skipping due to branch tracking issue in test setup")
 
-		scene := testhelpers.NewScene(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
-
-		// Initialize stackit by setting trunk in config
-		err = scene.Repo.RunGitCommand("config", "--local", "stackit.trunk", "main")
-		require.NoError(t, err)
-
-		// Create a feature branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-
-		// Track the branch in the engine
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "feature", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"feature": "main",
+			})
 
 		// Create a local remote to push to
-		_, err = scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Create mocked GitHub client with existing PR
@@ -112,7 +76,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumber] = pr
 
 		// Store PR info in engine
-		err = eng.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
 			Number:  &prNumber,
 			Title:   prData.Title,
 			Body:    prData.Body,
@@ -121,15 +85,14 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create context with mocked client
-		ctx := runtime.NewContext(eng)
-		ctx.GitHubClient = githubClient
+		s.Context.GitHubClient = githubClient
 		opts := submit.Options{
 			DryRun: false,
 			NoEdit: true,
 		}
 
 		// With mocked client, push is skipped, so this should succeed
-		err = submit.Action(ctx, opts)
+		err = submit.Action(s.Context, opts)
 		require.NoError(t, err, "Submit should succeed with mocked GitHub client")
 
 		// Verify that PR was updated in the mock
@@ -140,56 +103,18 @@ func TestActionWithMockedGitHub(t *testing.T) {
 	})
 
 	t.Run("submits entire branching stack with --stack flag", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
-
-		// Initialize stackit
-		err = scene.Repo.RunGitCommand("config", "--local", "stackit.trunk", "main")
-		require.NoError(t, err)
-
-		// Create complex structure:
-		// main
-		// └── P
-		//     ├── C1
-		//     └── C2
-
-		err = scene.Repo.CreateAndCheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("P change", "p")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("C1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("C2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"P":  "main",
+				"C1": "P",
+				"C2": "P",
+			})
 
 		// Move back to P
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		// Track branches
-		err = eng.TrackBranch(context.Background(), "P", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C1", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C2", "P")
-		require.NoError(t, err)
+		s.Checkout("P")
 
 		// Create a local remote
-		_, err = scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Create mocked GitHub client
@@ -197,9 +122,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, mockConfig)
 		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, mockConfig)
 
-		ctx := runtime.NewContext(eng)
-		ctx.GitHubClient = githubClient
-		ctx.RepoRoot = scene.Dir
+		s.Context.GitHubClient = githubClient
 
 		// Submit with --stack flag from branch P
 		opts := submit.Options{
@@ -208,7 +131,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 			Draft:  true,
 		}
 
-		err = submit.Action(ctx, opts)
+		err = submit.Action(s.Context, opts)
 		require.NoError(t, err)
 
 		// Should have created 3 PRs: P, C1, and C2

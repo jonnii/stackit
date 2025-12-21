@@ -8,324 +8,199 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestTrackBranch(t *testing.T) {
 	t.Run("tracks branch with parent", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			// Create initial commit
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create feature branch
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.CreateBranch("feature").
+			Commit("feature change")
+		s.Checkout("main")
 
 		// Track branch
-		err = eng.TrackBranch(context.Background(), "feature", "main")
+		err := s.Engine.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Verify parent relationship
-		parent := eng.GetParent("feature")
+		parent := s.Engine.GetParent("feature")
 		require.Equal(t, "main", parent)
 
 		// Verify children relationship
-		children := eng.GetChildren("main")
+		children := s.Engine.GetChildren("main")
 		require.Contains(t, children, "feature")
 	})
 
 	t.Run("tracks branch with non-trunk parent", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		// Create both branches first, before creating engine
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine (will see both branches)
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		// Create both branches first
+		s.CreateBranch("branch1").
+			Commit("branch1 change").
+			CreateBranch("branch2").
+			Commit("branch2 change").
+			Checkout("main")
 
 		// Track branch1 first
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
+		err := s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
 		// Track branch2 (branch1 is now tracked and in the branch list)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Verify relationships
-		require.Equal(t, "main", eng.GetParent("branch1"))
-		require.Equal(t, "branch1", eng.GetParent("branch2"))
-		require.Contains(t, eng.GetChildren("main"), "branch1")
-		require.Contains(t, eng.GetChildren("branch1"), "branch2")
+		require.Equal(t, "main", s.Engine.GetParent("branch1"))
+		require.Equal(t, "branch1", s.Engine.GetParent("branch2"))
+		require.Contains(t, s.Engine.GetChildren("main"), "branch1")
+		require.Contains(t, s.Engine.GetChildren("branch1"), "branch2")
 	})
 
 	t.Run("fails when branch does not exist", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "nonexistent", "main")
+		err := s.Engine.TrackBranch(context.Background(), "nonexistent", "main")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "does not exist")
 	})
 
 	t.Run("fails when parent does not exist", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		// Create feature branch before creating engine
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		// Create engine (will see feature branch)
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		// Create feature branch
+		s.CreateBranch("feature").
+			Commit("feature change").
+			Checkout("main")
 
 		// Try to track with nonexistent parent - should fail
-		err = eng.TrackBranch(context.Background(), "feature", "nonexistent")
+		err := s.Engine.TrackBranch(context.Background(), "feature", "nonexistent")
 		require.Error(t, err)
-		// Error should mention the parent branch doesn't exist
 		require.Contains(t, err.Error(), "parent branch nonexistent does not exist")
 	})
 }
 
 func TestSetParent(t *testing.T) {
 	t.Run("updates parent relationship", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create all branches first
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.CreateBranch("branch1").
+			Commit("branch1 change").
+			CreateBranch("branch2").
+			Commit("branch2 change").
+			Checkout("branch1").
+			CreateBranch("branch3").
+			Commit("branch3 change").
+			Checkout("main")
 
 		// Track branches
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
+		err := s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Verify initial state
-		require.Equal(t, "branch1", eng.GetParent("branch2"))
+		require.Equal(t, "branch1", s.Engine.GetParent("branch2"))
 
 		// Change parent of branch2 to main
-		err = eng.SetParent(context.Background(), "branch2", "main")
+		err = s.Engine.SetParent(context.Background(), "branch2", "main")
 		require.NoError(t, err)
 
 		// Verify new parent
-		require.Equal(t, "main", eng.GetParent("branch2"))
-		require.Contains(t, eng.GetChildren("main"), "branch2")
-		require.NotContains(t, eng.GetChildren("branch1"), "branch2")
+		require.Equal(t, "main", s.Engine.GetParent("branch2"))
+		require.Contains(t, s.Engine.GetChildren("main"), "branch2")
+		require.NotContains(t, s.Engine.GetChildren("branch1"), "branch2")
 	})
 }
 
 func TestDeleteBranch(t *testing.T) {
 	t.Run("deletes branch and updates children", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create branch structure: main -> branch1 -> branch2, branch3
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.CreateBranch("branch1").
+			Commit("branch1 change").
+			CreateBranch("branch2").
+			Commit("branch2 change").
+			Checkout("branch1").
+			CreateBranch("branch3").
+			Commit("branch3 change").
+			Checkout("main")
 
 		// Track all branches
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
+		err := s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch3", "branch1")
 		require.NoError(t, err)
 
 		// Verify initial state
-		require.Contains(t, eng.GetChildren("branch1"), "branch2")
-		require.Contains(t, eng.GetChildren("branch1"), "branch3")
+		require.Contains(t, s.Engine.GetChildren("branch1"), "branch2")
+		require.Contains(t, s.Engine.GetChildren("branch1"), "branch3")
 
 		// Delete branch1
-		err = eng.DeleteBranch(context.Background(), "branch1")
+		err = s.Engine.DeleteBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 
 		// Verify branch1 is removed
-		require.False(t, eng.IsBranchTracked("branch1"))
-		require.NotContains(t, eng.AllBranchNames(), "branch1")
+		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.NotContains(t, s.Engine.AllBranchNames(), "branch1")
 
 		// Verify children now point to main
-		require.Equal(t, "main", eng.GetParent("branch2"))
-		require.Equal(t, "main", eng.GetParent("branch3"))
-		require.Contains(t, eng.GetChildren("main"), "branch2")
-		require.Contains(t, eng.GetChildren("main"), "branch3")
+		require.Equal(t, "main", s.Engine.GetParent("branch2"))
+		require.Equal(t, "main", s.Engine.GetParent("branch3"))
+		require.Contains(t, s.Engine.GetChildren("main"), "branch2")
+		require.Contains(t, s.Engine.GetChildren("main"), "branch3")
 	})
 
 	t.Run("deletes branch with multiple siblings and children", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create complex structure:
-		// main
-		// └── P
-		//     ├── C1
-		//     │   └── GC1
-		//     ├── C2
-		//     └── C3
-		//         └── GC3
-
-		err := scene.Repo.CreateAndCheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("P change", "p")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("C1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("GC1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("GC1 change", "gc1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("C2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("P")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("C3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("C3 change", "c3")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("GC3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("GC3 change", "gc3")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		// Track all branches
-		err = eng.TrackBranch(context.Background(), "P", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C1", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "GC1", "C1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C2", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "C3", "P")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "GC3", "C3")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"P":   "main",
+				"C1":  "P",
+				"GC1": "C1",
+				"C2":  "P",
+				"C3":  "P",
+				"GC3": "C3",
+			})
 
 		// Verify initial parent of children is P
-		require.Equal(t, "P", eng.GetParent("C1"))
-		require.Equal(t, "P", eng.GetParent("C2"))
-		require.Equal(t, "P", eng.GetParent("C3"))
+		require.Equal(t, "P", s.Engine.GetParent("C1"))
+		require.Equal(t, "P", s.Engine.GetParent("C2"))
+		require.Equal(t, "P", s.Engine.GetParent("C3"))
 
 		// Delete P
-		err = eng.DeleteBranch(context.Background(), "P")
+		err := s.Engine.DeleteBranch(context.Background(), "P")
 		require.NoError(t, err)
 
 		// Verify P is removed
-		require.False(t, eng.IsBranchTracked("P"))
+		require.False(t, s.Engine.IsBranchTracked("P"))
 
 		// Verify all direct children of P now point to main
-		require.Equal(t, "main", eng.GetParent("C1"))
-		require.Equal(t, "main", eng.GetParent("C2"))
-		require.Equal(t, "main", eng.GetParent("C3"))
+		require.Equal(t, "main", s.Engine.GetParent("C1"))
+		require.Equal(t, "main", s.Engine.GetParent("C2"))
+		require.Equal(t, "main", s.Engine.GetParent("C3"))
 
 		// Verify grandchildren still point to their parents
-		require.Equal(t, "C1", eng.GetParent("GC1"))
-		require.Equal(t, "C3", eng.GetParent("GC3"))
+		require.Equal(t, "C1", s.Engine.GetParent("GC1"))
+		require.Equal(t, "C3", s.Engine.GetParent("GC3"))
 
 		// Verify main's children list contains C1, C2, C3
-		mainChildren := eng.GetChildren("main")
+		mainChildren := s.Engine.GetChildren("main")
 		require.Contains(t, mainChildren, "C1")
 		require.Contains(t, mainChildren, "C2")
 		require.Contains(t, mainChildren, "C3")
 	})
 
 	t.Run("fails when trying to delete trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.DeleteBranch(context.Background(), "main")
+		err := s.Engine.DeleteBranch(context.Background(), "main")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot delete trunk")
 	})
@@ -333,136 +208,53 @@ func TestDeleteBranch(t *testing.T) {
 
 func TestGetRelativeStack(t *testing.T) {
 	t.Run("returns downstack (ancestors) excluding trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create: main -> branch1 -> branch2
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
 
 		// Get downstack from branch2 - should NOT include trunk (main)
 		scope := engine.Scope{RecursiveParents: true}
-		stack := eng.GetRelativeStack("branch2", scope)
+		stack := s.Engine.GetRelativeStack("branch2", scope)
 		require.Equal(t, []string{"branch1"}, stack)
 		require.NotContains(t, stack, "main", "trunk should not be included in ancestors")
 	})
 
 	t.Run("returns upstack (descendants)", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create: main -> branch1 -> branch2, branch3
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+				"branch3": "branch1",
+			})
 
 		// Get upstack from branch1
 		scope := engine.Scope{RecursiveChildren: true}
-		stack := eng.GetRelativeStack("branch1", scope)
+		stack := s.Engine.GetRelativeStack("branch1", scope)
 		require.Contains(t, stack, "branch2")
 		require.Contains(t, stack, "branch3")
 		require.Len(t, stack, 2)
 	})
 
 	t.Run("returns only current branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		scope := engine.Scope{IncludeCurrent: true}
-		stack := eng.GetRelativeStack("branch1", scope)
+		stack := s.Engine.GetRelativeStack("branch1", scope)
 		require.Equal(t, []string{"branch1"}, stack)
 	})
 
 	t.Run("returns full stack (downstack + current + upstack) excluding trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create: main -> branch1 -> branch2 -> branch3
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch2")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+				"branch3": "branch2",
+			})
 
 		// Get full stack from branch2 - should NOT include trunk (main)
 		scope := engine.Scope{
@@ -470,7 +262,7 @@ func TestGetRelativeStack(t *testing.T) {
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := eng.GetRelativeStack("branch2", scope)
+		stack := s.Engine.GetRelativeStack("branch2", scope)
 		require.NotContains(t, stack, "main", "trunk should not be included in ancestors")
 		require.Contains(t, stack, "branch1")
 		require.Contains(t, stack, "branch2")
@@ -479,57 +271,17 @@ func TestGetRelativeStack(t *testing.T) {
 	})
 
 	t.Run("returns branching stacks in DFS order (parents before children)", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create branching structure:
-		// main
-		// ├── stackA
-		// │   └── stackA-child
-		// └── stackB
-		//     └── stackB-child
-
-		err := scene.Repo.CreateAndCheckoutBranch("stackA")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackA change", "sA")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("stackA-child")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackA-child change", "sAc")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("stackB")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackB change", "sB")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("stackB-child")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("stackB-child change", "sBc")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "stackA", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackA-child", "stackA")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackB", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "stackB-child", "stackB")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"stackA":       "main",
+				"stackA-child": "stackA",
+				"stackB":       "main",
+				"stackB-child": "stackB",
+			})
 
 		// Get all descendants from trunk
 		scope := engine.Scope{RecursiveChildren: true}
-		stack := eng.GetRelativeStack("main", scope)
+		stack := s.Engine.GetRelativeStack("main", scope)
 
 		// Should have all 4 branches
 		require.Len(t, stack, 4)
@@ -561,87 +313,45 @@ func indexOf(slice []string, item string) int {
 
 func TestRestackBranch(t *testing.T) {
 	t.Run("restacks branch when parent has moved", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create branch1
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		// Create branch2 on top of branch1
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		// Track branches
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
 
 		// Add commit to main (parent moves forward)
-		err = scene.Repo.CreateChangeAndCommit("main update", "main")
-		require.NoError(t, err)
+		s.Checkout("main").
+			Commit("main update")
 
 		// Restack branch1 (should rebase onto new main)
-		result, err := eng.RestackBranch(context.Background(), "branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackDone, result.Result)
 
 		// Verify branch1 is now fixed
-		require.True(t, eng.IsBranchFixed(context.Background(), "branch1"))
+		require.True(t, s.Engine.IsBranchFixed(context.Background(), "branch1"))
 	})
 
 	t.Run("returns unneeded when branch is already fixed", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Branch is already fixed (no changes to main)
-		result, err := eng.RestackBranch(context.Background(), "branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 	})
 
 	t.Run("returns error when branch is not tracked", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
 		// Don't track the branch
-		result, err := eng.RestackBranch(context.Background(), "branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
 		require.Error(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 		require.Contains(t, err.Error(), "not tracked")
@@ -650,165 +360,96 @@ func TestRestackBranch(t *testing.T) {
 
 func TestRebuild(t *testing.T) {
 	t.Run("rebuilds cache from Git state", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		// Create and track branches
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Verify initial state
-		require.Contains(t, eng.AllBranchNames(), "branch1")
-		require.Equal(t, "main", eng.GetParent("branch1"))
+		require.Contains(t, s.Engine.AllBranchNames(), "branch1")
+		require.Equal(t, "main", s.Engine.GetParent("branch1"))
 
 		// Create new branch externally (not tracked)
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
+		s.CreateBranch("branch2").
+			Commit("branch2 change").
+			Checkout("main")
 
 		// Rebuild should pick up new branch
-		err = eng.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild(context.Background(), "main")
 		require.NoError(t, err)
 
 		// New branch should be in list
-		require.Contains(t, eng.AllBranchNames(), "branch2")
+		require.Contains(t, s.Engine.AllBranchNames(), "branch2")
 		// But not tracked yet
-		require.False(t, eng.IsBranchTracked("branch2"))
+		require.False(t, s.Engine.IsBranchTracked("branch2"))
 	})
 }
 
 func TestIsBranchTracked(t *testing.T) {
 	t.Run("returns true for tracked branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
+		require.False(t, s.Engine.IsBranchTracked("branch1"))
 
-		eng, err := engine.NewEngine(scene.Dir)
+		err := s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
-		require.False(t, eng.IsBranchTracked("branch1"))
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-
-		require.True(t, eng.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.IsBranchTracked("branch1"))
 	})
 
 	t.Run("returns false for untracked branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		require.False(t, eng.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.IsBranchTracked("branch1"))
 	})
 }
 
 func TestIsTrunk(t *testing.T) {
 	t.Run("returns true for trunk branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		require.True(t, eng.IsTrunk("main"))
-		require.False(t, eng.IsTrunk("other"))
+		require.True(t, s.Engine.IsTrunk("main"))
+		require.False(t, s.Engine.IsTrunk("other"))
 	})
 }
 
 func TestGetParentPrecondition(t *testing.T) {
 	t.Run("returns parent when exists", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-
-		parent := eng.GetParentPrecondition("branch1")
+		parent := s.Engine.GetParentPrecondition("branch1")
 		require.Equal(t, "main", parent)
 	})
 
 	t.Run("returns trunk when no parent", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
 		// Don't track branch1
-		parent := eng.GetParentPrecondition("branch1")
+		parent := s.Engine.GetParentPrecondition("branch1")
 		require.Equal(t, "main", parent) // Should return trunk
 	})
 }
 
 func TestIsMergedIntoTrunk(t *testing.T) {
 	t.Run("returns false for unmerged branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		merged, err := eng.IsMergedIntoTrunk(context.Background(), "branch1")
+		merged, err := s.Engine.IsMergedIntoTrunk(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.False(t, merged)
 	})
@@ -816,40 +457,22 @@ func TestIsMergedIntoTrunk(t *testing.T) {
 
 func TestIsBranchEmpty(t *testing.T) {
 	t.Run("returns false for branch with changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			CommitChange("file1", "branch1 change").
+			Checkout("main")
 
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		empty, err := eng.IsBranchEmpty(context.Background(), "branch1")
+		empty, err := s.Engine.IsBranchEmpty(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.False(t, empty)
 	})
 
 	t.Run("returns true for branch with no changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Checkout("main")
 
-		// Create branch but don't make any changes
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		empty, err := eng.IsBranchEmpty(context.Background(), "branch1")
+		empty, err := s.Engine.IsBranchEmpty(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.True(t, empty)
 	})
@@ -857,22 +480,10 @@ func TestIsBranchEmpty(t *testing.T) {
 
 func TestUpsertPrInfo(t *testing.T) {
 	t.Run("creates PR info for branch", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		prNumber := 123
 		prInfo := &engine.PrInfo{
@@ -885,11 +496,11 @@ func TestUpsertPrInfo(t *testing.T) {
 			URL:     "https://github.com/owner/repo/pull/123",
 		}
 
-		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify PR info
-		retrieved, err := eng.GetPrInfo(context.Background(), "branch1")
+		retrieved, err := s.Engine.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, prNumber, *retrieved.Number)
@@ -899,22 +510,10 @@ func TestUpsertPrInfo(t *testing.T) {
 	})
 
 	t.Run("updates existing PR info", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		prNumber := 123
 		prInfo := &engine.PrInfo{
@@ -923,17 +522,17 @@ func TestUpsertPrInfo(t *testing.T) {
 			IsDraft: false,
 		}
 
-		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Update PR info
 		prInfo.Title = "Updated Title"
 		prInfo.Body = "Updated body"
-		err = eng.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err = s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify updated PR info
-		retrieved, err := eng.GetPrInfo(context.Background(), "branch1")
+		retrieved, err := s.Engine.GetPrInfo(context.Background(), "branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, "Updated Title", retrieved.Title)
@@ -943,41 +542,14 @@ func TestUpsertPrInfo(t *testing.T) {
 
 func TestGetRelativeStackUpstack(t *testing.T) {
 	t.Run("returns all descendants", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+				"branch3": "branch1",
+			})
 
-		// Create: main -> branch1 -> branch2, branch3
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "b2")
-		require.NoError(t, err)
-
-		err = scene.Repo.CheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateAndCheckoutBranch("branch3")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch3 change", "b3")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch3", "branch1")
-		require.NoError(t, err)
-
-		upstack := eng.GetRelativeStackUpstack("branch1")
+		upstack := s.Engine.GetRelativeStackUpstack("branch1")
 		require.Contains(t, upstack, "branch2")
 		require.Contains(t, upstack, "branch3")
 		require.Len(t, upstack, 2)
@@ -987,60 +559,36 @@ func TestGetRelativeStackUpstack(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	t.Run("resets engine with new trunk", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Reset with same trunk
-		err = eng.Reset(context.Background(), "main")
+		err := s.Engine.Reset(context.Background(), "main")
 		require.NoError(t, err)
 
 		// Branch should still exist but not be tracked
-		require.Contains(t, eng.AllBranchNames(), "branch1")
-		require.False(t, eng.IsBranchTracked("branch1"))
+		require.Contains(t, s.Engine.AllBranchNames(), "branch1")
+		require.False(t, s.Engine.IsBranchTracked("branch1"))
 	})
 }
 
 func TestConcurrentAccess(t *testing.T) {
 	t.Run("handles concurrent reads safely", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
 
 		// Concurrent reads should be safe
 		done := make(chan bool, 10)
 		for i := 0; i < 10; i++ {
 			go func() {
-				_ = eng.GetParent("branch1")
-				_ = eng.GetChildren("main")
-				_ = eng.IsBranchTracked("branch1")
-				_ = eng.AllBranchNames()
+				_ = s.Engine.GetParent("branch1")
+				_ = s.Engine.GetChildren("main")
+				_ = s.Engine.IsBranchTracked("branch1")
+				_ = s.Engine.AllBranchNames()
 				done <- true
 			}()
 		}
@@ -1054,152 +602,119 @@ func TestConcurrentAccess(t *testing.T) {
 
 func TestBranchMatchesRemote(t *testing.T) {
 	t.Run("returns true when branch matches remote", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote
-		_, err := scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Push main first
-		err = scene.Repo.PushBranch("origin", "main")
+		err = s.Scene.Repo.PushBranch("origin", "main")
 		require.NoError(t, err)
 
 		// Create and push a branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
+		s.CreateBranch("feature").
+			Commit("feature change")
+		err = s.Scene.Repo.PushBranch("origin", "feature")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.PushBranch("origin", "feature")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should match remote
-		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.True(t, matches, "branch should match remote after push")
 	})
 
 	t.Run("returns false when branch has local changes", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote
-		_, err := scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Push main first
-		err = scene.Repo.PushBranch("origin", "main")
+		err = s.Scene.Repo.PushBranch("origin", "main")
 		require.NoError(t, err)
 
 		// Create and push a branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.PushBranch("origin", "feature")
+		s.CreateBranch("feature").
+			Commit("feature change")
+		err = s.Scene.Repo.PushBranch("origin", "feature")
 		require.NoError(t, err)
 
 		// Make local change (not pushed)
-		err = scene.Repo.CreateChangeAndCommit("local change", "local")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Commit("local change").
+			Checkout("main")
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local has extra commit)
-		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote with local changes")
 	})
 
 	t.Run("returns false when branch does not exist on remote", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote
-		_, err := scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Push main (but not feature)
-		err = scene.Repo.PushBranch("origin", "main")
+		err = s.Scene.Repo.PushBranch("origin", "main")
 		require.NoError(t, err)
 
 		// Create a branch locally but don't push it
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.CreateBranch("feature").
+			Commit("feature change").
+			Checkout("main")
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (doesn't exist on remote)
-		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match when it doesn't exist on remote")
 	})
 
 	t.Run("returns false after amend (branch diverged)", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote
-		_, err := scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Push main first
-		err = scene.Repo.PushBranch("origin", "main")
+		err = s.Scene.Repo.PushBranch("origin", "main")
 		require.NoError(t, err)
 
 		// Create and push a branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "feat")
-		require.NoError(t, err)
-		err = scene.Repo.PushBranch("origin", "feature")
+		s.CreateBranch("feature").
+			Commit("feature change")
+		err = s.Scene.Repo.PushBranch("origin", "feature")
 		require.NoError(t, err)
 
 		// Amend the commit locally (simulates squash or rebase)
-		err = scene.Repo.CreateChangeAndAmend("amended change", "amended")
+		err = s.Scene.Repo.CreateChangeAndAmend("amended change", "amended")
 		require.NoError(t, err)
 
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local was amended)
-		matches, err := eng.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote after amend")
 	})
@@ -1207,70 +722,54 @@ func TestBranchMatchesRemote(t *testing.T) {
 
 func TestPopulateRemoteShas(t *testing.T) {
 	t.Run("populates SHAs for all remote branches", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote
-		_, err := scene.Repo.CreateBareRemote("origin")
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Push main
-		err = scene.Repo.PushBranch("origin", "main")
+		err = s.Scene.Repo.PushBranch("origin", "main")
 		require.NoError(t, err)
 
 		// Create and push multiple branches - checkout main between each
-		err = scene.Repo.CreateAndCheckoutBranch("feature1")
+		s.CreateBranch("feature1").
+			Commit("feature1 change")
+		err = s.Scene.Repo.PushBranch("origin", "feature1")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature1 change", "f1")
-		require.NoError(t, err)
-		err = scene.Repo.PushBranch("origin", "feature1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
+		s.Checkout("main")
 
-		err = scene.Repo.CreateAndCheckoutBranch("feature2")
+		s.CreateBranch("feature2").
+			Commit("feature2 change")
+		err = s.Scene.Repo.PushBranch("origin", "feature2")
 		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature2 change", "f2")
-		require.NoError(t, err)
-		err = scene.Repo.PushBranch("origin", "feature2")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// All branches should match remote
 		for _, branch := range []string{"main", "feature1", "feature2"} {
-			matches, err := eng.BranchMatchesRemote(context.Background(), branch)
+			matches, err := s.Engine.BranchMatchesRemote(context.Background(), branch)
 			require.NoError(t, err)
 			require.True(t, matches, "branch %s should match remote", branch)
 		}
 	})
 
 	t.Run("handles empty remote gracefully", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create a bare remote but don't push anything
-		_, err := scene.Repo.CreateBareRemote("origin")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
 		require.NoError(t, err)
 
 		// Populate should not fail
-		err = eng.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas(context.Background())
 		require.NoError(t, err)
 
 		// Branches should not match (nothing on remote)
-		matches, err := eng.BranchMatchesRemote(context.Background(), "main")
+		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "main")
 		require.NoError(t, err)
 		require.False(t, matches, "main should not match empty remote")
 	})
@@ -1278,252 +777,192 @@ func TestPopulateRemoteShas(t *testing.T) {
 
 func TestEdgeCases(t *testing.T) {
 	t.Run("handles branch with no parent gracefully", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
-
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "b1")
-		require.NoError(t, err)
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			CreateBranch("branch1").
+			Commit("branch1 change").
+			Checkout("main")
 
 		// Branch exists but not tracked
-		parent := eng.GetParent("branch1")
+		parent := s.Engine.GetParent("branch1")
 		require.Empty(t, parent)
 
 		// GetParentPrecondition should return trunk
-		parent = eng.GetParentPrecondition("branch1")
+		parent = s.Engine.GetParentPrecondition("branch1")
 		require.Equal(t, "main", parent)
 	})
 
 	t.Run("handles multiple children correctly", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create multiple branches from main
 		branchNames := []string{"branch1", "branch2", "branch3", "branch4", "branch5"}
 		for _, branchName := range branchNames {
-			err := scene.Repo.CreateAndCheckoutBranch(branchName)
-			require.NoError(t, err)
-			err = scene.Repo.CreateChangeAndCommit(branchName+" change", branchName)
-			require.NoError(t, err)
-			err = scene.Repo.CheckoutBranch("main")
-			require.NoError(t, err)
+			s.CreateBranch(branchName).
+				Commit(branchName + " change").
+				Checkout("main")
 		}
-
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
 
 		// Track all branches
 		for _, branchName := range branchNames {
-			err = eng.TrackBranch(context.Background(), branchName, "main")
+			err := s.Engine.TrackBranch(context.Background(), branchName, "main")
 			require.NoError(t, err)
 		}
 
 		// Verify all are children of main
-		children := eng.GetChildren("main")
+		children := s.Engine.GetChildren("main")
 		require.Len(t, children, 5)
 	})
 }
 
 func TestDetachAndResetBranchChanges(t *testing.T) {
 	t.Run("detaches and soft resets to parent merge base", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			// Create initial commit on main with a file we'll modify
-			return s.Repo.CreateChangeAndCommit("initial content", "shared")
-		})
+		s := scenario.NewScenario(t, nil)
+		err := s.Scene.Repo.CreateChangeAndCommit("initial content", "shared")
+		require.NoError(t, err)
 
 		// Create feature branch that modifies the existing file
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		// Modify the same file (shared_test.txt) that exists on main
-		err = scene.Repo.CreateChangeAndCommit("feature content", "shared")
+		s.CreateBranch("feature")
+		err = s.Scene.Repo.CreateChangeAndCommit("feature content", "shared")
 		require.NoError(t, err)
 
 		// Get the main branch commit (merge base)
-		mainCommit, err := scene.Repo.GetRevision("main")
-		require.NoError(t, err)
+		mainCommit, _ := s.Scene.Repo.GetRevision("main")
 
-		// Create engine and track branch
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "feature", "main")
+		// Track branch
+		err = s.Engine.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
+		err = s.Engine.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify HEAD is detached
-		currentBranch := eng.CurrentBranch()
+		currentBranch := s.Engine.CurrentBranch()
 		require.Empty(t, currentBranch, "should be in detached HEAD state")
 
 		// Verify we're at the merge base commit
-		headCommit, err := scene.Repo.GetRevision("HEAD")
-		require.NoError(t, err)
+		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")
 		require.Equal(t, mainCommit, headCommit, "HEAD should be at parent merge base")
 
 		// Verify the feature changes are now unstaged (modified tracked file)
-		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
-		require.NoError(t, err)
+		hasUnstaged, _ := s.Scene.Repo.HasUnstagedChanges()
 		require.True(t, hasUnstaged, "feature changes should appear as unstaged")
 	})
 
 	t.Run("works with multi-commit branch modifying same file", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "shared")
-		})
+		s := scenario.NewScenario(t, nil)
+		err := s.Scene.Repo.CreateChangeAndCommit("initial", "shared")
+		require.NoError(t, err)
 
 		// Create feature branch with multiple commits modifying the same file
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("commit 1", "shared")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("commit 2", "shared")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("commit 3", "shared")
-		require.NoError(t, err)
+		s.CreateBranch("feature").
+			CommitChange("shared", "commit 1").
+			CommitChange("shared", "commit 2").
+			CommitChange("shared", "commit 3")
 
 		// Get main commit
-		mainCommit, err := scene.Repo.GetRevision("main")
-		require.NoError(t, err)
+		mainCommit, _ := s.Scene.Repo.GetRevision("main")
 
-		// Create engine and track branch
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "feature", "main")
+		// Track branch
+		err = s.Engine.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
+		err = s.Engine.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify we're at main
-		headCommit, err := scene.Repo.GetRevision("HEAD")
-		require.NoError(t, err)
+		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")
 		require.Equal(t, mainCommit, headCommit)
 
 		// Verify changes are unstaged
-		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
-		require.NoError(t, err)
+		hasUnstaged, _ := s.Scene.Repo.HasUnstagedChanges()
 		require.True(t, hasUnstaged)
 	})
 
 	t.Run("works with stacked branches", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "shared")
-		})
+		s := scenario.NewScenario(t, nil)
+		err := s.Scene.Repo.CreateChangeAndCommit("initial", "shared")
+		require.NoError(t, err)
 
 		// Create branch1 on main
-		err := scene.Repo.CreateAndCheckoutBranch("branch1")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch1 change", "shared")
-		require.NoError(t, err)
+		s.CreateBranch("branch1").
+			CommitChange("shared", "branch1 change")
 
 		// Get branch1 commit (this will be the merge base for branch2)
-		branch1Commit, err := scene.Repo.GetRevision("branch1")
-		require.NoError(t, err)
+		branch1Commit, _ := s.Scene.Repo.GetRevision("branch1")
 
 		// Create branch2 on branch1
-		err = scene.Repo.CreateAndCheckoutBranch("branch2")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("branch2 change", "shared")
-		require.NoError(t, err)
+		s.CreateBranch("branch2").
+			CommitChange("shared", "branch2 change")
 
-		// Create engine and track branches
-		eng, err := engine.NewEngine(scene.Dir)
+		// Track branches
+		err = s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch1", "main")
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "branch2", "branch1")
+		err = s.Engine.TrackBranch(context.Background(), "branch2", "branch1")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges on branch2
-		err = eng.DetachAndResetBranchChanges(context.Background(), "branch2")
+		err = s.Engine.DetachAndResetBranchChanges(context.Background(), "branch2")
 		require.NoError(t, err)
 
 		// Verify we're at branch1's commit (the parent)
-		headCommit, err := scene.Repo.GetRevision("HEAD")
-		require.NoError(t, err)
+		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")
 		require.Equal(t, branch1Commit, headCommit, "HEAD should be at branch1 (parent of branch2)")
 
 		// Verify branch2 changes are unstaged
-		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
-		require.NoError(t, err)
+		hasUnstaged, _ := s.Scene.Repo.HasUnstagedChanges()
 		require.True(t, hasUnstaged)
 	})
 
 	t.Run("handles untracked branch using trunk as parent", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "shared")
-		})
+		s := scenario.NewScenario(t, nil)
+		err := s.Scene.Repo.CreateChangeAndCommit("initial", "shared")
+		require.NoError(t, err)
 
 		// Create feature branch (not tracked)
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature change", "shared")
-		require.NoError(t, err)
+		s.CreateBranch("feature").
+			CommitChange("shared", "feature change")
 
-		mainCommit, err := scene.Repo.GetRevision("main")
-		require.NoError(t, err)
-
-		// Create engine but don't track the branch
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
+		mainCommit, _ := s.Scene.Repo.GetRevision("main")
 
 		// Call DetachAndResetBranchChanges without tracking
-		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
+		err = s.Engine.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Should use trunk (main) as the parent
-		headCommit, err := scene.Repo.GetRevision("HEAD")
-		require.NoError(t, err)
+		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")
 		require.Equal(t, mainCommit, headCommit, "should use trunk as parent for untracked branch")
 
 		// Verify changes are unstaged
-		hasUnstaged, err := scene.Repo.HasUnstagedChanges()
-		require.NoError(t, err)
+		hasUnstaged, _ := s.Scene.Repo.HasUnstagedChanges()
 		require.True(t, hasUnstaged)
 	})
 
 	t.Run("handles new files as untracked", func(t *testing.T) {
-		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
-			return s.Repo.CreateChangeAndCommit("initial", "init")
-		})
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Create feature branch with a NEW file (doesn't exist on main)
-		err := scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("new file content", "newfile")
-		require.NoError(t, err)
-
-		mainCommit, err := scene.Repo.GetRevision("main")
+		s.CreateBranch("feature")
+		err := s.Scene.Repo.CreateChangeAndCommit("new file content", "newfile")
 		require.NoError(t, err)
 
-		// Create engine and track branch
-		eng, err := engine.NewEngine(scene.Dir)
-		require.NoError(t, err)
-		err = eng.TrackBranch(context.Background(), "feature", "main")
+		mainCommit, _ := s.Scene.Repo.GetRevision("main")
+
+		// Track branch
+		err = s.Engine.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
 		// Call DetachAndResetBranchChanges
-		err = eng.DetachAndResetBranchChanges(context.Background(), "feature")
+		err = s.Engine.DetachAndResetBranchChanges(context.Background(), "feature")
 		require.NoError(t, err)
 
 		// Verify we're at main
-		headCommit, err := scene.Repo.GetRevision("HEAD")
-		require.NoError(t, err)
+		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")
 		require.Equal(t, mainCommit, headCommit)
 
 		// New files should appear as untracked (not unstaged)
-		hasUntracked, err := scene.Repo.HasUntrackedFiles()
-		require.NoError(t, err)
+		hasUntracked, _ := s.Scene.Repo.HasUntrackedFiles()
 		require.True(t, hasUntracked, "new files should appear as untracked")
 	})
 }

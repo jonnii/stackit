@@ -1,12 +1,13 @@
 package cli_test
 
 import (
-	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/testhelpers"
+	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestLogCommand(t *testing.T) {
@@ -16,115 +17,71 @@ func TestLogCommand(t *testing.T) {
 
 	t.Run("log in empty repo", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
+		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
 
 		// Run log command
-		cmd := exec.Command(binaryPath, "log")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
+		output, err := s.RunCliAndGetOutput("log")
 
 		// Should succeed and show trunk branch
-		require.NoError(t, err, "log command failed: %s", string(output))
-		require.Contains(t, string(output), "main")
+		require.NoError(t, err, "log command failed: %s", output)
+		require.Contains(t, output, "main")
 	})
 
 	t.Run("log with branches", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
+		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
 
 		// Create a branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
-		err = scene.Repo.CreateChangeAndCommit("feature commit", "feature")
-		require.NoError(t, err)
+		s.CreateBranch("feature").
+			CommitChange("feature", "feature commit")
 
 		// Checkout main
-		err = scene.Repo.CheckoutBranch("main")
-		require.NoError(t, err)
+		s.Checkout("main")
 
 		// Run log command with --show-untracked to see untracked branches
-		cmd := exec.Command(binaryPath, "log", "--show-untracked")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
+		output, err := s.RunCliAndGetOutput("log", "--show-untracked")
 
-		require.NoError(t, err, "log command failed: %s", string(output))
-		require.Contains(t, string(output), "main")
-		require.Contains(t, string(output), "feature")
+		require.NoError(t, err, "log command failed: %s", output)
+		require.Contains(t, output, "main")
+		require.Contains(t, output, "feature")
 	})
 
 	t.Run("log with --reverse flag", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
+		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
 
 		// Run log command with reverse
-		cmd := exec.Command(binaryPath, "log", "--reverse")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
+		output, err := s.RunCliAndGetOutput("log", "--reverse")
 
-		require.NoError(t, err, "log command failed: %s", string(output))
-		require.Contains(t, string(output), "main")
+		require.NoError(t, err, "log command failed: %s", output)
+		require.Contains(t, output, "main")
 	})
 
 	t.Run("log with --stack flag", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
+		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
 
 		// Create and checkout a branch
-		err = scene.Repo.CreateAndCheckoutBranch("feature")
-		require.NoError(t, err)
+		s.CreateBranch("feature")
 
 		// Run log command with stack
-		cmd := exec.Command(binaryPath, "log", "--stack")
-		cmd.Dir = scene.Dir
-		output, err := cmd.CombinedOutput()
+		output, err := s.RunCliAndGetOutput("log", "--stack")
 
-		require.NoError(t, err, "log command failed: %s", string(output))
-		require.Contains(t, string(output), "feature")
+		require.NoError(t, err, "log command failed: %s", output)
+		require.Contains(t, output, "feature")
 	})
 
 	t.Run("log subcommands and top-level aliases", func(t *testing.T) {
 		t.Parallel()
-		scene := testhelpers.NewSceneParallel(t, nil)
-
-		// Create initial commit
-		err := scene.Repo.CreateChangeAndCommit("initial", "init")
-		require.NoError(t, err)
+		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
 
 		commands := []string{"log short", "log long", "ls", "ll", "log ls", "log ll"}
 		for _, cmdStr := range commands {
 			t.Run(cmdStr, func(t *testing.T) {
-				args := append([]string{}, cmdStr)
-				// If cmdStr has a space, split it
-				_ = args
-
-				var cmd *exec.Cmd
-				if len(cmdStr) > 3 && cmdStr[:3] == "log" {
-					parts := append([]string{}, "log", cmdStr[4:])
-					cmd = exec.Command(binaryPath, parts...)
-				} else {
-					cmd = exec.Command(binaryPath, cmdStr)
-				}
-
-				cmd.Dir = scene.Dir
-				output, err := cmd.CombinedOutput()
-				require.NoError(t, err, "%s command failed: %s", cmdStr, string(output))
-				require.Contains(t, string(output), "main")
+				args := strings.Fields(cmdStr)
+				output, err := s.RunCliAndGetOutput(args...)
+				require.NoError(t, err, "%s command failed: %s", cmdStr, output)
+				require.Contains(t, output, "main")
 			})
 		}
 	})

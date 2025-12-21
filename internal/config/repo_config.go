@@ -18,6 +18,7 @@ type RepoConfig struct {
 	BranchNamePattern          *string  `json:"branchNamePattern,omitempty"`
 	CreateAI                   *bool    `json:"create.ai,omitempty"`
 	SubmitFooter               *bool    `json:"submit.footer,omitempty"`
+	UndoStackDepth             *int     `json:"undo.stackDepth,omitempty"`
 }
 
 // GetRepoConfig reads the repository configuration
@@ -265,6 +266,45 @@ func SetSubmitFooter(repoRoot string, enabled bool) error {
 	}
 
 	config.SubmitFooter = &enabled
+
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return os.WriteFile(configPath, configJSON, 0600)
+}
+
+// GetUndoStackDepth returns the maximum number of undo snapshots to keep, or 10 by default
+func GetUndoStackDepth(repoRoot string) (int, error) {
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		return 10, err
+	}
+
+	if config.UndoStackDepth != nil {
+		return *config.UndoStackDepth, nil
+	}
+
+	// Default to 10
+	return 10, nil
+}
+
+// SetUndoStackDepth updates the undo.stackDepth configuration
+func SetUndoStackDepth(repoRoot string, depth int) error {
+	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
+
+	// Validate repo root exists
+	if _, err := os.Stat(repoRoot); err != nil {
+		return fmt.Errorf("repository root does not exist: %w", err)
+	}
+
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		config = &RepoConfig{}
+	}
+
+	config.UndoStackDepth = &depth
 
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

@@ -22,7 +22,9 @@ Examples:
   stackit config get branch-name-pattern
   stackit config set branch-name-pattern "{username}/{date}/{message}"
   stackit config get create.ai
-  stackit config set create.ai true`,
+  stackit config set create.ai true
+  stackit config get submit.footer
+  stackit config set submit.footer false`,
 	}
 
 	cmd.AddCommand(newConfigGetCmd())
@@ -60,6 +62,12 @@ func newConfigGetCmd() *cobra.Command {
 				enabled, err := config.GetCreateAI(repoRoot)
 				if err != nil {
 					return fmt.Errorf("failed to get create.ai: %w", err)
+				}
+				fmt.Println(enabled)
+			case "submit.footer":
+				enabled, err := config.GetSubmitFooter(repoRoot)
+				if err != nil {
+					return fmt.Errorf("failed to get submit.footer: %w", err)
 				}
 				fmt.Println(enabled)
 			default:
@@ -110,6 +118,15 @@ func newConfigSetCmd() *cobra.Command {
 					return fmt.Errorf("failed to set create.ai: %w", err)
 				}
 				splog.Info("Set create.ai to: %v", enabled)
+			case "submit.footer":
+				enabled, err := strconv.ParseBool(value)
+				if err != nil {
+					return fmt.Errorf("invalid value for submit.footer: %s (must be 'true' or 'false')", value)
+				}
+				if err := config.SetSubmitFooter(repoRoot, enabled); err != nil {
+					return fmt.Errorf("failed to set submit.footer: %w", err)
+				}
+				splog.Info("Set submit.footer to: %v", enabled)
 			default:
 				return fmt.Errorf("unknown configuration key: %s", key)
 			}

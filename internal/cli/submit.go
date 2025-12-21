@@ -76,7 +76,7 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 	}
 
 	// Run submit action
-	return submit.Action(ctx, submit.Options{
+	opts := submit.Options{
 		Branch:               f.branch,
 		Stack:                f.stack,
 		Force:                f.force,
@@ -103,7 +103,9 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 		TargetTrunk:          f.targetTrunk,
 		IgnoreOutOfSyncTrunk: f.ignoreOutOfSyncTrunk,
 		AI:                   f.ai,
-	})
+	}
+
+	return submit.Action(ctx, opts)
 }
 
 // newSubmitCmd creates the submit command

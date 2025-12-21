@@ -371,4 +371,70 @@ func TestConfigCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "false", strings.TrimSpace(string(output)))
 	})
+
+	t.Run("config get submit.footer returns true by default", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
+
+		// Create initial commit
+		err := scene.Repo.CreateChangeAndCommit("initial", "init")
+		require.NoError(t, err)
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		err = cmd.Run()
+		require.NoError(t, err)
+
+		// Get submit.footer (should return true by default)
+		cmd = exec.Command(binaryPath, "config", "get", "submit.footer")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "config get command failed: %s", string(output))
+
+		// Should return true
+		require.Equal(t, "true", strings.TrimSpace(string(output)))
+	})
+
+	t.Run("config set and get submit.footer", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, nil)
+
+		// Create initial commit
+		err := scene.Repo.CreateChangeAndCommit("initial", "init")
+		require.NoError(t, err)
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		err = cmd.Run()
+		require.NoError(t, err)
+
+		// Set submit.footer to false
+		cmd = exec.Command(binaryPath, "config", "set", "submit.footer", "false")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "config set command failed: %s", string(output))
+		require.Contains(t, string(output), "Set submit.footer to:")
+
+		// Get submit.footer back
+		cmd = exec.Command(binaryPath, "config", "get", "submit.footer")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "config get command failed: %s", string(output))
+		require.Equal(t, "false", strings.TrimSpace(string(output)))
+
+		// Set submit.footer to true
+		cmd = exec.Command(binaryPath, "config", "set", "submit.footer", "true")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "config set command failed: %s", string(output))
+
+		// Get submit.footer back
+		cmd = exec.Command(binaryPath, "config", "get", "submit.footer")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "config get command failed: %s", string(output))
+		require.Equal(t, "true", strings.TrimSpace(string(output)))
+	})
 }

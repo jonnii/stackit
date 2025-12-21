@@ -44,8 +44,6 @@ type Options struct {
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
 	AI                   bool
-	// SkipPush skips pushing branches to remote (for testing)
-	SkipPush bool
 }
 
 // Info contains information about a branch to submit
@@ -379,8 +377,8 @@ func getGitHubClient(ctx *runtime.Context) (github.GitHubClient, error) {
 
 // pushBranchIfNeeded pushes a branch to remote if needed
 func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, remote string, eng engine.SyncManager) error {
-	// Skip if dry run or skip push is set
-	if opts.DryRun || opts.SkipPush {
+	// Skip if dry run
+	if opts.DryRun {
 		return nil
 	}
 

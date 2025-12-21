@@ -27,7 +27,7 @@ func GetRepoConfig(repoRoot string) (*RepoConfig, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Config doesn't exist - return default
-		return &RepoConfig{}, nil
+		return &RepoConfig{}, nil //nolint:nilerr
 	}
 
 	var config RepoConfig

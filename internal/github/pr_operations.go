@@ -266,7 +266,7 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 	pr, err := GetPullRequestByBranch(ctx, client, owner, repo, branchName)
 	if err != nil {
 		// If we can't get the PR, assume checks are passing (safe default)
-		return true, false, nil
+		return true, false, nil //nolint:nilerr
 	}
 	if pr == nil || pr.Head == nil || pr.Head.SHA == nil {
 		// No PR found or no head SHA, assume passing
@@ -291,7 +291,7 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 	if err != nil {
 		// If we can't get combined status, just use check runs
 		passing, pending := evaluateCheckRuns(checkRuns.CheckRuns)
-		return passing, pending, nil
+		return passing, pending, nil //nolint:nilerr
 	}
 
 	// Combine results from both check runs and status
@@ -347,7 +347,7 @@ func getCombinedStatus(ctx context.Context, client *github.Client, owner, repo, 
 	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, ref, nil)
 	if err != nil {
 		// If we can't get status, assume passing (safe default)
-		return true, false, nil
+		return true, false, nil //nolint:nilerr
 	}
 
 	if combinedStatus == nil || combinedStatus.State == nil {

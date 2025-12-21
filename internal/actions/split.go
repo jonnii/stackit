@@ -457,7 +457,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 	newBranchName := branchToSplit + "_split"
 	allBranches := eng.AllBranchNames()
 	for containsString(allBranches, newBranchName) {
-		newBranchName = newBranchName + "_split"
+		newBranchName += "_split"
 	}
 
 	// First checkout the parent branch so the new branch starts from there
@@ -533,7 +533,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 	if containsString(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"
 		for containsString(existingNames, defaultName) {
-			defaultName = defaultName + "_split"
+			defaultName += "_split"
 		}
 	}
 

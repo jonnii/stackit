@@ -335,7 +335,9 @@ func detectCycles(eng engine.Engine) [][]string {
 			}
 			if cycleStart >= 0 {
 				// Extract the cycle: from first occurrence to current
-				cycle := append(path[cycleStart:], branch)
+				cycle := make([]string, len(path)-cycleStart+1)
+				copy(cycle, path[cycleStart:])
+				cycle[len(cycle)-1] = branch
 				cycles = append(cycles, cycle)
 			}
 			return

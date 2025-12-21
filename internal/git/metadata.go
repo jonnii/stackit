@@ -33,18 +33,18 @@ func ReadMetadataRef(branchName string) (*Meta, error) {
 	sha, err := RunGitCommand("rev-parse", "--verify", refName)
 	if err != nil {
 		// Ref doesn't exist - return empty meta
-		return &Meta{}, nil
+		return &Meta{}, nil //nolint:nilerr
 	}
 
 	// Get the content of the blob
 	content, err := RunGitCommand("cat-file", "-p", sha)
 	if err != nil {
-		return &Meta{}, nil
+		return &Meta{}, nil //nolint:nilerr
 	}
 
 	var meta Meta
 	if err := json.Unmarshal([]byte(content), &meta); err != nil {
-		return &Meta{}, nil
+		return &Meta{}, nil //nolint:nilerr
 	}
 
 	return &meta, nil

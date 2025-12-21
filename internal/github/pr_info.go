@@ -19,7 +19,7 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 	token, err := getGitHubToken()
 	if err != nil {
 		// If no token, skip PR syncing (non-fatal)
-		return nil
+		return nil //nolint:nilerr
 	}
 
 	// Get repository info if not provided
@@ -27,7 +27,7 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 	if repoOwner == "" || repoName == "" {
 		repoInfo, err = getRepoInfoWithHostname(ctx)
 		if err != nil {
-			return nil // Skip if can't determine repo
+			return nil //nolint:nilerr // Skip if can't determine repo
 		}
 		repoOwner = repoInfo.Owner
 		repoName = repoInfo.Repo
@@ -35,14 +35,14 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		// Still need hostname for client configuration
 		repoInfo, err = getRepoInfoWithHostname(ctx)
 		if err != nil {
-			return nil // Skip if can't determine repo
+			return nil //nolint:nilerr // Skip if can't determine repo
 		}
 	}
 
 	// Create GitHub client with Enterprise support
 	client, err := createGitHubClient(ctx, repoInfo.Hostname, token)
 	if err != nil {
-		return nil // Skip if can't create client
+		return nil //nolint:nilerr // Skip if can't create client
 	}
 
 	// Fetch PR info for each branch

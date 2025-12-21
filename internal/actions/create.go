@@ -103,6 +103,13 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 	// If AI is enabled and no branch name/message provided, generate commit message
 	commitMessage := opts.Message
+	if commitMessage == "" && !utils.IsInteractive() {
+		stdinMsg, err := utils.ReadFromStdin()
+		if err == nil && stdinMsg != "" {
+			commitMessage = stdinMsg
+		}
+	}
+
 	if opts.AI && opts.AIClient != nil && opts.BranchName == "" && commitMessage == "" {
 		if !hasStaged {
 			hasUntracked, _ := git.HasUntrackedFiles(ctx.Context)

@@ -69,6 +69,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Create UI early - all output goes through this
 	ui := tui.NewSubmitUI(splog)
+	defer ui.Complete()
 
 	// Validate flags
 	if opts.Draft && opts.Publish {
@@ -212,7 +213,6 @@ func Action(ctx *runtime.Context, opts Options) error {
 	wg.Wait()
 
 	if submitErr != nil {
-		ui.Complete()
 		return submitErr
 	}
 
@@ -231,8 +231,6 @@ func Action(ctx *runtime.Context, opts Options) error {
 	if footerEnabled {
 		updatePRFootersQuiet(context, branches, eng, githubClient, repoOwner, repoName)
 	}
-
-	ui.Complete()
 
 	return nil
 }

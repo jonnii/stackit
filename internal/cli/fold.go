@@ -1,9 +1,11 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"stackit.dev/stackit/internal/actions"
+	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newFoldCmd creates the fold command
@@ -25,8 +27,16 @@ This command does not perform any action on GitHub or the remote repository.
 If you fold a branch with an open pull request, you will need to manually
 close the pull request.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = keep // Will be used when implemented
-			return fmt.Errorf("fold command not yet implemented")
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			// Run fold action
+			return actions.FoldAction(ctx, actions.FoldOptions{
+				Keep: keep,
+			})
 		},
 	}
 

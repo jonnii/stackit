@@ -416,7 +416,7 @@ func TestTrackCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Corrupt metadata by deleting the metadata ref
-		err = scene.Repo.RunGitCommand("update-ref", "-d", "refs/branch-metadata/b")
+		err = scene.Repo.RunGitCommand("update-ref", "-d", "refs/stackit/metadata/b")
 		require.NoError(t, err)
 
 		// Verify b is no longer tracked

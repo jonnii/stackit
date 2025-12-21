@@ -6,6 +6,15 @@ import (
 	"strings"
 )
 
+const (
+	// MetadataRefPrefix is the prefix for Git refs where branch metadata is stored
+	MetadataRefPrefix = "refs/stackit/metadata/"
+
+	// DeprecatedMetadataRefPrefix is the old prefix for Git refs where branch metadata was stored.
+	// Deprecated: Use MetadataRefPrefix instead. This will be removed in a future release.
+	DeprecatedMetadataRefPrefix = "refs/branch-metadata/"
+)
+
 // Meta represents branch metadata stored in Git refs
 type Meta struct {
 	ParentBranchName     *string `json:"parentBranchName,omitempty"`
@@ -27,13 +36,32 @@ type PrInfo struct {
 // ReadMetadataRef reads metadata for a branch from Git refs
 func ReadMetadataRef(branchName string) (*Meta, error) {
 	// Use shell git commands for consistency with WriteMetadataRef and DeleteMetadataRef
-	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
+	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 
 	// Get the SHA of the ref
 	sha, err := RunGitCommand("rev-parse", "--verify", refName)
 	if err != nil {
-		// Ref doesn't exist - return empty meta
-		return &Meta{}, nil //nolint:nilerr
+		// Try deprecated ref
+		deprecatedRefName := fmt.Sprintf("%s%s", DeprecatedMetadataRefPrefix, branchName)
+		sha, err = RunGitCommand("rev-parse", "--verify", deprecatedRefName)
+		if err != nil {
+			// Ref doesn't exist - return empty meta
+			return &Meta{}, nil //nolint:nilerr
+		}
+
+		// Found deprecated ref, migrate it lazily
+		// We'll read the content first to ensure it's valid
+		content, err := RunGitCommand("cat-file", "-p", sha)
+		if err == nil {
+			var meta Meta
+			if err := json.Unmarshal([]byte(content), &meta); err == nil {
+				// Migrate to new ref
+				_ = WriteMetadataRef(branchName, &meta)
+				// Delete old ref
+				_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
+				return &meta, nil
+			}
+		}
 	}
 
 	// Get the content of the blob
@@ -52,34 +80,53 @@ func ReadMetadataRef(branchName string) (*Meta, error) {
 
 // GetMetadataRefList returns all metadata refs
 func GetMetadataRefList() (map[string]string, error) {
-	// Use shell git to list refs (consistent with WriteMetadataRef which uses shell git)
-	output, err := RunGitCommand("for-each-ref", "--format=%(refname) %(objectname)", "refs/branch-metadata/")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metadata refs: %w", err)
-	}
-
 	result := make(map[string]string)
-	if output == "" {
-		return result, nil
+
+	// Get current metadata refs
+	output, err := RunGitCommand("for-each-ref", "--format=%(refname) %(objectname)", MetadataRefPrefix)
+	if err == nil && output != "" {
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, " ", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			refName := parts[0]
+			sha := parts[1]
+
+			if strings.HasPrefix(refName, MetadataRefPrefix) {
+				branchName := refName[len(MetadataRefPrefix):]
+				result[branchName] = sha
+			}
+		}
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		refName := parts[0]
-		sha := parts[1]
+	// Also get deprecated metadata refs
+	// Deprecated: This section supports migration from the old prefix.
+	output, err = RunGitCommand("for-each-ref", "--format=%(refname) %(objectname)", DeprecatedMetadataRefPrefix)
+	if err == nil && output != "" {
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, " ", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			refName := parts[0]
+			sha := parts[1]
 
-		// Extract branch name from refs/branch-metadata/<branch>
-		const prefix = "refs/branch-metadata/"
-		if strings.HasPrefix(refName, prefix) {
-			branchName := refName[len(prefix):]
-			result[branchName] = sha
+			if strings.HasPrefix(refName, DeprecatedMetadataRefPrefix) {
+				branchName := refName[len(DeprecatedMetadataRefPrefix):]
+				// Only add if not already present in the new prefix (new prefix takes precedence)
+				if _, exists := result[branchName]; !exists {
+					result[branchName] = sha
+				}
+			}
 		}
 	}
 
@@ -88,8 +135,13 @@ func GetMetadataRefList() (map[string]string, error) {
 
 // DeleteMetadataRef deletes a metadata ref for a branch
 func DeleteMetadataRef(branchName string) error {
-	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
+	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 	_, err := RunGitCommand("update-ref", "-d", refName)
+
+	// Also delete deprecated ref if it exists
+	deprecatedRefName := fmt.Sprintf("%s%s", DeprecatedMetadataRefPrefix, branchName)
+	_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
+
 	return err
 }
 
@@ -108,7 +160,7 @@ func WriteMetadataRef(branchName string, meta *Meta) error {
 	}
 
 	// Create or update the ref using git update-ref
-	refName := fmt.Sprintf("refs/branch-metadata/%s", branchName)
+	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 	_, err = RunGitCommand("update-ref", refName, sha)
 	if err != nil {
 		return fmt.Errorf("failed to write metadata ref: %w", err)

@@ -160,7 +160,7 @@ func TestAbsorbCommand(t *testing.T) {
 		require.Contains(t, string(output), "Absorbed changes", "should mention absorbing")
 	})
 
-	t.Run("absorb error - no staged changes", func(t *testing.T) {
+	t.Run("absorb - no staged changes", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
 			// Create initial commit
@@ -178,8 +178,44 @@ func TestAbsorbCommand(t *testing.T) {
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 
-		require.Error(t, err, "absorb should fail with no staged changes")
-		require.Contains(t, string(output), "no staged changes", "should mention no staged changes")
+		require.NoError(t, err, "absorb should not fail with no staged changes")
+		require.Contains(t, string(output), "Nothing to absorb", "should mention nothing to absorb")
+	})
+
+	t.Run("absorb - only unabsorbable changes", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			if err := s.Repo.CreateChangeAndCommit("initial", "init"); err != nil {
+				return err
+			}
+			cmd := exec.Command(binaryPath, "init")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			// Create a branch with a commit
+			if err := s.Repo.CreateChange("commit 1", "file1", false); err != nil {
+				return err
+			}
+			cmd = exec.Command(binaryPath, "create", "branch1", "-m", "commit 1")
+			cmd.Dir = s.Dir
+			if err := cmd.Run(); err != nil {
+				return err
+			}
+			// Create a staged change that doesn't belong to any commit (new file)
+			if err := s.Repo.CreateChange("unrelated change", "file2", false); err != nil {
+				return err
+			}
+			return nil
+		})
+
+		cmd := exec.Command(binaryPath, "absorb", "--force")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "Should not error if there are changes but none can be absorbed")
+		require.Contains(t, string(output), "The following hunks could not be absorbed")
+		require.Contains(t, string(output), "file2")
 	})
 
 	t.Run("absorb error - not initialized", func(t *testing.T) {

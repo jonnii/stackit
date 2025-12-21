@@ -53,6 +53,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(newTrackCmd())
 	rootCmd.AddCommand(newUntrackCmd())
 	rootCmd.AddCommand(newTrunkCmd())
+	rootCmd.AddCommand(newUndoCmd())
 	rootCmd.AddCommand(newUpCmd())
 	rootCmd.AddCommand(newConfigCmd())
 

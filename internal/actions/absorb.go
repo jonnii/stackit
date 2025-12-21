@@ -32,6 +32,25 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		return fmt.Errorf("not on a branch")
 	}
 
+	// Take snapshot before modifying the repository
+	args := []string{}
+	if opts.All {
+		args = append(args, "--all")
+	}
+	if opts.DryRun {
+		args = append(args, "--dry-run")
+	}
+	if opts.Force {
+		args = append(args, "--force")
+	}
+	if opts.Patch {
+		args = append(args, "--patch")
+	}
+	if err := eng.TakeSnapshot(ctx.Context, "absorb", args); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
+
 	// Check if rebase is in progress
 	if err := utils.CheckRebaseInProgress(ctx.Context); err != nil {
 		return err

@@ -116,8 +116,17 @@ type ApplySplitOptions struct {
 	BranchPoints  []int    // Commit indices (0 = HEAD, 1 = HEAD~1, etc.)
 }
 
+// UndoManager provides operations for undo/redo functionality
+// Thread-safe: All methods are safe for concurrent use
+type UndoManager interface {
+	TakeSnapshot(ctx context.Context, command string, args []string) error
+	GetSnapshots() ([]SnapshotInfo, error)
+	LoadSnapshot(snapshotID string) (*Snapshot, error)
+	RestoreSnapshot(ctx context.Context, snapshotID string) error
+}
+
 // Engine is the core interface for branch state management
-// It composes BranchReader, BranchWriter, PRManager, SyncManager, SquashManager, and SplitManager
+// It composes BranchReader, BranchWriter, PRManager, SyncManager, SquashManager, SplitManager, and UndoManager
 // for backward compatibility. New code should prefer using the smaller interfaces.
 // Thread-safe: All methods are safe for concurrent use
 type Engine interface {
@@ -127,4 +136,5 @@ type Engine interface {
 	SyncManager
 	SquashManager
 	SplitManager
+	UndoManager
 }

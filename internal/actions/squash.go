@@ -26,6 +26,19 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		return fmt.Errorf("not on a branch")
 	}
 
+	// Take snapshot before modifying the repository
+	args := []string{}
+	if opts.Message != "" {
+		args = append(args, "-m", opts.Message)
+	}
+	if opts.NoEdit {
+		args = append(args, "--no-edit")
+	}
+	if err := eng.TakeSnapshot(context, "squash", args); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
+
 	// Squash current branch
 	if err := eng.SquashCurrentBranch(context, engine.SquashOptions{
 		Message: opts.Message,

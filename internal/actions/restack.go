@@ -91,6 +91,16 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 		return nil
 	}
 
+	// Take snapshot before modifying the repository
+	args := []string{}
+	if opts.BranchName != "" {
+		args = append(args, opts.BranchName)
+	}
+	if err := eng.TakeSnapshot(ctx.Context, "restack", args); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
+
 	// Call RestackBranches
 	return RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot)
 }

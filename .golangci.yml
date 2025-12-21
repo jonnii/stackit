@@ -19,6 +19,16 @@ linters:
     - unconvert
     - unparam
     - gosec
+    - stylecheck
+    - revive
+    - gocritic
+    - nilerr
+    - bodyclose
+    - prealloc
+    - whitespace
+    - errorlint
+    - copyloopvar
+    - tparallel
 
 linters-settings:
   gofmt:

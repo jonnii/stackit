@@ -100,7 +100,7 @@ If no branch is specified, uses the current branch.`,
 					// Check if it's a cursor-agent error and provide helpful message
 					errMsg := err.Error()
 					if strings.Contains(errMsg, "cursor-agent failed") || strings.Contains(errMsg, "resource_exhausted") {
-						return fmt.Errorf("cursor-agent failed: %v\n\nThis might be due to:\n- Rate limiting or resource exhaustion\n- Network connectivity issues\n- Invalid API credentials\n\nTry again later or check your cursor-agent configuration", err)
+						return fmt.Errorf("cursor-agent failed: %w\n\nThis might be due to:\n- Rate limiting or resource exhaustion\n- Network connectivity issues\n- Invalid API credentials\n\nTry again later or check your cursor-agent configuration", err)
 					}
 					return fmt.Errorf("failed to generate commit message: %w", err)
 				}

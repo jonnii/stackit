@@ -1174,7 +1174,7 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 		// Try to rollback on error
 		if rollbackErr := git.SoftReset(ctx, branchRevision); rollbackErr != nil {
 			// Log rollback error but return original error
-			return fmt.Errorf("failed to commit and failed to rollback: commit error: %w, rollback error: %v", err, rollbackErr)
+			return fmt.Errorf("failed to commit and failed to rollback: commit error: %w, rollback error: %w", err, rollbackErr)
 		}
 		return fmt.Errorf("failed to commit: %w", err)
 	}

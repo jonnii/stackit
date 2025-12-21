@@ -295,17 +295,15 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 	defaultTimeout := 10 * time.Minute
 
 	for i, branchInfo := range branchesToMerge {
-		// 1. If not the first PR, wait for CI checks on the current PR before merging
-		// (The first PR's CI was already checked during plan validation)
-		if i > 0 {
-			steps = append(steps, MergePlanStep{
-				StepType:    StepWaitCI,
-				BranchName:  branchInfo.BranchName,
-				PRNumber:    branchInfo.PRNumber,
-				Description: fmt.Sprintf("Wait for CI checks on PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
-				WaitTimeout: defaultTimeout,
-			})
-		}
+		// 1. Wait for CI checks on the current PR before merging.
+		// Even for the first PR, we wait if it's pending. If it's already passing, this is a no-op.
+		steps = append(steps, MergePlanStep{
+			StepType:    StepWaitCI,
+			BranchName:  branchInfo.BranchName,
+			PRNumber:    branchInfo.PRNumber,
+			Description: fmt.Sprintf("Wait for CI checks on PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
+			WaitTimeout: defaultTimeout,
+		})
 
 		// 2. Merge PR
 		steps = append(steps, MergePlanStep{
@@ -386,7 +384,16 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		Description: fmt.Sprintf("Update PR #%d base branch to trunk", currentBranchInfo.PRNumber),
 	})
 
-	// 3. Merge the single PR
+	// 3. Wait for CI checks on the single PR
+	steps = append(steps, MergePlanStep{
+		StepType:    StepWaitCI,
+		BranchName:  currentBranch,
+		PRNumber:    currentBranchInfo.PRNumber,
+		Description: fmt.Sprintf("Wait for CI checks on PR #%d (%s)", currentBranchInfo.PRNumber, currentBranch),
+		WaitTimeout: 10 * time.Minute,
+	})
+
+	// 4. Merge the single PR
 	steps = append(steps, MergePlanStep{
 		StepType:    StepMergePR,
 		BranchName:  currentBranch,
@@ -394,7 +401,7 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		Description: fmt.Sprintf("Merge PR #%d (%s)", currentBranchInfo.PRNumber, currentBranch),
 	})
 
-	// 4. Pull trunk
+	// 5. Pull trunk
 	steps = append(steps, MergePlanStep{
 		StepType:    StepPullTrunk,
 		BranchName:  "",
@@ -402,7 +409,7 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		Description: "Pull trunk to get merged changes",
 	})
 
-	// 5. Delete intermediate branches (all except current)
+	// 6. Delete intermediate branches (all except current)
 	for _, branchInfo := range branchesToMerge[:len(branchesToMerge)-1] {
 		steps = append(steps, MergePlanStep{
 			StepType:    StepDeleteBranch,
@@ -412,7 +419,7 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		})
 	}
 
-	// 6. Delete current branch
+	// 7. Delete current branch
 	steps = append(steps, MergePlanStep{
 		StepType:    StepDeleteBranch,
 		BranchName:  currentBranch,
@@ -420,7 +427,7 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		Description: fmt.Sprintf("Delete local branch %s", currentBranch),
 	})
 
-	// 7. Restack upstack branches
+	// 8. Restack upstack branches
 	for _, upstackBranch := range upstackBranches {
 		steps = append(steps, MergePlanStep{
 			StepType:    StepRestack,

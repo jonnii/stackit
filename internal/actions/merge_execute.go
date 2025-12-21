@@ -142,11 +142,16 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 		if prInfo.State != prStateOpen {
 			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
 		}
-		// Optionally check CI checks haven't changed to failing
+		// Optionally check CI checks haven't changed to failing or pending
 		if !opts.Force && ctx.GitHubClient != nil {
-			passing, _, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
-			if err == nil && !passing {
-				return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
+			passing, pending, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
+			if err == nil {
+				if !passing {
+					return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
+				}
+				if pending {
+					return fmt.Errorf("PR #%d for branch %s has pending CI checks", *prInfo.Number, step.BranchName)
+				}
 			}
 		}
 

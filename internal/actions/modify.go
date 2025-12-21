@@ -77,6 +77,15 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 		return err
 	}
 
+	commitMessage := opts.Message
+	if commitMessage == "" && !utils.IsInteractive() && !opts.NoEdit {
+		stdinMsg, err := utils.ReadFromStdin()
+		if err == nil && stdinMsg != "" {
+			commitMessage = stdinMsg
+			opts.NoEdit = true
+		}
+	}
+
 	// Check if there are staged changes (for new commits)
 	if opts.CreateCommit {
 		hasStagedChanges, err := git.HasStagedChanges(gctx)
@@ -91,7 +100,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	// Perform the commit
 	commitOpts := git.CommitOptions{
 		Amend:       !opts.CreateCommit,
-		Message:     opts.Message,
+		Message:     commitMessage,
 		NoEdit:      opts.NoEdit,
 		Edit:        opts.Edit,
 		Verbose:     opts.Verbose,

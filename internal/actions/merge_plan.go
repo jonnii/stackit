@@ -236,7 +236,25 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	}
 
 	// 4. Detect branching stacks (siblings)
-	// Note: Child branches will be restacked automatically - this is expected behavior, not a warning
+	// Any child of an ancestor that is not part of the main stack being merged
+	// will be reparented to trunk (or the nearest valid ancestor).
+	mergedSet := make(map[string]bool)
+	for _, branch := range allBranches {
+		mergedSet[branch] = true
+	}
+
+	for _, ancestor := range allBranches {
+		if eng.IsTrunk(ancestor) {
+			continue
+		}
+		children := eng.GetChildren(ancestor)
+		for _, child := range children {
+			if !mergedSet[child] {
+				// This is a sibling branch that will be affected
+				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Sibling branch %s will be reparented to trunk when %s is merged", child, ancestor))
+			}
+		}
+	}
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}

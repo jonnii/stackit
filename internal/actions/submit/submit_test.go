@@ -138,4 +138,89 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		require.True(t, exists, "PR %d should be in UpdatedPRs", prNumber)
 		require.NotNil(t, updatedPR, "Updated PR should not be nil")
 	})
+
+	t.Run("submits entire branching stack with --stack flag", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, nil)
+
+		// Create initial commit
+		err := scene.Repo.CreateChangeAndCommit("initial", "init")
+		require.NoError(t, err)
+
+		// Initialize stackit
+		err = scene.Repo.RunGitCommand("config", "--local", "stackit.trunk", "main")
+		require.NoError(t, err)
+
+		// Create complex structure:
+		// main
+		// └── P
+		//     ├── C1
+		//     └── C2
+
+		err = scene.Repo.CreateAndCheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P change", "p")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("C1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
+		require.NoError(t, err)
+
+		// Move back to P
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Track branches
+		err = eng.TrackBranch(context.Background(), "P", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C1", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C2", "P")
+		require.NoError(t, err)
+
+		// Create a local remote
+		_, err = scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Create mocked GitHub client
+		mockConfig := testhelpers.NewMockGitHubServerConfig()
+		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, mockConfig)
+		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, mockConfig)
+
+		ctx := runtime.NewContext(eng)
+		ctx.GitHubClient = githubClient
+		ctx.RepoRoot = scene.Dir
+
+		// Submit with --stack flag from branch P
+		opts := submit.Options{
+			Stack:  true,
+			NoEdit: true,
+			Draft:  true,
+		}
+
+		err = submit.Action(ctx, opts)
+		require.NoError(t, err)
+
+		// Should have created 3 PRs: P, C1, and C2
+		require.Equal(t, 3, len(mockConfig.CreatedPRs), "Should have created PRs for P and its children C1, C2")
+
+		// Verify branches are correct
+		createdBranches := make(map[string]bool)
+		for _, pr := range mockConfig.CreatedPRs {
+			createdBranches[*pr.Head.Ref] = true
+		}
+		require.True(t, createdBranches["P"])
+		require.True(t, createdBranches["C1"])
+		require.True(t, createdBranches["C2"])
+	})
 }

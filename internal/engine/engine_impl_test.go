@@ -224,6 +224,99 @@ func TestDeleteBranch(t *testing.T) {
 		require.Contains(t, eng.GetChildren("main"), "branch3")
 	})
 
+	t.Run("deletes branch with multiple siblings and children", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create complex structure:
+		// main
+		// └── P
+		//     ├── C1
+		//     │   └── GC1
+		//     ├── C2
+		//     └── C3
+		//         └── GC3
+
+		err := scene.Repo.CreateAndCheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P change", "p")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("C1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("GC1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("GC1 change", "gc1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C3")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C3 change", "c3")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("GC3")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("GC3 change", "gc3")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Track all branches
+		err = eng.TrackBranch(context.Background(), "P", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C1", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "GC1", "C1")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C2", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C3", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "GC3", "C3")
+		require.NoError(t, err)
+
+		// Verify initial parent of children is P
+		require.Equal(t, "P", eng.GetParent("C1"))
+		require.Equal(t, "P", eng.GetParent("C2"))
+		require.Equal(t, "P", eng.GetParent("C3"))
+
+		// Delete P
+		err = eng.DeleteBranch(context.Background(), "P")
+		require.NoError(t, err)
+
+		// Verify P is removed
+		require.False(t, eng.IsBranchTracked("P"))
+
+		// Verify all direct children of P now point to main
+		require.Equal(t, "main", eng.GetParent("C1"))
+		require.Equal(t, "main", eng.GetParent("C2"))
+		require.Equal(t, "main", eng.GetParent("C3"))
+
+		// Verify grandchildren still point to their parents
+		require.Equal(t, "C1", eng.GetParent("GC1"))
+		require.Equal(t, "C3", eng.GetParent("GC3"))
+
+		// Verify main's children list contains C1, C2, C3
+		mainChildren := eng.GetChildren("main")
+		require.Contains(t, mainChildren, "C1")
+		require.Contains(t, mainChildren, "C2")
+		require.Contains(t, mainChildren, "C3")
+	})
+
 	t.Run("fails when trying to delete trunk", func(t *testing.T) {
 		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
 			return s.Repo.CreateChangeAndCommit("initial", "init")

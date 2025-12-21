@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/google/go-github/v62/github"
 	"golang.org/x/oauth2"
@@ -46,53 +47,58 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		return nil //nolint:nilerr // Skip if can't create client
 	}
 
-	// Fetch PR info for each branch
+	// Fetch PR info for each branch in parallel
+	var wg sync.WaitGroup
 	for _, branchName := range branchNames {
-		prInfo, err := getPRInfoForBranch(ctx, client, repoOwner, repoName, branchName)
-		if err != nil {
-			// Continue with other branches
-			continue
-		}
-
-		if prInfo != nil {
-			// Update metadata
-			meta, err := git.ReadMetadataRef(branchName)
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			prInfo, err := getPRInfoForBranch(ctx, client, repoOwner, repoName, name)
 			if err != nil {
-				meta = &git.Meta{}
+				return
 			}
 
-			if meta.PrInfo == nil {
-				meta.PrInfo = &git.PrInfo{}
-			}
+			if prInfo != nil {
+				// Update metadata
+				meta, err := git.ReadMetadataRef(name)
+				if err != nil {
+					meta = &git.Meta{}
+				}
 
-			// Update PR info
-			if prInfo.Number != nil {
-				meta.PrInfo.Number = prInfo.Number
-			}
-			if prInfo.Base != nil && prInfo.Base.Ref != nil {
-				meta.PrInfo.Base = prInfo.Base.Ref
-			}
-			if prInfo.HTMLURL != nil {
-				meta.PrInfo.URL = prInfo.HTMLURL
-			}
-			if prInfo.Title != nil {
-				meta.PrInfo.Title = prInfo.Title
-			}
-			if prInfo.Body != nil {
-				meta.PrInfo.Body = prInfo.Body
-			}
-			if prInfo.Draft != nil {
-				meta.PrInfo.IsDraft = prInfo.Draft
-			}
-			if prInfo.State != nil {
-				state := strings.ToUpper(*prInfo.State)
-				meta.PrInfo.State = &state
-			}
+				if meta.PrInfo == nil {
+					meta.PrInfo = &git.PrInfo{}
+				}
 
-			// Write updated metadata
-			_ = git.WriteMetadataRef(branchName, meta)
-		}
+				// Update PR info
+				if prInfo.Number != nil {
+					meta.PrInfo.Number = prInfo.Number
+				}
+				if prInfo.Base != nil && prInfo.Base.Ref != nil {
+					meta.PrInfo.Base = prInfo.Base.Ref
+				}
+				if prInfo.HTMLURL != nil {
+					meta.PrInfo.URL = prInfo.HTMLURL
+				}
+				if prInfo.Title != nil {
+					meta.PrInfo.Title = prInfo.Title
+				}
+				if prInfo.Body != nil {
+					meta.PrInfo.Body = prInfo.Body
+				}
+				if prInfo.Draft != nil {
+					meta.PrInfo.IsDraft = prInfo.Draft
+				}
+				if prInfo.State != nil {
+					state := strings.ToUpper(*prInfo.State)
+					meta.PrInfo.State = &state
+				}
+
+				// Write updated metadata
+				_ = git.WriteMetadataRef(name, meta)
+			}
+		}(branchName)
 	}
+	wg.Wait()
 
 	return nil
 }

@@ -423,17 +423,38 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	e.parentMap = make(map[string]string)
 	e.childrenMap = make(map[string][]string)
 
-	// Load metadata for each branch
-	for _, branchName := range branches {
-		meta, err := git.ReadMetadataRef(branchName)
-		if err != nil {
-			continue
-		}
+	// Load metadata for each branch in parallel
+	type branchMeta struct {
+		name string
+		meta *git.Meta
+	}
+	metaChan := make(chan branchMeta, len(branches))
+	var wg sync.WaitGroup
 
-		if meta.ParentBranchName != nil {
-			parent := *meta.ParentBranchName
-			e.parentMap[branchName] = parent
-			e.childrenMap[parent] = append(e.childrenMap[parent], branchName)
+	for _, branchName := range branches {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			meta, err := git.ReadMetadataRef(name)
+			if err != nil {
+				return
+			}
+			metaChan <- branchMeta{name: name, meta: meta}
+		}(branchName)
+	}
+
+	// Close channel when all workers are done
+	go func() {
+		wg.Wait()
+		close(metaChan)
+	}()
+
+	// Collect results and populate maps sequentially to avoid lock contention/races
+	for bm := range metaChan {
+		if bm.meta.ParentBranchName != nil {
+			parent := *bm.meta.ParentBranchName
+			e.parentMap[bm.name] = parent
+			e.childrenMap[parent] = append(e.childrenMap[parent], bm.name)
 		}
 	}
 
@@ -1206,18 +1227,59 @@ func getBoolValue(b *bool) bool {
 // FindBranchForCommit finds which branch a commit belongs to
 func (e *engineImpl) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
 	e.mu.RLock()
-	defer e.mu.RUnlock()
+	branches := make([]string, len(e.branches))
+	copy(branches, e.branches)
+	e.mu.RUnlock()
 
-	for _, branchName := range e.branches {
-		commits, err := e.GetAllCommits(ctx, branchName, CommitFormatSHA)
-		if err != nil {
-			continue
-		}
+	type branchResult struct {
+		name string
+	}
 
-		for _, sha := range commits {
-			if sha == commitSHA {
-				return branchName, nil
+	resChan := make(chan branchResult, len(branches))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	for _, branchName := range branches {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+
+			// Check if already canceled
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
+
+			commits, err := e.GetAllCommits(ctx, name, CommitFormatSHA)
+			if err != nil {
+				return
+			}
+
+			for _, sha := range commits {
+				if sha == commitSHA {
+					select {
+					case resChan <- branchResult{name: name}:
+						cancel() // Cancel other workers
+					case <-ctx.Done():
+					}
+					return
+				}
+			}
+		}(branchName)
+	}
+
+	// Close channel when all workers are done
+	go func() {
+		wg.Wait()
+		close(resChan)
+	}()
+
+	// Wait for first result or all done
+	for res := range resChan {
+		if res.name != "" {
+			return res.name, nil
 		}
 	}
 

@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
@@ -26,6 +27,31 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	splog := ctx.Splog
 	c := ctx.Context
 
+	// Pre-calculate which branches should be deleted in parallel
+	allTrackedBranches := eng.AllBranchNames()
+	type deleteStatus struct {
+		shouldDelete bool
+		reason       string
+	}
+	deleteStatuses := make(map[string]deleteStatus)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, branchName := range allTrackedBranches {
+		if eng.IsTrunk(branchName) {
+			continue
+		}
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			shouldDelete, reason := shouldDeleteBranch(c, name, eng, opts.Force)
+			mu.Lock()
+			deleteStatuses[name] = deleteStatus{shouldDelete: shouldDelete, reason: reason}
+			mu.Unlock()
+		}(branchName)
+	}
+	wg.Wait()
+
 	// Start from trunk children
 	branchesToProcess := eng.GetChildren(eng.Trunk())
 	branchesToDelete := make(map[string]map[string]bool) // branch -> set of blocking children
@@ -42,9 +68,9 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 			continue
 		}
 
-		// Check if should delete
-		shouldDelete, _ := shouldDeleteBranch(c, branchName, eng, opts.Force)
-		if shouldDelete {
+		// Use pre-calculated status
+		status := deleteStatuses[branchName]
+		if status.shouldDelete {
 			children := eng.GetChildren(branchName)
 			// Add children to process (DFS)
 			branchesToProcess = append(branchesToProcess, children...)
@@ -56,7 +82,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 			}
 			branchesToDelete[branchName] = blockers
 
-			splog.Debug("Marked %s for deletion. Blockers: %v", branchName, children)
+			splog.Debug("Marked %s for deletion. Reason: %s. Blockers: %v", branchName, status.reason, children)
 		} else {
 			// Branch is not being deleted
 			// If its parent IS being deleted, update parent

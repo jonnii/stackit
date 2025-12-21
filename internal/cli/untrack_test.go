@@ -10,6 +10,7 @@ import (
 )
 
 func TestUntrackCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("untrack current branch", func(t *testing.T) {

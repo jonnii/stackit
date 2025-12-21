@@ -59,14 +59,14 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 		if eng.IsTrunk(parent) {
 			return fmt.Errorf("cannot fold into trunk with --keep because it would delete the trunk branch")
 		}
-		return foldWithKeep(ctx, currentBranch, parent, eng, splog, gctx)
+		return foldWithKeep(gctx, ctx, currentBranch, parent, eng, splog)
 	}
 
-	return foldNormal(ctx, currentBranch, parent, eng, splog, gctx)
+	return foldNormal(gctx, ctx, currentBranch, parent, eng, splog)
 }
 
 // foldNormal performs a normal fold: merge current branch into parent, then delete current branch
-func foldNormal(ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog, gctx context.Context) error {
+func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog) error {
 	// Checkout parent branch
 	if err := git.CheckoutBranch(gctx, parent); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
@@ -126,7 +126,7 @@ func foldNormal(ctx *runtime.Context, currentBranch, parent string, eng engine.E
 }
 
 // foldWithKeep performs a fold with --keep: merge parent into current branch, then delete parent
-func foldWithKeep(ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog, gctx context.Context) error {
+func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog) error {
 	// Get all children of parent (siblings + current branch)
 	allChildren := eng.GetChildren(parent)
 

@@ -43,7 +43,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			}
 
 			// Create AI client if AI is enabled
-			var aiClient ai.AIClient
+			var aiClient ai.Client
 			if aiFlag {
 				// Try to create real cursor-agent client, fall back to mock if unavailable
 				cursorClient, err := ai.NewCursorAgentClient()

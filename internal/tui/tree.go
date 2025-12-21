@@ -490,7 +490,7 @@ func (r *StackTreeRenderer) formatShortLines(lines []string, args treeRenderArgs
 
 // RenderBranchList renders a simple list of branches with annotations (no tree structure)
 func (r *StackTreeRenderer) RenderBranchList(branches []string) []string {
-	var result []string
+	result := make([]string, 0, len(branches))
 
 	for _, branchName := range branches {
 		isCurrent := branchName == r.currentBranch

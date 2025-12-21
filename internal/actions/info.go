@@ -203,12 +203,13 @@ func getPRTitleLine(prInfo *engine.PrInfo) string {
 
 	prNumber := tui.ColorPRNumber(*prInfo.Number)
 
-	if state == prStateMerged {
+	switch state {
+	case prStateMerged:
 		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title)
-	} else if state == prStateClosed {
+	case prStateClosed:
 		// Strikethrough not easily available, use dim instead
 		return fmt.Sprintf("%s (Abandoned) %s", prNumber, tui.ColorDim(prInfo.Title))
-	} else {
+	default:
 		prState := tui.ColorPRState(state, prInfo.IsDraft)
 		return fmt.Sprintf("%s %s %s", prNumber, prState, prInfo.Title)
 	}

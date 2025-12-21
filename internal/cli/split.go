@@ -30,7 +30,7 @@ split -F (--by-file-interactive) shows an interactive file selector.
 split without options will prompt for a splitting strategy.`,
 		// Disable default help flag to allow -h for --by-hunk
 		DisableFlagParsing: false,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
@@ -39,11 +39,12 @@ split without options will prompt for a splitting strategy.`,
 
 			// Determine split style - check all flag variants
 			var style actions.SplitStyle
-			if byCommit || cmd.Flags().Changed("commit") {
+			switch {
+			case byCommit || cmd.Flags().Changed("commit"):
 				style = actions.SplitStyleCommit
-			} else if byHunk || cmd.Flags().Changed("hunk") {
+			case byHunk || cmd.Flags().Changed("hunk"):
 				style = actions.SplitStyleHunk
-			} else if byFileInteractive || len(byFile) > 0 || cmd.Flags().Changed("file") {
+			case byFileInteractive || len(byFile) > 0 || cmd.Flags().Changed("file"):
 				// -F triggers interactive file selection
 				// --by-file with pathspecs uses those files directly
 				if cmd.Flags().Changed("file") {

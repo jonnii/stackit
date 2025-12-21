@@ -244,7 +244,7 @@ func (e *engineImpl) GetRevision(ctx context.Context, branchName string) (string
 }
 
 // GetPrInfo returns PR information for a branch
-func (e *engineImpl) GetPrInfo(ctx context.Context, branchName string) (*PrInfo, error) {
+func (e *engineImpl) GetPrInfo(_ context.Context, branchName string) (*PrInfo, error) {
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (e *engineImpl) GetPrInfo(ctx context.Context, branchName string) (*PrInfo,
 }
 
 // UpsertPrInfo updates or creates PR information for a branch
-func (e *engineImpl) UpsertPrInfo(ctx context.Context, branchName string, prInfo *PrInfo) error {
+func (e *engineImpl) UpsertPrInfo(_ context.Context, branchName string, prInfo *PrInfo) error {
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
 		meta = &git.Meta{}
@@ -360,7 +360,7 @@ func (e *engineImpl) PushBranch(ctx context.Context, branchName string, remote s
 }
 
 // Reset clears all branch metadata and rebuilds with new trunk
-func (e *engineImpl) Reset(ctx context.Context, newTrunkName string) error {
+func (e *engineImpl) Reset(_ context.Context, newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -386,7 +386,7 @@ func (e *engineImpl) Reset(ctx context.Context, newTrunkName string) error {
 }
 
 // Rebuild reloads branch cache with new trunk
-func (e *engineImpl) Rebuild(ctx context.Context, newTrunkName string) error {
+func (e *engineImpl) Rebuild(_ context.Context, newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -526,7 +526,7 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 }
 
 // UntrackBranch stops tracking a branch by deleting its metadata
-func (e *engineImpl) UntrackBranch(ctx context.Context, branchName string) error {
+func (e *engineImpl) UntrackBranch(_ context.Context, branchName string) error {
 	if e.IsTrunk(branchName) {
 		return fmt.Errorf("cannot untrack trunk branch")
 	}

@@ -71,7 +71,7 @@ func GetRepoInfo(ctx context.Context) (string, string, error) {
 // CleanCommitMessage removes comments and trailing whitespace from a commit message
 func CleanCommitMessage(message string) string {
 	lines := strings.Split(message, "\n")
-	var result []string
+	result := make([]string, 0, len(lines))
 	for _, line := range lines {
 		trimmed := strings.TrimRight(line, " \t\r\n")
 		if strings.HasPrefix(trimmed, "#") {

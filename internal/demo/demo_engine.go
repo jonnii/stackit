@@ -48,16 +48,16 @@ func NewDemoContext() (*runtime.Context, bool) {
 	return runtime.NewContext(eng), true
 }
 
-// DemoEngine implements the engine.Engine interface with simulated data
-type DemoEngine struct {
+// Engine implements the engine.Engine interface with simulated data
+type Engine struct {
 	parentMap   map[string]string
 	childrenMap map[string][]string
 	prInfoMap   map[string]*engine.PrInfo
 }
 
 // NewDemoEngine creates a new demo engine with simulated stack data
-func NewDemoEngine() *DemoEngine {
-	e := &DemoEngine{
+func NewDemoEngine() *Engine {
+	e := &Engine{
 		parentMap:   make(map[string]string),
 		childrenMap: make(map[string][]string),
 		prInfoMap:   make(map[string]*engine.PrInfo),
@@ -86,7 +86,8 @@ func NewDemoEngine() *DemoEngine {
 
 // BranchReader interface implementation
 
-func (e *DemoEngine) AllBranchNames() []string {
+// AllBranchNames returns simulated branch names
+func (e *Engine) AllBranchNames() []string {
 	names := []string{GetDemoTrunk()}
 	for _, b := range GetDemoBranches() {
 		names = append(names, b.Name)
@@ -94,19 +95,23 @@ func (e *DemoEngine) AllBranchNames() []string {
 	return names
 }
 
-func (e *DemoEngine) CurrentBranch() string {
+// CurrentBranch returns the simulated current branch
+func (e *Engine) CurrentBranch() string {
 	return GetDemoCurrentBranch()
 }
 
-func (e *DemoEngine) Trunk() string {
+// Trunk returns the simulated trunk branch
+func (e *Engine) Trunk() string {
 	return GetDemoTrunk()
 }
 
-func (e *DemoEngine) GetParent(branchName string) string {
+// GetParent returns the simulated parent of a branch
+func (e *Engine) GetParent(branchName string) string {
 	return e.parentMap[branchName]
 }
 
-func (e *DemoEngine) GetParentPrecondition(branchName string) string {
+// GetParentPrecondition returns the simulated parent, panics if no parent
+func (e *Engine) GetParentPrecondition(branchName string) string {
 	parent := e.parentMap[branchName]
 	if parent == "" {
 		panic(fmt.Sprintf("branch %s has no parent", branchName))
@@ -114,11 +119,13 @@ func (e *DemoEngine) GetParentPrecondition(branchName string) string {
 	return parent
 }
 
-func (e *DemoEngine) GetChildren(branchName string) []string {
+// GetChildren returns the simulated children of a branch
+func (e *Engine) GetChildren(branchName string) []string {
 	return e.childrenMap[branchName]
 }
 
-func (e *DemoEngine) GetRelativeStack(branchName string, scope engine.Scope) []string {
+// GetRelativeStack returns branches in stack order
+func (e *Engine) GetRelativeStack(branchName string, scope engine.Scope) []string {
 	var result []string
 
 	// Add ancestors if RecursiveParents
@@ -149,9 +156,9 @@ func (e *DemoEngine) GetRelativeStack(branchName string, scope engine.Scope) []s
 	return result
 }
 
-func (e *DemoEngine) getDescendants(branchName string) []string {
-	var result []string
+func (e *Engine) getDescendants(branchName string) []string {
 	children := e.childrenMap[branchName]
+	result := make([]string, 0, len(children))
 	for _, child := range children {
 		result = append(result, child)
 		result = append(result, e.getDescendants(child)...)
@@ -159,11 +166,13 @@ func (e *DemoEngine) getDescendants(branchName string) []string {
 	return result
 }
 
-func (e *DemoEngine) IsTrunk(branchName string) bool {
+// IsTrunk returns true if the branch is trunk in the demo engine
+func (e *Engine) IsTrunk(branchName string) bool {
 	return branchName == GetDemoTrunk()
 }
 
-func (e *DemoEngine) IsBranchTracked(branchName string) bool {
+// IsBranchTracked returns true if the branch is tracked in the demo engine
+func (e *Engine) IsBranchTracked(branchName string) bool {
 	if branchName == GetDemoTrunk() {
 		return true
 	}
@@ -171,41 +180,50 @@ func (e *DemoEngine) IsBranchTracked(branchName string) bool {
 	return exists
 }
 
-func (e *DemoEngine) IsBranchFixed(ctx context.Context, branchName string) bool {
+// IsBranchFixed returns true in the demo engine
+func (e *Engine) IsBranchFixed(_ context.Context, _ string) bool {
 	return true // All demo branches are "fixed" (not needing restack)
 }
 
-func (e *DemoEngine) GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
+// GetCommitDate returns a fake commit date in the demo engine
+func (e *Engine) GetCommitDate(_ context.Context, _ string) (time.Time, error) {
 	return time.Now().Add(-24 * time.Hour), nil
 }
 
-func (e *DemoEngine) GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
+// GetCommitAuthor returns a fake commit author in the demo engine
+func (e *Engine) GetCommitAuthor(_ context.Context, _ string) (string, error) {
 	return "Demo User <demo@example.com>", nil
 }
 
-func (e *DemoEngine) GetRevision(ctx context.Context, branchName string) (string, error) {
+// GetRevision returns a fake revision in the demo engine
+func (e *Engine) GetRevision(_ context.Context, branchName string) (string, error) {
 	// Return fake SHA based on branch name
 	return fmt.Sprintf("abc%x123", len(branchName)), nil
 }
 
-func (e *DemoEngine) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
+// FindBranchForCommit returns the current branch in the demo engine
+func (e *Engine) FindBranchForCommit(_ context.Context, _ string) (string, error) {
 	// For demo, just return the current branch
 	return e.CurrentBranch(), nil
 }
 
-func (e *DemoEngine) GetRelativeStackUpstack(branchName string) []string {
+// GetRelativeStackUpstack returns descendants in the demo engine
+func (e *Engine) GetRelativeStackUpstack(branchName string) []string {
 	return e.getDescendants(branchName)
 }
 
-func (e *DemoEngine) IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error) {
+// IsMergedIntoTrunk returns false in the demo engine
+func (e *Engine) IsMergedIntoTrunk(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 
-func (e *DemoEngine) IsBranchEmpty(ctx context.Context, branchName string) (bool, error) {
+// IsBranchEmpty returns false in the demo engine
+func (e *Engine) IsBranchEmpty(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 
-func (e *DemoEngine) FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error) {
+// FindMostRecentTrackedAncestors returns the parent in the demo engine
+func (e *Engine) FindMostRecentTrackedAncestors(_ context.Context, branchName string) ([]string, error) {
 	parent := e.parentMap[branchName]
 	if parent == "" {
 		return nil, fmt.Errorf("no tracked ancestor found for branch %s", branchName)
@@ -215,13 +233,15 @@ func (e *DemoEngine) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 
 // BranchWriter interface implementation
 
-func (e *DemoEngine) TrackBranch(ctx context.Context, branchName string, parentBranchName string) error {
+// TrackBranch tracks a branch in the demo engine
+func (e *Engine) TrackBranch(_ context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
 	e.childrenMap[parentBranchName] = append(e.childrenMap[parentBranchName], branchName)
 	return nil
 }
 
-func (e *DemoEngine) UntrackBranch(ctx context.Context, branchName string) error {
+// UntrackBranch untracks a branch in the demo engine
+func (e *Engine) UntrackBranch(_ context.Context, branchName string) error {
 	delete(e.parentMap, branchName)
 	// Rebuild children map (simplified for demo)
 	newChildrenMap := make(map[string][]string)
@@ -232,35 +252,41 @@ func (e *DemoEngine) UntrackBranch(ctx context.Context, branchName string) error
 	return nil
 }
 
-func (e *DemoEngine) SetParent(ctx context.Context, branchName string, parentBranchName string) error {
+// SetParent sets the parent of a branch in the demo engine
+func (e *Engine) SetParent(_ context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
 	return nil
 }
 
-func (e *DemoEngine) DeleteBranch(ctx context.Context, branchName string) error {
+// DeleteBranch deletes a branch in the demo engine
+func (e *Engine) DeleteBranch(_ context.Context, branchName string) error {
 	delete(e.parentMap, branchName)
 	delete(e.prInfoMap, branchName)
 	return nil
 }
 
-func (e *DemoEngine) Reset(ctx context.Context, newTrunkName string) error {
+// Reset resets the demo engine
+func (e *Engine) Reset(_ context.Context, _ string) error {
 	return nil
 }
 
-func (e *DemoEngine) Rebuild(ctx context.Context, newTrunkName string) error {
+// Rebuild rebuilds the demo engine
+func (e *Engine) Rebuild(_ context.Context, _ string) error {
 	return nil
 }
 
 // PRManager interface implementation
 
-func (e *DemoEngine) GetPrInfo(ctx context.Context, branchName string) (*engine.PrInfo, error) {
+// GetPrInfo returns PR info in the demo engine
+func (e *Engine) GetPrInfo(_ context.Context, branchName string) (*engine.PrInfo, error) {
 	if info, exists := e.prInfoMap[branchName]; exists {
 		return info, nil
 	}
 	return nil, nil
 }
 
-func (e *DemoEngine) UpsertPrInfo(ctx context.Context, branchName string, prInfo *engine.PrInfo) error {
+// UpsertPrInfo upserts PR info in the demo engine
+func (e *Engine) UpsertPrInfo(_ context.Context, branchName string, prInfo *engine.PrInfo) error {
 	simulateDelay(delayLong) // GitHub API call to create/update PR
 	e.prInfoMap[branchName] = prInfo
 	return nil
@@ -268,37 +294,44 @@ func (e *DemoEngine) UpsertPrInfo(ctx context.Context, branchName string, prInfo
 
 // SyncManager interface implementation
 
-func (e *DemoEngine) BranchMatchesRemote(ctx context.Context, branchName string) (bool, error) {
+// BranchMatchesRemote returns false in the demo engine
+func (e *Engine) BranchMatchesRemote(_ context.Context, _ string) (bool, error) {
 	return false, nil // Demo branches never match remote (so submit always has work to do)
 }
 
-func (e *DemoEngine) PopulateRemoteShas(ctx context.Context) error {
+// PopulateRemoteShas simulates fetching remote refs in the demo engine
+func (e *Engine) PopulateRemoteShas(_ context.Context) error {
 	simulateDelay(delayMedium) // Fetching remote refs takes time
 	return nil
 }
 
-func (e *DemoEngine) PushBranch(ctx context.Context, branchName string, remote string, force bool, forceWithLease bool) error {
+// PushBranch simulates git push in the demo engine
+func (e *Engine) PushBranch(_ context.Context, _ string, _ string, _ bool, _ bool) error {
 	simulateDelay(delayMedium) // Git push takes time
 	return nil
 }
 
-func (e *DemoEngine) PullTrunk(ctx context.Context) (engine.PullResult, error) {
+// PullTrunk simulates git pull in the demo engine
+func (e *Engine) PullTrunk(_ context.Context) (engine.PullResult, error) {
 	simulateDelay(delayLong) // Git pull takes time
 	return engine.PullUnneeded, nil
 }
 
-func (e *DemoEngine) ResetTrunkToRemote(ctx context.Context) error {
+// ResetTrunkToRemote simulates resetting trunk to remote in the demo engine
+func (e *Engine) ResetTrunkToRemote(_ context.Context) error {
 	return nil
 }
 
-func (e *DemoEngine) RestackBranch(ctx context.Context, branchName string) (engine.RestackBranchResult, error) {
+// RestackBranch simulates restack in the demo engine
+func (e *Engine) RestackBranch(_ context.Context, _ string) (engine.RestackBranchResult, error) {
 	simulateDelay(delayMedium) // Rebase operation takes time
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
 	}, nil
 }
 
-func (e *DemoEngine) ContinueRebase(ctx context.Context, rebasedBranchBase string) (engine.ContinueRebaseResult, error) {
+// ContinueRebase simulates continuing rebase in the demo engine
+func (e *Engine) ContinueRebase(_ context.Context, _ string) (engine.ContinueRebaseResult, error) {
 	return engine.ContinueRebaseResult{
 		Result:     0, // RebaseDone
 		BranchName: GetDemoCurrentBranch(),
@@ -307,37 +340,43 @@ func (e *DemoEngine) ContinueRebase(ctx context.Context, rebasedBranchBase strin
 
 // SquashManager interface implementation
 
-func (e *DemoEngine) SquashCurrentBranch(ctx context.Context, opts engine.SquashOptions) error {
+// SquashCurrentBranch simulates squash in the demo engine
+func (e *Engine) SquashCurrentBranch(_ context.Context, _ engine.SquashOptions) error {
 	simulateDelay(delayMedium) // Squash takes time
 	return nil
 }
 
 // SplitManager interface implementation
 
-func (e *DemoEngine) GetAllCommits(ctx context.Context, branchName string, format engine.CommitFormat) ([]string, error) {
+// GetAllCommits returns fake commits in the demo engine
+func (e *Engine) GetAllCommits(_ context.Context, branchName string, _ engine.CommitFormat) ([]string, error) {
 	return []string{
 		"abc1234 Initial commit for " + branchName,
 		"def5678 Add feature implementation",
 	}, nil
 }
 
-func (e *DemoEngine) ApplySplitToCommits(ctx context.Context, opts engine.ApplySplitOptions) error {
+// ApplySplitToCommits simulates split in the demo engine
+func (e *Engine) ApplySplitToCommits(_ context.Context, _ engine.ApplySplitOptions) error {
 	simulateDelay(delayLong) // Split involves multiple git operations
 	return nil
 }
 
-func (e *DemoEngine) Detach(ctx context.Context, revision string) error {
+// Detach simulates detach in the demo engine
+func (e *Engine) Detach(_ context.Context, _ string) error {
 	return nil
 }
 
-func (e *DemoEngine) DetachAndResetBranchChanges(ctx context.Context, branchName string) error {
+// DetachAndResetBranchChanges simulates detach and reset in the demo engine
+func (e *Engine) DetachAndResetBranchChanges(_ context.Context, _ string) error {
 	return nil
 }
 
-func (e *DemoEngine) ForceCheckoutBranch(ctx context.Context, branchName string) error {
+// ForceCheckoutBranch simulates force checkout in the demo engine
+func (e *Engine) ForceCheckoutBranch(_ context.Context, _ string) error {
 	simulateDelay(delayShort) // Checkout is fast
 	return nil
 }
 
-// Ensure DemoEngine implements engine.Engine
-var _ engine.Engine = (*DemoEngine)(nil)
+// Ensure Engine implements engine.Engine
+var _ engine.Engine = (*Engine)(nil)

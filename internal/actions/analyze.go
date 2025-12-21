@@ -12,7 +12,7 @@ import (
 
 // AnalyzeOptions contains options for the analyze command
 type AnalyzeOptions struct {
-	AIClient ai.AIClient
+	AIClient ai.Client
 	Verbose  int
 }
 

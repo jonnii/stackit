@@ -21,7 +21,7 @@ func newSyncCmd() *cobra.Command {
 		Long: `Sync all branches with remote, prompting to delete any branches for PRs that have been merged or closed. 
 Restacks all branches in your repository that can be restacked without conflicts. 
 If trunk cannot be fast-forwarded to match remote, overwrites trunk with the remote version.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
@@ -45,7 +45,7 @@ If trunk cannot be fast-forwarded to match remote, overwrites trunk with the rem
 	cmd.Flags().BoolVar(&noRestack, "no-restack", false, "Skip restacking branches")
 
 	// Apply --no-restack flag
-	cmd.PreRun = func(cmd *cobra.Command, args []string) {
+	cmd.PreRun = func(_ *cobra.Command, _ []string) {
 		if noRestack {
 			restack = false
 		}

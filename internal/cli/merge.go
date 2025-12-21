@@ -27,7 +27,7 @@ func newMergeCmd() *cobra.Command {
 This command merges PRs for all branches in the stack from trunk up to (and including) the current branch.
 
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

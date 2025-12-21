@@ -2,9 +2,9 @@ package tui
 
 import "github.com/charmbracelet/lipgloss"
 
-// STACKIT_COLORS defines the color palette for branch visualization
+// StackitColors defines the color palette for branch visualization
 // Matching the TypeScript version
-var STACKIT_COLORS = [][]int{
+var StackitColors = [][]int{
 	{76, 203, 241},  // Light blue
 	{77, 202, 125},  // Green
 	{110, 173, 38},  // Dark green

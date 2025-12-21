@@ -1,3 +1,4 @@
+// Package github provides a client for interacting with the GitHub API.
 package github
 
 import (
@@ -19,15 +20,15 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 	token, err := getGitHubToken()
 	if err != nil {
 		// If no token, skip PR syncing (non-fatal)
-		return nil
+		return nil //nolint:nilerr
 	}
 
 	// Get repository info if not provided
-	var repoInfo *GitHubRepoInfo
+	var repoInfo *RepoInfo
 	if repoOwner == "" || repoName == "" {
 		repoInfo, err = getRepoInfoWithHostname(ctx)
 		if err != nil {
-			return nil // Skip if can't determine repo
+			return nil //nolint:nilerr // Skip if can't determine repo
 		}
 		repoOwner = repoInfo.Owner
 		repoName = repoInfo.Repo
@@ -35,14 +36,14 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		// Still need hostname for client configuration
 		repoInfo, err = getRepoInfoWithHostname(ctx)
 		if err != nil {
-			return nil // Skip if can't determine repo
+			return nil //nolint:nilerr // Skip if can't determine repo
 		}
 	}
 
 	// Create GitHub client with Enterprise support
 	client, err := createGitHubClient(ctx, repoInfo.Hostname, token)
 	if err != nil {
-		return nil // Skip if can't create client
+		return nil //nolint:nilerr // Skip if can't create client
 	}
 
 	// Fetch PR info for each branch
@@ -169,8 +170,8 @@ func getGitHubToken() (string, error) {
 	return token, nil
 }
 
-// GitHubRepoInfo contains parsed information from a git remote URL
-type GitHubRepoInfo struct {
+// RepoInfo contains parsed information from a git remote URL
+type RepoInfo struct {
 	Hostname string
 	Owner    string
 	Repo     string
@@ -183,7 +184,7 @@ type GitHubRepoInfo struct {
 //   - git@github.com:owner/repo.git
 //   - https://github.company.com/owner/repo.git
 //   - git@github.company.com:owner/repo.git
-func ParseGitHubRemoteURL(remoteURL string) (*GitHubRepoInfo, error) {
+func ParseGitHubRemoteURL(remoteURL string) (*RepoInfo, error) {
 	remoteURL = strings.TrimSpace(remoteURL)
 	remoteURL = strings.TrimSuffix(remoteURL, ".git")
 
@@ -244,7 +245,7 @@ func ParseGitHubRemoteURL(remoteURL string) (*GitHubRepoInfo, error) {
 		return nil, fmt.Errorf("failed to parse hostname, owner, or repo from remote URL")
 	}
 
-	return &GitHubRepoInfo{
+	return &RepoInfo{
 		Hostname: hostname,
 		Owner:    owner,
 		Repo:     repo,
@@ -252,7 +253,7 @@ func ParseGitHubRemoteURL(remoteURL string) (*GitHubRepoInfo, error) {
 }
 
 // getRepoInfoWithHostname gets repository hostname, owner, and name from git remote
-func getRepoInfoWithHostname(ctx context.Context) (*GitHubRepoInfo, error) {
+func getRepoInfoWithHostname(ctx context.Context) (*RepoInfo, error) {
 	// Get remote URL
 	remoteURL, err := git.RunGitCommandWithContext(ctx, "config", "--get", "remote.origin.url")
 	if err != nil {

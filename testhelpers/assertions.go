@@ -1,3 +1,5 @@
+// Package testhelpers provides testing utilities for the Stackit CLI,
+// including a scene system, Git repository helpers, and custom assertions.
 package testhelpers
 
 import (

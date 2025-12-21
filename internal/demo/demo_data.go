@@ -4,8 +4,8 @@ package demo
 
 import "stackit.dev/stackit/internal/engine"
 
-// DemoBranch represents a simulated branch with PR info
-type DemoBranch struct {
+// Branch represents a simulated branch with PR info
+type Branch struct {
 	Name     string
 	Parent   string
 	PRNumber int
@@ -26,7 +26,7 @@ type DemoBranch struct {
 // └── feature/api-refactor (#107)
 //
 //	└── feature/api-v2 (#108)
-var demoBranches = []DemoBranch{
+var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-base",
 		Parent:   "main",
@@ -97,7 +97,7 @@ var demoCurrentBranch = "feature/auth-login"
 var demoTrunk = "main"
 
 // GetDemoBranches returns the demo branch data
-func GetDemoBranches() []DemoBranch {
+func GetDemoBranches() []Branch {
 	return demoBranches
 }
 

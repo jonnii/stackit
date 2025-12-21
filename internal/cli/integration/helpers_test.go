@@ -265,12 +265,13 @@ func splitArgs(s string) []string {
 	for _, r := range s {
 		switch {
 		case r == '"' || r == '\'':
-			if inQuote && r == quoteChar {
+			switch {
+			case inQuote && r == quoteChar:
 				inQuote = false
-			} else if !inQuote {
+			case !inQuote:
 				inQuote = true
 				quoteChar = r
-			} else {
+			default:
 				current.WriteRune(r)
 			}
 		case r == ' ' && !inQuote:

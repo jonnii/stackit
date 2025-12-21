@@ -119,7 +119,7 @@ func newSubmitCmd() *cobra.Command {
 creating or updating distinct pull requests for each. Validates that branches are properly restacked before submitting,
 and fails if there are conflicts. Blocks force pushes to branches that overwrite branches that have changed since
 you last submitted or got them. Opens an interactive prompt that allows you to input pull request metadata.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeSubmit(cmd, f)
 		},
 	}
@@ -137,7 +137,7 @@ func newSsCmd() *cobra.Command {
 		Use:    "ss",
 		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
 		Short:  "Alias for submit --stack",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			f.stack = true
 			return executeSubmit(cmd, f)
 		},

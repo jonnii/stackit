@@ -120,17 +120,18 @@ func getCodeDiff(ctx context.Context, eng engine.Engine, branchName, parentBranc
 	}
 
 	var baseRevision string
-	if eng.IsTrunk(branchName) {
+	switch {
+	case eng.IsTrunk(branchName):
 		// For trunk, use parent commit
 		parentSHA, err := git.GetCommitSHA(branchName, 1)
 		if err != nil {
 			return "", fmt.Errorf("failed to get parent commit: %w", err)
 		}
 		baseRevision = parentSHA
-	} else if parentBranch == "" {
+	case parentBranch == "":
 		// Branch has no parent (shouldn't happen for tracked branches, but handle gracefully)
 		return "", fmt.Errorf("branch has no parent and is not trunk")
-	} else {
+	default:
 		// For regular branches, get parent revision from metadata
 		meta, err := git.ReadMetadataRef(branchName)
 		if err != nil || meta.ParentBranchRevision == nil {
@@ -157,17 +158,18 @@ func getChangedFiles(ctx context.Context, eng engine.Engine, branchName, parentB
 	}
 
 	var baseRevision string
-	if eng.IsTrunk(branchName) {
+	switch {
+	case eng.IsTrunk(branchName):
 		// For trunk, use parent commit
 		parentSHA, err := git.GetCommitSHA(branchName, 1)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get parent commit: %w", err)
 		}
 		baseRevision = parentSHA
-	} else if parentBranch == "" {
+	case parentBranch == "":
 		// Branch has no parent (shouldn't happen for tracked branches, but handle gracefully)
 		return nil, fmt.Errorf("branch has no parent and is not trunk")
-	} else {
+	default:
 		// For regular branches, get parent revision from metadata
 		meta, err := git.ReadMetadataRef(branchName)
 		if err != nil || meta.ParentBranchRevision == nil {
@@ -194,7 +196,7 @@ func collectRelatedPRs(ctx context.Context, eng engine.Engine, branchName string
 	}
 	relatedBranches := eng.GetRelativeStack(branchName, scope)
 
-	var relatedPRs []RelatedPR
+	relatedPRs := make([]RelatedPR, 0, len(relatedBranches))
 	for _, relatedBranch := range relatedBranches {
 		prInfo, err := eng.GetPrInfo(ctx, relatedBranch)
 		if err != nil || prInfo == nil {

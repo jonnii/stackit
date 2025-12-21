@@ -83,6 +83,7 @@ const (
 	actionUpdate     = "update"
 )
 
+// Init initializes the bubbletea model
 func (m SubmitTUIModel) Init() tea.Cmd {
 	// Start spinner and first submission
 	if len(m.items) > 0 {
@@ -92,6 +93,7 @@ func (m SubmitTUIModel) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles message updates for the bubbletea model
 func (m SubmitTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -135,6 +137,7 @@ func (m SubmitTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View renders the bubbletea model
 func (m SubmitTUIModel) View() string {
 	if m.quitting {
 		return ""

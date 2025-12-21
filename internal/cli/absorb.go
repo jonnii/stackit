@@ -26,7 +26,7 @@ and finding the first commit that each staged hunk (consecutive lines of changes
 If there is no clear commit to absorb a hunk into, it will not be absorbed.
 
 Prompts for confirmation before amending the commits, and restacks the branches upstack of the current branch.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

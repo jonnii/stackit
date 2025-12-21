@@ -15,29 +15,40 @@ import (
 type MergeStrategy string
 
 const (
+	// MergeStrategyBottomUp merges PRs from the bottom of the stack up to the current branch
 	MergeStrategyBottomUp MergeStrategy = "bottom-up"
-	MergeStrategyTopDown  MergeStrategy = "top-down"
+	// MergeStrategyTopDown merges the entire stack into a single PR
+	MergeStrategyTopDown MergeStrategy = "top-down"
 )
 
 // StepType represents the type of step in a merge plan
 type StepType string
 
 const (
-	StepMergePR      StepType = "MERGE_PR"
-	StepRestack      StepType = "RESTACK"
+	// StepMergePR represents merging a PR
+	StepMergePR StepType = "MERGE_PR"
+	// StepRestack represents restacking a branch onto its parent
+	StepRestack StepType = "RESTACK"
+	// StepDeleteBranch represents deleting a local branch
 	StepDeleteBranch StepType = "DELETE_BRANCH"
+	// StepUpdatePRBase represents updating a PR's base branch
 	StepUpdatePRBase StepType = "UPDATE_PR_BASE"
-	StepPullTrunk    StepType = "PULL_TRUNK"
+	// StepPullTrunk represents pulling the trunk branch
+	StepPullTrunk StepType = "PULL_TRUNK"
 )
 
 // ChecksStatus represents the CI check status for a PR
 type ChecksStatus string
 
 const (
+	// ChecksPassing indicates all checks passed
 	ChecksPassing ChecksStatus = "PASSING"
+	// ChecksFailing indicates at least one check failed
 	ChecksFailing ChecksStatus = "FAILING"
+	// ChecksPending indicates checks are still running
 	ChecksPending ChecksStatus = "PENDING"
-	ChecksNone    ChecksStatus = "NONE"
+	// ChecksNone indicates no checks are configured
+	ChecksNone ChecksStatus = "NONE"
 )
 
 // BranchMergeInfo contains info about a branch to be merged
@@ -188,21 +199,22 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		if ctx.GitHubClient != nil {
 			var checkErr error
 			passing, pending, checkErr = ctx.GitHubClient.GetPRChecksStatus(c, branchName)
-			if checkErr != nil {
+			switch {
+			case checkErr != nil:
 				splog.Debug("Failed to get PR checks status for %s: %v", branchName, checkErr)
 				// Don't fail on check status errors, just mark as none
-			} else if pending {
+			case pending:
 				checksStatus = ChecksPending
 				if !opts.Force {
 					validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s PR #%d has pending CI checks", branchName, *prInfo.Number))
 				}
-			} else if !passing {
+			case !passing:
 				checksStatus = ChecksFailing
 				if !opts.Force {
 					validation.Valid = false
 					validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number))
 				}
-			} else {
+			default:
 				checksStatus = ChecksPassing
 			}
 		}
@@ -512,13 +524,14 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 		return fmt.Sprintf("local: %s, remote: %s (likely local is ahead)", localShort, remoteShort)
 	}
 
-	if commonAncestor == localSha {
+	switch {
+	case commonAncestor == localSha:
 		// Local is behind remote
 		return fmt.Sprintf("local is behind remote (local: %s, remote: %s)", localShort, remoteShort)
-	} else if commonAncestor == remoteSha {
+	case commonAncestor == remoteSha:
 		// Local is ahead of remote
 		return fmt.Sprintf("local is ahead of remote (local: %s, remote: %s)", localShort, remoteShort)
-	} else {
+	default:
 		// Diverged
 		return fmt.Sprintf("local and remote have diverged (local: %s, remote: %s)", localShort, remoteShort)
 	}

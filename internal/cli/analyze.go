@@ -18,7 +18,7 @@ func newAnalyzeCmd() *cobra.Command {
 		Use:   "analyze",
 		Short: "Analyze staged changes and suggest a stack structure",
 		Long:  "Uses AI to analyze your staged changes and suggest how to split them into a logical stack of branches.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

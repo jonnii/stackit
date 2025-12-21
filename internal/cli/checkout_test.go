@@ -11,6 +11,7 @@ import (
 )
 
 func TestCheckoutCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("direct checkout with branch name", func(t *testing.T) {

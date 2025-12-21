@@ -12,6 +12,7 @@ import (
 )
 
 func TestRestackCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("restack auto-reparents when parent is merged into trunk", func(t *testing.T) {

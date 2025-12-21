@@ -20,7 +20,7 @@ func newParentCmd() *cobra.Command {
 Displays the name of the branch that is the parent of the current branch
 in the stack. This is useful for understanding the structure of your stack
 and seeing which branch the current branch is based on.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

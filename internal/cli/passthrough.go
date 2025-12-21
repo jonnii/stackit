@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -73,7 +74,8 @@ func HandlePassthrough(args []string) bool {
 	// Execute git command
 	err := gitCmd.Run()
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			os.Exit(exitError.ExitCode())
 		}
 		os.Exit(1)

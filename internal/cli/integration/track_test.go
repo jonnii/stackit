@@ -5,6 +5,7 @@ import (
 )
 
 func TestTrackIntegration(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("recover from metadata corruption after git operations", func(t *testing.T) {

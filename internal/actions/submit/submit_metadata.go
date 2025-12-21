@@ -1,3 +1,4 @@
+// Package submit provides functionality for submitting stacked branches as pull requests.
 package submit
 
 import (
@@ -78,7 +79,7 @@ func GetPRBody(branchName string, editInline bool, existingBody string, ctx *run
 }
 
 // GetReviewers gets reviewers from flag or prompts user
-func GetReviewers(reviewersFlag string, ctx *runtime.Context) ([]string, []string, error) {
+func GetReviewers(reviewersFlag string, _ *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Don't prompt by default - return empty
 		return nil, nil, nil
@@ -90,7 +91,7 @@ func GetReviewers(reviewersFlag string, ctx *runtime.Context) ([]string, []strin
 }
 
 // GetReviewersWithPrompt gets reviewers, prompting if flag is empty
-func GetReviewersWithPrompt(reviewersFlag string, ctx *runtime.Context) ([]string, []string, error) {
+func GetReviewersWithPrompt(reviewersFlag string, _ *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
 		// Prompt for reviewers
 		result, err := tui.PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
@@ -172,14 +173,15 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	}
 
 	// Get draft status - respect flags, default to published (not draft)
-	if opts.Draft {
+	switch {
+	case opts.Draft:
 		metadata.IsDraft = true
-	} else if opts.Publish {
+	case opts.Publish:
 		metadata.IsDraft = false
-	} else if prInfo == nil {
+	case prInfo == nil:
 		// New PR - default to published (not draft)
 		metadata.IsDraft = false
-	} else {
+	default:
 		metadata.IsDraft = prInfo.IsDraft
 	}
 
@@ -225,7 +227,7 @@ type MetadataOptions struct {
 	Reviewers         string
 	ReviewersPrompt   bool
 	AI                bool
-	AIClient          ai.AIClient
+	AIClient          ai.Client
 }
 
 // PRMetadata contains PR metadata

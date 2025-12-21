@@ -6,6 +6,7 @@ import (
 	"context"
 )
 
+// StackLayer represents a layer in a proposed stack of branches.
 type StackLayer struct {
 	BranchName    string
 	Files         []string
@@ -13,12 +14,13 @@ type StackLayer struct {
 	CommitMessage string
 }
 
+// StackSuggestion represents a proposed stack structure for changes.
 type StackSuggestion struct {
 	Layers []StackLayer
 }
 
-// AIClient defines the interface for AI-powered PR description generation.
-type AIClient interface {
+// Client defines the interface for AI-powered PR description generation.
+type Client interface {
 	// GeneratePRDescription generates a PR title and body from the provided context.
 	// The context parameter is used for cancellation and timeout handling.
 	// The prContext contains all necessary information about the branch, commits, diffs, etc.

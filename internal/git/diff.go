@@ -20,14 +20,8 @@ func IsDiffEmpty(ctx context.Context, branchName, baseRevision string) (bool, er
 	}
 
 	// Use git diff to check if there are any changes
-	diffOutput, err := RunGitCommandWithContext(ctx, "diff", "--quiet", baseRevision, branchRev)
-	if err != nil {
-		// diff --quiet returns non-zero if there are differences
-		return false, nil
-	}
-
-	// If diff --quiet succeeds, there are no differences
-	return diffOutput == "", nil
+	_, err = RunGitCommandWithContext(ctx, "diff", "--quiet", baseRevision, branchRev)
+	return err == nil, nil
 }
 
 // GetUnmergedFiles returns list of files with merge conflicts
@@ -35,7 +29,7 @@ func GetUnmergedFiles(ctx context.Context) ([]string, error) {
 	output, err := RunGitCommandWithContext(ctx, "diff", "--name-only", "--diff-filter=U")
 	if err != nil {
 		// If there are no unmerged files, return empty list
-		return []string{}, nil
+		return []string{}, nil //nolint:nilerr
 	}
 	if output == "" {
 		return []string{}, nil
@@ -57,11 +51,12 @@ func ShowDiff(ctx context.Context, left, right string, stat bool) (string, error
 // base can be empty string for trunk (will use head~), or a revision for regular branches
 func ShowCommits(ctx context.Context, base, head string, patch, stat bool) (string, error) {
 	args := []string{"-c", "color.ui=always", "--no-pager", "log"}
-	if patch && stat {
+	switch {
+	case patch && stat:
 		args = append(args, "--stat")
-	} else if patch {
+	case patch:
 		args = append(args, "-p")
-	} else {
+	default:
 		// Default to oneline format if no patch
 		args = append(args, "--pretty=format:%h - %s")
 	}

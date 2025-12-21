@@ -212,7 +212,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 
 	// Build list of candidate parents (trunk + all tracked branches)
 	var choices []tui.BranchChoice
-	var initialIndex int = -1
+	initialIndex := -1
 
 	// Add trunk first
 	display := branchToDisplay[trunk]

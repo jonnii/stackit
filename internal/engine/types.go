@@ -22,10 +22,15 @@ type Scope struct {
 type ValidationResult int
 
 const (
+	// ValidationResultValid indicates the branch is valid
 	ValidationResultValid ValidationResult = iota
+	// ValidationResultInvalidParent indicates the branch has an invalid parent
 	ValidationResultInvalidParent
+	// ValidationResultBadParentRevision indicates the branch has a bad parent revision
 	ValidationResultBadParentRevision
+	// ValidationResultBadParentName indicates the branch has a bad parent name
 	ValidationResultBadParentName
+	// ValidationResultTrunk indicates the branch is a trunk
 	ValidationResultTrunk
 )
 
@@ -33,8 +38,11 @@ const (
 type PullResult int
 
 const (
+	// PullDone indicates the pull was successful
 	PullDone PullResult = iota
+	// PullUnneeded indicates no pull was needed
 	PullUnneeded
+	// PullConflict indicates a conflict occurred during pull
 	PullConflict
 )
 
@@ -42,8 +50,11 @@ const (
 type RestackResult int
 
 const (
+	// RestackDone indicates the restack was successful
 	RestackDone RestackResult = iota
+	// RestackUnneeded indicates no restack was needed
 	RestackUnneeded
+	// RestackConflict indicates a conflict occurred during restack
 	RestackConflict
 )
 

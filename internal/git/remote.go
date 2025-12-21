@@ -10,7 +10,7 @@ func PruneRemote(ctx context.Context, remote string) error {
 	_, err := RunGitCommandWithContext(ctx, "remote", "prune", remote)
 	if err != nil {
 		// Prune is not critical, just log and continue
-		return nil
+		return nil //nolint:nilerr
 	}
 	return nil
 }

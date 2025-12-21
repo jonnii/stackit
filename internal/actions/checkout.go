@@ -33,12 +33,13 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	var err error
 
 	// Handle --trunk flag
-	if opts.CheckoutTrunk {
+	switch {
+	case opts.CheckoutTrunk:
 		branchName = eng.Trunk()
-	} else if opts.BranchName != "" {
+	case opts.BranchName != "":
 		// Direct checkout
 		branchName = opts.BranchName
-	} else {
+	default:
 		// Interactive selection
 		branchName, err = interactiveBranchSelection(ctx, opts)
 		if err != nil {
@@ -67,7 +68,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 // interactiveBranchSelection shows an interactive branch selector
 func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (string, error) {
 	var choices []tui.BranchChoice
-	var initialIndex int = -1
+	initialIndex := -1
 	currentBranch := ctx.Engine.CurrentBranch()
 	seenBranches := make(map[string]bool)
 

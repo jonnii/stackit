@@ -18,9 +18,12 @@ import (
 type SplitStyle string
 
 const (
+	// SplitStyleCommit splits by selecting commit points
 	SplitStyleCommit SplitStyle = "commit"
-	SplitStyleHunk   SplitStyle = "hunk"
-	SplitStyleFile   SplitStyle = "file"
+	// SplitStyleHunk splits by interactively staging hunks
+	SplitStyleHunk SplitStyle = "hunk"
+	// SplitStyleFile splits by extracting specified files
+	SplitStyleFile SplitStyle = "file"
 )
 
 // SplitOptions contains options for the split command
@@ -89,11 +92,12 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 				return fmt.Errorf("canceled")
 			}
 
-			if strings.Contains(styleStr, "Cancel") {
+			switch {
+			case strings.Contains(styleStr, "Cancel"):
 				return fmt.Errorf("canceled")
-			} else if strings.Contains(styleStr, "commit") {
+			case strings.Contains(styleStr, "commit"):
 				style = SplitStyleCommit
-			} else if strings.Contains(styleStr, "hunk") {
+			case strings.Contains(styleStr, "hunk"):
 				style = SplitStyleHunk
 			}
 		} else {
@@ -456,7 +460,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 	newBranchName := branchToSplit + "_split"
 	allBranches := eng.AllBranchNames()
 	for containsString(allBranches, newBranchName) {
-		newBranchName = newBranchName + "_split"
+		newBranchName += "_split"
 	}
 
 	// First checkout the parent branch so the new branch starts from there
@@ -532,7 +536,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 	if containsString(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"
 		for containsString(existingNames, defaultName) {
-			defaultName = defaultName + "_split"
+			defaultName += "_split"
 		}
 	}
 

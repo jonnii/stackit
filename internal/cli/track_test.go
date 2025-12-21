@@ -11,6 +11,7 @@ import (
 )
 
 func TestTrackCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("track with --parent flag tracks single branch", func(t *testing.T) {

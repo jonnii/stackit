@@ -22,7 +22,7 @@ func isInteractive() bool {
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
-// inferTrunk attempts to infer the trunk branch name
+// InferTrunk attempts to infer the trunk branch name
 // Exported so it can be used by other commands
 func InferTrunk(ctx context.Context, branchNames []string) string {
 	// First, try to find a remote branch (check origin)
@@ -134,7 +134,7 @@ func newInitCmd() *cobra.Command {
 		Use:     "init",
 		Aliases: []string{"i"},
 		Short:   "Initialize Stackit in the current repository",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)

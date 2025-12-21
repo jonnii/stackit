@@ -5,7 +5,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/config"
@@ -25,7 +24,7 @@ type CreateOptions struct {
 	Update     bool
 	Verbose    int
 	AI         bool
-	AIClient   ai.AIClient
+	AIClient   ai.Client
 }
 
 // CreateAction creates a new branch stacked on top of the current branch
@@ -237,13 +236,8 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 			return err
 		}
 
-		if strings.ToLower(response) == "all" {
-			toMove = siblings
-		} else {
-			// Parse comma-separated numbers
-			// For now, just move all - proper parsing can be added later
-			toMove = siblings
-		}
+		toMove = siblings
+		_ = response // For now, just move all - proper parsing can be added later
 	} else {
 		// Single child or non-interactive - move all
 		toMove = siblings

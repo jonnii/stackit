@@ -36,8 +36,7 @@ func (m textInputModel) Init() tea.Cmd {
 func (m textInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
 			m.done = true
@@ -74,8 +73,7 @@ func (m confirmModel) Init() tea.Cmd {
 }
 
 func (m confirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
 			m.done = true
@@ -194,8 +192,7 @@ func (m selectModel) Init() tea.Cmd {
 }
 
 func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
 			if len(m.options) > 0 && m.cursor >= 0 && m.cursor < len(m.options) {
@@ -308,8 +305,7 @@ func (m branchSelectModel) Init() tea.Cmd {
 }
 
 func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {

@@ -25,7 +25,7 @@ func newMoveCmd() *cobra.Command {
 		Long: `Rebase the current branch onto the target branch and restack all of its descendants.
 
 If no branch is passed in, opens an interactive selector to choose the target branch.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
@@ -70,8 +70,7 @@ If no branch is passed in, opens an interactive selector to choose the target br
 // interactiveOntoSelection shows an interactive branch selector for choosing the "onto" branch
 func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string, error) {
 	eng := ctx.Engine
-	var choices []tui.BranchChoice
-	var initialIndex int = -1
+	initialIndex := -1
 	seenBranches := make(map[string]bool)
 
 	// Get descendants of source to exclude them
@@ -89,6 +88,7 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	trunkName := eng.Trunk()
 	branchOrder := collectBranchesDepthFirst(trunkName, ctx)
 
+	choices := make([]tui.BranchChoice, 0, len(branchOrder))
 	for _, branchName := range branchOrder {
 		// Skip source and its descendants
 		if excludedBranches[branchName] {

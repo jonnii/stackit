@@ -67,7 +67,7 @@ func FindRemoteBranch(ctx context.Context, remote string) (string, error) {
 	// Format: "branch.<name>.remote <remote>"
 	output, err := RunGitCommandWithContext(ctx, "config", "--get-regexp", "^branch\\..*\\.remote$")
 	if err != nil {
-		return "", nil // No remote branches configured
+		return "", nil //nolint:nilerr // git config returns 1 if no branches match
 	}
 
 	if output == "" {

@@ -17,7 +17,7 @@ func newLogCmd() *cobra.Command {
 		Use:     "log",
 		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
 		Aliases: []string{"l"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},
 	}
@@ -86,7 +86,7 @@ func newLogShortCmd() *cobra.Command {
 		Use:     "short",
 		Short:   "Log branches in a compact format",
 		Aliases: []string{"ls"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "SHORT")
 		},
 	}
@@ -100,7 +100,7 @@ func newLogLongCmd() *cobra.Command {
 		Use:     "long",
 		Short:   "Log branches with full details",
 		Aliases: []string{"ll"},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},
 	}
@@ -114,7 +114,7 @@ func newLsCmd() *cobra.Command {
 		Use:    "ls",
 		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
 		Short:  "Alias for log short",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "SHORT")
 		},
 	}
@@ -128,7 +128,7 @@ func newLlCmd() *cobra.Command {
 		Use:    "ll",
 		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
 		Short:  "Alias for log long",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},
 	}

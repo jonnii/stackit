@@ -3,13 +3,14 @@ package ai
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-// CursorAgentClient implements AIClient using cursor-agent CLI
+// CursorAgentClient implements Client using cursor-agent CLI
 type CursorAgentClient struct{}
 
 // NewCursorAgentClient creates a new CursorAgentClient
@@ -111,7 +112,8 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	err := cmd.Run()
 	if err != nil {
 		// Check if cursor-agent is not found
-		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
 			return "", fmt.Errorf("cursor-agent not found in PATH")
 		}
 
@@ -122,7 +124,8 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 		// Build detailed error message
 		var errorMsg strings.Builder
 		errorMsg.WriteString("cursor-agent failed with exit code")
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			errorMsg.WriteString(fmt.Sprintf(" %d", exitError.ExitCode()))
 		}
 		errorMsg.WriteString(fmt.Sprintf(": %v\n", err))
@@ -154,7 +157,7 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	// Extract just the commit message from the output
 	// cursor-agent might return additional formatting, so we clean it up
 	lines := strings.Split(output, "\n")
-	var messageLines []string
+	messageLines := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		// Skip empty lines and common prefixes
@@ -378,13 +381,14 @@ func parseStackSuggestion(response string) (*StackSuggestion, error) {
 		// Message: "message: ..." or "commit: ..." or "- message: ..."
 		if strings.HasPrefix(trimmed, "message:") || strings.HasPrefix(trimmed, "commit:") || strings.HasPrefix(trimmed, "- message:") || strings.HasPrefix(trimmed, "- commit:") {
 			message := ""
-			if strings.HasPrefix(trimmed, "message:") {
+			switch {
+			case strings.HasPrefix(trimmed, "message:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "message:"))
-			} else if strings.HasPrefix(trimmed, "commit:") {
+			case strings.HasPrefix(trimmed, "commit:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "commit:"))
-			} else if strings.HasPrefix(trimmed, "- message:") {
+			case strings.HasPrefix(trimmed, "- message:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- message:"))
-			} else {
+			default:
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- commit:"))
 			}
 			currentLayer.CommitMessage = strings.Trim(message, `"'`)

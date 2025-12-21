@@ -26,7 +26,7 @@ This command does not perform any action on GitHub or the remote repository.
 If you delete a branch with an open pull request, you will need to manually
 close the pull request.`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			_ = downstack // Will be used when implemented
 			_ = force     // Will be used when implemented
 			_ = upstack   // Will be used when implemented

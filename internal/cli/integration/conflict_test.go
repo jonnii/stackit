@@ -16,6 +16,7 @@ func TestConflictResolution(t *testing.T) {
 	binaryPath := getStackitBinary(t)
 
 	t.Run("continue through cascading conflicts in stack", func(t *testing.T) {
+		t.Parallel()
 		// TODO: Implement multi-level conflict resolution test
 		//
 		// Scenario:
@@ -42,6 +43,7 @@ func TestConflictResolution(t *testing.T) {
 	})
 
 	t.Run("continue preserves stack structure after mid-stack conflict", func(t *testing.T) {
+		t.Parallel()
 		// TODO: Implement mid-stack conflict preservation test
 		//
 		// Scenario:

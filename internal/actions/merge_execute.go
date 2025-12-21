@@ -271,7 +271,7 @@ func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase str
 	pr, err := ctx.GitHubClient.GetPullRequestByBranch(ctx.Context, owner, repo, branchName)
 	if err != nil || pr == nil {
 		// PR not found or error - non-fatal
-		return nil
+		return nil //nolint:nilerr
 	}
 
 	// Update PR base

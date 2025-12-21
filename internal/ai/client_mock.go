@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// MockClient is a mock implementation of AIClient for testing purposes.
+// MockClient is a mock implementation of Client for testing purposes.
 // It allows setting predefined responses and errors without making actual API calls.
 type MockClient struct {
 	mu                sync.Mutex
@@ -32,9 +32,9 @@ func NewMockClient() *MockClient {
 	}
 }
 
-// GeneratePRDescription implements AIClient interface.
+// GeneratePRDescription implements Client interface.
 // Returns the mock response if set, otherwise returns an error.
-func (m *MockClient) GeneratePRDescription(ctx context.Context, prContext *PRContext) (string, string, error) {
+func (m *MockClient) GeneratePRDescription(_ context.Context, prContext *PRContext) (string, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -92,9 +92,9 @@ func (m *MockClient) Reset() {
 	m.callContexts = make([]*PRContext, 0)
 }
 
-// GenerateCommitMessage implements AIClient interface.
+// GenerateCommitMessage implements Client interface.
 // Returns the mock commit message if set, otherwise returns an error.
-func (m *MockClient) GenerateCommitMessage(ctx context.Context, diff string) (string, error) {
+func (m *MockClient) GenerateCommitMessage(_ context.Context, diff string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -142,8 +142,8 @@ func (m *MockClient) LastDiff() string {
 	return m.lastDiff
 }
 
-// GenerateStackSuggestion implements AIClient interface.
-func (m *MockClient) GenerateStackSuggestion(ctx context.Context, diff string) (*StackSuggestion, error) {
+// GenerateStackSuggestion implements Client interface.
+func (m *MockClient) GenerateStackSuggestion(_ context.Context, diff string) (*StackSuggestion, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -160,6 +160,8 @@ func (m *MockClient) GenerateStackSuggestion(ctx context.Context, diff string) (
 
 	return m.mockSuggestion, nil
 }
+
+var _ Client = (*MockClient)(nil)
 
 // SetMockSuggestion sets the mock suggestion to return for GenerateStackSuggestion.
 func (m *MockClient) SetMockSuggestion(suggestion *StackSuggestion) {

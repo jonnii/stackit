@@ -134,7 +134,7 @@ func newInitCmd() *cobra.Command {
 		Use:     "init",
 		Aliases: []string{"i"},
 		Short:   "Initialize Stackit in the current repository",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)

@@ -194,7 +194,7 @@ func collectRelatedPRs(ctx context.Context, eng engine.Engine, branchName string
 	}
 	relatedBranches := eng.GetRelativeStack(branchName, scope)
 
-	var relatedPRs []RelatedPR
+	relatedPRs := make([]RelatedPR, 0, len(relatedBranches))
 	for _, relatedBranch := range relatedBranches {
 		prInfo, err := eng.GetPrInfo(ctx, relatedBranch)
 		if err != nil || prInfo == nil {

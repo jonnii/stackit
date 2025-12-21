@@ -20,7 +20,7 @@ func newAbortCmd() *cobra.Command {
 This command cancels any in-progress operation (such as restack, sync, or merge)
 that has been paused due to a rebase conflict. Any changes made during the
 operation will be rolled back.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			_ = force // Will be used when implemented
 			return fmt.Errorf("abort command not yet implemented")
 		},

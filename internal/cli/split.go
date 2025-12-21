@@ -30,7 +30,7 @@ split -F (--by-file-interactive) shows an interactive file selector.
 split without options will prompt for a splitting strategy.`,
 		// Disable default help flag to allow -h for --by-hunk
 		DisableFlagParsing: false,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

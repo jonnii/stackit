@@ -154,7 +154,7 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	// Extract just the commit message from the output
 	// cursor-agent might return additional formatting, so we clean it up
 	lines := strings.Split(output, "\n")
-	var messageLines []string
+	messageLines := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		// Skip empty lines and common prefixes

@@ -26,7 +26,7 @@ combine its changes with its parent branch.
 This command does not perform any action on GitHub or the remote repository.
 If you fold a branch with an open pull request, you will need to manually
 close the pull request.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

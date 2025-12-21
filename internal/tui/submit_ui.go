@@ -87,7 +87,7 @@ func (u *SimpleSubmitUI) ShowPreparing() {
 	// Skip - we'll show progress during actual submission
 }
 
-func (u *SimpleSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent bool, skip bool, skipReason string) {
+func (u *SimpleSubmitUI) ShowBranchPlan(branchName string, _ string, isCurrent bool, skip bool, skipReason string) {
 	// Only show if skipping (important info), otherwise we'll show during submission
 	if skip {
 		displayName := branchName

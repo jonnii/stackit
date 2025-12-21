@@ -14,7 +14,7 @@ func GetMergeBase(ctx context.Context, branch1, branch2 string) (string, error) 
 }
 
 // GetMergeBaseByRef returns the merge base between two refs (can be branches or remote refs)
-func GetMergeBaseByRef(ctx context.Context, ref1Name, ref2Name string) (string, error) {
+func GetMergeBaseByRef(_ context.Context, ref1Name, ref2Name string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err

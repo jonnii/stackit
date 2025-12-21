@@ -74,7 +74,7 @@ func buildBranchSection(prContext *PRContext) string {
 
 // buildCommitSection formats commit messages
 func buildCommitSection(commitMessages []string) string {
-	var lines []string
+	lines := make([]string, 0, len(commitMessages)+2)
 	lines = append(lines, "## Commit Messages")
 	lines = append(lines, "")
 	for i, msg := range commitMessages {

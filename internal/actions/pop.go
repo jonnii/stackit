@@ -15,7 +15,7 @@ type PopOptions struct {
 }
 
 // PopAction deletes the current branch but retains the state of files in the working tree
-func PopAction(ctx *runtime.Context, opts PopOptions) error {
+func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 

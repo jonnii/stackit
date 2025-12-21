@@ -150,8 +150,8 @@ func (e *DemoEngine) GetRelativeStack(branchName string, scope engine.Scope) []s
 }
 
 func (e *DemoEngine) getDescendants(branchName string) []string {
-	var result []string
 	children := e.childrenMap[branchName]
+	result := make([]string, 0, len(children))
 	for _, child := range children {
 		result = append(result, child)
 		result = append(result, e.getDescendants(child)...)

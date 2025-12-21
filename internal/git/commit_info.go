@@ -10,7 +10,7 @@ import (
 )
 
 // GetCommitDate returns the commit date for a branch
-func GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
+func GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return time.Time{}, err
@@ -30,7 +30,7 @@ func GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
+func GetCommitAuthor(_ context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -50,7 +50,7 @@ func GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
 }
 
 // GetRevision returns the SHA of a branch
-func GetRevision(ctx context.Context, branchName string) (string, error) {
+func GetRevision(_ context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -65,7 +65,7 @@ func GetRevision(ctx context.Context, branchName string) (string, error) {
 }
 
 // GetRemoteRevision returns the SHA of a remote branch (e.g., origin/branchName)
-func GetRemoteRevision(ctx context.Context, branchName string) (string, error) {
+func GetRemoteRevision(_ context.Context, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err

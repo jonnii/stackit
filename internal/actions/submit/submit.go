@@ -146,7 +146,6 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Start submission phase
 	ui.StartSubmitting(progressItems)
 
-	githubCtx := context
 	githubClient, err := getGitHubClient(ctx)
 	if err != nil {
 		return err
@@ -169,9 +168,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 			actionUpdate = "update"
 		)
 		if submissionInfo.Action == actionCreate {
-			prURL, err = createPullRequestQuiet(context, submissionInfo, eng, githubCtx, githubClient, repoOwner, repoName)
+			prURL, err = createPullRequestQuiet(context, submissionInfo, eng, githubClient, repoOwner, repoName)
 		} else {
-			prURL, err = updatePullRequestQuiet(context, submissionInfo, opts, eng, githubCtx, githubClient, repoOwner, repoName)
+			prURL, err = updatePullRequestQuiet(context, submissionInfo, opts, eng, githubClient, repoOwner, repoName)
 		}
 
 		if err != nil {
@@ -203,7 +202,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	if footerEnabled {
-		updatePRFootersQuiet(context, branches, eng, githubCtx, githubClient, repoOwner, repoName)
+		updatePRFootersQuiet(context, branches, eng, githubClient, repoOwner, repoName)
 	}
 
 	ui.Complete()
@@ -213,7 +212,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 // prepareBranchesForSubmit prepares submission info for each branch, outputting via UI
 func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
-	var submissionInfos []Info
+	submissionInfos := make([]Info, 0, len(branches))
 
 	// Determine AI preference: flag takes precedence, then config default
 	aiEnabled := opts.AI
@@ -393,7 +392,7 @@ func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, 
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
 	createOpts := github.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -403,7 +402,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 		Reviewers:     submissionInfo.Metadata.Reviewers,
 		TeamReviewers: submissionInfo.Metadata.TeamReviewers,
 	}
-	pr, err := githubClient.CreatePullRequest(githubCtx, repoOwner, repoName, createOpts)
+	pr, err := githubClient.CreatePullRequest(ctx, repoOwner, repoName, createOpts)
 	if err != nil {
 		return "", fmt.Errorf("failed to create PR for %s: %w", submissionInfo.BranchName, err)
 	}
@@ -425,7 +424,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
 	// Check if base changed
 	prInfo, _ := eng.GetPrInfo(ctx, submissionInfo.BranchName)
 	baseChanged := false
@@ -449,7 +448,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 	if baseChanged {
 		updateOpts.Base = &submissionInfo.Base
 	}
-	if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
+	if err := githubClient.UpdatePullRequest(ctx, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
 		return "", fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
 	}
 
@@ -460,7 +459,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		prURL = prInfo.URL
 	} else {
 		// Get from GitHub
-		pr, err := githubClient.GetPullRequestByBranch(githubCtx, repoOwner, repoName, submissionInfo.BranchName)
+		pr, err := githubClient.GetPullRequestByBranch(ctx, repoOwner, repoName, submissionInfo.BranchName)
 		if err == nil && pr != nil {
 			prURL = pr.HTMLURL
 		}
@@ -480,7 +479,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 }
 
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubCtx context.Context, githubClient github.GitHubClient, repoOwner, repoName string) {
+func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubClient github.GitHubClient, repoOwner, repoName string) {
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(ctx, branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {
@@ -494,7 +493,7 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 			updateOpts := github.UpdatePROptions{
 				Body: &updatedBody,
 			}
-			if err := githubClient.UpdatePullRequest(githubCtx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
+			if err := githubClient.UpdatePullRequest(ctx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
 				continue
 			}
 		}

@@ -17,7 +17,7 @@ func newReorderCmd() *cobra.Command {
 Opens an editor where you can reorder branches by moving around a line
 corresponding to each branch. After saving and closing the editor, the
 branches will be restacked in the new order.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

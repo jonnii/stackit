@@ -16,7 +16,7 @@ type simpleHandler struct {
 	debugMode bool
 }
 
-func (h *simpleHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (h *simpleHandler) Enabled(_ context.Context, level slog.Level) bool {
 	// Debug messages only enabled in debug mode
 	if level == slog.LevelDebug {
 		return h.debugMode
@@ -25,16 +25,16 @@ func (h *simpleHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return true
 }
 
-func (h *simpleHandler) Handle(ctx context.Context, record slog.Record) error {
+func (h *simpleHandler) Handle(_ context.Context, record slog.Record) error {
 	_, err := fmt.Fprintln(h.writer, record.Message)
 	return err
 }
 
-func (h *simpleHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (h *simpleHandler) WithAttrs(_ []slog.Attr) slog.Handler {
 	return h
 }
 
-func (h *simpleHandler) WithGroup(name string) slog.Handler {
+func (h *simpleHandler) WithGroup(_ string) slog.Handler {
 	return h
 }
 

@@ -344,17 +344,21 @@ func TestRestackBranch(t *testing.T) {
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 	})
 
-	t.Run("returns error when branch is not tracked", func(t *testing.T) {
+	t.Run("auto-tracks branch when branch is not tracked", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
 			CreateBranch("branch1").
-			Commit("branch1 change").
-			Checkout("main")
+			Commit("branch1 change")
 
-		// Don't track the branch
+		// Don't track the branch explicitly
+		// RestackBranch should auto-discover parent (main) and succeed
+		// In this case, main is still at the fork point, so FindMostRecentTrackedAncestors finds it.
 		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
-		require.Error(t, err)
+		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
-		require.Contains(t, err.Error(), "not tracked")
+
+		// Verify it is now tracked
+		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.Equal(t, "main", s.Engine.GetParent("branch1"))
 	})
 }
 

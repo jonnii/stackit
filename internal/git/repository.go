@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-git/go-git/v5"
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // Repository wraps a go-git repository
 type Repository struct {
-	*git.Repository
+	*gogit.Repository
 	path string
 }
 
@@ -37,7 +37,7 @@ func OpenRepository(path string) (*Repository, error) {
 	}
 
 	// Open repository
-	repo, err := git.PlainOpenWithOptions(absPath, &git.PlainOpenOptions{
+	repo, err := gogit.PlainOpenWithOptions(absPath, &gogit.PlainOpenOptions{
 		DetectDotGit: true,
 	})
 	if err != nil {

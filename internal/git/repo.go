@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-git/go-git/v5"
+	gogit "github.com/go-git/go-git/v5"
 )
 
 // GetRepoRoot returns the root directory of the Git repository
@@ -16,7 +16,7 @@ func GetRepoRoot() (string, error) {
 	}
 
 	// Use go-git to find the repository
-	repo, err := git.PlainOpenWithOptions(wd, &git.PlainOpenOptions{
+	repo, err := gogit.PlainOpenWithOptions(wd, &gogit.PlainOpenOptions{
 		DetectDotGit: true,
 	})
 	if err != nil {

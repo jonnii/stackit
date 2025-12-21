@@ -25,7 +25,7 @@ func TestTrackIntegration(t *testing.T) {
 			OutputContains("feature2")
 
 		// Corrupt metadata by manually deleting a metadata ref
-		shell.Git("update-ref -d refs/branch-metadata/feature2")
+		shell.Git("update-ref -d refs/stackit/metadata/feature2")
 
 		// Verify feature2 is no longer tracked
 		shell.Checkout("feature2").
@@ -232,8 +232,8 @@ func TestTrackIntegration(t *testing.T) {
 
 		// Simulate force push on remote (someone else rewrote history)
 		// This would break local tracking. Delete metadata to simulate
-		shell.Git("update-ref -d refs/branch-metadata/feature-a").
-			Git("update-ref -d refs/branch-metadata/feature-b")
+		shell.Git("update-ref -d refs/stackit/metadata/feature-a").
+			Git("update-ref -d refs/stackit/metadata/feature-b")
 
 		// Re-track the branches
 		shell.Run("track feature-a --parent main").
@@ -290,7 +290,7 @@ func TestTrackIntegration(t *testing.T) {
 		// Delete and recreate feature-b (simulating branch recreation)
 		shell.Checkout("main").
 			Git("branch -D feature-b").
-			Git("update-ref -d refs/branch-metadata/feature-b").
+			Git("update-ref -d refs/stackit/metadata/feature-b").
 			Git("checkout -b feature-b").
 			Write("b.go", "package main").
 			Commit("b.go", "Add feature B recreated")
@@ -353,10 +353,10 @@ func TestTrackIntegration(t *testing.T) {
 			Run("create feature-d -m 'Add feature D'")
 
 		// Corrupt all metadata
-		shell.Git("update-ref -d refs/branch-metadata/feature-a").
-			Git("update-ref -d refs/branch-metadata/feature-b").
-			Git("update-ref -d refs/branch-metadata/feature-c").
-			Git("update-ref -d refs/branch-metadata/feature-d")
+		shell.Git("update-ref -d refs/stackit/metadata/feature-a").
+			Git("update-ref -d refs/stackit/metadata/feature-b").
+			Git("update-ref -d refs/stackit/metadata/feature-c").
+			Git("update-ref -d refs/stackit/metadata/feature-d")
 
 		// Recover the entire stack using --force
 		shell.Run("track feature-a --force").

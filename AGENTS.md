@@ -2,12 +2,12 @@
 
 Go-based CLI tool for managing stacked changes in Git repositories.
 
-**Tech stack:** Go 1.22, Cobra, Just (justfile)
+**Tech stack:** Go 1.24, Cobra, Just (justfile)
 
 ## Architecture
 
 - `cmd/stackit`: CLI entry point and command definitions.
-- `internal/actions`: High-level business logic for CLI commands (create, submit, sync, etc.).
+- `internal/actions`: High-level business logic for CLI commands (create, submit, sync, undo, etc.).
 - `internal/engine`: Core logic for managing stacked branches, metadata state, and branch relationships.
 - `internal/git`: Low-level Git operations (executing git commands, reading config, managing refs).
 - `internal/utils`: Shared utilities for branch naming, sanitization, and UI helpers.

@@ -8,7 +8,7 @@ import (
 
 const (
 	// MaxBranchNameByteLength is the maximum length for a branch name
-	// Git refs have a max length of 256 bytes, minus 22 for "refs/branch-metadata/"
+	// Git refs have a max length of 256 bytes, minus 22 for "refs/stackit/metadata/"
 	MaxBranchNameByteLength = 234
 )
 

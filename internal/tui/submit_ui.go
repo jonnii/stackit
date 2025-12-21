@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -59,6 +60,7 @@ type SimpleSubmitUI struct {
 	items     []SubmitItem
 	completed int
 	failed    int
+	mu        sync.Mutex
 }
 
 // NewSimpleSubmitUI creates a new simple submit UI
@@ -115,6 +117,9 @@ func (u *SimpleSubmitUI) ShowDryRunComplete() {
 
 // StartSubmitting begins the actual submission phase
 func (u *SimpleSubmitUI) StartSubmitting(items []SubmitItem) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	u.items = items
 	u.completed = 0
 	u.failed = 0
@@ -124,6 +129,9 @@ func (u *SimpleSubmitUI) StartSubmitting(items []SubmitItem) {
 
 // UpdateSubmitItem updates the status of a specific branch submission
 func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url string, err error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	var item *SubmitItem
 	var itemIdx int
 	for i := range u.items {
@@ -181,6 +189,9 @@ func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url 
 
 // Complete finalizes the display and shows a summary
 func (u *SimpleSubmitUI) Complete() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	u.splog.Newline()
 	if u.failed > 0 {
 		u.splog.Info("Completed: %d, Failed: %d", u.completed, u.failed)

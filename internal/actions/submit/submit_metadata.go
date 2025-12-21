@@ -121,9 +121,12 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	shouldEditTitle := opts.EditTitle || (opts.Edit && !opts.NoEditTitle)
 	shouldEditBody := opts.EditDescription || (opts.Edit && !opts.NoEditDescription)
 
-	// Try AI generation if enabled and no existing body/title
-	var aiTitle, aiBody string
-	if opts.AI && opts.AIClient != nil && (metadata.Body == "" || (prInfo == nil || prInfo.Title == "")) {
+	// Use pre-generated AI metadata if provided
+	aiTitle := opts.AIGeneratedTitle
+	aiBody := opts.AIGeneratedBody
+
+	// Try AI generation if enabled and no existing body/title and no pre-generated content
+	if opts.AI && opts.AIClient != nil && aiTitle == "" && aiBody == "" && (metadata.Body == "" || (prInfo == nil || prInfo.Title == "")) {
 		ctx.Splog.Debug("AI enabled, collecting PR context for branch %s", branchName)
 
 		// Collect PR context
@@ -228,6 +231,8 @@ type MetadataOptions struct {
 	ReviewersPrompt   bool
 	AI                bool
 	AIClient          ai.Client
+	AIGeneratedTitle  string
+	AIGeneratedBody   string
 }
 
 // PRMetadata contains PR metadata

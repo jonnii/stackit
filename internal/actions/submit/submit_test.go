@@ -37,6 +37,10 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
+		// Create a local remote to push to
+		_, err = scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
 		// Create mocked GitHub client
 		config := testhelpers.NewMockGitHubServerConfig()
 		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
@@ -46,10 +50,9 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		ctx := runtime.NewContext(eng)
 		ctx.GitHubClient = githubClient
 		opts := submit.Options{
-			DryRun:   false, // We want to test actual PR creation
-			NoEdit:   true,  // Skip interactive prompts
-			Draft:    true,  // Set draft status explicitly to skip prompt
-			SkipPush: true,  // Skip push since we don't have a real remote
+			DryRun: false, // We want to test actual PR creation
+			NoEdit: true,  // Skip interactive prompts
+			Draft:  true,  // Set draft status explicitly to skip prompt
 		}
 
 		// With mocked client, push is skipped, so this should succeed
@@ -87,6 +90,10 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		err = eng.TrackBranch(context.Background(), "feature", "main")
 		require.NoError(t, err)
 
+		// Create a local remote to push to
+		_, err = scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
 		// Create mocked GitHub client with existing PR
 		config := testhelpers.NewMockGitHubServerConfig()
 		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
@@ -117,9 +124,8 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		ctx := runtime.NewContext(eng)
 		ctx.GitHubClient = githubClient
 		opts := submit.Options{
-			DryRun:   false,
-			NoEdit:   true,
-			SkipPush: true, // Skip push since we don't have a real remote
+			DryRun: false,
+			NoEdit: true,
 		}
 
 		// With mocked client, push is skipped, so this should succeed

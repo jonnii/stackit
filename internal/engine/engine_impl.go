@@ -979,6 +979,17 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 		}
 	}
 
+	// Remove from parent's children list
+	if parent != "" {
+		parentChildren := e.childrenMap[parent]
+		for i, c := range parentChildren {
+			if c == branchName {
+				e.childrenMap[parent] = append(parentChildren[:i], parentChildren[i+1:]...)
+				break
+			}
+		}
+	}
+
 	// Remove from maps
 	delete(e.parentMap, branchName)
 	delete(e.childrenMap, branchName)
@@ -989,19 +1000,6 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 			e.branches = append(e.branches[:i], e.branches[i+1:]...)
 			break
 		}
-	}
-
-	// Update children map for parent
-	if parent != "" {
-		parentChildren := e.childrenMap[parent]
-		for i, c := range parentChildren {
-			if c == branchName {
-				e.childrenMap[parent] = append(parentChildren[:i], parentChildren[i+1:]...)
-				break
-			}
-		}
-		// Add children to parent
-		e.childrenMap[parent] = append(e.childrenMap[parent], children...)
 	}
 
 	return nil

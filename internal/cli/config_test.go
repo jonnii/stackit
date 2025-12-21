@@ -27,8 +27,8 @@ func TestConfigCommand(t *testing.T) {
 		err = cmd.Run()
 		require.NoError(t, err)
 
-		// Get branch-name-pattern (should return default)
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		// Get branch.pattern (should return default)
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "config get command failed: %s", string(output))
@@ -37,7 +37,7 @@ func TestConfigCommand(t *testing.T) {
 		require.Equal(t, "{username}/{date}/{message}", strings.TrimSpace(string(output)))
 	})
 
-	t.Run("config set and get branch-name-pattern", func(t *testing.T) {
+	t.Run("config set and get branch.pattern", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, nil)
 
@@ -53,14 +53,14 @@ func TestConfigCommand(t *testing.T) {
 
 		// Set a custom pattern
 		pattern := "{username}/{date}/{message}"
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", pattern)
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", pattern)
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "config set command failed: %s", string(output))
-		require.Contains(t, string(output), "Set branch-name-pattern to:")
+		require.Contains(t, string(output), "Set branch.pattern to:")
 
 		// Get the pattern back
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err = cmd.CombinedOutput()
 		require.NoError(t, err, "config get command failed: %s", string(output))
@@ -82,14 +82,14 @@ func TestConfigCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to set a pattern without {message}
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{username}/{date}")
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", "{username}/{date}")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config set should fail without {message} placeholder")
 		require.Contains(t, string(output), "must contain {message}")
 
 		// Verify pattern was not set (should still be default)
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err = cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -112,13 +112,13 @@ func TestConfigCommand(t *testing.T) {
 
 		// Set pattern with only {message}
 		pattern := "{message}"
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", pattern)
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", pattern)
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "config set command failed: %s", string(output))
 
 		// Verify it was set
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err = cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestConfigCommand(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Don't initialize git or stackit - just try to run config get
-		cmd := exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd := exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config get should fail when not in git repository")
@@ -186,7 +186,7 @@ func TestConfigCommand(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Don't initialize git or stackit - just try to run config set
-		cmd := exec.Command(binaryPath, "config", "set", "branch-name-pattern", "{message}")
+		cmd := exec.Command(binaryPath, "config", "set", "branch.pattern", "{message}")
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "config set should fail when not in git repository")
@@ -209,13 +209,13 @@ func TestConfigCommand(t *testing.T) {
 
 		// Set a custom pattern
 		pattern := "{username}/dev/{date}/{message}"
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", pattern)
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", pattern)
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)
 
 		// Get it back
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -223,13 +223,13 @@ func TestConfigCommand(t *testing.T) {
 
 		// Set a different pattern
 		pattern2 := "{date}/{message}"
-		cmd = exec.Command(binaryPath, "config", "set", "branch-name-pattern", pattern2)
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", pattern2)
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)
 
 		// Verify it changed
-		cmd = exec.Command(binaryPath, "config", "get", "branch-name-pattern")
+		cmd = exec.Command(binaryPath, "config", "get", "branch.pattern")
 		cmd.Dir = scene.Dir
 		output, err = cmd.CombinedOutput()
 		require.NoError(t, err)

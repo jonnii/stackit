@@ -24,7 +24,6 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 	splog := ctx.Splog
 
 	for i, step := range plan.Steps {
-
 		// 1. Re-validate preconditions for this step
 		if err := validateStepPreconditions(step, ctx, opts); err != nil {
 			return fmt.Errorf("step %d (%s) failed precondition: %w", i+1, step.Description, err)

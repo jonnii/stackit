@@ -223,20 +223,20 @@ func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) 
 	u.model.renderer = renderer
 	u.model.rootBranch = rootBranch
 
-	u.program = tea.NewProgram(u.model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
-
-	// Run program in background
-	go func() {
-		if _, err := u.program.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running submit TUI: %v\n", err)
-		}
-	}()
+	// Print the stack once initially
+	lines := renderer.RenderStack(rootBranch, TreeRenderOptions{})
+	for _, line := range lines {
+		u.splog.Info("%s", line)
+	}
+	u.splog.Newline()
 }
 
 // ShowRestackStart indicates the start of the restack process
 func (u *TTYSubmitUI) ShowRestackStart() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Restacking branches..."))
+	} else {
+		u.splog.Info("Restacking branches before submitting...")
 	}
 }
 
@@ -251,6 +251,8 @@ func (u *TTYSubmitUI) ShowRestackComplete() {
 func (u *TTYSubmitUI) ShowPreparing() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Preparing branches..."))
+	} else {
+		u.splog.Info("Preparing branches...")
 	}
 }
 
@@ -264,6 +266,36 @@ func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent
 			skip:       skip,
 			skipReason: skipReason,
 		})
+	} else {
+		// Update model items so they are ready when the program starts
+		found := false
+		for i, item := range u.model.items {
+			if item.BranchName == branchName {
+				u.model.items[i].Action = action
+				u.model.items[i].IsSkipped = skip
+				u.model.items[i].SkipReason = skipReason
+				found = true
+				break
+			}
+		}
+		if !found {
+			u.model.items = append(u.model.items, SubmitItem{
+				BranchName: branchName,
+				Action:     action,
+				IsSkipped:  skip,
+				SkipReason: skipReason,
+				Status:     "pending",
+			})
+		}
+
+		// Only show if skipping (important info)
+		if skip {
+			displayName := branchName
+			if isCurrent {
+				displayName = branchName + " (current)"
+			}
+			u.splog.Info("  ▸ %s %s", ColorDim(displayName), ColorDim("— "+skipReason))
+		}
 	}
 }
 
@@ -271,6 +303,9 @@ func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent
 func (u *TTYSubmitUI) ShowNoChanges() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("All PRs up to date."))
+		u.program.Send(progressCompleteMsg{})
+	} else {
+		u.splog.Info("All PRs up to date.")
 	}
 }
 
@@ -279,16 +314,43 @@ func (u *TTYSubmitUI) ShowDryRunComplete() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Dry run complete."))
 		u.program.Send(progressCompleteMsg{})
+	} else {
+		u.splog.Info("Dry run complete.")
 	}
 }
 
 // StartSubmitting begins the actual submission phase
 func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
 	u.inSubmitPhase = true
-	if u.program != nil {
-		u.program.Send(globalMessageMsg("Submitting..."))
-		u.program.Send(startSubmitMsg{items: items})
+
+	// Update items in the model
+	for _, newItem := range items {
+		found := false
+		for i, item := range u.model.items {
+			if item.BranchName == newItem.BranchName {
+				u.model.items[i].Status = newItem.Status
+				u.model.items[i].Action = newItem.Action
+				u.model.items[i].PRNumber = newItem.PRNumber
+				found = true
+				break
+			}
+		}
+		if !found {
+			u.model.items = append(u.model.items, newItem)
+		}
 	}
+
+	// Start the program now that we're past the potential interactive phase
+	u.program = tea.NewProgram(u.model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+
+	// Run program in background
+	go func() {
+		if _, err := u.program.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error running submit TUI: %v\n", err)
+		}
+	}()
+
+	u.program.Send(globalMessageMsg("Submitting..."))
 }
 
 // UpdateSubmitItem updates the status of a specific branch submission
@@ -306,12 +368,21 @@ func (u *TTYSubmitUI) UpdateSubmitItem(branchName string, status string, url str
 
 // Complete finalizes the display and shows a summary
 func (u *TTYSubmitUI) Complete() {
-	if !u.inSubmitPhase || u.program == nil {
+	if u.program == nil {
 		return
 	}
-	u.program.Send(globalMessageMsg(""))
-	u.program.Send(progressCompleteMsg{})
+
+	// If we're already done or didn't start the submit phase, just quit.
+	// Otherwise, send completion messages.
+	if u.inSubmitPhase {
+		u.program.Send(globalMessageMsg(""))
+		u.program.Send(progressCompleteMsg{})
+	} else {
+		u.program.Quit()
+	}
+
 	u.program.Wait()
+	u.program = nil
 }
 
 // ============================================================================

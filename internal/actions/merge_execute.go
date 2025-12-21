@@ -40,7 +40,6 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 	// If no reporter provided and we're in a TTY, use TUI
 	if opts.Reporter == nil && tui.IsTTY() {
 		reporter := tui.NewChannelMergeProgressReporter()
-		defer reporter.Close()
 
 		// Extract step descriptions
 		stepDescriptions := make([]string, len(plan.Steps))

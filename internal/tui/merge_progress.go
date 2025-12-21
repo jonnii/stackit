@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"sync"
 	"time"
 )
 
 // ChannelMergeProgressReporter implements MergeProgressReporter using channels
 type ChannelMergeProgressReporter struct {
 	updates chan MergeProgressUpdate
+	once    sync.Once
 }
 
 // NewChannelMergeProgressReporter creates a new channel-based progress reporter
@@ -21,9 +23,11 @@ func (r *ChannelMergeProgressReporter) Updates() <-chan MergeProgressUpdate {
 	return r.updates
 }
 
-// Close closes the update channel
+// Close closes the update channel (safe to call multiple times)
 func (r *ChannelMergeProgressReporter) Close() {
-	close(r.updates)
+	r.once.Do(func() {
+		close(r.updates)
+	})
 }
 
 // StepStarted reports that a step has started

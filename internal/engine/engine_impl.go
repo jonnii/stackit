@@ -52,7 +52,8 @@ func NewEngine(repoRoot string) (Engine, error) {
 	e.currentBranch = currentBranch
 
 	// Load branches and metadata
-	if err := e.rebuild(); err != nil {
+	// Don't refresh currentBranch here since we just set it
+	if err := e.rebuildInternal(false); err != nil {
 		return nil, fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -63,7 +64,8 @@ func NewEngine(repoRoot string) (Engine, error) {
 func (e *engineImpl) rebuild() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.rebuildInternal()
+	// Don't refresh currentBranch here - it should already be set correctly
+	return e.rebuildInternal(false)
 }
 
 // AllBranchNames returns all branch names
@@ -379,7 +381,8 @@ func (e *engineImpl) Reset(ctx context.Context, newTrunkName string) error {
 	}
 
 	// Rebuild cache (already holding lock, so call rebuildInternal)
-	return e.rebuildInternal()
+	// Refresh currentBranch since we're resetting everything
+	return e.rebuildInternal(true)
 }
 
 // Rebuild reloads branch cache with new trunk
@@ -391,17 +394,30 @@ func (e *engineImpl) Rebuild(ctx context.Context, newTrunkName string) error {
 	e.trunk = newTrunkName
 
 	// Rebuild cache (already holding lock, so call rebuildInternal)
-	return e.rebuildInternal()
+	// Refresh currentBranch since we might have switched branches
+	return e.rebuildInternal(true)
 }
 
 // rebuildInternal is the internal rebuild logic without locking
-func (e *engineImpl) rebuildInternal() error {
+// refreshCurrentBranch indicates whether to refresh currentBranch from Git
+func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	// Get all branch names
 	branches, err := git.GetAllBranchNames()
 	if err != nil {
 		return fmt.Errorf("failed to get branches: %w", err)
 	}
 	e.branches = branches
+
+	// Refresh current branch from Git if requested (needed when called from Rebuild/Reset after branch switches)
+	if refreshCurrentBranch {
+		currentBranch, err := git.GetCurrentBranch()
+		if err != nil {
+			// Not on a branch (e.g., detached HEAD) - that's okay
+			e.currentBranch = ""
+		} else {
+			e.currentBranch = currentBranch
+		}
+	}
 
 	// Reset maps
 	e.parentMap = make(map[string]string)
@@ -524,7 +540,8 @@ func (e *engineImpl) UntrackBranch(ctx context.Context, branchName string) error
 	}
 
 	// Rebuild cache (already holding lock, so call rebuildInternal)
-	return e.rebuildInternal()
+	// Refresh currentBranch since we're resetting everything
+	return e.rebuildInternal(true)
 }
 
 // PullTrunk pulls the trunk branch from remote
@@ -1165,7 +1182,8 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Rebuild to refresh cache (parent/children relationships remain the same)
-	if err := e.rebuildInternal(); err != nil {
+	// Don't refresh currentBranch - we're still on the same branch
+	if err := e.rebuildInternal(false); err != nil {
 		return fmt.Errorf("failed to rebuild after squash: %w", err)
 	}
 

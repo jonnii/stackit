@@ -1,9 +1,11 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"stackit.dev/stackit/internal/actions"
+	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newPopCmd creates the pop command
@@ -17,7 +19,14 @@ This is useful when you want to remove a branch from the stack but keep
 your uncommitted changes. The working tree will remain unchanged after
 the branch is deleted.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("pop command not yet implemented")
+			// Get context (demo or real)
+			ctx, err := runtime.GetContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			// Run pop action
+			return actions.PopAction(ctx, actions.PopOptions{})
 		},
 	}
 

@@ -1,6 +1,8 @@
 package actions_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -203,5 +205,147 @@ func TestFoldAction(t *testing.T) {
 		err = actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "due to conflicts. Please resolve the conflicts and run 'git commit'")
+	})
+
+	t.Run("restacks descendants after folding", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+				"branch3": "branch2",
+			})
+
+		// Make branch1 and branch2 both have commits
+		s.Checkout("branch1")
+		s.Scene.Repo.CreateChangeAndCommit("c1", "f1")
+		s.Checkout("branch2")
+		s.Scene.Repo.CreateChangeAndCommit("c2", "f2")
+		s.Checkout("branch3")
+		s.Scene.Repo.CreateChangeAndCommit("c3", "f3")
+
+		// Fold branch2 into branch1
+		s.Checkout("branch2")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
+		require.NoError(t, err)
+
+		// Verify branch3's parent is now branch1
+		require.Equal(t, "branch1", s.Engine.GetParent("branch3"))
+
+		// Verify branch3 contains all commits (c1, c2, c3)
+		logOutput, err := s.Scene.Repo.RunGitCommandAndGetOutput("log", "--oneline", "main..branch3")
+		require.NoError(t, err)
+		require.Contains(t, logOutput, "c1")
+		require.Contains(t, logOutput, "c2")
+		require.Contains(t, logOutput, "c3")
+	})
+
+	t.Run("fails when rebase is in progress", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
+
+		// Start a rebase manually
+		s.Checkout("branch2")
+		// We can simulate a rebase by creating the .git/rebase-merge directory
+		rebasePath := filepath.Join(s.Scene.Dir, ".git", "rebase-merge")
+		err := os.MkdirAll(rebasePath, 0755)
+		require.NoError(t, err)
+
+		err = actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "rebase is already in progress")
+	})
+
+	t.Run("folds branch with no unique commits", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
+
+		// branch2 has no unique commits (it's at the same position as branch1)
+		s.Checkout("branch2")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
+		require.NoError(t, err)
+
+		// Verify branch2 is deleted and we're on branch1
+		branches, _ := git.GetAllBranchNames()
+		require.NotContains(t, branches, "branch2")
+		current, _ := s.Scene.Repo.CurrentBranchName()
+		require.Equal(t, "branch1", current)
+	})
+
+	t.Run("takes snapshot before folding", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
+
+		s.Checkout("branch2")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
+		require.NoError(t, err)
+
+		// Verify snapshot exists
+		snapshots, err := s.Engine.GetSnapshots()
+		require.NoError(t, err)
+		require.NotEmpty(t, snapshots)
+		require.Equal(t, "fold", snapshots[0].Command)
+	})
+
+	t.Run("takes snapshot with --keep flag", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
+
+		s.Checkout("branch2")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: true})
+		require.NoError(t, err)
+
+		// Verify snapshot exists with --keep arg
+		snapshots, err := s.Engine.GetSnapshots()
+		require.NoError(t, err)
+		require.NotEmpty(t, snapshots)
+		require.Equal(t, "fold", snapshots[0].Command)
+		require.Contains(t, snapshots[0].Args, "--keep")
+	})
+
+	t.Run("fails when folding into trunk without --allow-trunk", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
+
+		s.Checkout("branch1")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: false, AllowTrunk: false})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "without --allow-trunk")
+	})
+
+	t.Run("folds bottom branch into trunk with --allow-trunk", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+			})
+
+		s.Checkout("branch1")
+		err := actions.FoldAction(s.Context, actions.FoldOptions{Keep: false, AllowTrunk: true})
+		require.NoError(t, err)
+
+		// Verify branch1 is deleted
+		branches, _ := git.GetAllBranchNames()
+		require.NotContains(t, branches, "branch1")
+
+		// Verify we're on main
+		current, _ := s.Scene.Repo.CurrentBranchName()
+		require.Equal(t, "main", current)
+
+		// Verify main contains branch1's commit
+		logOutput, _ := s.Scene.Repo.RunGitCommandAndGetOutput("log", "--oneline", "-n", "1")
+		require.Contains(t, logOutput, "change on branch1")
 	})
 }

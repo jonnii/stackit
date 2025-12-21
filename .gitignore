@@ -27,3 +27,4 @@ stackit
 # Website server binary
 website/server
 website/tmp/
+.gocache/

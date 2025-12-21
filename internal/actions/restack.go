@@ -26,7 +26,7 @@ func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engin
 		// Log reparenting if it happened
 		if result.Reparented {
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branchName, true),
+				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
 				tui.ColorBranchName(result.OldParent, false),
 				tui.ColorBranchName(result.NewParent, false))
 		}
@@ -38,7 +38,7 @@ func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engin
 				parent = eng.Trunk()
 			}
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branchName, true),
+				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
 				tui.ColorBranchName(parent, false))
 		case engine.RestackConflict:
 			// Persist continuation state with remaining branches
@@ -64,7 +64,7 @@ func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engin
 				parent = eng.Trunk()
 			}
 			splog.Info("%s does not need to be restacked on %s.",
-				tui.ColorBranchName(branchName, false),
+				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
 				tui.ColorBranchName(parent, false))
 		}
 	}

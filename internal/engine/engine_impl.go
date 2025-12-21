@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -456,6 +457,11 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 			e.parentMap[bm.name] = parent
 			e.childrenMap[parent] = append(e.childrenMap[parent], bm.name)
 		}
+	}
+
+	// Sort children by name for deterministic traversal
+	for _, children := range e.childrenMap {
+		sort.Strings(children)
 	}
 
 	return nil
@@ -968,7 +974,8 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	defer e.mu.Unlock()
 
 	// Get children before deletion
-	children := e.childrenMap[branchName]
+	children := make([]string, len(e.childrenMap[branchName]))
+	copy(children, e.childrenMap[branchName])
 
 	// Get parent
 	parent, ok := e.parentMap[branchName]
@@ -995,7 +1002,6 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	// Update children to point to parent
 	for _, child := range children {
 		if err := e.setParentInternal(ctx, child, parent); err != nil {
-			// Log error but continue
 			continue
 		}
 	}

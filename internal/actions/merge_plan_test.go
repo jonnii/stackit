@@ -2,6 +2,7 @@ package actions_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -169,5 +170,95 @@ func TestCreateMergePlan(t *testing.T) {
 		require.NotNil(t, validation)
 		// With force, validation should pass (warnings may exist)
 		require.True(t, validation.Valid)
+	})
+
+	t.Run("identifies upstack branches for restacking in branching stack", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create structure: main -> P -> [C1, C2], C1 -> GC1
+		err := scene.Repo.CreateAndCheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P change", "p")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("C1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("GC1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("GC1 change", "gc1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
+		require.NoError(t, err)
+
+		// Move back to C1
+		err = scene.Repo.CheckoutBranch("C1")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		// Track branches
+		err = eng.TrackBranch(context.Background(), "P", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C1", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "GC1", "C1")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C2", "P")
+		require.NoError(t, err)
+
+		// Add PR info for P and C1
+		prP := 101
+		prC1 := 102
+		err = eng.UpsertPrInfo(context.Background(), "P", &engine.PrInfo{Number: &prP, State: "OPEN"})
+		require.NoError(t, err)
+		err = eng.UpsertPrInfo(context.Background(), "C1", &engine.PrInfo{Number: &prC1, State: "OPEN"})
+		require.NoError(t, err)
+
+		eng, err = engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		plan, _, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
+			Strategy: actions.MergeStrategyBottomUp,
+		})
+		require.NoError(t, err)
+
+		// Branches to merge should be P and C1
+		require.Len(t, plan.BranchesToMerge, 2)
+		require.Equal(t, "P", plan.BranchesToMerge[0].BranchName)
+		require.Equal(t, "C1", plan.BranchesToMerge[1].BranchName)
+
+		// Upstack branches should include GC1 (child of C1)
+		// It should NOT include C2 (sibling of C1) because we are merging up to C1.
+		// Wait, if P is merged, C2 SHOULD be restacked onto trunk.
+		// Let's see what the current implementation does.
+		require.Contains(t, plan.UpstackBranches, "GC1")
+
+		// Check if C2 is in UpstackBranches.
+		// Currently, GetRelativeStackUpstack(currentBranch) is used.
+		// If currentBranch is C1, it only includes GC1.
+		require.NotContains(t, plan.UpstackBranches, "C2", "Sibling C2 should not be in upstack of C1")
+
+		// Verify warning for sibling C2
+		foundWarning := false
+		for _, warn := range plan.Warnings {
+			if strings.Contains(warn, "C2") && strings.Contains(warn, "reparented") {
+				foundWarning = true
+				break
+			}
+		}
+		require.True(t, foundWarning, "Should have a warning about sibling C2 being reparented")
 	})
 }

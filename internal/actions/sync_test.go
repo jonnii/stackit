@@ -218,4 +218,145 @@ func TestSyncAction(t *testing.T) {
 		require.Equal(t, "main", eng.GetParent("stackB"))
 		require.Equal(t, "stackB", eng.GetParent("stackB-child1"))
 	})
+
+	t.Run("restacks multiple deep subtrees correctly", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create deep branching structure:
+		// main
+		// └── P
+		//     ├── C1
+		//     │   └── GC1
+		//     └── C2
+		//         └── GC2
+
+		err := scene.Repo.CreateAndCheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P change", "p")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("C1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("GC1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("GC1 change", "gc1")
+		require.NoError(t, err)
+
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C2 change", "c2")
+		require.NoError(t, err)
+
+		err = scene.Repo.CreateAndCheckoutBranch("GC2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("GC2 change", "gc2")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		err = eng.TrackBranch(context.Background(), "P", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C1", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "GC1", "C1")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C2", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "GC2", "C2")
+		require.NoError(t, err)
+
+		// Modify P to trigger restacking of all descendants
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P updated", "p2")
+		require.NoError(t, err)
+
+		// Refresh engine
+		err = eng.Rebuild(context.Background(), "main")
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
+			All:     true,
+			Restack: true,
+		})
+		require.NoError(t, err)
+
+		// Verify all branches are fixed
+		require.True(t, eng.IsBranchFixed(context.Background(), "C1"))
+		require.True(t, eng.IsBranchFixed(context.Background(), "GC1"))
+		require.True(t, eng.IsBranchFixed(context.Background(), "C2"))
+		require.True(t, eng.IsBranchFixed(context.Background(), "GC2"))
+	})
+
+	t.Run("partial success in branching restack (one child succeeds, one fails)", func(t *testing.T) {
+		scene := testhelpers.NewScene(t, func(s *testhelpers.Scene) error {
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Create: main -> P -> [C1, C2]
+		err := scene.Repo.CreateAndCheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("P change", "p")
+		require.NoError(t, err)
+
+		// C1 will restack successfully
+		err = scene.Repo.CreateAndCheckoutBranch("C1")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("C1 change", "c1")
+		require.NoError(t, err)
+
+		// C2 will have a conflict
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateAndCheckoutBranch("C2")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("initial content", "conflict")
+		require.NoError(t, err)
+
+		eng, err := engine.NewEngine(scene.Dir)
+		require.NoError(t, err)
+
+		err = eng.TrackBranch(context.Background(), "P", "main")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C1", "P")
+		require.NoError(t, err)
+		err = eng.TrackBranch(context.Background(), "C2", "P")
+		require.NoError(t, err)
+
+		// Modify P with a change that conflicts with C2 but not C1
+		err = scene.Repo.CheckoutBranch("P")
+		require.NoError(t, err)
+		err = scene.Repo.CreateChangeAndCommit("conflicting content", "conflict")
+		require.NoError(t, err)
+
+		// Refresh engine
+		err = eng.Rebuild(context.Background(), "main")
+		require.NoError(t, err)
+
+		ctx := runtime.NewContext(eng)
+		ctx.RepoRoot = scene.Dir
+		err = actions.SyncAction(ctx, actions.SyncOptions{
+			All:     true,
+			Restack: true,
+		})
+
+		// Should error due to conflict in C2
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "conflict")
+
+		// C1 should still have been restacked successfully
+		require.True(t, eng.IsBranchFixed(context.Background(), "C1"))
+		// C2 should NOT be fixed
+		require.False(t, eng.IsBranchFixed(context.Background(), "C2"))
+	})
 }

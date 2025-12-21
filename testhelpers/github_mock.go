@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-github/v62/github"
@@ -26,6 +27,8 @@ type MockGitHubServerConfig struct {
 	// Owner and Repo for the mock server
 	Owner string
 	Repo  string
+
+	mu sync.Mutex
 }
 
 // NewMockGitHubServerConfig creates a new mock server config with defaults
@@ -53,6 +56,9 @@ func NewMockGitHubServer(t *testing.T, config *MockGitHubServerConfig) *httptest
 	basePathWithSlash := basePath + "/"
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		config.mu.Lock()
+		defer config.mu.Unlock()
+
 		// Use original path for all operations
 		originalPath := r.URL.Path
 		path := originalPath

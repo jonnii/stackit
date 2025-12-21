@@ -45,7 +45,7 @@ func TestMockClient_ErrorHandling(t *testing.T) {
 		t.Fatal("Expected error, got nil")
 	}
 
-	if err != expectedErr {
+	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error '%v', got '%v'", expectedErr, err)
 	}
 }
@@ -218,7 +218,7 @@ func TestMockClient_GenerateCommitMessage_Error(t *testing.T) {
 		t.Fatal("Expected error, got nil")
 	}
 
-	if err != expectedErr {
+	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error '%v', got '%v'", expectedErr, err)
 	}
 }

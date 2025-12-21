@@ -43,7 +43,7 @@ func (c *DemoGitHubClient) GetOwnerRepo() (string, string) {
 }
 
 // CreatePullRequest creates a simulated pull request
-func (c *DemoGitHubClient) CreatePullRequest(ctx context.Context, owner, repo string, opts github.CreatePROptions) (*github.PullRequestInfo, error) {
+func (c *DemoGitHubClient) CreatePullRequest(_ context.Context, owner, repo string, opts github.CreatePROptions) (*github.PullRequestInfo, error) {
 	simulateDelay(delayMedium)
 
 	prNum := int(atomic.AddInt32(&prCounter, 1))
@@ -64,7 +64,7 @@ func (c *DemoGitHubClient) CreatePullRequest(ctx context.Context, owner, repo st
 }
 
 // UpdatePullRequest simulates updating a pull request
-func (c *DemoGitHubClient) UpdatePullRequest(ctx context.Context, owner, repo string, prNumber int, opts github.UpdatePROptions) error {
+func (c *DemoGitHubClient) UpdatePullRequest(_ context.Context, _, _ string, prNumber int, opts github.UpdatePROptions) error {
 	simulateDelay(delayShort)
 
 	// Find the PR by number
@@ -90,7 +90,7 @@ func (c *DemoGitHubClient) UpdatePullRequest(ctx context.Context, owner, repo st
 }
 
 // GetPullRequestByBranch returns a simulated PR for a branch
-func (c *DemoGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, repo, branchName string) (*github.PullRequestInfo, error) {
+func (c *DemoGitHubClient) GetPullRequestByBranch(_ context.Context, _, _, branchName string) (*github.PullRequestInfo, error) {
 	simulateDelay(delayShort)
 
 	if pr, ok := c.prs[branchName]; ok {
@@ -100,7 +100,7 @@ func (c *DemoGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 }
 
 // MergePullRequest simulates merging a pull request
-func (c *DemoGitHubClient) MergePullRequest(ctx context.Context, branchName string) error {
+func (c *DemoGitHubClient) MergePullRequest(_ context.Context, branchName string) error {
 	simulateDelay(delayMedium)
 
 	if pr, ok := c.prs[branchName]; ok {
@@ -110,7 +110,7 @@ func (c *DemoGitHubClient) MergePullRequest(ctx context.Context, branchName stri
 }
 
 // GetPRChecksStatus returns simulated check status
-func (c *DemoGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
+func (c *DemoGitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
 	// Simulate a small delay
 	time.Sleep(50 * time.Millisecond)
 

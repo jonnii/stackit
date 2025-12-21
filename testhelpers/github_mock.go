@@ -357,11 +357,13 @@ func extractPRNumber(path string) int {
 	// Extract the number
 	var number int
 	for i := pullsIdx; i < len(path); i++ {
-		if path[i] >= '0' && path[i] <= '9' {
-			number = number*10 + int(path[i]-'0')
-		} else if path[i] == '/' || path[i] == '?' || path[i] == '#' {
-			break
-		} else {
+		char := path[i]
+		switch {
+		case char >= '0' && char <= '9':
+			number = number*10 + int(char-'0')
+		case char == '/' || char == '?' || char == '#':
+			return number
+		default:
 			return 0 // Invalid character
 		}
 	}

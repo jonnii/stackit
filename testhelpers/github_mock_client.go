@@ -94,13 +94,13 @@ func (c *MockGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 }
 
 // MergePullRequest merges a pull request
-func (c *MockGitHubClient) MergePullRequest(ctx context.Context, branchName string) error {
+func (c *MockGitHubClient) MergePullRequest(_ context.Context, _ string) error {
 	// In tests, just return nil
 	return nil
 }
 
 // GetPRChecksStatus returns the check status for a PR
-func (c *MockGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
+func (c *MockGitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
 	// In tests, always return passing
 	return true, false, nil
 }

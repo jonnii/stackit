@@ -11,6 +11,7 @@ import (
 )
 
 func TestTrunkCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("trunk shows primary trunk", func(t *testing.T) {

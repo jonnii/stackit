@@ -11,6 +11,7 @@ import (
 )
 
 func TestConfigCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("config get returns default pattern when not set", func(t *testing.T) {

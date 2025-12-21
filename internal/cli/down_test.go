@@ -10,6 +10,7 @@ import (
 )
 
 func TestDownCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("down moves to parent branch", func(t *testing.T) {

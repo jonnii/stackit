@@ -11,6 +11,7 @@ import (
 )
 
 func TestParentCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("parent shows parent branch", func(t *testing.T) {

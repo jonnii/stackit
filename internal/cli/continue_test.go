@@ -14,6 +14,7 @@ import (
 )
 
 func TestContinueCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("continue errors when no rebase in progress", func(t *testing.T) {

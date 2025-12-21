@@ -11,6 +11,7 @@ import (
 )
 
 func TestChildrenCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("children shows child branches", func(t *testing.T) {

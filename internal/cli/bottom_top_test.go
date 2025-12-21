@@ -11,6 +11,7 @@ import (
 )
 
 func TestBottomCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("bottom from middle of stack", func(t *testing.T) {
@@ -134,6 +135,7 @@ func TestBottomCommand(t *testing.T) {
 }
 
 func TestTopCommand(t *testing.T) {
+	t.Parallel()
 	binaryPath := getStackitBinary(t)
 
 	t.Run("top from middle of stack", func(t *testing.T) {

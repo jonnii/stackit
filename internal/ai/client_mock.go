@@ -34,7 +34,7 @@ func NewMockClient() *MockClient {
 
 // GeneratePRDescription implements AIClient interface.
 // Returns the mock response if set, otherwise returns an error.
-func (m *MockClient) GeneratePRDescription(ctx context.Context, prContext *PRContext) (string, string, error) {
+func (m *MockClient) GeneratePRDescription(_ context.Context, prContext *PRContext) (string, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -94,7 +94,7 @@ func (m *MockClient) Reset() {
 
 // GenerateCommitMessage implements AIClient interface.
 // Returns the mock commit message if set, otherwise returns an error.
-func (m *MockClient) GenerateCommitMessage(ctx context.Context, diff string) (string, error) {
+func (m *MockClient) GenerateCommitMessage(_ context.Context, diff string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -143,7 +143,7 @@ func (m *MockClient) LastDiff() string {
 }
 
 // GenerateStackSuggestion implements AIClient interface.
-func (m *MockClient) GenerateStackSuggestion(ctx context.Context, diff string) (*StackSuggestion, error) {
+func (m *MockClient) GenerateStackSuggestion(_ context.Context, diff string) (*StackSuggestion, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

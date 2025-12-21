@@ -89,11 +89,12 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 				return fmt.Errorf("canceled")
 			}
 
-			if strings.Contains(styleStr, "Cancel") {
+			switch {
+			case strings.Contains(styleStr, "Cancel"):
 				return fmt.Errorf("canceled")
-			} else if strings.Contains(styleStr, "commit") {
+			case strings.Contains(styleStr, "commit"):
 				style = SplitStyleCommit
-			} else if strings.Contains(styleStr, "hunk") {
+			case strings.Contains(styleStr, "hunk"):
 				style = SplitStyleHunk
 			}
 		} else {

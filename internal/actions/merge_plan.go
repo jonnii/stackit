@@ -188,21 +188,22 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		if ctx.GitHubClient != nil {
 			var checkErr error
 			passing, pending, checkErr = ctx.GitHubClient.GetPRChecksStatus(c, branchName)
-			if checkErr != nil {
+			switch {
+			case checkErr != nil:
 				splog.Debug("Failed to get PR checks status for %s: %v", branchName, checkErr)
 				// Don't fail on check status errors, just mark as none
-			} else if pending {
+			case pending:
 				checksStatus = ChecksPending
 				if !opts.Force {
 					validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s PR #%d has pending CI checks", branchName, *prInfo.Number))
 				}
-			} else if !passing {
+			case !passing:
 				checksStatus = ChecksFailing
 				if !opts.Force {
 					validation.Valid = false
 					validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number))
 				}
-			} else {
+			default:
 				checksStatus = ChecksPassing
 			}
 		}
@@ -512,13 +513,14 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 		return fmt.Sprintf("local: %s, remote: %s (likely local is ahead)", localShort, remoteShort)
 	}
 
-	if commonAncestor == localSha {
+	switch {
+	case commonAncestor == localSha:
 		// Local is behind remote
 		return fmt.Sprintf("local is behind remote (local: %s, remote: %s)", localShort, remoteShort)
-	} else if commonAncestor == remoteSha {
+	case commonAncestor == remoteSha:
 		// Local is ahead of remote
 		return fmt.Sprintf("local is ahead of remote (local: %s, remote: %s)", localShort, remoteShort)
-	} else {
+	default:
 		// Diverged
 		return fmt.Sprintf("local and remote have diverged (local: %s, remote: %s)", localShort, remoteShort)
 	}

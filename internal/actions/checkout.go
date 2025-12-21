@@ -33,12 +33,13 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	var err error
 
 	// Handle --trunk flag
-	if opts.CheckoutTrunk {
+	switch {
+	case opts.CheckoutTrunk:
 		branchName = eng.Trunk()
-	} else if opts.BranchName != "" {
+	case opts.BranchName != "":
 		// Direct checkout
 		branchName = opts.BranchName
-	} else {
+	default:
 		// Interactive selection
 		branchName, err = interactiveBranchSelection(ctx, opts)
 		if err != nil {

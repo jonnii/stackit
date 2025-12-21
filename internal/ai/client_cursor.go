@@ -378,13 +378,14 @@ func parseStackSuggestion(response string) (*StackSuggestion, error) {
 		// Message: "message: ..." or "commit: ..." or "- message: ..."
 		if strings.HasPrefix(trimmed, "message:") || strings.HasPrefix(trimmed, "commit:") || strings.HasPrefix(trimmed, "- message:") || strings.HasPrefix(trimmed, "- commit:") {
 			message := ""
-			if strings.HasPrefix(trimmed, "message:") {
+			switch {
+			case strings.HasPrefix(trimmed, "message:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "message:"))
-			} else if strings.HasPrefix(trimmed, "commit:") {
+			case strings.HasPrefix(trimmed, "commit:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "commit:"))
-			} else if strings.HasPrefix(trimmed, "- message:") {
+			case strings.HasPrefix(trimmed, "- message:"):
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- message:"))
-			} else {
+			default:
 				message = strings.TrimSpace(strings.TrimPrefix(trimmed, "- commit:"))
 			}
 			currentLayer.CommitMessage = strings.Trim(message, `"'`)

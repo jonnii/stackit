@@ -52,40 +52,31 @@ func GetCommitRange(base string, head string, format string) ([]string, error) {
 				return nil, fmt.Errorf("failed to get commit %s: %w", sha, err)
 			}
 
-			if format == "MESSAGE" {
-				// For MESSAGE format, trim and add to result
-				commitOutput = strings.TrimSpace(commitOutput)
-				if commitOutput != "" {
-					result = append(result, commitOutput)
-				}
-			} else {
-				// For other formats, add the line
-				commitOutput = strings.TrimSpace(commitOutput)
-				if commitOutput != "" {
-					result = append(result, commitOutput)
-				}
+			commitOutput = strings.TrimSpace(commitOutput)
+			if commitOutput != "" {
+				result = append(result, commitOutput)
 			}
 		}
 
 		return result, nil
-	} else {
-		// For trunk (no base), get just the one commit
-		output, err := RunGitCommand("log", "-1", "--pretty=format:"+formatArg, head)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get commit: %w", err)
-		}
-
-		if output == "" {
-			return []string{}, nil
-		}
-
-		output = strings.TrimSpace(output)
-		if output == "" {
-			return []string{}, nil
-		}
-
-		return []string{output}, nil
 	}
+
+	// For trunk (no base), get just the one commit
+	output, err := RunGitCommand("log", "-1", "--pretty=format:"+formatArg, head)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	if output == "" {
+		return []string{}, nil
+	}
+
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return []string{}, nil
+	}
+
+	return []string{output}, nil
 }
 
 // GetCommitSHA returns the SHA at a relative position (0 = HEAD, 1 = HEAD~1)

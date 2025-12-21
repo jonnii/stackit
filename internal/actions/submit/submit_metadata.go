@@ -172,14 +172,15 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	}
 
 	// Get draft status - respect flags, default to published (not draft)
-	if opts.Draft {
+	switch {
+	case opts.Draft:
 		metadata.IsDraft = true
-	} else if opts.Publish {
+	case opts.Publish:
 		metadata.IsDraft = false
-	} else if prInfo == nil {
+	case prInfo == nil:
 		// New PR - default to published (not draft)
 		metadata.IsDraft = false
-	} else {
+	default:
 		metadata.IsDraft = prInfo.IsDraft
 	}
 

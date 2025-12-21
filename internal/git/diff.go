@@ -57,11 +57,12 @@ func ShowDiff(ctx context.Context, left, right string, stat bool) (string, error
 // base can be empty string for trunk (will use head~), or a revision for regular branches
 func ShowCommits(ctx context.Context, base, head string, patch, stat bool) (string, error) {
 	args := []string{"-c", "color.ui=always", "--no-pager", "log"}
-	if patch && stat {
+	switch {
+	case patch && stat:
 		args = append(args, "--stat")
-	} else if patch {
+	case patch:
 		args = append(args, "-p")
-	} else {
+	default:
 		// Default to oneline format if no patch
 		args = append(args, "--pretty=format:%h - %s")
 	}

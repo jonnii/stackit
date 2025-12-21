@@ -53,7 +53,8 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 
 	// Summary
 	splog.Newline()
-	if len(errors) > 0 {
+	switch {
+	case len(errors) > 0:
 		splog.Warn("Doctor found %d error(s) and %d warning(s).", len(errors), len(warnings))
 		for _, err := range errors {
 			splog.Warn("  ❌ %s", err)
@@ -62,7 +63,7 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 			splog.Warn("  ⚠️  %s", warn)
 		}
 		return fmt.Errorf("doctor found %d error(s)", len(errors))
-	} else if len(warnings) > 0 {
+	case len(warnings) > 0:
 		if opts.Fix {
 			splog.Info("Doctor found %d warning(s), some of which may have been fixed.", len(warnings))
 		} else {
@@ -71,7 +72,7 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 		for _, warn := range warnings {
 			splog.Warn("  ⚠️  %s", warn)
 		}
-	} else {
+	default:
 		splog.Info("✅ All checks passed. Your stackit setup is healthy.")
 	}
 

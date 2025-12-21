@@ -50,18 +50,19 @@ func validateBaseRevisions(ctx context.Context, branches []string, eng engine.En
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
 
-		if eng.IsTrunk(parentBranchName) {
+		switch {
+		case eng.IsTrunk(parentBranchName):
 			if !eng.IsBranchFixed(ctx, branchName) {
 				runtimeCtx.Splog.Info("Note that %s has fallen behind trunk. You may encounter conflicts if you attempt to merge it.",
 					tui.ColorBranchName(branchName, false))
 			}
-		} else if validatedBranches[parentBranchName] {
+		case validatedBranches[parentBranchName]:
 			// Parent is in the submission list
 			if !eng.IsBranchFixed(ctx, branchName) {
 				return fmt.Errorf("you are trying to submit at least one branch that has not been restacked on its parent. To resolve this, check out %s and run 'stackit restack'",
 					tui.ColorBranchName(branchName, false))
 			}
-		} else {
+		default:
 			// Parent is not in submission list
 			matchesRemote, err := eng.BranchMatchesRemote(ctx, parentBranchName)
 			if err != nil {

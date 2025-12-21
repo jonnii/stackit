@@ -320,7 +320,7 @@ func TestTopCommand(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err, "top command should fail in non-interactive mode with multiple children")
 		// The error message may vary, but should indicate failure and list the branches
-		require.Contains(t, string(output), "Multiple branches found")
+		require.Contains(t, string(output), "multiple branches found")
 		require.Contains(t, string(output), "b")
 		require.Contains(t, string(output), "c")
 		require.Contains(t, string(output), "Error")

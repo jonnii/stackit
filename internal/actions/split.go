@@ -18,9 +18,12 @@ import (
 type SplitStyle string
 
 const (
+	// SplitStyleCommit splits by selecting commit points
 	SplitStyleCommit SplitStyle = "commit"
-	SplitStyleHunk   SplitStyle = "hunk"
-	SplitStyleFile   SplitStyle = "file"
+	// SplitStyleHunk splits by interactively staging hunks
+	SplitStyleHunk SplitStyle = "hunk"
+	// SplitStyleFile splits by extracting specified files
+	SplitStyleFile SplitStyle = "file"
 )
 
 // SplitOptions contains options for the split command

@@ -15,8 +15,10 @@ import (
 type Direction string
 
 const (
+	// DirectionBottom specifies navigating towards the trunk
 	DirectionBottom Direction = "BOTTOM"
-	DirectionTop    Direction = "TOP"
+	// DirectionTop specifies navigating towards the stack tips
+	DirectionTop Direction = "TOP"
 )
 
 // SwitchBranchAction switches to a branch based on the given direction
@@ -111,7 +113,7 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 // handleMultipleChildren prompts the user to select a branch when multiple children exist
 func handleMultipleChildren(children []string) (string, error) {
 	if !utils.IsInteractive() {
-		return "", fmt.Errorf("Multiple branches found; cannot get top branch in non-interactive mode. Multiple choices available:\n%s", formatBranchList(children))
+		return "", fmt.Errorf("multiple branches found; cannot get top branch in non-interactive mode. Multiple choices available:\n%s", formatBranchList(children))
 	}
 
 	options := make([]tui.SelectOption, len(children))

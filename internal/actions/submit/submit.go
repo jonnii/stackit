@@ -1,3 +1,4 @@
+// Package submit provides functionality for submitting stacked branches as pull requests.
 package submit
 
 import (
@@ -237,7 +238,7 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 	}
 
 	// Create AI client if enabled
-	var aiClient ai.AIClient
+	var aiClient ai.Client
 	if aiEnabled {
 		aiClient = ai.NewMockClient()
 		runtimeCtx.Splog.Debug("AI-powered PR description generation enabled")
@@ -367,7 +368,7 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 }
 
 // getGitHubClient returns the GitHub client from context
-func getGitHubClient(ctx *runtime.Context) (github.GitHubClient, error) {
+func getGitHubClient(ctx *runtime.Context) (github.Client, error) {
 	if ctx.GitHubClient != nil {
 		return ctx.GitHubClient, nil
 	}
@@ -392,7 +393,7 @@ func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, 
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubClient github.Client, repoOwner, repoName string) (string, error) {
 	createOpts := github.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -424,7 +425,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 }
 
 // updatePullRequestQuiet updates an existing pull request without logging
-func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubClient github.GitHubClient, repoOwner, repoName string) (string, error) {
+func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) (string, error) {
 	// Check if base changed
 	prInfo, _ := eng.GetPrInfo(ctx, submissionInfo.BranchName)
 	baseChanged := false
@@ -479,7 +480,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 }
 
 // updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubClient github.GitHubClient, repoOwner, repoName string) {
+func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) {
 	for _, branchName := range branches {
 		prInfo, err := eng.GetPrInfo(ctx, branchName)
 		if err != nil || prInfo == nil || prInfo.Number == nil {

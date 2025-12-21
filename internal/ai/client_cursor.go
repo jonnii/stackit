@@ -3,13 +3,14 @@ package ai
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-// CursorAgentClient implements AIClient using cursor-agent CLI
+// CursorAgentClient implements Client using cursor-agent CLI
 type CursorAgentClient struct{}
 
 // NewCursorAgentClient creates a new CursorAgentClient
@@ -111,7 +112,8 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 	err := cmd.Run()
 	if err != nil {
 		// Check if cursor-agent is not found
-		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
 			return "", fmt.Errorf("cursor-agent not found in PATH")
 		}
 
@@ -122,7 +124,8 @@ func (c *CursorAgentClient) callCursorAgentCLI(ctx context.Context, prompt strin
 		// Build detailed error message
 		var errorMsg strings.Builder
 		errorMsg.WriteString("cursor-agent failed with exit code")
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			errorMsg.WriteString(fmt.Sprintf(" %d", exitError.ExitCode()))
 		}
 		errorMsg.WriteString(fmt.Sprintf(": %v\n", err))

@@ -20,7 +20,7 @@ type Context struct {
 	Engine       engine.Engine
 	Splog        *tui.Splog
 	RepoRoot     string
-	GitHubClient github.GitHubClient
+	GitHubClient github.Client
 }
 
 // NewContext creates a new context with the given engine
@@ -53,7 +53,7 @@ var DemoEngineFactory func() engine.Engine
 
 // DemoGitHubClientFactory is a function that creates a demo GitHub client.
 // This is set by the demo package to avoid circular imports.
-var DemoGitHubClientFactory func() github.GitHubClient
+var DemoGitHubClientFactory func() github.Client
 
 // NewContextAuto creates a context automatically based on the environment.
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine

@@ -1,5 +1,4 @@
-// Package output provides structured logging and output formatting for stackit.
-// It includes a custom slog handler and color formatting utilities.
+// Package tui provides terminal user interface components and utilities.
 package tui
 
 import (

@@ -70,7 +70,7 @@ If no branch is passed in, opens an interactive selector to choose the target br
 // interactiveOntoSelection shows an interactive branch selector for choosing the "onto" branch
 func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string, error) {
 	eng := ctx.Engine
-	var initialIndex int = -1
+	initialIndex := -1
 	seenBranches := make(map[string]bool)
 
 	// Get descendants of source to exclude them

@@ -81,7 +81,7 @@ If no branch is specified, uses the current branch.`,
 				}
 
 				// Create AI client
-				var aiClient ai.AIClient
+				var aiClient ai.Client
 				cursorClient, err := ai.NewCursorAgentClient()
 				if err != nil {
 					// Fall back to mock for demonstration

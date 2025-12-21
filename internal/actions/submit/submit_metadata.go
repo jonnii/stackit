@@ -1,3 +1,4 @@
+// Package submit provides functionality for submitting stacked branches as pull requests.
 package submit
 
 import (
@@ -226,7 +227,7 @@ type MetadataOptions struct {
 	Reviewers         string
 	ReviewersPrompt   bool
 	AI                bool
-	AIClient          ai.AIClient
+	AIClient          ai.Client
 }
 
 // PRMetadata contains PR metadata

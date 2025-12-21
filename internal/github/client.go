@@ -1,3 +1,4 @@
+// Package github provides a client for interacting with the GitHub API.
 package github
 
 import "context"
@@ -16,8 +17,8 @@ type PullRequestInfo struct {
 	Head    string
 }
 
-// GitHubClient is an interface for GitHub API interactions
-type GitHubClient interface {
+// Client is an interface for GitHub API interactions
+type Client interface {
 	// CreatePullRequest creates a new pull request
 	CreatePullRequest(ctx context.Context, owner, repo string, opts CreatePROptions) (*PullRequestInfo, error)
 

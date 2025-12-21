@@ -8,7 +8,7 @@ import (
 	githubpkg "stackit.dev/stackit/internal/github"
 )
 
-// MockGitHubClient implements githubpkg.GitHubClient using the mock server
+// MockGitHubClient implements githubpkg.Client using the mock server
 type MockGitHubClient struct {
 	client *github.Client
 	owner  string
@@ -18,7 +18,7 @@ type MockGitHubClient struct {
 
 // NewMockGitHubClientInterface creates a GitHubClient interface implementation
 // using the mock server
-func NewMockGitHubClientInterface(client *github.Client, owner, repo string, config *MockGitHubServerConfig) githubpkg.GitHubClient {
+func NewMockGitHubClientInterface(client *github.Client, owner, repo string, config *MockGitHubServerConfig) githubpkg.Client {
 	return &MockGitHubClient{
 		client: client,
 		owner:  owner,

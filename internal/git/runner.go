@@ -19,18 +19,18 @@ const DefaultCommandTimeout = 5 * time.Minute
 // ErrStaleRemoteInfo indicates that a push failed because the remote has changed
 var ErrStaleRemoteInfo = errors.New("stale info")
 
-// GitRunner handles execution of git commands
-type GitRunner struct {
+// Runner handles execution of git commands
+type Runner struct {
 	workingDir string
 }
 
-// NewGitRunner creates a new GitRunner
-func NewGitRunner(workingDir string) *GitRunner {
-	return &GitRunner{workingDir: workingDir}
+// NewRunner creates a new Runner
+func NewRunner(workingDir string) *Runner {
+	return &Runner{workingDir: workingDir}
 }
 
 // defaultRunner is the global runner used by the package-level functions
-var defaultRunner = &GitRunner{}
+var defaultRunner = &Runner{}
 
 // SetWorkingDir sets the working directory for the default git runner.
 func SetWorkingDir(dir string) {
@@ -50,7 +50,7 @@ func RunGitCommand(args ...string) (string, error) {
 
 // RunGitCommandInDir executes a git command in a specific directory and returns the output.
 func RunGitCommandInDir(dir string, args ...string) (string, error) {
-	runner := &GitRunner{workingDir: dir}
+	runner := &Runner{workingDir: dir}
 	return runner.Run(context.Background(), args...)
 }
 
@@ -60,12 +60,12 @@ func RunGitCommandWithContext(ctx context.Context, args ...string) (string, erro
 }
 
 // Run executes a git command with the given context and returns the output
-func (r *GitRunner) Run(ctx context.Context, args ...string) (string, error) {
+func (r *Runner) Run(ctx context.Context, args ...string) (string, error) {
 	return r.runInternal(ctx, "", true, args...)
 }
 
 // runInternal is the internal implementation that handles directory and input
-func (r *GitRunner) runInternal(ctx context.Context, input string, trim bool, args ...string) (string, error) {
+func (r *Runner) runInternal(ctx context.Context, input string, trim bool, args ...string) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

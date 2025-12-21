@@ -15,29 +15,40 @@ import (
 type MergeStrategy string
 
 const (
+	// MergeStrategyBottomUp merges PRs from the bottom of the stack up to the current branch
 	MergeStrategyBottomUp MergeStrategy = "bottom-up"
-	MergeStrategyTopDown  MergeStrategy = "top-down"
+	// MergeStrategyTopDown merges the entire stack into a single PR
+	MergeStrategyTopDown MergeStrategy = "top-down"
 )
 
 // StepType represents the type of step in a merge plan
 type StepType string
 
 const (
-	StepMergePR      StepType = "MERGE_PR"
-	StepRestack      StepType = "RESTACK"
+	// StepMergePR represents merging a PR
+	StepMergePR StepType = "MERGE_PR"
+	// StepRestack represents restacking a branch onto its parent
+	StepRestack StepType = "RESTACK"
+	// StepDeleteBranch represents deleting a local branch
 	StepDeleteBranch StepType = "DELETE_BRANCH"
+	// StepUpdatePRBase represents updating a PR's base branch
 	StepUpdatePRBase StepType = "UPDATE_PR_BASE"
-	StepPullTrunk    StepType = "PULL_TRUNK"
+	// StepPullTrunk represents pulling the trunk branch
+	StepPullTrunk StepType = "PULL_TRUNK"
 )
 
 // ChecksStatus represents the CI check status for a PR
 type ChecksStatus string
 
 const (
+	// ChecksPassing indicates all checks passed
 	ChecksPassing ChecksStatus = "PASSING"
+	// ChecksFailing indicates at least one check failed
 	ChecksFailing ChecksStatus = "FAILING"
+	// ChecksPending indicates checks are still running
 	ChecksPending ChecksStatus = "PENDING"
-	ChecksNone    ChecksStatus = "NONE"
+	// ChecksNone indicates no checks are configured
+	ChecksNone ChecksStatus = "NONE"
 )
 
 // BranchMergeInfo contains info about a branch to be merged

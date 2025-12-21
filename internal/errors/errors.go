@@ -34,6 +34,7 @@ func (e *BranchNotFoundError) Error() string {
 	return fmt.Sprintf("branch %s does not exist", e.BranchName)
 }
 
+// Is returns true if the target error is ErrBranchNotFound
 func (e *BranchNotFoundError) Is(target error) bool {
 	return target == ErrBranchNotFound
 }
@@ -56,6 +57,7 @@ func (e *RebaseConflictError) Error() string {
 	return fmt.Sprintf("rebase conflict on branch %s", e.BranchName)
 }
 
+// Is returns true if the target error is ErrRebaseConflict
 func (e *RebaseConflictError) Is(target error) bool {
 	return target == ErrRebaseConflict
 }

@@ -1,3 +1,4 @@
+// Package github provides a client for interacting with the GitHub API.
 package github
 
 import (
@@ -7,7 +8,7 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-// RealGitHubClient implements GitHubClient using the real GitHub API
+// RealGitHubClient implements Client using the real GitHub API
 type RealGitHubClient struct {
 	client *github.Client
 	owner  string

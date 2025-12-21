@@ -66,6 +66,7 @@ func NewSimpleSubmitUI(splog *Splog) *SimpleSubmitUI {
 	return &SimpleSubmitUI{splog: splog}
 }
 
+// ShowStack displays the branch stack being submitted
 func (u *SimpleSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
 	u.splog.Info("Stack to submit:")
 	lines := renderer.RenderStack(rootBranch, TreeRenderOptions{})
@@ -75,18 +76,22 @@ func (u *SimpleSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch strin
 	u.splog.Newline()
 }
 
+// ShowRestackStart indicates the start of the restack process
 func (u *SimpleSubmitUI) ShowRestackStart() {
 	u.splog.Info("Restacking branches before submitting...")
 }
 
+// ShowRestackComplete indicates the completion of the restack process
 func (u *SimpleSubmitUI) ShowRestackComplete() {
 	// Nothing needed for simple UI
 }
 
+// ShowPreparing indicates the preparation phase
 func (u *SimpleSubmitUI) ShowPreparing() {
 	// Skip - we'll show progress during actual submission
 }
 
+// ShowBranchPlan indicates the action planned for a branch
 func (u *SimpleSubmitUI) ShowBranchPlan(branchName string, _ string, isCurrent bool, skip bool, skipReason string) {
 	// Only show if skipping (important info), otherwise we'll show during submission
 	if skip {
@@ -98,14 +103,17 @@ func (u *SimpleSubmitUI) ShowBranchPlan(branchName string, _ string, isCurrent b
 	}
 }
 
+// ShowNoChanges indicates no changes were detected
 func (u *SimpleSubmitUI) ShowNoChanges() {
 	u.splog.Info("All PRs up to date.")
 }
 
+// ShowDryRunComplete indicates completion of a dry run
 func (u *SimpleSubmitUI) ShowDryRunComplete() {
 	u.splog.Info("Dry run complete.")
 }
 
+// StartSubmitting begins the actual submission phase
 func (u *SimpleSubmitUI) StartSubmitting(items []SubmitItem) {
 	u.items = items
 	u.completed = 0
@@ -114,6 +122,7 @@ func (u *SimpleSubmitUI) StartSubmitting(items []SubmitItem) {
 	u.splog.Info("Submitting...")
 }
 
+// UpdateSubmitItem updates the status of a specific branch submission
 func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url string, err error) {
 	var item *SubmitItem
 	var itemIdx int
@@ -170,6 +179,7 @@ func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url 
 	u.items[itemIdx].Error = err
 }
 
+// Complete finalizes the display and shows a summary
 func (u *SimpleSubmitUI) Complete() {
 	u.splog.Newline()
 	if u.failed > 0 {
@@ -196,6 +206,7 @@ func NewTTYSubmitUI(splog *Splog) *TTYSubmitUI {
 	return &TTYSubmitUI{splog: splog}
 }
 
+// ShowStack displays the branch stack being submitted
 func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
 	u.model = newTTYSubmitModel(nil)
 	u.model.renderer = renderer
@@ -211,24 +222,28 @@ func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) 
 	}()
 }
 
+// ShowRestackStart indicates the start of the restack process
 func (u *TTYSubmitUI) ShowRestackStart() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Restacking branches..."))
 	}
 }
 
+// ShowRestackComplete indicates the completion of the restack process
 func (u *TTYSubmitUI) ShowRestackComplete() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg(""))
 	}
 }
 
+// ShowPreparing indicates the preparation phase
 func (u *TTYSubmitUI) ShowPreparing() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Preparing branches..."))
 	}
 }
 
+// ShowBranchPlan indicates the action planned for a branch
 func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent bool, skip bool, skipReason string) {
 	if u.program != nil {
 		u.program.Send(planUpdateMsg{
@@ -241,12 +256,14 @@ func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent
 	}
 }
 
+// ShowNoChanges indicates no changes were detected
 func (u *TTYSubmitUI) ShowNoChanges() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("All PRs up to date."))
 	}
 }
 
+// ShowDryRunComplete indicates completion of a dry run
 func (u *TTYSubmitUI) ShowDryRunComplete() {
 	if u.program != nil {
 		u.program.Send(globalMessageMsg("Dry run complete."))
@@ -254,6 +271,7 @@ func (u *TTYSubmitUI) ShowDryRunComplete() {
 	}
 }
 
+// StartSubmitting begins the actual submission phase
 func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
 	u.inSubmitPhase = true
 	if u.program != nil {
@@ -262,6 +280,7 @@ func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
 	}
 }
 
+// UpdateSubmitItem updates the status of a specific branch submission
 func (u *TTYSubmitUI) UpdateSubmitItem(branchName string, status string, url string, err error) {
 	if !u.inSubmitPhase || u.program == nil {
 		return
@@ -274,6 +293,7 @@ func (u *TTYSubmitUI) UpdateSubmitItem(branchName string, status string, url str
 	})
 }
 
+// Complete finalizes the display and shows a summary
 func (u *TTYSubmitUI) Complete() {
 	if !u.inSubmitPhase || u.program == nil {
 		return

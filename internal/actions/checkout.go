@@ -68,7 +68,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 // interactiveBranchSelection shows an interactive branch selector
 func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (string, error) {
 	var choices []tui.BranchChoice
-	var initialIndex int = -1
+	initialIndex := -1
 	currentBranch := ctx.Engine.CurrentBranch()
 	seenBranches := make(map[string]bool)
 

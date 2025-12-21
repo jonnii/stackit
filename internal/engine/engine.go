@@ -99,10 +99,14 @@ type SplitManager interface {
 type CommitFormat string
 
 const (
-	CommitFormatSHA      CommitFormat = "SHA"      // Full SHA
+	// CommitFormatSHA is the full commit SHA
+	CommitFormatSHA CommitFormat = "SHA" // Full SHA
+	// CommitFormatReadable is a readable one-line format
 	CommitFormatReadable CommitFormat = "READABLE" // Oneline format: "abc123 Commit message"
-	CommitFormatMessage  CommitFormat = "MESSAGE"  // Full commit message
-	CommitFormatSubject  CommitFormat = "SUBJECT"  // First line of commit message
+	// CommitFormatMessage is the full commit message
+	CommitFormatMessage CommitFormat = "MESSAGE" // Full commit message
+	// CommitFormatSubject is the first line of the commit message
+	CommitFormatSubject CommitFormat = "SUBJECT" // First line of commit message
 )
 
 // ApplySplitOptions contains options for applying a split

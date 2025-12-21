@@ -22,7 +22,7 @@ func isInteractive() bool {
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
-// inferTrunk attempts to infer the trunk branch name
+// InferTrunk attempts to infer the trunk branch name
 // Exported so it can be used by other commands
 func InferTrunk(ctx context.Context, branchNames []string) string {
 	// First, try to find a remote branch (check origin)

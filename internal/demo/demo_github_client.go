@@ -15,13 +15,13 @@ var prCounter int32 = 100
 
 func init() {
 	// Register the demo GitHub client factory with runtime package
-	runtime.DemoGitHubClientFactory = func() github.GitHubClient {
+	runtime.DemoGitHubClientFactory = func() github.Client {
 		return NewDemoGitHubClient()
 	}
 }
 
-// DemoGitHubClient implements github.GitHubClient for demo mode
-type DemoGitHubClient struct {
+// GitHubClient implements github.Client for demo mode
+type GitHubClient struct {
 	owner string
 	repo  string
 	// prs stores PR info by branch name
@@ -29,8 +29,8 @@ type DemoGitHubClient struct {
 }
 
 // NewDemoGitHubClient creates a new demo GitHub client
-func NewDemoGitHubClient() *DemoGitHubClient {
-	return &DemoGitHubClient{
+func NewDemoGitHubClient() *GitHubClient {
+	return &GitHubClient{
 		owner: "example",
 		repo:  "repo",
 		prs:   make(map[string]*github.PullRequestInfo),
@@ -38,12 +38,12 @@ func NewDemoGitHubClient() *DemoGitHubClient {
 }
 
 // GetOwnerRepo returns the repository owner and name
-func (c *DemoGitHubClient) GetOwnerRepo() (string, string) {
+func (c *GitHubClient) GetOwnerRepo() (string, string) {
 	return c.owner, c.repo
 }
 
 // CreatePullRequest creates a simulated pull request
-func (c *DemoGitHubClient) CreatePullRequest(_ context.Context, owner, repo string, opts github.CreatePROptions) (*github.PullRequestInfo, error) {
+func (c *GitHubClient) CreatePullRequest(_ context.Context, owner, repo string, opts github.CreatePROptions) (*github.PullRequestInfo, error) {
 	simulateDelay(delayMedium)
 
 	prNum := int(atomic.AddInt32(&prCounter, 1))
@@ -64,7 +64,7 @@ func (c *DemoGitHubClient) CreatePullRequest(_ context.Context, owner, repo stri
 }
 
 // UpdatePullRequest simulates updating a pull request
-func (c *DemoGitHubClient) UpdatePullRequest(_ context.Context, _, _ string, prNumber int, opts github.UpdatePROptions) error {
+func (c *GitHubClient) UpdatePullRequest(_ context.Context, _, _ string, prNumber int, opts github.UpdatePROptions) error {
 	simulateDelay(delayShort)
 
 	// Find the PR by number
@@ -90,7 +90,7 @@ func (c *DemoGitHubClient) UpdatePullRequest(_ context.Context, _, _ string, prN
 }
 
 // GetPullRequestByBranch returns a simulated PR for a branch
-func (c *DemoGitHubClient) GetPullRequestByBranch(_ context.Context, _, _, branchName string) (*github.PullRequestInfo, error) {
+func (c *GitHubClient) GetPullRequestByBranch(_ context.Context, _, _, branchName string) (*github.PullRequestInfo, error) {
 	simulateDelay(delayShort)
 
 	if pr, ok := c.prs[branchName]; ok {
@@ -100,7 +100,7 @@ func (c *DemoGitHubClient) GetPullRequestByBranch(_ context.Context, _, _, branc
 }
 
 // MergePullRequest simulates merging a pull request
-func (c *DemoGitHubClient) MergePullRequest(_ context.Context, branchName string) error {
+func (c *GitHubClient) MergePullRequest(_ context.Context, branchName string) error {
 	simulateDelay(delayMedium)
 
 	if pr, ok := c.prs[branchName]; ok {
@@ -110,7 +110,7 @@ func (c *DemoGitHubClient) MergePullRequest(_ context.Context, branchName string
 }
 
 // GetPRChecksStatus returns simulated check status
-func (c *DemoGitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
+func (c *GitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
 	// Simulate a small delay
 	time.Sleep(50 * time.Millisecond)
 

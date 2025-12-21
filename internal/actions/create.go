@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -23,8 +22,6 @@ type CreateOptions struct {
 	Patch      bool
 	Update     bool
 	Verbose    int
-	AI         bool
-	AIClient   ai.Client
 }
 
 // CreateAction creates a new branch stacked on top of the current branch
@@ -58,16 +55,12 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	if opts.Update {
 		args = append(args, "--update")
 	}
-	if opts.AI {
-		args = append(args, "--ai")
-	}
 	if err := eng.TakeSnapshot(ctx.Context, "create", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}
 
 	// Handle staging first if we might need the message to name the branch
-	// or if AI is enabled
 	hasStaged, err := git.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
@@ -101,7 +94,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		}
 	}
 
-	// If AI is enabled and no branch name/message provided, generate commit message
+	// Get commit message
 	commitMessage := opts.Message
 	if commitMessage == "" && !utils.IsInteractive() {
 		stdinMsg, err := utils.ReadFromStdin()
@@ -110,54 +103,11 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		}
 	}
 
-	if opts.AI && opts.AIClient != nil && opts.BranchName == "" && commitMessage == "" {
-		if !hasStaged {
-			hasUntracked, _ := git.HasUntrackedFiles(ctx.Context)
-			hasUnstaged, _ := git.HasUnstagedChanges(ctx.Context)
-			if !hasUntracked && !hasUnstaged {
-				return fmt.Errorf("no changes to commit. Stage some changes first or provide a branch name or commit message")
-			}
-			// Auto-stage all changes for AI generation if not staged already
-			if err := git.StageAll(ctx.Context); err != nil {
-				return fmt.Errorf("failed to stage changes for AI: %w", err)
-			}
-			hasStaged = true
-			splog.Debug("Staged changes for AI commit message generation")
-		}
-
-		// Get staged diff
-		diff, err := git.GetStagedDiff(ctx.Context)
-		if err != nil {
-			return fmt.Errorf("failed to get staged diff: %w", err)
-		}
-
-		if diff == "" {
-			return fmt.Errorf("no staged changes found. Stage some changes first or provide a branch name or commit message")
-		}
-
-		// Generate commit message using AI
-		splog.Debug("Generating commit message using AI from staged changes")
-		generatedMessage, err := opts.AIClient.GenerateCommitMessage(ctx.Context, diff)
-		if err != nil {
-			return fmt.Errorf("failed to generate commit message with AI: %w", err)
-		}
-
-		if generatedMessage == "" {
-			return fmt.Errorf("AI generated empty commit message")
-		}
-
-		commitMessage = generatedMessage
-		splog.Debug("AI generated commit message: %s", commitMessage)
-	}
-
 	// Determine branch name
 	branchName := opts.BranchName
 	if branchName == "" {
 		if commitMessage == "" {
 			if !utils.IsInteractive() {
-				if opts.AI && opts.AIClient != nil {
-					return fmt.Errorf("must specify either a branch name, commit message, or use --ai with staged changes")
-				}
 				return fmt.Errorf("must specify either a branch name or commit message")
 			}
 

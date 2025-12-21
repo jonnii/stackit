@@ -31,12 +31,6 @@ func ConfigListAction(repoRoot string) error {
 		return fmt.Errorf("failed to get branch.pattern: %w", err)
 	}
 
-	// Get create.ai
-	createAI, err := config.GetCreateAI(repoRoot)
-	if err != nil {
-		return fmt.Errorf("failed to get create.ai: %w", err)
-	}
-
 	// Get submit.footer
 	submitFooter, err := config.GetSubmitFooter(repoRoot)
 	if err != nil {
@@ -60,7 +54,6 @@ func ConfigListAction(repoRoot string) error {
 	}
 
 	lines = append(lines, fmt.Sprintf("%s: %s", tui.ColorCyan("branch.pattern"), branchPattern))
-	lines = append(lines, fmt.Sprintf("%s: %v", tui.ColorCyan("create.ai"), createAI))
 	lines = append(lines, fmt.Sprintf("%s: %v", tui.ColorCyan("submit.footer"), submitFooter))
 
 	splog.Page(strings.Join(lines, "\n"))
@@ -81,12 +74,6 @@ func ConfigTUIAction(repoRoot string) error {
 			branchPattern = "{username}/{date}/{message}" // fallback
 		}
 
-		createAI, err := config.GetCreateAI(repoRoot)
-		if err != nil {
-			splog.Debug("Failed to get create.ai: %v", err)
-			createAI = false // fallback
-		}
-
 		submitFooter, err := config.GetSubmitFooter(repoRoot)
 		if err != nil {
 			splog.Debug("Failed to get submit.footer: %v", err)
@@ -98,10 +85,6 @@ func ConfigTUIAction(repoRoot string) error {
 			{
 				Label: fmt.Sprintf("branch.pattern: %s", branchPattern),
 				Value: "branch.pattern",
-			},
-			{
-				Label: fmt.Sprintf("create.ai: %v", createAI),
-				Value: "create.ai",
 			},
 			{
 				Label: fmt.Sprintf("submit.footer: %v", submitFooter),
@@ -139,22 +122,6 @@ func ConfigTUIAction(repoRoot string) error {
 					continue
 				}
 				splog.Info("Set branch.pattern to: %s", newPattern)
-			}
-
-		case "create.ai":
-			newValue, err := tui.PromptConfirm(fmt.Sprintf("Enable AI-powered PR description? (current: %v):", createAI), createAI)
-			if err != nil {
-				if errors.Is(err, tui.ErrInteractiveDisabled) || strings.Contains(err.Error(), "canceled") {
-					continue
-				}
-				return err
-			}
-			if newValue != createAI {
-				if err := config.SetCreateAI(repoRoot, newValue); err != nil {
-					splog.Info("Failed to set create.ai: %v", err)
-					continue
-				}
-				splog.Info("Set create.ai to: %v", newValue)
 			}
 
 		case "submit.footer":

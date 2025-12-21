@@ -54,4 +54,3 @@ Stackit manages branch relationships and PR state using custom Git references an
 - **PR Information**: Managed through the `Engine` which abstracts the storage of PR titles, bodies, and status.
 - **State Management**: The `internal/engine` package is the source of truth for the stack structure. Always use the `Engine` to query or modify branch relationships.
 
-

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
@@ -121,54 +120,16 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	shouldEditTitle := opts.EditTitle || (opts.Edit && !opts.NoEditTitle)
 	shouldEditBody := opts.EditDescription || (opts.Edit && !opts.NoEditDescription)
 
-	// Use pre-generated AI metadata if provided
-	aiTitle := opts.AIGeneratedTitle
-	aiBody := opts.AIGeneratedBody
-
-	// Try AI generation if enabled and no existing body/title and no pre-generated content
-	if opts.AI && opts.AIClient != nil && aiTitle == "" && aiBody == "" && (metadata.Body == "" || (prInfo == nil || prInfo.Title == "")) {
-		ctx.Splog.Debug("AI enabled, collecting PR context for branch %s", branchName)
-
-		// Collect PR context
-		prContext, err := ai.CollectPRContext(ctx, eng, branchName)
-		if err != nil {
-			ctx.Splog.Debug("Failed to collect PR context: %v, falling back to default", err)
-		} else {
-			// Generate PR description using AI
-			generatedTitle, generatedBody, err := opts.AIClient.GeneratePRDescription(ctx.Context, prContext)
-			if err != nil {
-				ctx.Splog.Debug("AI generation failed: %v, falling back to default", err)
-			} else {
-				aiTitle = generatedTitle
-				aiBody = generatedBody
-				ctx.Splog.Debug("AI-generated PR description ready for review")
-			}
-		}
-	}
-
-	// Get title - use AI title if available and no existing title
-	titleToUse := metadata.Title
-	if aiTitle != "" && (prInfo == nil || prInfo.Title == "") {
-		titleToUse = aiTitle
-	}
-
 	if shouldEditTitle || (prInfo == nil || prInfo.Title == "") {
-		title, err := GetPRTitle(branchName, shouldEditTitle, titleToUse, ctx)
+		title, err := GetPRTitle(branchName, shouldEditTitle, metadata.Title, ctx)
 		if err != nil {
 			return nil, err
 		}
 		metadata.Title = title
 	}
 
-	// Get body - use AI body if available and no existing body
-	bodyToUse := metadata.Body
-	if aiBody != "" && bodyToUse == "" {
-		bodyToUse = aiBody
-	}
-
 	if shouldEditBody || (prInfo == nil || prInfo.Body == "") {
-		// Get body (with AI-generated content as initial value if available)
-		finalBody, err := GetPRBody(branchName, shouldEditBody, bodyToUse, ctx)
+		finalBody, err := GetPRBody(branchName, shouldEditBody, metadata.Body, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -229,10 +190,6 @@ type MetadataOptions struct {
 	Publish           bool
 	Reviewers         string
 	ReviewersPrompt   bool
-	AI                bool
-	AIClient          ai.Client
-	AIGeneratedTitle  string
-	AIGeneratedBody   string
 }
 
 // PRMetadata contains PR metadata

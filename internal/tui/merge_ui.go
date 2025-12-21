@@ -115,13 +115,6 @@ func (m MergeTUIModel) checkForUpdates() tea.Cmd {
 		select {
 		case update, ok := <-m.updates:
 			if !ok {
-				// Channel closed, signal completion
-				if m.doneChan != nil {
-					select {
-					case m.doneChan <- true:
-					default:
-					}
-				}
 				return tea.Quit()
 			}
 
@@ -302,5 +295,14 @@ func RunMergeTUI(stepDescriptions []string, updates <-chan MergeProgressUpdate, 
 	program := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 
 	_, err := program.Run()
+
+	// Signal completion after the program has finished and restored the terminal
+	if done != nil {
+		select {
+		case done <- true:
+		default:
+		}
+	}
+
 	return err
 }

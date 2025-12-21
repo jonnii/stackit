@@ -146,4 +146,81 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		require.True(t, createdBranches["C1"])
 		require.True(t, createdBranches["C2"])
 	})
+
+	t.Run("skips base update when no commits between base and head", func(t *testing.T) {
+		// This test covers the scenario where after reordering, a branch has no commits
+		// between it and its new base, which would cause GitHub to reject the PR update.
+		// Our fix should detect this and skip the base update to avoid the error.
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"A": "main",
+				"B": "A",
+			})
+
+		// Create a local remote
+		_, err := s.Scene.Repo.CreateBareRemote("origin")
+		require.NoError(t, err)
+
+		// Get the SHA of branch A
+		aSHA, err := s.Engine.GetRevision(context.Background(), "A")
+		require.NoError(t, err)
+
+		// Make branch B point to the same commit as A
+		// This simulates the scenario where there are no commits between B and A
+		s.Checkout("A")
+		s.RunGit("branch", "-f", "B", aSHA)
+		s.Rebuild()
+
+		// Create mocked GitHub client
+		config := testhelpers.NewMockGitHubServerConfig()
+		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
+		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
+
+		// Create a PR for B with A as the base (but B and A point to same commit)
+		prNumberB := 101
+		prDataB := testhelpers.DefaultPRData()
+		prDataB.Head = "B"
+		prDataB.Number = prNumberB
+		prDataB.Base = "main" // Original base
+		prB := testhelpers.NewSamplePullRequest(prDataB)
+		config.PRs["B"] = prB
+		config.CreatedPRs = append(config.CreatedPRs, prB)
+		config.UpdatedPRs[prNumberB] = prB
+
+		// Store PR info in engine with A as the base (simulating after reorder)
+		err = s.Engine.UpsertPrInfo(context.Background(), "B", &engine.PrInfo{
+			Number: &prNumberB,
+			Title:  prDataB.Title,
+			Body:   prDataB.Body,
+			Base:   "main", // Will be changed to "A" in prepareBranchesForSubmit
+		})
+		require.NoError(t, err)
+
+		// Update parent relationship: B's parent is now A
+		err = s.Engine.SetParent(context.Background(), "B", "A")
+		require.NoError(t, err)
+
+		// Verify that B and A have the same SHA (no commits between them)
+		bSHA, err := s.Engine.GetRevision(context.Background(), "B")
+		require.NoError(t, err)
+		require.Equal(t, aSHA, bSHA, "B and A should point to the same commit")
+
+		// Now try to submit B with A as the new base
+		// Since B's SHA equals A's SHA, the base update should be skipped
+		s.Context.GitHubClient = githubClient
+		opts := submit.Options{
+			DryRun: false,
+			NoEdit: true,
+			Draft:  true,
+		}
+
+		s.Checkout("B")
+		err = submit.Action(s.Context, opts)
+		require.NoError(t, err, "Submit should succeed even when base update is skipped due to no commits")
+
+		// Verify that the PR was updated (other fields should be updated)
+		updatedPR, exists := config.UpdatedPRs[prNumberB]
+		require.True(t, exists, "PR %d should be in UpdatedPRs", prNumberB)
+		require.NotNil(t, updatedPR, "Updated PR should not be nil")
+	})
 }

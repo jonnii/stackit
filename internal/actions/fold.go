@@ -13,7 +13,8 @@ import (
 
 // FoldOptions contains options for the fold command
 type FoldOptions struct {
-	Keep bool // If true, keeps the name of the current branch instead of using the name of its parent
+	Keep       bool // If true, keeps the name of the current branch instead of using the name of its parent
+	AllowTrunk bool // If true, allows folding into the trunk branch
 }
 
 // FoldAction performs the fold operation
@@ -32,6 +33,9 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	args := []string{}
 	if opts.Keep {
 		args = append(args, "--keep")
+	}
+	if opts.AllowTrunk {
+		args = append(args, "--allow-trunk")
 	}
 	if err := eng.TakeSnapshot(gctx, "fold", args); err != nil {
 		// Log but don't fail - snapshot is best effort
@@ -70,6 +74,11 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 			return fmt.Errorf("cannot fold into trunk with --keep because it would delete the trunk branch")
 		}
 		return foldWithKeep(gctx, ctx, currentBranch, parent, eng, splog)
+	}
+
+	// Check if folding into trunk
+	if eng.IsTrunk(parent) && !opts.AllowTrunk {
+		return fmt.Errorf("cannot fold into trunk branch %s without --allow-trunk. Folding into trunk will modify your local main branch directly", parent)
 	}
 
 	return foldNormal(gctx, ctx, currentBranch, parent, eng, splog)

@@ -62,19 +62,33 @@ func ReorderAction(ctx *runtime.Context) error {
 	originalOrder := make([]string, len(branches))
 	copy(originalOrder, branches)
 
-	// Create editor content with instructions
-	editorContent := buildEditorContent(branches)
+	// Open TUI or Editor to get new order
+	var newOrder []string
+	if tui.IsTTY() {
+		var err error
+		newOrder, err = tui.RunReorderTUI(branches)
+		if err != nil {
+			if err.Error() == "reorder canceled" {
+				splog.Info("Reorder canceled.")
+				return nil
+			}
+			return fmt.Errorf("TUI failed: %w", err)
+		}
+	} else {
+		// Create editor content with instructions
+		editorContent := buildEditorContent(branches)
 
-	// Open editor
-	editedContent, err := tui.OpenEditor(editorContent, "stackit-reorder-*.txt")
-	if err != nil {
-		return fmt.Errorf("failed to open editor: %w", err)
-	}
+		// Open editor
+		editedContent, err := tui.OpenEditor(editorContent, "stackit-reorder-*.txt")
+		if err != nil {
+			return fmt.Errorf("failed to open editor: %w", err)
+		}
 
-	// Parse and validate edited content
-	newOrder, err := parseEditorContent(editedContent, originalOrder)
-	if err != nil {
-		return err
+		// Parse and validate edited content
+		newOrder, err = parseEditorContent(editedContent, originalOrder)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Check if order actually changed

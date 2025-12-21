@@ -11,11 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const (
-	keyCtrlC = "ctrl+c"
-	keyQuit  = "q"
-)
-
 // MergeStepItem represents a step in the merge process
 type MergeStepItem struct {
 	StepIndex   int
@@ -153,13 +148,14 @@ func (m MergeTUIModel) checkForUpdates() tea.Cmd {
 
 // Update handles message updates for the bubbletea model
 func (m MergeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == keyCtrlC || msg.String() == keyQuit {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg.String() == KeyCtrlC || msg.String() == KeyQuit {
 			m.quitting = true
 			return m, tea.Quit
 		}
+	}
 
+	switch msg := msg.(type) {
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)

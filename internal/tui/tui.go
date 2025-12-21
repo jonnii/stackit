@@ -11,6 +11,17 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+// Key constants for TUI interactions
+const (
+	KeyCtrlC = "ctrl+c"
+	KeyQuit  = "q"
+	KeyEsc   = "esc"
+	KeyEnter = "enter"
+	KeyUp    = "up"
+	KeyDown  = "down"
+	KeyTab   = "tab"
+)
+
 // SubmitItem represents a branch being submitted
 type SubmitItem struct {
 	BranchName string
@@ -95,13 +106,14 @@ func (m SubmitTUIModel) Init() tea.Cmd {
 
 // Update handles message updates for the bubbletea model
 func (m SubmitTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" || msg.String() == "q" {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg.String() == KeyCtrlC || msg.String() == KeyQuit {
 			m.quitting = true
 			return m, tea.Quit
 		}
+	}
 
+	switch msg := msg.(type) {
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)

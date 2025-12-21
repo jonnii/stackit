@@ -122,15 +122,16 @@ func TestUndoAction(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, snapshots, 2)
 
-		// Restore to the older snapshot (index 1) - bypass confirmation
-		err = s.Engine.RestoreSnapshot(s.Context, snapshots[1].ID)
+		// Restore to the most recent snapshot (Snapshot 2, taken after first change)
+		// Since GetSnapshots returns newest first, this is index 0
+		err = s.Engine.RestoreSnapshot(s.Context, snapshots[0].ID)
 		require.NoError(t, err)
 
-		// Verify state restored to first snapshot (after first change, not initial)
+		// Verify state restored to Snapshot 2 (after first change, not initial)
 		s.Engine.Rebuild(s.Context, s.Engine.Trunk())
 		restoredFeature1SHA, err := s.Engine.GetRevision(s.Context, "feature1")
 		require.NoError(t, err)
-		// Should restore to state after first change (what was captured in first snapshot)
+		// Should restore to state after first change
 		require.Equal(t, afterFirstChangeSHA, restoredFeature1SHA)
 	})
 }

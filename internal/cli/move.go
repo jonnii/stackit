@@ -64,6 +64,9 @@ If no branch is passed in, opens an interactive selector to choose the target br
 	cmd.Flags().StringVarP(&onto, "onto", "o", "", "Branch to move the current branch onto.")
 	cmd.Flags().StringVar(&source, "source", "", "Branch to move (defaults to current branch).")
 
+	_ = cmd.RegisterFlagCompletionFunc("onto", completeBranches)
+	_ = cmd.RegisterFlagCompletionFunc("source", completeBranches)
+
 	return cmd
 }
 

@@ -24,6 +24,7 @@ func newCheckoutCmd() *cobra.Command {
 
 The interactive selector allows you to navigate branches using arrow keys and filter
 by typing. Use flags to customize which branches are shown.`,
+		ValidArgsFunction: completeBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

@@ -58,7 +58,7 @@ func ensureUndoDir(repoRoot string) error {
 func getSnapshotFilename(timestamp time.Time, command string) string {
 	// Format: YYYYMMDDHHMMSS_command.json
 	// This ensures chronological ordering when sorted by filename
-	return fmt.Sprintf("%s_%s.json", timestamp.Format("20060102150405"), command)
+	return fmt.Sprintf("%s_%s.json", timestamp.Format("20060102150405.000"), command)
 }
 
 // parseSnapshotFilename extracts timestamp and command from a filename
@@ -84,9 +84,14 @@ func parseSnapshotFilename(filename string) (time.Time, string, error) {
 	timestampStr := base[:lastUnderscore]
 	command := base[lastUnderscore+1:]
 
-	timestamp, err := time.Parse("20060102150405", timestampStr)
+	timestamp, err := time.Parse("20060102150405.000", timestampStr)
 	if err != nil {
-		return time.Time{}, "", fmt.Errorf("failed to parse timestamp: %w", err)
+		// Try without milliseconds for backward compatibility
+		var err2 error
+		timestamp, err2 = time.Parse("20060102150405", timestampStr)
+		if err2 != nil {
+			return time.Time{}, "", fmt.Errorf("failed to parse timestamp: %w", err)
+		}
 	}
 
 	return timestamp, command, nil
@@ -258,7 +263,11 @@ func (e *engineImpl) GetSnapshots() ([]SnapshotInfo, error) {
 
 	// Sort by timestamp (newest first)
 	sort.Slice(snapshots, func(i, j int) bool {
-		return snapshots[i].Timestamp.After(snapshots[j].Timestamp)
+		if !snapshots[i].Timestamp.Equal(snapshots[j].Timestamp) {
+			return snapshots[i].Timestamp.After(snapshots[j].Timestamp)
+		}
+		// Tie-breaker: use ID (filename) descending
+		return snapshots[i].ID > snapshots[j].ID
 	})
 
 	return snapshots, nil

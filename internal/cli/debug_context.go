@@ -26,7 +26,8 @@ If --ai is specified, also generates and displays what the commit message would 
 if running 'stackit create --ai' with the current staged changes.
 
 If no branch is specified, uses the current branch.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

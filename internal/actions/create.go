@@ -38,6 +38,34 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		return err
 	}
 
+	// Take snapshot before modifying the repository
+	args := []string{}
+	if opts.BranchName != "" {
+		args = append(args, opts.BranchName)
+	}
+	if opts.Message != "" {
+		args = append(args, "-m", opts.Message)
+	}
+	if opts.All {
+		args = append(args, "--all")
+	}
+	if opts.Insert {
+		args = append(args, "--insert")
+	}
+	if opts.Patch {
+		args = append(args, "--patch")
+	}
+	if opts.Update {
+		args = append(args, "--update")
+	}
+	if opts.AI {
+		args = append(args, "--ai")
+	}
+	if err := eng.TakeSnapshot(ctx.Context, "create", args); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
+
 	// Handle staging first if we might need the message to name the branch
 	// or if AI is enabled
 	hasStaged, err := git.HasStagedChanges(ctx.Context)

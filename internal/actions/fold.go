@@ -28,6 +28,16 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 		return err
 	}
 
+	// Take snapshot before modifying the repository
+	args := []string{}
+	if opts.Keep {
+		args = append(args, "--keep")
+	}
+	if err := eng.TakeSnapshot(gctx, "fold", args); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
+
 	// Check if on trunk
 	if eng.IsTrunk(currentBranch) {
 		return fmt.Errorf("cannot fold trunk branch")

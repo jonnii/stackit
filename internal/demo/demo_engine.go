@@ -378,5 +378,29 @@ func (e *Engine) ForceCheckoutBranch(_ context.Context, _ string) error {
 	return nil
 }
 
+// UndoManager interface implementation
+
+// TakeSnapshot simulates taking a snapshot in the demo engine
+func (e *Engine) TakeSnapshot(_ context.Context, _ string, _ []string) error {
+	// In demo mode, snapshots are not persisted
+	return nil
+}
+
+// GetSnapshots returns empty snapshots list in the demo engine
+func (e *Engine) GetSnapshots() ([]engine.SnapshotInfo, error) {
+	// Demo mode doesn't support undo
+	return []engine.SnapshotInfo{}, nil
+}
+
+// LoadSnapshot returns an error in the demo engine
+func (e *Engine) LoadSnapshot(_ string) (*engine.Snapshot, error) {
+	return nil, fmt.Errorf("undo not supported in demo mode")
+}
+
+// RestoreSnapshot returns an error in the demo engine
+func (e *Engine) RestoreSnapshot(_ context.Context, _ string) error {
+	return fmt.Errorf("undo not supported in demo mode")
+}
+
 // Ensure Engine implements engine.Engine
 var _ engine.Engine = (*Engine)(nil)

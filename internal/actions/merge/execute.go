@@ -3,6 +3,9 @@ package merge
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"stackit.dev/stackit/internal/config"
@@ -93,8 +96,109 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 }
 
 // ExecuteInWorktree executes the merge plan in a temporary worktree
-func ExecuteInWorktree(_ context.Context, _ mergeExecuteEngine, _ *tui.Splog, _ github.Client, _ string, _ ExecuteOptions) error {
-	return fmt.Errorf("ExecuteInWorktree not implemented yet")
+func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
+	splog.Info("🔨 Creating temporary worktree for merge execution...")
+
+	// 1. Create temporary directory
+	tmpDir, err := os.MkdirTemp("", "stackit-merge-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+
+	worktreePath := filepath.Join(tmpDir, "worktree")
+	splog.Info("📁 Worktree: %s", worktreePath)
+
+	// 2. Add detached worktree
+	// Use HEAD to ensure we have a valid starting point without switching branches in main workspace
+	if err := git.AddWorktree(ctx, worktreePath, "HEAD", true); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return fmt.Errorf("failed to add worktree: %w", err)
+	}
+
+	// 3. Set working directory for git commands
+	originalWorkDir := git.GetWorkingDir()
+	git.SetWorkingDir(worktreePath)
+
+	// Ensure we restore working directory and clean up on exit (unless there's a conflict)
+	cleanupWorktree := true
+	defer func() {
+		git.SetWorkingDir(originalWorkDir)
+		if cleanupWorktree {
+			splog.Debug("Cleaning up worktree at %s", worktreePath)
+			if err := git.RemoveWorktree(context.Background(), worktreePath); err != nil {
+				splog.Warn("Failed to remove worktree at %s: %v", worktreePath, err)
+			}
+			_ = os.RemoveAll(tmpDir)
+		}
+	}()
+
+	// 4. Create a new engine for the worktree
+	trunk := eng.Trunk()
+	maxUndoDepth, _ := config.GetUndoStackDepth(repoRoot)
+	if maxUndoDepth <= 0 {
+		maxUndoDepth = engine.DefaultMaxUndoStackDepth
+	}
+
+	worktreeEng, err := engine.NewEngine(engine.Options{
+		RepoRoot:          worktreePath,
+		Trunk:             trunk,
+		MaxUndoStackDepth: maxUndoDepth,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize engine in worktree: %w", err)
+	}
+
+	// 5. Execute the plan in the worktree
+	splog.Info("🚀 Executing merge plan in worktree...")
+	err = Execute(ctx, worktreeEng, splog, githubClient, worktreePath, opts)
+
+	if err != nil {
+		// If it's a conflict, don't clean up so the user can resolve it
+		if isConflictError(err) {
+			cleanupWorktree = false
+			splog.Warn("Conflict detected during merge execution in worktree.")
+			splog.Info("The worktree has been preserved for manual resolution:")
+			splog.Info("  Path: %s", worktreePath)
+			splog.Newline()
+			splog.Info("To resolve the conflict and continue:")
+			splog.Info("  1. cd %s", worktreePath)
+			splog.Info("  2. Resolve the conflicts and git add the files.")
+			splog.Info("  3. Run 'stackit continue' to finish the restack.")
+			splog.Info("  4. Once finished, return to your main workspace and run 'stackit merge' again.")
+			return err
+		}
+
+		// For other errors (like CI failure), we still want to give instructions
+		// but we can clean up the worktree.
+		splog.Warn("Merge execution failed in worktree.")
+		if isCIFailure(err) {
+			splog.Info("CI checks failed. Please:")
+			splog.Info("  1. Stay in your main workspace.")
+			splog.Info("  2. Fix the issues on the failing branch.")
+			splog.Info("  3. Run 'stackit modify' and 'stackit submit'.")
+			splog.Info("  4. Run 'stackit merge' again once CI passes.")
+		} else {
+			splog.Info("To resolve:")
+			splog.Info("  1. Fix the underlying issue in your main workspace.")
+			splog.Info("  2. Run 'stackit merge' again.")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func isConflictError(err error) bool {
+	// Simple check for now - can be made more robust
+	return err != nil && (fmt.Sprintf("%v", err) != "" && (fmt.Sprintf("%v", err)[:12] == "hit conflict" || fmt.Sprintf("%v", err)[:15] == "rebase conflict"))
+}
+
+func isCIFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := fmt.Sprintf("%v", err)
+	return strings.Contains(errStr, "CI checks failed") || strings.Contains(errStr, "failing CI checks") || strings.Contains(errStr, "pending CI checks")
 }
 
 func calculateGroups(plan *Plan) []tui.MergeGroup {

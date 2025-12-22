@@ -22,42 +22,61 @@ const (
 // onto is the branch name to rebase onto (parent branch)
 // from is the base revision (old parent branch revision)
 func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, error) {
-	// Save current branch
+	// Save current branch/detached HEAD
 	currentBranch, err := GetCurrentBranch()
+	var currentRev string
 	if err != nil {
 		currentBranch = ""
+		currentRev, _ = RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
 	}
 
-	// Checkout the branch to rebase
-	if err := CheckoutBranch(ctx, branchName); err != nil {
-		return RebaseConflict, fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
+	// Get the SHA of the branch we want to rebase
+	branchRev, err := RunGitCommandWithContext(ctx, "rev-parse", branchName)
+	if err != nil {
+		return RebaseConflict, fmt.Errorf("failed to get revision for %s: %w", branchName, err)
 	}
 
-	// Perform rebase using git rebase --onto
-	// git rebase --onto <onto> <from>
-	// This rebases commits from <from>..HEAD onto <onto>
-	_, err = RunGitCommandWithContext(ctx, "rebase", "--onto", onto, from)
+	// Perform rebase using detached HEAD to avoid "already used by worktree" errors
+	// git rebase --onto <onto> <from> <branchRev>
+	// This will result in a detached HEAD at the new rebased commit
+	_, err = RunGitCommandWithContext(ctx, "rebase", "--onto", onto, from, branchRev)
 	if err != nil {
 		// Check if rebase is in progress (conflict)
 		if IsRebaseInProgress(ctx) {
-			// Rebase is in progress, switch back
-			if currentBranch != "" && currentBranch != branchName {
-				_ = CheckoutBranch(ctx, currentBranch)
-			}
 			return RebaseConflict, nil
 		}
-		// Switch back to original branch
-		if currentBranch != "" && currentBranch != branchName {
+		// Try to abort rebase if it failed for other reasons
+		_, _ = RunGitCommandWithContext(ctx, "rebase", "--abort")
+
+		// Restore original state
+		if currentBranch != "" {
 			_ = CheckoutBranch(ctx, currentBranch)
+		} else if currentRev != "" {
+			_ = CheckoutDetached(ctx, currentRev)
 		}
 		return RebaseConflict, nil
 	}
 
-	// Switch back to original branch
-	if currentBranch != "" && currentBranch != branchName {
+	// Get the new rebased SHA
+	newRev, err := RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
+	if err != nil {
+		return RebaseConflict, fmt.Errorf("failed to get new revision after rebase: %w", err)
+	}
+
+	// Update the branch reference to the new rebased commit
+	_, err = RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, newRev)
+	if err != nil {
+		return RebaseConflict, fmt.Errorf("failed to update branch reference %s: %w", branchName, err)
+	}
+
+	// Restore original state
+	if currentBranch != "" {
 		if err := CheckoutBranch(ctx, currentBranch); err != nil {
-			return RebaseDone, fmt.Errorf("failed to switch back to %s: %w", currentBranch, err)
+			// If original branch is now used elsewhere (unlikely but possible), checkout detached
+			_ = CheckoutDetached(ctx, currentBranch)
 		}
+	} else if currentRev != "" {
+		_ = CheckoutDetached(ctx, currentRev)
 	}
 
 	return RebaseDone, nil

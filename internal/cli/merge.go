@@ -18,6 +18,7 @@ func newMergeCmd() *cobra.Command {
 		yes      bool
 		force    bool
 		strategy string
+		worktree bool
 	)
 
 	cmd := &cobra.Command{
@@ -58,10 +59,11 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 			// Run merge action
 			return merge.Action(ctx, merge.Options{
-				DryRun:   dryRun,
-				Confirm:  !yes, // If --yes is set, don't confirm
-				Strategy: mergeStrategy,
-				Force:    force,
+				DryRun:      dryRun,
+				Confirm:     !yes, // If --yes is set, don't confirm
+				Strategy:    mergeStrategy,
+				Force:       force,
+				UseWorktree: worktree,
 			})
 		},
 	}
@@ -70,6 +72,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
 	cmd.Flags().BoolVar(&force, "force", false, "Skip validation checks (draft PRs, failing CI)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show merge plan without executing")
+	cmd.Flags().BoolVar(&worktree, "worktree", false, "Execute the merge and restack in a temporary worktree to avoid interfering with current branch")
 
 	return cmd
 }
@@ -232,14 +235,25 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		return nil
 	}
 
-	// Execute the plan
-	if err := merge.Execute(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, merge.ExecuteOptions{
-		Plan:  plan,
-		Force: forceFlag,
-	}); err != nil {
-		return fmt.Errorf("merge execution failed: %w", err)
+	// Ask about worktree if not specified by flag
+	useWorktree := false
+	useWorktree, err = tui.PromptConfirm("Execute merge in a temporary worktree? (allows you to continue working here)", true)
+	if err != nil {
+		return fmt.Errorf("worktree confirmation canceled: %w", err)
 	}
 
-	splog.Info("Merge completed successfully")
+	// Execute the plan
+	mergeOpts := merge.Options{
+		DryRun:      dryRun,
+		Confirm:     false, // Already confirmed
+		Strategy:    mergeStrategy,
+		Force:       forceFlag,
+		UseWorktree: useWorktree,
+	}
+
+	if err := merge.Action(ctx, mergeOpts); err != nil {
+		return fmt.Errorf("merge action failed: %w", err)
+	}
+
 	return nil
 }

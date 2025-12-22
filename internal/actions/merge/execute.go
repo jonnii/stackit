@@ -189,8 +189,13 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 }
 
 func isConflictError(err error) bool {
-	// Simple check for now - can be made more robust
-	return err != nil && (fmt.Sprintf("%v", err) != "" && (fmt.Sprintf("%v", err)[:12] == "hit conflict" || fmt.Sprintf("%v", err)[:15] == "rebase conflict"))
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "hit conflict") ||
+		strings.Contains(msg, "rebase conflict") ||
+		strings.Contains(msg, "could not be fast-forwarded (conflict)")
 }
 
 func isCIFailure(err error) bool {

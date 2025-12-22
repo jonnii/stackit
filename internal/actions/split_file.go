@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // splitByFile splits a branch by extracting files to a new parent branch
@@ -20,7 +21,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 	// Generate new branch name
 	newBranchName := branchToSplit + "_split"
 	allBranches := eng.AllBranchNames()
-	for containsString(allBranches, newBranchName) {
+	for utils.ContainsString(allBranches, newBranchName) {
 		newBranchName += "_split"
 	}
 

@@ -80,7 +80,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 						// Try to find the child that leads to toBranch
 						var candidates []string
 						for _, child := range children {
-							if child == toBranch || containsString(ctx.Engine.GetRelativeStackUpstack(child), toBranch) {
+							if child == toBranch || utils.ContainsString(ctx.Engine.GetRelativeStackUpstack(child), toBranch) {
 								candidates = append(candidates, child)
 							}
 						}
@@ -154,13 +154,4 @@ func promptForChild(children []string, parent string) (string, error) {
 	}
 
 	return selected, nil
-}
-
-func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

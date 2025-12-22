@@ -203,7 +203,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	splog.Newline()
 
 	// Recreate plan with selected strategy
-	plan, _, err = merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
+	plan, validation, err = merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
 		Strategy: mergeStrategy,
 		Force:    forceFlag,
 	})
@@ -211,16 +211,22 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		return err
 	}
 
-	// Display plan
-	splog.Newline()
-	splog.Info("📋 Merge Plan:")
-	for i, step := range plan.Steps {
-		splog.Info("  %d. %s", i+1, step.Description)
+	// Re-validate if strategy changed (important for top-down)
+	if !validation.Valid && !forceFlag {
+		splog.Warn("Errors found with selected strategy:")
+		for _, errMsg := range validation.Errors {
+			splog.Warn("  ✗ %s", errMsg)
+		}
+		return fmt.Errorf("validation failed")
 	}
-	splog.Newline()
 
 	// If dry-run, stop here
 	if dryRun {
+		splog.Info("📋 Merge Plan:")
+		for i, step := range plan.Steps {
+			splog.Info("  %d. %s", i+1, step.Description)
+		}
+		splog.Newline()
 		splog.Info("Dry-run mode: plan displayed above. Use without --dry-run to execute.")
 		return nil
 	}
@@ -236,8 +242,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	}
 
 	// Ask about worktree if not specified by flag
-	useWorktree := false
-	useWorktree, err = tui.PromptConfirm("Execute merge in a temporary worktree? (allows you to continue working here)", true)
+	useWorktree, err := tui.PromptConfirm("Execute merge in a temporary worktree? (allows you to continue working here)", true)
 	if err != nil {
 		return fmt.Errorf("worktree confirmation canceled: %w", err)
 	}
@@ -249,6 +254,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		Strategy:    mergeStrategy,
 		Force:       forceFlag,
 		UseWorktree: useWorktree,
+		Plan:        plan,
 	}
 
 	if err := merge.Action(ctx, mergeOpts); err != nil {

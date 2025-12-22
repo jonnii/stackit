@@ -108,7 +108,12 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 
 // ExecuteInWorktree executes the merge plan in a temporary worktree
 func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
-	splog.Info("🔨 Creating temporary worktree for merge execution...")
+	// If using TUI, show a brief message about the worktree
+	if tui.IsTTY() {
+		splog.Debug("🔨 Creating temporary worktree for merge execution...")
+	} else {
+		splog.Info("🔨 Creating temporary worktree for merge execution...")
+	}
 
 	// 1. Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "stackit-merge-*")
@@ -117,7 +122,7 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 	}
 
 	worktreePath := filepath.Join(tmpDir, "worktree")
-	splog.Info("📁 Worktree: %s", worktreePath)
+	splog.Debug("📁 Worktree: %s", worktreePath)
 
 	// 2. Add detached worktree
 	// Use HEAD to ensure we have a valid starting point without switching branches in main workspace
@@ -160,7 +165,6 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 	}
 
 	// 5. Execute the plan in the worktree
-	splog.Info("🚀 Executing merge plan in worktree...")
 	err = Execute(ctx, worktreeEng, splog, githubClient, worktreePath, opts)
 
 	if err != nil {

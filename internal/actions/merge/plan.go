@@ -3,6 +3,7 @@ package merge
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"stackit.dev/stackit/internal/engine"
@@ -410,66 +411,34 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 
 // FormatMergePlan returns a human-readable representation of a merge plan
 func FormatMergePlan(plan *Plan, validation *PlanValidation) string {
-	const (
-		iconSuccess = "✓"
-		iconFailure = "✗"
-		iconPending = "⏳"
-		iconWarning = "⚠"
-	)
-	var result string
+	var result strings.Builder
 
-	result += fmt.Sprintf("Merge Strategy: %s\n", plan.Strategy)
-	result += fmt.Sprintf("Current Branch: %s\n", plan.CurrentBranch)
-	result += "\n"
-
-	if len(plan.BranchesToMerge) > 0 {
-		result += "Branches to merge (bottom to top):\n"
-		for i, branchInfo := range plan.BranchesToMerge {
-			marker := ""
-			if branchInfo.BranchName == plan.CurrentBranch {
-				marker = " ← current"
-			}
-			checksIcon := iconSuccess
-			if branchInfo.ChecksStatus == ChecksFailing {
-				checksIcon = iconFailure
-			} else if branchInfo.ChecksStatus == ChecksPending {
-				checksIcon = iconPending
-			}
-			result += fmt.Sprintf("  %d. %s  PR #%d  %s Checks %s%s\n", i+1, branchInfo.BranchName, branchInfo.PRNumber, checksIcon, branchInfo.ChecksStatus, marker)
-		}
-		result += "\n"
-	}
-
-	if len(plan.UpstackBranches) > 0 {
-		result += "Branches above (will be restacked on trunk):\n"
-		for _, branchName := range plan.UpstackBranches {
-			result += fmt.Sprintf("  • %s\n", branchName)
-		}
-		result += "\n"
-	}
+	result.WriteString(fmt.Sprintf("Merge Strategy: %s\n", plan.Strategy))
+	result.WriteString(fmt.Sprintf("Current Branch: %s\n", plan.CurrentBranch))
+	result.WriteString("\n")
 
 	if len(validation.Errors) > 0 {
-		result += "Errors:\n"
+		result.WriteString("Errors:\n")
 		for _, err := range validation.Errors {
-			result += fmt.Sprintf("  %s %s\n", iconFailure, err)
+			result.WriteString(fmt.Sprintf("  ✗ %s\n", err))
 		}
-		result += "\n"
+		result.WriteString("\n")
 	}
 
 	if len(validation.Warnings) > 0 {
-		result += "Warnings:\n"
+		result.WriteString("Warnings:\n")
 		for _, warn := range validation.Warnings {
-			result += fmt.Sprintf("  %s %s\n", iconWarning, warn)
+			result.WriteString(fmt.Sprintf("  ⚠ %s\n", warn))
 		}
-		result += "\n"
+		result.WriteString("\n")
 	}
 
-	result += "Merge Plan:\n"
+	result.WriteString("Merge Plan:\n")
 	for i, step := range plan.Steps {
-		result += fmt.Sprintf("  %d. %s\n", i+1, step.Description)
+		result.WriteString(fmt.Sprintf("  %d. %s\n", i+1, step.Description))
 	}
 
-	return result
+	return result.String()
 }
 
 func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {

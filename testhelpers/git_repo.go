@@ -228,6 +228,11 @@ func (r *GitRepo) CreatePrecommitHook(contents string) error {
 	return nil
 }
 
+// CreateBranch creates a new branch without checking it out.
+func (r *GitRepo) CreateBranch(name string) error {
+	return r.runGitCommand("branch", name)
+}
+
 // CreateAndCheckoutBranch creates and checks out a new branch.
 func (r *GitRepo) CreateAndCheckoutBranch(name string) error {
 	return r.runGitCommand("checkout", "-b", name)

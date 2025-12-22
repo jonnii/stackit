@@ -29,7 +29,7 @@ type MergeTUIModel struct {
 	done       bool
 	quitting   bool
 	styles     mergeStyles
-	updates    <-chan MergeProgressUpdate
+	updates    <-chan ProgressUpdate
 	doneChan   chan<- bool
 }
 
@@ -271,8 +271,8 @@ func (m MergeTUIModel) View() string {
 	return b.String()
 }
 
-// MergeProgressUpdate represents an update to merge progress
-type MergeProgressUpdate struct {
+// ProgressUpdate represents an update to merge progress
+type ProgressUpdate struct {
 	Type        string // "started", "completed", "failed", "waiting"
 	StepIndex   int
 	Description string
@@ -282,7 +282,7 @@ type MergeProgressUpdate struct {
 }
 
 // RunMergeTUI runs the merge TUI with channel-based updates
-func RunMergeTUI(stepDescriptions []string, updates <-chan MergeProgressUpdate, done chan<- bool) error {
+func RunMergeTUI(stepDescriptions []string, updates <-chan ProgressUpdate, done chan<- bool) error {
 	m := NewMergeTUIModel(stepDescriptions)
 	m.updates = updates
 	m.doneChan = done

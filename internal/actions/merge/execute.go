@@ -1,4 +1,4 @@
-package actions
+package merge
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
-	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
@@ -17,25 +16,32 @@ const (
 	prStateOpen = "OPEN"
 )
 
-// MergeProgressReporter is an interface for reporting merge progress
-type MergeProgressReporter interface {
+// ProgressReporter is an interface for reporting merge progress
+type ProgressReporter interface {
 	StepStarted(stepIndex int, description string)
 	StepCompleted(stepIndex int)
 	StepFailed(stepIndex int, err error)
 	StepWaiting(stepIndex int, elapsed, timeout time.Duration)
 }
 
-// ExecuteMergePlanOptions contains options for executing a merge plan
-type ExecuteMergePlanOptions struct {
-	Plan     *MergePlan
-	Force    bool
-	Reporter MergeProgressReporter // Optional progress reporter
+// mergeExecuteEngine is a minimal interface needed for executing a merge plan
+type mergeExecuteEngine interface {
+	engine.PRManager
+	engine.BranchReader
+	engine.BranchWriter
+	engine.SyncManager
 }
 
-// ExecuteMergePlan executes a validated merge plan step by step
-func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+// ExecuteOptions contains options for executing a merge plan
+type ExecuteOptions struct {
+	Plan     *Plan
+	Force    bool
+	Reporter ProgressReporter // Optional progress reporter
+}
+
+// Execute executes a validated merge plan step by step
+func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	plan := opts.Plan
-	splog := ctx.Splog
 
 	// If no reporter provided and we're in a TTY, use TUI
 	if opts.Reporter == nil && tui.IsTTY() {
@@ -61,7 +67,7 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 		opts.Reporter = reporter
 
 		// Execute plan (this will send updates to the reporter)
-		err := executeMergePlanSteps(ctx, opts)
+		err := executeSteps(ctx, eng, splog, githubClient, repoRoot, opts)
 
 		// Close reporter to signal TUI to finish
 		reporter.Close()
@@ -80,13 +86,12 @@ func ExecuteMergePlan(ctx *runtime.Context, opts ExecuteMergePlanOptions) error 
 	}
 
 	// Execute without TUI
-	return executeMergePlanSteps(ctx, opts)
+	return executeSteps(ctx, eng, splog, githubClient, repoRoot, opts)
 }
 
-// executeMergePlanSteps executes the merge plan steps
-func executeMergePlanSteps(ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+// executeSteps executes the merge plan steps
+func executeSteps(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	plan := opts.Plan
-	splog := ctx.Splog
 
 	for i, step := range plan.Steps {
 		// Report step started
@@ -95,7 +100,7 @@ func executeMergePlanSteps(ctx *runtime.Context, opts ExecuteMergePlanOptions) e
 		}
 
 		// 1. Re-validate preconditions for this step
-		if err := validateStepPreconditions(step, ctx, opts); err != nil {
+		if err := validateStepPreconditions(ctx, step, eng, githubClient, opts); err != nil {
 			if opts.Reporter != nil {
 				opts.Reporter.StepFailed(i, err)
 			}
@@ -103,7 +108,7 @@ func executeMergePlanSteps(ctx *runtime.Context, opts ExecuteMergePlanOptions) e
 		}
 
 		// 2. Execute the step (with progress reporting for wait steps)
-		if err := executeStepWithProgress(step, i, ctx, opts); err != nil {
+		if err := executeStepWithProgress(ctx, step, i, eng, splog, githubClient, repoRoot, opts); err != nil {
 			if opts.Reporter != nil {
 				opts.Reporter.StepFailed(i, err)
 			}
@@ -125,14 +130,11 @@ func executeMergePlanSteps(ctx *runtime.Context, opts ExecuteMergePlanOptions) e
 }
 
 // validateStepPreconditions validates that a step can be executed
-func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
-	eng := ctx.Engine
-	context := ctx.Context
-
+func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExecuteEngine, githubClient github.Client, opts ExecuteOptions) error {
 	switch step.StepType {
 	case StepMergePR:
 		// Validate PR still exists and is open
-		prInfo, err := eng.GetPrInfo(context, step.BranchName)
+		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -143,8 +145,8 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
 		}
 		// Optionally check CI checks haven't changed to failing or pending
-		if !opts.Force && ctx.GitHubClient != nil {
-			passing, pending, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
+		if !opts.Force && githubClient != nil {
+			passing, pending, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
 			if err == nil {
 				if !passing {
 					return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
@@ -167,7 +169,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 
 	case StepUpdatePRBase:
 		// Validate PR exists
-		prInfo, err := eng.GetPrInfo(context, step.BranchName)
+		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -180,7 +182,7 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 
 	case StepWaitCI:
 		// Validate PR exists and is open
-		prInfo, err := eng.GetPrInfo(context, step.BranchName)
+		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -196,37 +198,33 @@ func validateStepPreconditions(step MergePlanStep, ctx *runtime.Context, opts Ex
 }
 
 // executeStepWithProgress executes a step with progress reporting
-func executeStepWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
+func executeStepWithProgress(ctx context.Context, step PlanStep, stepIndex int, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	// Special handling for wait steps to report progress
 	if step.StepType == StepWaitCI {
-		return executeWaitCIWithProgress(step, stepIndex, ctx, opts)
+		return executeWaitCIWithProgress(ctx, step, stepIndex, eng, splog, githubClient, opts)
 	}
-	return executeStep(step, ctx, opts)
+	return executeStep(ctx, step, eng, splog, githubClient, repoRoot, opts)
 }
 
 // executeStep executes a single step
-func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOptions) error {
-	eng := ctx.Engine
-	splog := ctx.Splog
-	context := ctx.Context
-
+func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, _ ExecuteOptions) error {
 	switch step.StepType {
 	case StepMergePR:
-		if ctx.GitHubClient == nil {
+		if githubClient == nil {
 			return fmt.Errorf("GitHub client not available")
 		}
-		if err := ctx.GitHubClient.MergePullRequest(context, step.BranchName); err != nil {
+		if err := githubClient.MergePullRequest(ctx, step.BranchName); err != nil {
 			return fmt.Errorf("failed to merge PR: %w", err)
 		}
 
 	case StepPullTrunk:
-		pullResult, err := eng.PullTrunk(context)
+		pullResult, err := eng.PullTrunk(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to pull trunk: %w", err)
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(context, eng.Trunk())
+			rev, _ := eng.GetRevision(ctx, eng.Trunk())
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -241,7 +239,7 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 	case StepRestack:
 		// Restack the branch - RestackBranch will automatically handle reparenting
 		// if the parent has been merged/deleted
-		result, err := eng.RestackBranch(context, step.BranchName)
+		result, err := eng.RestackBranch(ctx, step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to restack: %w", err)
 		}
@@ -260,13 +258,13 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 		case engine.RestackDone:
 			// Success - now push the rebased branch and update PR base
 			// Force push is required since we rebased
-			if err := git.PushBranch(context, step.BranchName, git.GetRemote(context), true, false); err != nil {
+			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(ctx), true, false); err != nil {
 				return fmt.Errorf("failed to push rebased branch %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
 
 			// Update the PR's base branch to the actual parent (not always trunk)
-			if err := updatePRBaseBranchFromContext(ctx, step.BranchName, actualParent); err != nil {
+			if err := updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, actualParent); err != nil {
 				return fmt.Errorf("failed to update PR base for %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Updated PR base for %s to %s", step.BranchName, actualParent)
@@ -277,18 +275,18 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 				RebasedBranchBase:     result.RebasedBranchBase,
 				CurrentBranchOverride: eng.CurrentBranch(),
 			}
-			if err := config.PersistContinuationState(ctx.RepoRoot, continuation); err != nil {
+			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
 				return fmt.Errorf("failed to persist continuation: %w", err)
 			}
 			return fmt.Errorf("hit conflict restacking %s", step.BranchName)
 		case engine.RestackUnneeded:
 			// Already up to date, but still need to ensure PR base is correct
 			// Push in case local is ahead of remote
-			if err := git.PushBranch(context, step.BranchName, git.GetRemote(context), true, false); err != nil {
+			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(ctx), true, false); err != nil {
 				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
 			}
 			// Update PR base to the actual parent (not always trunk)
-			if err := updatePRBaseBranchFromContext(ctx, step.BranchName, actualParent); err != nil {
+			if err := updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, actualParent); err != nil {
 				splog.Debug("Failed to update PR base for %s: %v", step.BranchName, err)
 			}
 		}
@@ -296,7 +294,7 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 	case StepDeleteBranch:
 		// Only delete if branch is tracked
 		if eng.IsBranchTracked(step.BranchName) {
-			if err := eng.DeleteBranch(context, step.BranchName); err != nil {
+			if err := eng.DeleteBranch(ctx, step.BranchName); err != nil {
 				// Non-fatal - branch might already be deleted
 				splog.Debug("Failed to delete branch %s (may already be deleted): %v", step.BranchName, err)
 			}
@@ -304,7 +302,7 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 
 	case StepUpdatePRBase:
 		// For top-down strategy: rebase branch onto trunk and update PR base
-		if err := executeUpdatePRBase(ctx, step); err != nil {
+		if err := executeUpdatePRBase(ctx, eng, githubClient, step); err != nil {
 			return err
 		}
 
@@ -322,10 +320,8 @@ func executeStep(step MergePlanStep, ctx *runtime.Context, _ ExecuteMergePlanOpt
 
 // executeUpdatePRBase handles the UPDATE_PR_BASE step
 // This is used in top-down strategy to rebase the current branch onto trunk
-func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
-	eng := ctx.Engine
+func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClient github.Client, step PlanStep) error {
 	trunk := eng.Trunk()
-	context := ctx.Context
 
 	// Get the parent revision (old base)
 	parent := eng.GetParent(step.BranchName)
@@ -334,7 +330,7 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	}
 
 	// Get the old parent revision
-	oldParentRev, err := eng.GetRevision(context, parent)
+	oldParentRev, err := eng.GetRevision(ctx, parent)
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}
@@ -342,11 +338,11 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	// If parent is already trunk, we might just need to update the PR base
 	if parent == trunk {
 		// Just update the PR base branch via GitHub API
-		return updatePRBaseBranchFromContext(ctx, step.BranchName, trunk)
+		return updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunk)
 	}
 
 	// Rebase the branch onto trunk
-	gitResult, err := git.Rebase(context, step.BranchName, trunk, oldParentRev)
+	gitResult, err := git.Rebase(ctx, step.BranchName, trunk, oldParentRev)
 	if err != nil {
 		return fmt.Errorf("failed to rebase: %w", err)
 	}
@@ -356,34 +352,34 @@ func executeUpdatePRBase(ctx *runtime.Context, step MergePlanStep) error {
 	}
 
 	// Update parent to trunk
-	if err := eng.SetParent(context, step.BranchName, trunk); err != nil {
+	if err := eng.SetParent(ctx, step.BranchName, trunk); err != nil {
 		return fmt.Errorf("failed to update parent: %w", err)
 	}
 
 	// Update PR base branch via GitHub API
-	if err := updatePRBaseBranchFromContext(ctx, step.BranchName, trunk); err != nil {
+	if err := updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunk); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 
 	// Rebuild engine to reflect changes
-	if err := eng.Rebuild(context, trunk); err != nil {
+	if err := eng.Rebuild(ctx, trunk); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
 	return nil
 }
 
-// updatePRBaseBranchFromContext updates a PR's base branch via GitHub API using the runtime context's GitHubClient
-func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase string) error {
-	if ctx.GitHubClient == nil {
+// updatePRBaseBranchFromContext updates a PR's base branch via GitHub API
+func updatePRBaseBranchFromContext(ctx context.Context, githubClient github.Client, branchName, newBase string) error {
+	if githubClient == nil {
 		// If we can't get GitHub client, skip this step (non-fatal)
 		return nil
 	}
 
-	owner, repo := ctx.GitHubClient.GetOwnerRepo()
+	owner, repo := githubClient.GetOwnerRepo()
 
 	// Get PR for this branch
-	pr, err := ctx.GitHubClient.GetPullRequestByBranch(ctx.Context, owner, repo, branchName)
+	pr, err := githubClient.GetPullRequestByBranch(ctx, owner, repo, branchName)
 	if err != nil || pr == nil {
 		// PR not found or error - non-fatal
 		return nil //nolint:nilerr
@@ -394,7 +390,7 @@ func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase str
 		Base: &newBase,
 	}
 
-	if err := ctx.GitHubClient.UpdatePullRequest(ctx.Context, owner, repo, pr.Number, updateOpts); err != nil {
+	if err := githubClient.UpdatePullRequest(ctx, owner, repo, pr.Number, updateOpts); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 
@@ -402,8 +398,8 @@ func updatePRBaseBranchFromContext(ctx *runtime.Context, branchName, newBase str
 }
 
 // executeWaitCIWithProgress waits for CI checks with progress reporting
-func executeWaitCIWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.Context, opts ExecuteMergePlanOptions) error {
-	if ctx.GitHubClient == nil {
+func executeWaitCIWithProgress(ctx context.Context, step PlanStep, stepIndex int, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, opts ExecuteOptions) error {
+	if githubClient == nil {
 		return fmt.Errorf("GitHub client not available")
 	}
 
@@ -418,12 +414,8 @@ func executeWaitCIWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.C
 	deadline := startTime.Add(timeout)
 	lastProgressReport := startTime
 
-	splog := ctx.Splog
-	context := ctx.Context
-
 	// Get PR info for better error messages
-	eng := ctx.Engine
-	prInfo, err := eng.GetPrInfo(context, step.BranchName)
+	prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get PR info: %w", err)
 	}
@@ -451,7 +443,7 @@ func executeWaitCIWithProgress(step MergePlanStep, stepIndex int, ctx *runtime.C
 		}
 
 		// Check CI status
-		passing, pending, err := ctx.GitHubClient.GetPRChecksStatus(context, step.BranchName)
+		passing, pending, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
 		if err != nil {
 			// Log error but continue polling (might be transient)
 			splog.Debug("Error checking CI status: %v", err)

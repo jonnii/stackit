@@ -1,4 +1,4 @@
-package actions_test
+package merge_test
 
 import (
 	"context"
@@ -7,23 +7,23 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/merge"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
 
-func TestMergeAction(t *testing.T) {
+func TestAction(t *testing.T) {
 	t.Run("fails when not on a branch", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
 		// Detach HEAD
 		s.RunGit("checkout", "HEAD~0").Rebuild()
 
-		err := actions.MergeAction(s.Context, actions.MergeOptions{
+		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
 			Confirm:  false,
-			Strategy: actions.MergeStrategyBottomUp,
+			Strategy: merge.StrategyBottomUp,
 		})
 		require.Error(t, err)
 		// Either error is acceptable as it indicates merge is not allowed in detached state
@@ -43,10 +43,10 @@ func TestMergeAction(t *testing.T) {
 		// Verify we're on trunk
 		require.True(t, s.Engine.IsTrunk(s.Engine.CurrentBranch()))
 
-		err := actions.MergeAction(s.Context, actions.MergeOptions{
+		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
 			Confirm:  false,
-			Strategy: actions.MergeStrategyBottomUp,
+			Strategy: merge.StrategyBottomUp,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot merge from trunk")
@@ -59,10 +59,10 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is not tracked
 		require.False(t, s.Engine.IsBranchTracked("untracked"))
 
-		err := actions.MergeAction(s.Context, actions.MergeOptions{
+		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
 			Confirm:  false,
-			Strategy: actions.MergeStrategyBottomUp,
+			Strategy: merge.StrategyBottomUp,
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not tracked")
@@ -80,10 +80,10 @@ func TestMergeAction(t *testing.T) {
 		// Verify branch is tracked
 		require.True(t, s.Engine.IsBranchTracked("branch1"))
 
-		err := actions.MergeAction(s.Context, actions.MergeOptions{
+		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
 			Confirm:  false,
-			Strategy: actions.MergeStrategyBottomUp,
+			Strategy: merge.StrategyBottomUp,
 		})
 		// Should fail because no PRs found
 		require.Error(t, err)
@@ -115,10 +115,10 @@ func TestMergeAction(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
-		err = actions.MergeAction(s.Context, actions.MergeOptions{
+		err = merge.Action(s.Context, merge.Options{
 			DryRun:   true,
 			Confirm:  false,
-			Strategy: actions.MergeStrategyBottomUp,
+			Strategy: merge.StrategyBottomUp,
 		})
 		require.NoError(t, err)
 	})
@@ -132,8 +132,8 @@ func TestMergeAction(t *testing.T) {
 			})
 
 		// Set up mock GitHub server with PRs
-		config := testhelpers.NewMockGitHubServerConfig()
-		config.PRs["branch-a"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
+		mockConfig := testhelpers.NewMockGitHubServerConfig()
+		mockConfig.PRs["branch-a"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
 			Number:  101,
 			Title:   "Branch A",
 			Head:    "branch-a",
@@ -141,7 +141,7 @@ func TestMergeAction(t *testing.T) {
 			State:   "open",
 			HTMLURL: "https://github.com/owner/repo/pull/101",
 		})
-		config.PRs["branch-b"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
+		mockConfig.PRs["branch-b"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
 			Number:  102,
 			Title:   "Branch B",
 			Head:    "branch-b",
@@ -149,7 +149,7 @@ func TestMergeAction(t *testing.T) {
 			State:   "open",
 			HTMLURL: "https://github.com/owner/repo/pull/102",
 		})
-		config.PRs["branch-c"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
+		mockConfig.PRs["branch-c"] = testhelpers.NewSamplePullRequest(testhelpers.SamplePRData{
 			Number:  103,
 			Title:   "Branch C",
 			Head:    "branch-c",
@@ -158,8 +158,8 @@ func TestMergeAction(t *testing.T) {
 			HTMLURL: "https://github.com/owner/repo/pull/103",
 		})
 
-		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, config)
-		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, config)
+		rawClient, owner, repo := testhelpers.NewMockGitHubClient(t, mockConfig)
+		githubClient := testhelpers.NewMockGitHubClientInterface(rawClient, owner, repo, mockConfig)
 
 		// Add PR info to engine
 		prA := 101
@@ -196,8 +196,8 @@ func TestMergeAction(t *testing.T) {
 		s.Context.GitHubClient = githubClient
 
 		// Execute merge plan (merge branch-a)
-		plan, validation, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
-			Strategy: actions.MergeStrategyBottomUp,
+		plan, validation, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
+			Strategy: merge.StrategyBottomUp,
 			Force:    true,
 		})
 		require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestMergeAction(t *testing.T) {
 		s.Checkout("branch-a")
 
 		// Execute the merge plan
-		err = actions.ExecuteMergePlan(s.Context, actions.ExecuteMergePlanOptions{
+		err = merge.Execute(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, s.Context.RepoRoot, merge.ExecuteOptions{
 			Plan:  plan,
 			Force: true,
 		})
@@ -239,14 +239,14 @@ func TestMergeAction(t *testing.T) {
 
 		// Verify PR base branches were updated correctly
 		// branch-b should point to main (since branch-a was merged)
-		updatedPRB, exists := config.UpdatedPRs[102]
+		updatedPRB, exists := mockConfig.UpdatedPRs[102]
 		require.True(t, exists, "branch-b PR should have been updated")
 		require.NotNil(t, updatedPRB.Base)
 		require.NotNil(t, updatedPRB.Base.Ref)
 		require.Equal(t, "main", *updatedPRB.Base.Ref, "branch-b PR base should be main after branch-a is merged")
 
 		// branch-c should point to branch-b (not main - this is the bug fix!)
-		updatedPRC, exists := config.UpdatedPRs[103]
+		updatedPRC, exists := mockConfig.UpdatedPRs[103]
 		require.True(t, exists, "branch-c PR should have been updated")
 		require.NotNil(t, updatedPRC.Base)
 		require.NotNil(t, updatedPRC.Base.Ref)

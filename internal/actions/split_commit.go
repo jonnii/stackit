@@ -10,8 +10,22 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// splitByCommit splits a branch by selecting commit points
-func splitByCommit(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
+// splitByCommitEngine is a minimal interface needed for splitting by commit
+type splitByCommitEngine interface {
+	engine.BranchReader
+	engine.PRManager
+	engine.SplitManager
+}
+
+// splitByCommit splits a branch by selecting commit points.
+//
+// Algorithm:
+//  1. Get all commits on the branch in a readable format.
+//  2. Interactively prompt the user to select split points (commits that will start a new branch).
+//  3. Interactively prompt for a name for each new branch.
+//  4. Detach HEAD to the original branch's head to prepare for state changes.
+//  5. Return the selected branch names and points to be applied by the engine.
+func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitEngine, splog *tui.Splog) (*SplitResult, error) {
 	// Get readable commits
 	readableCommits, err := eng.GetAllCommits(ctx, branchToSplit, engine.CommitFormatReadable)
 	if err != nil {

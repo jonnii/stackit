@@ -1,4 +1,4 @@
-package actions
+package merge
 
 import (
 	"context"
@@ -7,18 +7,18 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// MergeStrategy defines how PRs in the stack should be merged
-type MergeStrategy string
+// Strategy defines how PRs in the stack should be merged
+type Strategy string
 
 const (
-	// MergeStrategyBottomUp merges PRs from the bottom of the stack up to the current branch
-	MergeStrategyBottomUp MergeStrategy = "bottom-up"
-	// MergeStrategyTopDown merges the entire stack into a single PR
-	MergeStrategyTopDown MergeStrategy = "top-down"
+	// StrategyBottomUp merges PRs from the bottom of the stack up to the current branch
+	StrategyBottomUp Strategy = "bottom-up"
+	// StrategyTopDown merges the entire stack into a single PR
+	StrategyTopDown Strategy = "top-down"
 )
 
 // StepType represents the type of step in a merge plan
@@ -63,8 +63,8 @@ type BranchMergeInfo struct {
 	MatchesRemote bool
 }
 
-// MergePlanStep represents a single step in the merge plan
-type MergePlanStep struct {
+// PlanStep represents a single step in the merge plan
+type PlanStep struct {
 	StepType    StepType
 	BranchName  string
 	PRNumber    int
@@ -72,36 +72,39 @@ type MergePlanStep struct {
 	WaitTimeout time.Duration // Timeout for waiting steps (e.g., CI checks)
 }
 
-// MergePlan is the complete plan for a merge operation
-type MergePlan struct {
-	Strategy        MergeStrategy
+// Plan is the complete plan for a merge operation
+type Plan struct {
+	Strategy        Strategy
 	CurrentBranch   string
 	BranchesToMerge []BranchMergeInfo // Branches that will be merged (bottom to top)
 	UpstackBranches []string          // Branches above current that will be restacked
-	Steps           []MergePlanStep   // Ordered steps to execute
+	Steps           []PlanStep        // Ordered steps to execute
 	Warnings        []string          // Non-blocking warnings
 	CreatedAt       time.Time
 }
 
-// MergePlanValidation contains validation results
-type MergePlanValidation struct {
+// PlanValidation contains validation results
+type PlanValidation struct {
 	Valid    bool
 	Errors   []string // Blocking errors
 	Warnings []string // Non-blocking warnings
 }
 
-// CreateMergePlanOptions contains options for creating a merge plan
-type CreateMergePlanOptions struct {
-	Strategy MergeStrategy
+// CreatePlanOptions contains options for creating a merge plan
+type CreatePlanOptions struct {
+	Strategy Strategy
 	Force    bool
 }
 
-// CreateMergePlan analyzes the current state and builds a merge plan
-func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergePlan, *MergePlanValidation, error) {
-	eng := ctx.Engine
-	splog := ctx.Splog
-	c := ctx.Context
+// mergePlanEngine is a minimal interface needed for creating a merge plan
+type mergePlanEngine interface {
+	engine.BranchReader
+	engine.PRManager
+	engine.SyncManager
+}
 
+// CreateMergePlan analyzes the current state and builds a merge plan
+func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog, githubClient github.Client, opts CreatePlanOptions) (*Plan, *PlanValidation, error) {
 	// 1. Get current branch, validate not on trunk
 	currentBranch := eng.CurrentBranch()
 	if currentBranch == "" {
@@ -124,18 +127,16 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	// Build full list: parent branches + current branch
 	// Filter out trunk (it shouldn't be in the list, but be safe)
 	allBranches := make([]string, 0, len(parentBranches)+1)
-	trunk := eng.Trunk()
 	for _, branchName := range parentBranches {
 		if !eng.IsTrunk(branchName) {
 			allBranches = append(allBranches, branchName)
 		}
 	}
 	allBranches = append(allBranches, currentBranch)
-	_ = trunk // Reserved for future use
 
 	// 3. For each branch: fetch PR info, check status, CI checks
 	branchesToMerge := []BranchMergeInfo{}
-	validation := &MergePlanValidation{
+	validation := &PlanValidation{
 		Valid:    true,
 		Errors:   []string{},
 		Warnings: []string{},
@@ -143,7 +144,7 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 
 	for _, branchName := range allBranches {
 		// Get PR info
-		prInfo, err := eng.GetPrInfo(c, branchName)
+		prInfo, err := eng.GetPrInfo(ctx, branchName)
 		if err != nil {
 			splog.Debug("Failed to get PR info for %s: %v", branchName, err)
 			validation.Valid = false
@@ -177,18 +178,14 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		}
 
 		// Check if local matches remote
-		// Only check if branch has a PR (meaning it exists on remote)
-		// If branch doesn't have a PR or doesn't exist on remote, don't warn
-		matchesRemote, err := eng.BranchMatchesRemote(c, branchName)
+		matchesRemote, err := eng.BranchMatchesRemote(ctx, branchName)
 		if err != nil {
 			splog.Debug("Failed to check if branch matches remote: %v", err)
 			matchesRemote = true // Assume matches if check fails
 		}
-		// Only warn if branch has a PR (exists on remote) and differs
-		// If branch doesn't exist on remote, that's fine (might be local-only or already merged)
 		if !matchesRemote && prInfo != nil && prInfo.Number != nil {
 			// Get detailed difference information
-			diffInfo := getBranchRemoteDifference(c, branchName, splog)
+			diffInfo := getBranchRemoteDifference(ctx, branchName, splog)
 			if diffInfo != "" {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s differs from remote: %s", branchName, diffInfo))
 			} else {
@@ -199,16 +196,14 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		// Get CI check status
 		checksStatus := ChecksNone
 		var passing, pending bool
-		if ctx.GitHubClient != nil {
+		if githubClient != nil {
 			var checkErr error
-			passing, pending, checkErr = ctx.GitHubClient.GetPRChecksStatus(c, branchName)
+			passing, pending, checkErr = githubClient.GetPRChecksStatus(ctx, branchName)
 			switch {
 			case checkErr != nil:
 				splog.Debug("Failed to get PR checks status for %s: %v", branchName, checkErr)
-				// Don't fail on check status errors, just mark as none
 			case pending:
 				checksStatus = ChecksPending
-				// Don't warn about pending CI checks - the CI wait step will handle waiting for them
 			case !passing:
 				checksStatus = ChecksFailing
 				if !opts.Force {
@@ -236,8 +231,6 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	}
 
 	// 4. Detect branching stacks (siblings)
-	// Any child of an ancestor that is not part of the main stack being merged
-	// will be reparented to trunk (or the nearest valid ancestor).
 	mergedSet := make(map[string]bool)
 	for _, branch := range allBranches {
 		mergedSet[branch] = true
@@ -250,7 +243,6 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 		children := eng.GetChildren(ancestor)
 		for _, child := range children {
 			if !mergedSet[child] {
-				// This is a sibling branch that will be affected
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Sibling branch %s will be reparented to trunk when %s is merged", child, ancestor))
 			}
 		}
@@ -258,25 +250,22 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}
-	upstackScope := engine.Scope{RecursiveChildren: true}
 	upstack := eng.GetRelativeStackUpstack(currentBranch)
 	for _, branchName := range upstack {
 		if eng.IsBranchTracked(branchName) {
 			upstackBranches = append(upstackBranches, branchName)
 		}
 	}
-	_ = upstackScope // Reserved for future use
 
 	// 6. Build ordered steps based on strategy
-	var steps []MergePlanStep
-	if opts.Strategy == MergeStrategyTopDown {
+	var steps []PlanStep
+	if opts.Strategy == StrategyTopDown {
 		steps = buildTopDownSteps(branchesToMerge, currentBranch, upstackBranches)
 	} else {
-		// Default to bottom-up
 		steps = buildBottomUpSteps(branchesToMerge, upstackBranches)
 	}
 
-	plan := &MergePlan{
+	plan := &Plan{
 		Strategy:        opts.Strategy,
 		CurrentBranch:   currentBranch,
 		BranchesToMerge: branchesToMerge,
@@ -289,15 +278,12 @@ func CreateMergePlan(ctx *runtime.Context, opts CreateMergePlanOptions) (*MergeP
 	return plan, validation, nil
 }
 
-// buildBottomUpSteps builds steps for bottom-up merge strategy
-func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []string) []MergePlanStep {
-	steps := []MergePlanStep{}
+func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []string) []PlanStep {
+	steps := []PlanStep{}
 	defaultTimeout := 10 * time.Minute
 
 	for i, branchInfo := range branchesToMerge {
-		// 1. Wait for CI checks on the current PR before merging.
-		// Even for the first PR, we wait if it's pending. If it's already passing, this is a no-op.
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepWaitCI,
 			BranchName:  branchInfo.BranchName,
 			PRNumber:    branchInfo.PRNumber,
@@ -305,26 +291,23 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 			WaitTimeout: defaultTimeout,
 		})
 
-		// 2. Merge PR
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepMergePR,
 			BranchName:  branchInfo.BranchName,
 			PRNumber:    branchInfo.PRNumber,
 			Description: fmt.Sprintf("Merge PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
 		})
 
-		// 3. Pull trunk
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepPullTrunk,
 			BranchName:  "",
 			PRNumber:    0,
 			Description: "Pull trunk to get merged changes",
 		})
 
-		// 4. If not the last branch, restack the next one
 		if i < len(branchesToMerge)-1 {
 			nextBranch := branchesToMerge[i+1].BranchName
-			steps = append(steps, MergePlanStep{
+			steps = append(steps, PlanStep{
 				StepType:    StepRestack,
 				BranchName:  nextBranch,
 				PRNumber:    0,
@@ -333,9 +316,8 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 		}
 	}
 
-	// 4. Delete all merged branches
 	for _, branchInfo := range branchesToMerge {
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepDeleteBranch,
 			BranchName:  branchInfo.BranchName,
 			PRNumber:    0,
@@ -343,9 +325,8 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 		})
 	}
 
-	// 5. Restack upstack branches
 	for _, upstackBranch := range upstackBranches {
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepRestack,
 			BranchName:  upstackBranch,
 			PRNumber:    0,
@@ -356,36 +337,30 @@ func buildBottomUpSteps(branchesToMerge []BranchMergeInfo, upstackBranches []str
 	return steps
 }
 
-// buildTopDownSteps builds steps for top-down merge strategy
-func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, upstackBranches []string) []MergePlanStep {
-	steps := []MergePlanStep{}
+func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, upstackBranches []string) []PlanStep {
+	steps := []PlanStep{}
 
 	if len(branchesToMerge) == 0 {
 		return steps
 	}
 
-	// Find the current branch in the list
 	currentBranchInfo := branchesToMerge[len(branchesToMerge)-1]
 
-	// 1. Rebase current branch onto trunk (squashing intermediate branches)
-	// This is a complex operation that will be handled in execution
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepUpdatePRBase,
 		BranchName:  currentBranch,
 		PRNumber:    currentBranchInfo.PRNumber,
 		Description: fmt.Sprintf("Rebase %s onto trunk (squashing %d intermediate branch(es))", currentBranch, len(branchesToMerge)-1),
 	})
 
-	// 2. Update PR base to trunk
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepUpdatePRBase,
 		BranchName:  currentBranch,
 		PRNumber:    currentBranchInfo.PRNumber,
 		Description: fmt.Sprintf("Update PR #%d base branch to trunk", currentBranchInfo.PRNumber),
 	})
 
-	// 3. Wait for CI checks on the single PR
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepWaitCI,
 		BranchName:  currentBranch,
 		PRNumber:    currentBranchInfo.PRNumber,
@@ -393,25 +368,22 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		WaitTimeout: 10 * time.Minute,
 	})
 
-	// 4. Merge the single PR
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepMergePR,
 		BranchName:  currentBranch,
 		PRNumber:    currentBranchInfo.PRNumber,
 		Description: fmt.Sprintf("Merge PR #%d (%s)", currentBranchInfo.PRNumber, currentBranch),
 	})
 
-	// 5. Pull trunk
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepPullTrunk,
 		BranchName:  "",
 		PRNumber:    0,
 		Description: "Pull trunk to get merged changes",
 	})
 
-	// 6. Delete intermediate branches (all except current)
 	for _, branchInfo := range branchesToMerge[:len(branchesToMerge)-1] {
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepDeleteBranch,
 			BranchName:  branchInfo.BranchName,
 			PRNumber:    0,
@@ -419,17 +391,15 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 		})
 	}
 
-	// 7. Delete current branch
-	steps = append(steps, MergePlanStep{
+	steps = append(steps, PlanStep{
 		StepType:    StepDeleteBranch,
 		BranchName:  currentBranch,
 		PRNumber:    0,
 		Description: fmt.Sprintf("Delete local branch %s", currentBranch),
 	})
 
-	// 8. Restack upstack branches
 	for _, upstackBranch := range upstackBranches {
-		steps = append(steps, MergePlanStep{
+		steps = append(steps, PlanStep{
 			StepType:    StepRestack,
 			BranchName:  upstackBranch,
 			PRNumber:    0,
@@ -440,8 +410,8 @@ func buildTopDownSteps(branchesToMerge []BranchMergeInfo, currentBranch string, 
 	return steps
 }
 
-// FormatMergePlan formats a merge plan for display
-func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
+// FormatMergePlan returns a human-readable representation of a merge plan
+func FormatMergePlan(plan *Plan, validation *PlanValidation) string {
 	const (
 		iconSuccess = "✓"
 		iconFailure = "✗"
@@ -504,19 +474,15 @@ func FormatMergePlan(plan *MergePlan, validation *MergePlanValidation) string {
 	return result
 }
 
-// getBranchRemoteDifference returns a detailed description of how a branch differs from remote
 func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.Splog) string {
-	// Get local SHA
 	localSha, err := git.GetRevision(c, branchName)
 	if err != nil {
 		splog.Debug("Failed to get local SHA for %s: %v", branchName, err)
 		return ""
 	}
 
-	// Get remote SHA - try from remote tracking branch first, then fall back to ls-remote
 	remoteSha, err := git.GetRemoteRevision(c, branchName)
 	if err != nil {
-		// Remote tracking branch doesn't exist locally, try fetching directly from remote
 		splog.Debug("Remote tracking branch not found for %s, fetching from remote: %v", branchName, err)
 		remoteShas, err := git.FetchRemoteShas(c, "origin")
 		if err != nil {
@@ -530,7 +496,6 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 		var exists bool
 		remoteSha, exists = remoteShas[branchName]
 		if !exists {
-			// Branch doesn't exist on remote
 			localShort := localSha
 			if len(localSha) > 7 {
 				localShort = localSha[:7]
@@ -540,10 +505,9 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 	}
 
 	if localSha == remoteSha {
-		return "" // Shouldn't happen if we got here, but be safe
+		return ""
 	}
 
-	// Shorten SHAs for display
 	localShort := localSha
 	if len(localSha) > 7 {
 		localShort = localSha[:7]
@@ -553,25 +517,18 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 		remoteShort = remoteSha[:7]
 	}
 
-	// Try to determine relationship using git merge-base
-	// Use remote tracking branch reference
 	remoteBranchRef := "refs/remotes/origin/" + branchName
 	commonAncestor, err := git.GetMergeBaseByRef(c, branchName, remoteBranchRef)
 	if err != nil {
-		// Can't determine relationship, just show SHAs
-		// Most common case: local is ahead (has unpushed commits)
 		return fmt.Sprintf("local: %s, remote: %s (likely local is ahead)", localShort, remoteShort)
 	}
 
 	switch {
 	case commonAncestor == localSha:
-		// Local is behind remote
 		return fmt.Sprintf("local is behind remote (local: %s, remote: %s)", localShort, remoteShort)
 	case commonAncestor == remoteSha:
-		// Local is ahead of remote
 		return fmt.Sprintf("local is ahead of remote (local: %s, remote: %s)", localShort, remoteShort)
 	default:
-		// Diverged
 		return fmt.Sprintf("local and remote have diverged (local: %s, remote: %s)", localShort, remoteShort)
 	}
 }

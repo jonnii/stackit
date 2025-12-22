@@ -77,7 +77,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		if branchName == "" {
 			branchName = eng.CurrentBranch()
 		}
-		if err := PrintConflictStatus(ctx.Context, branchName, eng, splog); err != nil {
+		if err := PrintConflictStatus(ctx.Context, branchName, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)
 		}
 		return fmt.Errorf("rebase conflict is not yet resolved")

@@ -433,15 +433,6 @@ func ApplyHunksToCommit(ctx context.Context, hunks []Hunk, commitSHA string, bra
 	return nil
 }
 
-// CheckoutDetached checks out a commit in detached HEAD state
-func CheckoutDetached(ctx context.Context, commitSHA string) error {
-	_, err := RunGitCommandWithContext(ctx, "checkout", commitSHA)
-	if err != nil {
-		return fmt.Errorf("failed to checkout commit: %w", err)
-	}
-	return nil
-}
-
 // GetCommitMessage returns the full commit message for a commit
 func GetCommitMessage(commitSHA string) (string, error) {
 	repo, err := GetDefaultRepo()

@@ -71,7 +71,7 @@ func NewEngine(opts Options) (Engine, error) {
 }
 
 // Reset clears all branch metadata and rebuilds with new trunk
-func (e *engineImpl) Reset(_ context.Context, newTrunkName string) error {
+func (e *engineImpl) Reset(newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -97,7 +97,7 @@ func (e *engineImpl) Reset(_ context.Context, newTrunkName string) error {
 }
 
 // Rebuild reloads branch cache with new trunk
-func (e *engineImpl) Rebuild(_ context.Context, newTrunkName string) error {
+func (e *engineImpl) Rebuild(newTrunkName string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -110,7 +110,7 @@ func (e *engineImpl) Rebuild(_ context.Context, newTrunkName string) error {
 }
 
 // PopulateRemoteShas populates remote branch information by fetching SHAs from remote
-func (e *engineImpl) PopulateRemoteShas(ctx context.Context) error {
+func (e *engineImpl) PopulateRemoteShas(_ context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -119,7 +119,7 @@ func (e *engineImpl) PopulateRemoteShas(ctx context.Context) error {
 
 	// Fetch remote SHAs using git ls-remote
 	remote := "origin" // TODO: Get from config
-	remoteShas, err := git.FetchRemoteShas(ctx, remote)
+	remoteShas, err := git.FetchRemoteShas(remote)
 	if err != nil {
 		// Don't fail if we can't fetch remote SHAs (e.g., offline)
 		return nil

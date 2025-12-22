@@ -1,7 +1,6 @@
 package git_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -46,7 +45,7 @@ func TestGetCommitSubject(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test GetCommitSubject
-		subject, err := git.GetCommitSubject(context.Background(), branchName)
+		subject, err := git.GetCommitSubject(branchName)
 		require.NoError(t, err)
 		require.Equal(t, oldestSubject, subject, "Should return the oldest commit subject on the branch")
 	})
@@ -79,7 +78,7 @@ func TestGetCommitSubject(t *testing.T) {
 		err = git.WriteMetadataRef(branchName, meta)
 		require.NoError(t, err)
 
-		subject, err := git.GetCommitSubject(context.Background(), branchName)
+		subject, err := git.GetCommitSubject(branchName)
 		require.NoError(t, err)
 		require.Equal(t, subjectText, subject)
 	})

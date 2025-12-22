@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -10,7 +9,7 @@ import (
 )
 
 // PruneRemote prunes stale remote-tracking branches
-func PruneRemote(_ context.Context, remote string) error {
+func PruneRemote(remote string) error {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return err
@@ -33,7 +32,7 @@ func PruneRemote(_ context.Context, remote string) error {
 }
 
 // GetRemote returns the default remote name (usually "origin")
-func GetRemote(_ context.Context) string {
+func GetRemote() string {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "origin"
@@ -58,7 +57,7 @@ func GetRemote(_ context.Context) string {
 
 // FetchRemoteShas fetches the SHAs of all branches on the remote.
 // Returns a map of branch name -> SHA.
-func FetchRemoteShas(_ context.Context, remote string) (map[string]string, error) {
+func FetchRemoteShas(remote string) (map[string]string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return nil, err

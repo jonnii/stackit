@@ -9,7 +9,7 @@ import (
 
 // PullTrunk pulls the trunk branch from remote
 func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
-	remote := git.GetRemote(ctx)
+	remote := git.GetRemote()
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
@@ -41,7 +41,7 @@ func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
 
 // ResetTrunkToRemote resets trunk to match remote
 func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
-	remote := git.GetRemote(ctx)
+	remote := git.GetRemote()
 
 	e.mu.RLock()
 	trunk := e.trunk
@@ -49,7 +49,7 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	e.mu.RUnlock()
 
 	// Get remote SHA
-	remoteSha, err := git.GetRemoteSha(ctx, remote, trunk)
+	remoteSha, err := git.GetRemoteSha(remote, trunk)
 	if err != nil {
 		return fmt.Errorf("failed to get remote SHA: %w", err)
 	}
@@ -163,14 +163,14 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	// or if it's empty, find the actual merge base. This handles cases where
 	// the parent was amended or rebased outside of stackit.
 	if oldParentRev != "" {
-		if isAncestor, _ := git.IsAncestor(ctx, oldParentRev, branchName); !isAncestor {
-			if mergeBase, err := git.GetMergeBase(ctx, branchName, parent); err == nil {
+		if isAncestor, _ := git.IsAncestor(oldParentRev, branchName); !isAncestor {
+			if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
 				oldParentRev = mergeBase
 			}
 		}
 	} else {
 		// No old parent revision in metadata, try to find merge base
-		if mergeBase, err := git.GetMergeBase(ctx, branchName, parent); err == nil {
+		if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
 			oldParentRev = mergeBase
 		}
 	}

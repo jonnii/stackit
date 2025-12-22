@@ -57,7 +57,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 		// Preserve PR info if branch name matches original
 		var prInfo *PrInfo
 		if branchName == opts.BranchToSplit {
-			prInfo, _ = e.GetPrInfo(ctx, opts.BranchToSplit)
+			prInfo, _ = e.GetPrInfo(opts.BranchToSplit)
 		}
 
 		// Track branch with parent
@@ -152,7 +152,7 @@ func (e *engineImpl) DetachAndResetBranchChanges(ctx context.Context, branchName
 	}
 
 	// Get the merge base between this branch and its parent
-	mergeBase, err := git.GetMergeBase(ctx, branchName, parentBranchName)
+	mergeBase, err := git.GetMergeBase(branchName, parentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}

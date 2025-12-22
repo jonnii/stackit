@@ -122,7 +122,7 @@ func (s *Scenario) Rebuild() *Scenario {
 	err := git.InitDefaultRepo()
 	require.NoError(s.T, err)
 	if s.Engine != nil {
-		err = s.Engine.Rebuild(context.Background(), s.Engine.Trunk())
+		err = s.Engine.Rebuild(s.Engine.Trunk())
 		require.NoError(s.T, err)
 	}
 	return s

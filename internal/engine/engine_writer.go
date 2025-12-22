@@ -82,7 +82,7 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 }
 
 // UntrackBranch stops tracking a branch by deleting its metadata
-func (e *engineImpl) UntrackBranch(_ context.Context, branchName string) error {
+func (e *engineImpl) UntrackBranch(branchName string) error {
 	if e.IsTrunk(branchName) {
 		return fmt.Errorf("cannot untrack trunk branch")
 	}
@@ -210,7 +210,7 @@ func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBra
 // setParentInternal updates parent without locking (caller must hold lock)
 func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, parentBranchName string) error {
 	// Get new parent revision
-	parentRev, err := git.GetMergeBase(ctx, branchName, parentBranchName)
+	parentRev, err := git.GetMergeBase(branchName, parentBranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get merge base: %w", err)
 	}
@@ -232,7 +232,7 @@ func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, p
 	shouldUpdateRevision := true
 	if oldParent != "" && oldParent != parentBranchName && meta.ParentBranchRevision != nil && *meta.ParentBranchRevision != "" {
 		// Check if existing revision is still a valid ancestor of the branch
-		if isAncestor, _ := git.IsAncestor(ctx, *meta.ParentBranchRevision, branchName); isAncestor {
+		if isAncestor, _ := git.IsAncestor(*meta.ParentBranchRevision, branchName); isAncestor {
 			// Check if the old parent was merged into the new parent (the "merge" case)
 			// OR if the new parent is the same as the old parent (no change)
 			// We use the branch name to check for merging.

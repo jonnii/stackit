@@ -26,7 +26,7 @@ func SoftReset(ctx context.Context, sha string) error {
 }
 
 // GetRemoteSha returns the SHA of a remote branch
-func GetRemoteSha(_ context.Context, remote, branchName string) (string, error) {
+func GetRemoteSha(remote, branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err

@@ -115,7 +115,7 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has "MERGED" PR state in metadata
-	prInfo, err := e.GetPrInfo(ctx, parentBranchName)
+	prInfo, err := e.GetPrInfo(parentBranchName)
 	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
 		return true
 	}

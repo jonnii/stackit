@@ -180,7 +180,7 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 		splog.Warn("  ❌ failed to get trunk: %v", err)
 	} else {
 		// Check if trunk branch exists
-		_, err = git.GetRevision(ctx.Context, trunk)
+		_, err = git.GetRevision(trunk)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("trunk branch '%s' does not exist", trunk))
 			splog.Warn("  ❌ trunk branch '%s' does not exist", trunk)

@@ -112,7 +112,7 @@ func promptForFiles(ctx context.Context, branchToSplit string, eng engine.Branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
 	// Get merge base between branch and parent
-	mergeBase, err := git.GetMergeBase(ctx, branchToSplit, parentBranchName)
+	mergeBase, err := git.GetMergeBase(branchToSplit, parentBranchName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get merge base: %w", err)
 	}

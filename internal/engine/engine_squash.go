@@ -42,7 +42,7 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Get commit range SHAs from parent to current branch
-	commitSHAs, err := git.GetCommitRangeSHAs(ctx, parentBranchRevision, branchRevision)
+	commitSHAs, err := git.GetCommitRangeSHAs(parentBranchRevision, branchRevision)
 	if err != nil {
 		return fmt.Errorf("failed to get commit range: %w", err)
 	}

@@ -144,7 +144,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	for _, branchName := range allBranches {
 		// Get PR info
-		prInfo, err := eng.GetPrInfo(ctx, branchName)
+		prInfo, err := eng.GetPrInfo(branchName)
 		if err != nil {
 			splog.Debug("Failed to get PR info for %s: %v", branchName, err)
 			validation.Valid = false
@@ -185,7 +185,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		}
 		if !matchesRemote && prInfo != nil && prInfo.Number != nil {
 			// Get detailed difference information
-			diffInfo := getBranchRemoteDifference(ctx, branchName, splog)
+			diffInfo := getBranchRemoteDifference(branchName, splog)
 			if diffInfo != "" {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s differs from remote: %s", branchName, diffInfo))
 			} else {
@@ -474,17 +474,17 @@ func FormatMergePlan(plan *Plan, validation *PlanValidation) string {
 	return result
 }
 
-func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.Splog) string {
-	localSha, err := git.GetRevision(c, branchName)
+func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {
+	localSha, err := git.GetRevision(branchName)
 	if err != nil {
 		splog.Debug("Failed to get local SHA for %s: %v", branchName, err)
 		return ""
 	}
 
-	remoteSha, err := git.GetRemoteRevision(c, branchName)
+	remoteSha, err := git.GetRemoteRevision(branchName)
 	if err != nil {
 		splog.Debug("Remote tracking branch not found for %s, fetching from remote: %v", branchName, err)
-		remoteShas, err := git.FetchRemoteShas(c, "origin")
+		remoteShas, err := git.FetchRemoteShas("origin")
 		if err != nil {
 			splog.Debug("Failed to fetch remote SHAs: %v", err)
 			localShort := localSha
@@ -518,7 +518,7 @@ func getBranchRemoteDifference(c context.Context, branchName string, splog *tui.
 	}
 
 	remoteBranchRef := "refs/remotes/origin/" + branchName
-	commonAncestor, err := git.GetMergeBaseByRef(c, branchName, remoteBranchRef)
+	commonAncestor, err := git.GetMergeBaseByRef(branchName, remoteBranchRef)
 	if err != nil {
 		return fmt.Sprintf("local: %s, remote: %s (likely local is ahead)", localShort, remoteShort)
 	}

@@ -57,15 +57,15 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 
 		// Validate parent is an ancestor (unless force is used)
 		if !opts.Force {
-			parentRev, err := git.GetRevision(ctx.Context, parent)
+			parentRev, err := git.GetRevision(parent)
 			if err != nil {
 				return fmt.Errorf("failed to get parent revision: %w", err)
 			}
-			branchRev, err := git.GetRevision(ctx.Context, branchName)
+			branchRev, err := git.GetRevision(branchName)
 			if err != nil {
 				return fmt.Errorf("failed to get branch revision: %w", err)
 			}
-			isAnc, err := git.IsAncestor(ctx.Context, parentRev, branchRev)
+			isAnc, err := git.IsAncestor(parentRev, branchRev)
 			if err != nil {
 				return fmt.Errorf("failed to check ancestry: %w", err)
 			}
@@ -144,12 +144,12 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		}
 
 		// Check if candidate is a child (has this branch as merge base)
-		mergeBase, err := git.GetMergeBase(ctx.Context, candidate, branchName)
+		mergeBase, err := git.GetMergeBase(candidate, branchName)
 		if err != nil {
 			continue
 		}
 
-		branchRev, err := git.GetRevision(ctx.Context, branchName)
+		branchRev, err := git.GetRevision(branchName)
 		if err != nil {
 			continue
 		}

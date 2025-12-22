@@ -61,7 +61,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err := s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: true,
@@ -77,7 +77,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.True(t, metadata.IsDraft, "PR should preserve existing draft status")
 
 		// Test with non-draft existing PR
-		err = s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: false,
@@ -94,7 +94,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with non-draft status
-		err := s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: false,
@@ -115,7 +115,7 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err := s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
 			Title:   "Existing PR",
 			Body:    "PR body",
 			IsDraft: true,
@@ -171,7 +171,7 @@ func TestGetPRBody_MultipleCommits(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get PR body
-		body, err := submit.GetPRBody(branchName, false, "", s.Context)
+		body, err := submit.GetPRBody(branchName, false, "")
 		require.NoError(t, err)
 
 		// Note: GetPRBody formats as a list of subjects

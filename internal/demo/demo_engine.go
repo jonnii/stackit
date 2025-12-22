@@ -268,7 +268,7 @@ func (e *Engine) TrackBranch(_ context.Context, branchName string, parentBranchN
 }
 
 // UntrackBranch untracks a branch in the demo engine
-func (e *Engine) UntrackBranch(_ context.Context, branchName string) error {
+func (e *Engine) UntrackBranch(branchName string) error {
 	delete(e.parentMap, branchName)
 	// Rebuild children map (simplified for demo)
 	newChildrenMap := make(map[string][]string)
@@ -301,19 +301,19 @@ func (e *Engine) DeleteBranches(ctx context.Context, branchNames []string) ([]st
 }
 
 // Reset resets the demo engine
-func (e *Engine) Reset(_ context.Context, _ string) error {
+func (e *Engine) Reset(_ string) error {
 	return nil
 }
 
 // Rebuild rebuilds the demo engine
-func (e *Engine) Rebuild(_ context.Context, _ string) error {
+func (e *Engine) Rebuild(_ string) error {
 	return nil
 }
 
 // PRManager interface implementation
 
 // GetPrInfo returns PR info in the demo engine
-func (e *Engine) GetPrInfo(_ context.Context, branchName string) (*engine.PrInfo, error) {
+func (e *Engine) GetPrInfo(branchName string) (*engine.PrInfo, error) {
 	if info, exists := e.prInfoMap[branchName]; exists {
 		return info, nil
 	}
@@ -321,15 +321,15 @@ func (e *Engine) GetPrInfo(_ context.Context, branchName string) (*engine.PrInfo
 }
 
 // UpsertPrInfo upserts PR info in the demo engine
-func (e *Engine) UpsertPrInfo(_ context.Context, branchName string, prInfo *engine.PrInfo) error {
+func (e *Engine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) error {
 	simulateDelay(delayLong) // GitHub API call to create/update PR
 	e.prInfoMap[branchName] = prInfo
 	return nil
 }
 
 // GetPRSubmissionStatus returns the submission status in the demo engine
-func (e *Engine) GetPRSubmissionStatus(ctx context.Context, branchName string) (engine.PRSubmissionStatus, error) {
-	info, _ := e.GetPrInfo(ctx, branchName)
+func (e *Engine) GetPRSubmissionStatus(_ context.Context, branchName string) (engine.PRSubmissionStatus, error) {
+	info, _ := e.GetPrInfo(branchName)
 	if info == nil {
 		return engine.PRSubmissionStatus{Action: "create", NeedsUpdate: true}, nil
 	}

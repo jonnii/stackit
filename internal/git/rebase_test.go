@@ -217,7 +217,7 @@ func TestGetRebaseHead(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get rebase head
-		rebaseHead, err := git.GetRebaseHead(context.Background())
+		rebaseHead, err := git.GetRebaseHead()
 		require.NoError(t, err)
 		require.NotEmpty(t, rebaseHead)
 	})

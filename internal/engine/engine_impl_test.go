@@ -380,7 +380,7 @@ func TestRebuild(t *testing.T) {
 			Checkout("main")
 
 		// Rebuild should pick up new branch
-		err := s.Engine.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
 		// New branch should be in list
@@ -501,11 +501,11 @@ func TestUpsertPrInfo(t *testing.T) {
 			URL:     "https://github.com/owner/repo/pull/123",
 		}
 
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify PR info
-		retrieved, err := s.Engine.GetPrInfo(context.Background(), "branch1")
+		retrieved, err := s.Engine.GetPrInfo("branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, prNumber, *retrieved.Number)
@@ -527,17 +527,17 @@ func TestUpsertPrInfo(t *testing.T) {
 			IsDraft: false,
 		}
 
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		// Update PR info
 		prInfo.Title = "Updated Title"
 		prInfo.Body = "Updated body"
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err = s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		// Verify updated PR info
-		retrieved, err := s.Engine.GetPrInfo(context.Background(), "branch1")
+		retrieved, err := s.Engine.GetPrInfo("branch1")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		require.Equal(t, "Updated Title", retrieved.Title)
@@ -570,7 +570,7 @@ func TestReset(t *testing.T) {
 			})
 
 		// Reset with same trunk
-		err := s.Engine.Reset(context.Background(), "main")
+		err := s.Engine.Reset("main")
 		require.NoError(t, err)
 
 		// Branch should still exist but not be tracked

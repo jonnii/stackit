@@ -47,7 +47,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 
 	// Show instructions
 	splog.Info("Splitting %s into multiple single-commit branches.", tui.ColorBranchName(branchToSplit, true))
-	prInfo, _ := eng.GetPrInfo(ctx, branchToSplit)
+	prInfo, _ := eng.GetPrInfo(branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
 			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
@@ -82,7 +82,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 		splog.Info("Stage changes for branch %d:", len(branchNames)+1)
 
 		// Stage patch interactively
-		if err := git.StagePatch(ctx); err != nil {
+		if err := git.StagePatch(); err != nil {
 			// If user cancels, restore branch
 			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 			return nil, fmt.Errorf("canceled: no new branches created")

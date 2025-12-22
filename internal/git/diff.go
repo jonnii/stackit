@@ -9,7 +9,7 @@ import (
 // IsDiffEmpty checks if there are no differences between a branch and a base revision
 func IsDiffEmpty(ctx context.Context, branchName, baseRevision string) (bool, error) {
 	// Get branch revision
-	branchRev, err := GetRevision(ctx, branchName)
+	branchRev, err := GetRevision(branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get branch revision: %w", err)
 	}

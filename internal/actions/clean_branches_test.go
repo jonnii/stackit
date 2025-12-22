@@ -1,7 +1,6 @@
 package actions_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func TestCleanBranches(t *testing.T) {
 			RunGit("merge", "branch1")
 
 		// Rebuild to see changes
-		err := s.Engine.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged via PR info
@@ -35,7 +34,7 @@ func TestCleanBranches(t *testing.T) {
 			State:  "MERGED",
 			Base:   "main",
 		}
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err = s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		result, err := actions.CleanBranches(s.Context, actions.CleanBranchesOptions{
@@ -64,7 +63,7 @@ func TestCleanBranches(t *testing.T) {
 			RunGit("merge", "branch1")
 
 		// Rebuild to see changes
-		err := s.Engine.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
 		// Mark branch1 as merged
@@ -73,7 +72,7 @@ func TestCleanBranches(t *testing.T) {
 			Number: &prNumber,
 			State:  "MERGED",
 		}
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err = s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		result, err := actions.CleanBranches(s.Context, actions.CleanBranchesOptions{

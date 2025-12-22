@@ -25,7 +25,7 @@ func PrintConflictStatus(ctx context.Context, branchName string, splog *tui.Splo
 	}
 
 	// Get rebase head
-	rebaseHead, err := git.GetRebaseHead(ctx)
+	rebaseHead, err := git.GetRebaseHead()
 	if err == nil && rebaseHead != "" {
 		rebaseHeadShort := rebaseHead
 		if len(rebaseHead) > 7 {

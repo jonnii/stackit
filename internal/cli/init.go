@@ -206,8 +206,18 @@ func newInitCmd() *cobra.Command {
 			coloredTrunk := tui.ColorBranchName(trunkName, false)
 			splog.Info("Trunk set to %s", coloredTrunk)
 
+			// Read config for engine options
+			maxUndoDepth, err := config.GetUndoStackDepth(repoRoot)
+			if err != nil {
+				maxUndoDepth = engine.DefaultMaxUndoStackDepth
+			}
+
 			// Create engine and perform reset/rebuild
-			eng, err := engine.NewEngine(repoRoot)
+			eng, err := engine.NewEngine(engine.Options{
+				RepoRoot:          repoRoot,
+				Trunk:             trunkName,
+				MaxUndoStackDepth: maxUndoDepth,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to create engine: %w", err)
 			}

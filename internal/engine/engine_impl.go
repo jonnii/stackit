@@ -5,42 +5,53 @@ import (
 	"fmt"
 	"sync"
 
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 )
 
 // engineImpl is a minimal implementation of the Engine interface
 type engineImpl struct {
-	repoRoot      string
-	trunk         string
-	currentBranch string
-	branches      []string
-	parentMap     map[string]string   // branch -> parent
-	childrenMap   map[string][]string // branch -> children
-	remoteShas    map[string]string   // branch -> remote SHA (populated by PopulateRemoteShas)
-	mu            sync.RWMutex
+	repoRoot          string
+	trunk             string
+	currentBranch     string
+	branches          []string
+	parentMap         map[string]string   // branch -> parent
+	childrenMap       map[string][]string // branch -> children
+	remoteShas        map[string]string   // branch -> remote SHA (populated by PopulateRemoteShas)
+	maxUndoStackDepth int
+	mu                sync.RWMutex
 }
 
 // NewEngine creates a new engine instance
-func NewEngine(repoRoot string) (Engine, error) {
+func NewEngine(opts Options) (Engine, error) {
 	// Initialize git repository
 	if err := git.InitDefaultRepo(); err != nil {
 		return nil, fmt.Errorf("failed to initialize git repository: %w", err)
 	}
 
-	e := &engineImpl{
-		repoRoot:    repoRoot,
-		parentMap:   make(map[string]string),
-		childrenMap: make(map[string][]string),
-		remoteShas:  make(map[string]string),
+	// Validate repo root
+	if opts.RepoRoot == "" {
+		return nil, fmt.Errorf("repo root must be specified in Options")
 	}
 
-	// Get trunk from config
-	trunk, err := config.GetTrunk(repoRoot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get trunk: %w", err)
+	// Validate trunk
+	if opts.Trunk == "" {
+		return nil, fmt.Errorf("trunk must be specified in Options")
 	}
-	e.trunk = trunk
+
+	// Validate and set max undo stack depth
+	maxDepth := opts.MaxUndoStackDepth
+	if maxDepth <= 0 {
+		maxDepth = DefaultMaxUndoStackDepth
+	}
+
+	e := &engineImpl{
+		repoRoot:          opts.RepoRoot,
+		trunk:             opts.Trunk,
+		parentMap:         make(map[string]string),
+		childrenMap:       make(map[string][]string),
+		remoteShas:        make(map[string]string),
+		maxUndoStackDepth: maxDepth,
+	}
 
 	// Get current branch
 	currentBranch, err := git.GetCurrentBranch()

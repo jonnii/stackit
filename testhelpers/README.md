@@ -168,7 +168,11 @@ func TestSubmitWithMockedGitHub(t *testing.T) {
     scene.Repo.CreateChangeAndCommit("feature change", "feat")
     
     // Create engine and track branch
-    eng, err := engine.NewEngine(scene.Dir)
+    eng, err := engine.NewEngine(engine.Options{
+        RepoRoot:          scene.Dir,
+        Trunk:             "main",
+        MaxUndoStackDepth: engine.DefaultMaxUndoStackDepth,
+    })
     require.NoError(t, err)
     err = eng.TrackBranch("feature", "main")
     require.NoError(t, err)

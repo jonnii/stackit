@@ -5,21 +5,21 @@ import (
 	"time"
 )
 
-// ChannelMergeProgressReporter implements MergeProgressReporter using channels
+// ChannelMergeProgressReporter implements merge.ProgressReporter using channels
 type ChannelMergeProgressReporter struct {
-	updates chan MergeProgressUpdate
+	updates chan ProgressUpdate
 	once    sync.Once
 }
 
 // NewChannelMergeProgressReporter creates a new channel-based progress reporter
 func NewChannelMergeProgressReporter() *ChannelMergeProgressReporter {
 	return &ChannelMergeProgressReporter{
-		updates: make(chan MergeProgressUpdate, 100),
+		updates: make(chan ProgressUpdate, 100),
 	}
 }
 
 // Updates returns the channel for receiving updates
-func (r *ChannelMergeProgressReporter) Updates() <-chan MergeProgressUpdate {
+func (r *ChannelMergeProgressReporter) Updates() <-chan ProgressUpdate {
 	return r.updates
 }
 
@@ -32,7 +32,7 @@ func (r *ChannelMergeProgressReporter) Close() {
 
 // StepStarted reports that a step has started
 func (r *ChannelMergeProgressReporter) StepStarted(stepIndex int, description string) {
-	r.updates <- MergeProgressUpdate{
+	r.updates <- ProgressUpdate{
 		Type:        "started",
 		StepIndex:   stepIndex,
 		Description: description,
@@ -41,7 +41,7 @@ func (r *ChannelMergeProgressReporter) StepStarted(stepIndex int, description st
 
 // StepCompleted reports that a step has completed
 func (r *ChannelMergeProgressReporter) StepCompleted(stepIndex int) {
-	r.updates <- MergeProgressUpdate{
+	r.updates <- ProgressUpdate{
 		Type:      "completed",
 		StepIndex: stepIndex,
 	}
@@ -49,7 +49,7 @@ func (r *ChannelMergeProgressReporter) StepCompleted(stepIndex int) {
 
 // StepFailed reports that a step has failed
 func (r *ChannelMergeProgressReporter) StepFailed(stepIndex int, err error) {
-	r.updates <- MergeProgressUpdate{
+	r.updates <- ProgressUpdate{
 		Type:      "failed",
 		StepIndex: stepIndex,
 		Error:     err,
@@ -58,7 +58,7 @@ func (r *ChannelMergeProgressReporter) StepFailed(stepIndex int, err error) {
 
 // StepWaiting reports progress on a waiting step
 func (r *ChannelMergeProgressReporter) StepWaiting(stepIndex int, elapsed, timeout time.Duration) {
-	r.updates <- MergeProgressUpdate{
+	r.updates <- ProgressUpdate{
 		Type:      "waiting",
 		StepIndex: stepIndex,
 		Elapsed:   elapsed,

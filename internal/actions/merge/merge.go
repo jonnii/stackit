@@ -1,4 +1,4 @@
-package actions
+package merge
 
 import (
 	"fmt"
@@ -8,30 +8,28 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// MergeOptions contains options for the merge command
-type MergeOptions struct {
+// Options contains options for the merge command
+type Options struct {
 	DryRun   bool
 	Confirm  bool
-	Strategy MergeStrategy
+	Strategy Strategy
 	Force    bool
 }
 
-// MergeAction performs the merge operation using the plan/execute pattern
-func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
+// Action performs the merge operation using the plan/execute pattern
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
 	// Default strategy to bottom-up if not specified
 	strategy := opts.Strategy
 	if strategy == "" {
-		strategy = MergeStrategyBottomUp
+		strategy = StrategyBottomUp
 	}
 
 	// 1. Populate remote SHAs so we can accurately check if branches match remote
-	// This must be called before creating the merge plan so BranchMatchesRemote works correctly
 	if err := eng.PopulateRemoteShas(ctx.Context); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
-		// Continue anyway - we'll just have less accurate remote matching info
 	} else {
 		splog.Debug("Populated remote SHAs for branch matching")
 	}
@@ -48,12 +46,10 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 			splog.Info("Stale branches: %v", staleBranches)
 		}
 		splog.Tip("Run 'stackit sync' to update before merging")
-		// In interactive mode, we would prompt here, but for now we'll continue
-		// The plan creation will validate individual branches
 	}
 
 	// 3. Create merge plan
-	plan, validation, err := CreateMergePlan(ctx, CreateMergePlanOptions{
+	plan, validation, err := CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, CreatePlanOptions{
 		Strategy: strategy,
 		Force:    opts.Force,
 	})
@@ -67,7 +63,6 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 		for _, errMsg := range validation.Errors {
 			splog.Warn("  ✗ %s", errMsg)
 		}
-		// In dry-run mode, show the plan anyway
 		if !opts.DryRun && !opts.Force {
 			return fmt.Errorf("validation failed (use --force to override)")
 		}
@@ -83,7 +78,6 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 			splog.Warn("  ⚠ %s", warn)
 		}
 		splog.Newline()
-		// Block execution if there are warnings (unless --force or dry-run)
 		if !opts.DryRun && !opts.Force {
 			splog.Warn("Cannot proceed with merge due to warnings. Use --force to override.")
 			return fmt.Errorf("merge blocked due to warnings (use --force to override)")
@@ -97,7 +91,6 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 	planText := FormatMergePlan(plan, validation)
 	splog.Page(planText)
 
-	// If dry-run, stop here
 	if opts.DryRun {
 		return nil
 	}
@@ -115,7 +108,7 @@ func MergeAction(ctx *runtime.Context, opts MergeOptions) error {
 	}
 
 	// 7. Execute the plan
-	if err := ExecuteMergePlan(ctx, ExecuteMergePlanOptions{
+	if err := Execute(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, ExecuteOptions{
 		Plan:  plan,
 		Force: opts.Force,
 	}); err != nil {

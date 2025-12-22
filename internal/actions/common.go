@@ -9,8 +9,14 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
+// Restacker is a minimal interface needed for restacking branches
+type Restacker interface {
+	engine.BranchReader
+	engine.SyncManager
+}
+
 // RestackBranches restacks a list of branches
-func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engine, splog *tui.Splog, repoRoot string) error {
+func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, splog *tui.Splog, repoRoot string) error {
 	for i, branchName := range branchNames {
 		if eng.IsTrunk(branchName) {
 			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
@@ -52,7 +58,7 @@ func RestackBranches(ctx context.Context, branchNames []string, eng engine.Engin
 			}
 
 			// Print conflict status
-			if err := PrintConflictStatus(ctx, branchName, eng, splog); err != nil {
+			if err := PrintConflictStatus(ctx, branchName, splog); err != nil {
 				return fmt.Errorf("failed to print conflict status: %w", err)
 			}
 

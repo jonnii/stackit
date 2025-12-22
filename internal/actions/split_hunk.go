@@ -13,8 +13,24 @@ import (
 	"stackit.dev/stackit/internal/utils"
 )
 
-// splitByHunk splits a branch by interactively staging hunks
-func splitByHunk(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) (*SplitResult, error) {
+// splitByHunkEngine is a minimal interface needed for splitting by hunk
+type splitByHunkEngine interface {
+	engine.BranchReader
+	engine.PRManager
+	engine.SplitManager
+}
+
+// splitByHunk splits a branch by interactively staging hunks.
+//
+// Algorithm:
+//  1. Detach HEAD and soft reset to the parent branch's tip, leaving changes unstaged.
+//  2. Loop until no unstaged changes remain:
+//     a. Show remaining unstaged changes.
+//     b. Interactively prompt the user to stage hunks for the next branch.
+//     c. Prompt for a commit message and branch name.
+//     d. Create a new commit with the staged changes.
+//  3. Return the created branch names.
+func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngine, splog *tui.Splog) (*SplitResult, error) {
 	// Detach and reset branch changes
 	if err := eng.DetachAndResetBranchChanges(ctx, branchToSplit); err != nil {
 		return nil, fmt.Errorf("failed to detach and reset: %w", err)

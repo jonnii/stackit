@@ -1,4 +1,4 @@
-package actions_test
+package merge_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/merge"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
@@ -38,15 +38,15 @@ func TestCreateMergePlan(t *testing.T) {
 		// Switch to branch2
 		s.Checkout("branch2")
 
-		plan, validation, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
-			Strategy: actions.MergeStrategyBottomUp,
+		plan, validation, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
+			Strategy: merge.StrategyBottomUp,
 			Force:    false,
 		})
 
 		require.NoError(t, err)
 		require.NotNil(t, plan)
 		require.NotNil(t, validation)
-		require.Equal(t, actions.MergeStrategyBottomUp, plan.Strategy)
+		require.Equal(t, merge.StrategyBottomUp, plan.Strategy)
 		require.Equal(t, "branch2", plan.CurrentBranch)
 		require.Len(t, plan.BranchesToMerge, 2)
 		require.Equal(t, "branch1", plan.BranchesToMerge[0].BranchName)
@@ -72,8 +72,8 @@ func TestCreateMergePlan(t *testing.T) {
 		// Make sure we're on branch1
 		s.Checkout("branch1")
 
-		plan, validation, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
-			Strategy: actions.MergeStrategyBottomUp,
+		plan, validation, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
+			Strategy: merge.StrategyBottomUp,
 			Force:    false,
 		})
 
@@ -102,8 +102,8 @@ func TestCreateMergePlan(t *testing.T) {
 		// Make sure we're on branch1
 		s.Checkout("branch1")
 
-		plan, validation, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
-			Strategy: actions.MergeStrategyBottomUp,
+		plan, validation, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
+			Strategy: merge.StrategyBottomUp,
 			Force:    true,
 		})
 
@@ -134,8 +134,8 @@ func TestCreateMergePlan(t *testing.T) {
 		err = s.Engine.UpsertPrInfo(context.Background(), "C1", &engine.PrInfo{Number: &prC1, State: "OPEN"})
 		require.NoError(t, err)
 
-		plan, _, err := actions.CreateMergePlan(s.Context, actions.CreateMergePlanOptions{
-			Strategy: actions.MergeStrategyBottomUp,
+		plan, _, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
+			Strategy: merge.StrategyBottomUp,
 		})
 		require.NoError(t, err)
 

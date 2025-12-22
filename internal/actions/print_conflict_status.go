@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
 )
 
 // PrintConflictStatus displays conflict information and instructions to the user
-func PrintConflictStatus(ctx context.Context, branchName string, _ engine.Engine, splog *tui.Splog) error {
+func PrintConflictStatus(ctx context.Context, branchName string, splog *tui.Splog) error {
 	msg := tui.ColorRed(fmt.Sprintf("Hit conflict restacking %s", branchName))
 	splog.Info("%s", msg)
 	splog.Newline()

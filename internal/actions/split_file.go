@@ -13,8 +13,23 @@ import (
 	"stackit.dev/stackit/internal/utils"
 )
 
-// splitByFile splits a branch by extracting files to a new parent branch
-func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng engine.Engine) (*SplitResult, error) {
+// splitByFileEngine is a minimal interface needed for splitting by file
+type splitByFileEngine interface {
+	engine.BranchReader
+	engine.BranchWriter
+}
+
+// splitByFile splits a branch by extracting specified files to a new parent branch.
+//
+// Algorithm:
+//  1. Determine the parent of the branch to split.
+//  2. Create a new "split" branch from the parent.
+//  3. Checkout the specified files from the original branch into the new split branch.
+//  4. Commit the extracted files on the new split branch.
+//  5. Checkout the original branch and remove the extracted files.
+//  6. Commit the removals on the original branch.
+//  7. Update the original branch's parent to be the new split branch.
+func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng splitByFileEngine) (*SplitResult, error) {
 	// Get parent branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -92,7 +107,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 }
 
 // promptForFiles shows an interactive file selector for split --by-file
-func promptForFiles(ctx context.Context, branchToSplit string, eng engine.Engine, splog *tui.Splog) ([]string, error) {
+func promptForFiles(ctx context.Context, branchToSplit string, eng engine.BranchReader, splog *tui.Splog) ([]string, error) {
 	// Get the parent branch to compare against
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 

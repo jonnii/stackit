@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/merge"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -39,13 +39,13 @@ If no flags are provided, an interactive wizard will guide you through the merge
 			interactive := strategy == "" && !yes && !force
 
 			// Parse strategy
-			var mergeStrategy actions.MergeStrategy
+			var mergeStrategy merge.Strategy
 			if strategy != "" {
 				switch strings.ToLower(strategy) {
 				case "bottom-up", "bottomup":
-					mergeStrategy = actions.MergeStrategyBottomUp
+					mergeStrategy = merge.StrategyBottomUp
 				case "top-down", "topdown":
-					mergeStrategy = actions.MergeStrategyTopDown
+					mergeStrategy = merge.StrategyTopDown
 				default:
 					return fmt.Errorf("invalid strategy: %s (must be 'bottom-up' or 'top-down')", strategy)
 				}
@@ -57,7 +57,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 			}
 
 			// Run merge action
-			return actions.MergeAction(ctx, actions.MergeOptions{
+			return merge.Action(ctx, merge.Options{
 				DryRun:   dryRun,
 				Confirm:  !yes, // If --yes is set, don't confirm
 				Strategy: mergeStrategy,
@@ -94,8 +94,8 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	}
 
 	// Create initial plan with bottom-up strategy (default)
-	plan, validation, err := actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
-		Strategy: actions.MergeStrategyBottomUp,
+	plan, validation, err := merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
+		Strategy: merge.StrategyBottomUp,
 		Force:    forceFlag,
 	})
 	if err != nil {
@@ -189,18 +189,18 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		return fmt.Errorf("strategy selection canceled: %w", err)
 	}
 
-	var mergeStrategy actions.MergeStrategy
+	var mergeStrategy merge.Strategy
 	if selectedStrategy == "bottom-up" {
-		mergeStrategy = actions.MergeStrategyBottomUp
+		mergeStrategy = merge.StrategyBottomUp
 	} else {
-		mergeStrategy = actions.MergeStrategyTopDown
+		mergeStrategy = merge.StrategyTopDown
 	}
 
 	splog.Info("✅ Strategy: %s", mergeStrategy)
 	splog.Newline()
 
 	// Recreate plan with selected strategy
-	plan, _, err = actions.CreateMergePlan(ctx, actions.CreateMergePlanOptions{
+	plan, _, err = merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
 		Strategy: mergeStrategy,
 		Force:    forceFlag,
 	})
@@ -233,7 +233,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	}
 
 	// Execute the plan
-	if err := actions.ExecuteMergePlan(ctx, actions.ExecuteMergePlanOptions{
+	if err := merge.Execute(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, merge.ExecuteOptions{
 		Plan:  plan,
 		Force: forceFlag,
 	}); err != nil {

@@ -123,6 +123,19 @@ type ApplySplitOptions struct {
 	BranchPoints  []int    // Commit indices (0 = HEAD, 1 = HEAD~1, etc.)
 }
 
+// Options contains configuration options for creating an Engine
+type Options struct {
+	// RepoRoot is the root directory of the Git repository
+	RepoRoot string
+
+	// Trunk is the primary trunk branch name (e.g., "main", "master")
+	Trunk string
+
+	// MaxUndoStackDepth is the maximum number of undo snapshots to keep.
+	// If zero or negative, defaults to DefaultMaxUndoStackDepth (10).
+	MaxUndoStackDepth int
+}
+
 // UndoManager provides operations for undo/redo functionality
 // Thread-safe: All methods are safe for concurrent use
 type UndoManager interface {

@@ -69,8 +69,22 @@ func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
 		return runtimeCtx, nil
 	}
 
+	// Read config and create engine options
+	trunk, err := config.GetTrunk(repoRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get trunk: %w", err)
+	}
+	maxUndoDepth, err := config.GetUndoStackDepth(repoRoot)
+	if err != nil {
+		maxUndoDepth = engine.DefaultMaxUndoStackDepth
+	}
+
 	// Create real engine
-	eng, err := engine.NewEngine(repoRoot)
+	eng, err := engine.NewEngine(engine.Options{
+		RepoRoot:          repoRoot,
+		Trunk:             trunk,
+		MaxUndoStackDepth: maxUndoDepth,
+	})
 	if err != nil {
 		return nil, err
 	}

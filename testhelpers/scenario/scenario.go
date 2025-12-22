@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -36,7 +37,19 @@ func NewScenario(t *testing.T, setup testhelpers.SceneSetup) *Scenario {
 	t.Setenv("STACKIT_NON_INTERACTIVE", "true")
 
 	scene := testhelpers.NewScene(t, setup)
-	eng, err := engine.NewEngine(scene.Dir)
+	trunk, _ := config.GetTrunk(scene.Dir)
+	if trunk == "" {
+		trunk = "main"
+	}
+	maxUndoDepth, _ := config.GetUndoStackDepth(scene.Dir)
+	if maxUndoDepth <= 0 {
+		maxUndoDepth = engine.DefaultMaxUndoStackDepth
+	}
+	eng, err := engine.NewEngine(engine.Options{
+		RepoRoot:          scene.Dir,
+		Trunk:             trunk,
+		MaxUndoStackDepth: maxUndoDepth,
+	})
 	require.NoError(t, err)
 
 	ctx := runtime.NewContext(eng)

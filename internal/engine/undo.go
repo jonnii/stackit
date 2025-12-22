@@ -10,7 +10,6 @@ import (
 	"sort"
 	"time"
 
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/timeutil"
 )
@@ -184,14 +183,8 @@ func (e *engineImpl) enforceMaxStackDepth() error {
 		}
 	}
 
-	// Get max depth from config
-	maxDepth, err := config.GetUndoStackDepth(e.repoRoot)
-	if err != nil {
-		maxDepth = DefaultMaxUndoStackDepth
-	}
-
 	// If we're under the limit, nothing to do
-	if len(snapshots) <= maxDepth {
+	if len(snapshots) <= e.maxUndoStackDepth {
 		return nil
 	}
 
@@ -201,7 +194,7 @@ func (e *engineImpl) enforceMaxStackDepth() error {
 	})
 
 	// Delete oldest snapshots
-	toDelete := len(snapshots) - maxDepth
+	toDelete := len(snapshots) - e.maxUndoStackDepth
 	for i := 0; i < toDelete; i++ {
 		filePath := filepath.Join(dir, snapshots[i].Name())
 		if err := os.Remove(filePath); err != nil {

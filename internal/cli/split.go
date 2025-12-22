@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/split"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -38,12 +38,12 @@ split without options will prompt for a splitting strategy.`,
 			}
 
 			// Determine split style - check all flag variants
-			var style actions.SplitStyle
+			var style split.Style
 			switch {
 			case byCommit || cmd.Flags().Changed("commit"):
-				style = actions.SplitStyleCommit
+				style = split.StyleCommit
 			case byHunk || cmd.Flags().Changed("hunk"):
-				style = actions.SplitStyleHunk
+				style = split.StyleHunk
 			case byFileInteractive || len(byFile) > 0 || cmd.Flags().Changed("file"):
 				// -F triggers interactive file selection
 				// --by-file with pathspecs uses those files directly
@@ -51,12 +51,12 @@ split without options will prompt for a splitting strategy.`,
 					filePaths, _ := cmd.Flags().GetStringSlice("file")
 					byFile = filePaths
 				}
-				style = actions.SplitStyleFile
+				style = split.StyleFile
 			}
 			// If style is empty, SplitAction will prompt
 
 			// Run split action
-			return actions.SplitAction(ctx, actions.SplitOptions{
+			return split.Action(ctx, split.Options{
 				Style:     style,
 				Pathspecs: byFile,
 			})

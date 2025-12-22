@@ -1,4 +1,4 @@
-package actions
+package split
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type splitByHunkEngine interface {
 //     c. Prompt for a commit message and branch name.
 //     d. Create a new commit with the staged changes.
 //  3. Return the created branch names.
-func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngine, splog *tui.Splog) (*SplitResult, error) {
+func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngine, splog *tui.Splog) (*Result, error) {
 	// Detach and reset branch changes
 	if err := eng.DetachAndResetBranchChanges(ctx, branchToSplit); err != nil {
 		return nil, fmt.Errorf("failed to detach and reset: %w", err)
@@ -131,7 +131,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 		branchNames = append(branchNames, branchName)
 	}
 
-	return &SplitResult{
+	return &Result{
 		BranchNames:  branchNames,
 		BranchPoints: makeRange(len(branchNames)), // Each branch is a single commit
 	}, nil

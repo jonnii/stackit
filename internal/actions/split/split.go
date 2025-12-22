@@ -1,4 +1,4 @@
-package actions
+package split
 
 import (
 	"fmt"
@@ -6,37 +6,38 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// SplitStyle specifies the split mode
-type SplitStyle string
+// Style specifies the split mode
+type Style string
 
 const (
-	// SplitStyleCommit splits by selecting commit points
-	SplitStyleCommit SplitStyle = "commit"
-	// SplitStyleHunk splits by interactively staging hunks
-	SplitStyleHunk SplitStyle = "hunk"
-	// SplitStyleFile splits by extracting specified files
-	SplitStyleFile SplitStyle = "file"
+	// StyleCommit splits by selecting commit points
+	StyleCommit Style = "commit"
+	// StyleHunk splits by interactively staging hunks
+	StyleHunk Style = "hunk"
+	// StyleFile splits by extracting specified files
+	StyleFile Style = "file"
 )
 
-// SplitOptions contains options for the split command
-type SplitOptions struct {
-	Style     SplitStyle
+// Options contains options for the split command
+type Options struct {
+	Style     Style
 	Pathspecs []string
 }
 
-// SplitResult contains the result of a split operation
-type SplitResult struct {
+// Result contains the result of a split operation
+type Result struct {
 	BranchNames  []string // From oldest to newest
 	BranchPoints []int    // Commit indices (0 = HEAD, 1 = HEAD~1, etc.)
 }
 
-// SplitAction performs the split operation
-func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
+// Action performs the split operation
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 	context := ctx.Context
@@ -93,24 +94,24 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 			case strings.Contains(styleStr, "Cancel"):
 				return fmt.Errorf("canceled")
 			case strings.Contains(styleStr, "commit"):
-				style = SplitStyleCommit
+				style = StyleCommit
 			case strings.Contains(styleStr, "hunk"):
-				style = SplitStyleHunk
+				style = StyleHunk
 			}
 		} else {
 			// Only one commit, default to hunk
-			style = SplitStyleHunk
+			style = StyleHunk
 		}
 	}
 
 	// Perform the split
-	var result *SplitResult
+	var result *Result
 	switch style {
-	case SplitStyleCommit:
+	case StyleCommit:
 		result, err = splitByCommit(context, currentBranch, eng, splog)
-	case SplitStyleHunk:
+	case StyleHunk:
 		result, err = splitByHunk(context, currentBranch, eng, splog)
-	case SplitStyleFile:
+	case StyleFile:
 		pathspecs := opts.Pathspecs
 		// If no pathspecs provided, prompt interactively
 		if len(pathspecs) == 0 {
@@ -136,7 +137,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 		}
 		upstackBranches := eng.GetRelativeStack(currentBranch, scope)
 		if len(upstackBranches) > 0 {
-			if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -168,7 +169,7 @@ func SplitAction(ctx *runtime.Context, opts SplitOptions) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

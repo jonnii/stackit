@@ -134,11 +134,11 @@ func PromptTextInput(prompt, defaultValue string) (string, error) {
 		return "", err
 	}
 
-	if m, ok := model.(textInputModel); ok {
-		if m.err != nil {
-			return "", m.err
+	if finalModel, ok := model.(textInputModel); ok {
+		if finalModel.err != nil {
+			return "", finalModel.err
 		}
-		return m.textInput.Value(), nil
+		return finalModel.textInput.Value(), nil
 	}
 
 	return "", fmt.Errorf("unexpected model type")
@@ -272,11 +272,11 @@ func PromptSelect(title string, options []SelectOption, defaultIndex int) (strin
 		return "", err
 	}
 
-	if m, ok := model.(selectModel); ok {
-		if m.err != nil {
-			return "", m.err
+	if finalModel, ok := model.(selectModel); ok {
+		if finalModel.err != nil {
+			return "", finalModel.err
 		}
-		return m.selected, nil
+		return finalModel.selected, nil
 	}
 
 	return "", fmt.Errorf("unexpected model type")
@@ -441,11 +441,11 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 		return "", err
 	}
 
-	if m, ok := model.(branchSelectModel); ok {
-		if m.err != nil {
-			return "", m.err
+	if finalModel, ok := model.(branchSelectModel); ok {
+		if finalModel.err != nil {
+			return "", finalModel.err
 		}
-		return m.selected, nil
+		return finalModel.selected, nil
 	}
 
 	return "", fmt.Errorf("unexpected model type")

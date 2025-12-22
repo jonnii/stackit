@@ -95,38 +95,13 @@ func Pluralize(word string, count int) string {
 
 // ShouldDeleteBranch checks if a branch should be deleted
 func ShouldDeleteBranch(ctx context.Context, branchName string, eng engine.Engine, force bool) (bool, string) {
-	// Check PR info
-	prInfo, err := eng.GetPrInfo(ctx, branchName)
-	if err == nil && prInfo != nil {
-		const (
-			prStateClosed = "CLOSED"
-			prStateMerged = "MERGED"
-		)
-		if prInfo.State == prStateClosed {
-			return true, fmt.Sprintf("%s is closed on GitHub", branchName)
-		}
-		if prInfo.State == prStateMerged {
-			base := prInfo.Base
-			if base == "" {
-				base = eng.Trunk()
-			}
-			return true, fmt.Sprintf("%s is merged into %s", branchName, base)
-		}
+	status, err := eng.GetDeletionStatus(ctx, branchName)
+	if err != nil {
+		return false, ""
 	}
 
-	// Check if merged into trunk
-	merged, err := eng.IsMergedIntoTrunk(ctx, branchName)
-	if err == nil && merged {
-		return true, fmt.Sprintf("%s is merged into %s", branchName, eng.Trunk())
-	}
-
-	// Check if empty
-	empty, err := eng.IsBranchEmpty(ctx, branchName)
-	if err == nil && empty {
-		// Only delete empty branches if they have a PR
-		if prInfo != nil && prInfo.Number != nil {
-			return true, fmt.Sprintf("%s is empty", branchName)
-		}
+	if status.SafeToDelete {
+		return true, status.Reason
 	}
 
 	// If force, don't prompt

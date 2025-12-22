@@ -117,7 +117,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	currentBranch := eng.CurrentBranch()
 	if currentBranch != "" && eng.IsBranchTracked(currentBranch) {
 		// Get full stack (up to trunk)
-		stack := utils.GetFullStack(eng, currentBranch)
+		stack := eng.GetFullStack(currentBranch)
 		// Add branches to restack list
 		branchesToRestack = append(branchesToRestack, stack...)
 	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
@@ -137,7 +137,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Sort branches topologically (parents before children) for correct restack order
-	sortedBranches := utils.SortBranchesTopologically(uniqueBranches, eng)
+	sortedBranches := eng.SortBranchesTopologically(uniqueBranches)
 
 	// Restack branches
 	if len(sortedBranches) > 0 {

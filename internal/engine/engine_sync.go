@@ -240,6 +240,37 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	}, nil
 }
 
+// RestackBranches restacks multiple branches in order
+func (e *engineImpl) RestackBranches(ctx context.Context, branchNames []string) (RestackBatchResult, error) {
+	results := make(map[string]RestackBranchResult)
+	for i, branchName := range branchNames {
+		result, err := e.RestackBranch(ctx, branchName)
+		results[branchName] = result
+
+		if err != nil {
+			return RestackBatchResult{
+				ConflictBranch:    branchName,
+				RebasedBranchBase: result.RebasedBranchBase,
+				RemainingBranches: branchNames[i+1:],
+				Results:           results,
+			}, err
+		}
+
+		if result.Result == RestackConflict {
+			return RestackBatchResult{
+				ConflictBranch:    branchName,
+				RebasedBranchBase: result.RebasedBranchBase,
+				RemainingBranches: branchNames[i+1:],
+				Results:           results,
+			}, nil
+		}
+	}
+
+	return RestackBatchResult{
+		Results: results,
+	}, nil
+}
+
 // ContinueRebase continues an in-progress rebase
 func (e *engineImpl) ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error) {
 	// Call git rebase --continue

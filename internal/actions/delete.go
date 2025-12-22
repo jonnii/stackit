@@ -45,17 +45,7 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	}
 
 	if opts.Downstack {
-		// Get ancestors (excluding trunk)
-		curr := branchName
-		for {
-			parent := eng.GetParent(curr)
-			if parent == "" || eng.IsTrunk(parent) {
-				break
-			}
-			// Prepend ancestor
-			toDelete = append([]string{parent}, toDelete...)
-			curr = parent
-		}
+		toDelete = append(eng.GetRelativeStackDownstack(branchName), toDelete...)
 	}
 
 	// Confirm if not forced and not merged/closed
@@ -83,36 +73,18 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	// Actually, if we delete a middle branch, its children are reparented to its parent.
 	// If we delete a whole stack, only children of the stack need restacking onto the stack's parent.
 
-	// Collect all children of all branches we are deleting
-	allChildren := make(map[string]bool)
-	for _, b := range toDelete {
-		for _, child := range eng.GetChildren(b) {
-			allChildren[child] = true
-		}
-	}
-	// Remove branches that are also being deleted from the children set
-	for _, b := range toDelete {
-		delete(allChildren, b)
+	// Delete branches and get children to restack
+	childrenToRestack, err := eng.DeleteBranches(ctx.Context, toDelete)
+	if err != nil {
+		return err
 	}
 
-	// Delete branches
 	for _, b := range toDelete {
-		if err := eng.DeleteBranch(ctx.Context, b); err != nil {
-			return fmt.Errorf("failed to delete branch %s: %w", b, err)
-		}
 		splog.Info("Deleted branch %s", tui.ColorBranchName(b, false))
 	}
 
 	// Restack children if any
-	if len(allChildren) > 0 {
-		childrenToRestack := []string{}
-		for child := range allChildren {
-			childrenToRestack = append(childrenToRestack, child)
-		}
-
-		// Sort children to maintain stack order if possible?
-		// Actually, RestackBranches handles multiple branches.
-
+	if len(childrenToRestack) > 0 {
 		splog.Info("Restacking children of deleted %s...", Pluralize("branch", len(toDelete)))
 		if err := RestackBranches(ctx.Context, childrenToRestack, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack children: %w", err)

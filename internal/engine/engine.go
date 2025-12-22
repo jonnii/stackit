@@ -32,9 +32,13 @@ type BranchReader interface {
 
 	// Stack queries
 	GetRelativeStackUpstack(branchName string) []string
+	GetRelativeStackDownstack(branchName string) []string
+	GetFullStack(branchName string) []string
+	SortBranchesTopologically(branches []string) []string
 	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
 	FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error)
+	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 }
 
 // BranchWriter provides write operations for branch management
@@ -45,6 +49,7 @@ type BranchWriter interface {
 	UntrackBranch(ctx context.Context, branchName string) error
 	SetParent(ctx context.Context, branchName string, parentBranchName string) error
 	DeleteBranch(ctx context.Context, branchName string) error
+	DeleteBranches(ctx context.Context, branchNames []string) ([]string, error)
 
 	// Initialization operations
 	Reset(ctx context.Context, newTrunkName string) error
@@ -56,6 +61,7 @@ type BranchWriter interface {
 type PRManager interface {
 	GetPrInfo(ctx context.Context, branchName string) (*PrInfo, error)
 	UpsertPrInfo(ctx context.Context, branchName string, prInfo *PrInfo) error
+	GetPRSubmissionStatus(ctx context.Context, branchName string) (PRSubmissionStatus, error)
 }
 
 // SyncManager provides operations for syncing and restacking branches
@@ -70,6 +76,7 @@ type SyncManager interface {
 	PullTrunk(ctx context.Context) (PullResult, error)
 	ResetTrunkToRemote(ctx context.Context) error
 	RestackBranch(ctx context.Context, branchName string) (RestackBranchResult, error)
+	RestackBranches(ctx context.Context, branchNames []string) (RestackBatchResult, error)
 	ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error)
 }
 

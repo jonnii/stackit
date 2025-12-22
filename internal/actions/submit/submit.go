@@ -238,20 +238,14 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 	submissionInfos := make([]Info, 0, len(branches))
 
 	for _, branchName := range branches {
-		parentBranchName := eng.GetParentPrecondition(branchName)
-		prInfo, _ := eng.GetPrInfo(ctx, branchName)
-
-		// Determine action
-		const (
-			actionCreate = "create"
-			actionUpdate = "update"
-		)
-		action := actionCreate
-		prNumber := (*int)(nil)
-		if prInfo != nil && prInfo.Number != nil {
-			action = actionUpdate
-			prNumber = prInfo.Number
+		status, err := eng.GetPRSubmissionStatus(ctx, branchName)
+		if err != nil {
+			return nil, err
 		}
+
+		action := status.Action
+		prNumber := status.PRNumber
+		prInfo := status.PRInfo
 
 		isCurrent := branchName == currentBranch
 
@@ -261,23 +255,22 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 			continue
 		}
 
-		// Check if branch needs update
+		needsUpdate := status.NeedsUpdate
 		if action == "update" {
-			baseChanged := prInfo.Base != parentBranchName
-			branchChanged, _ := eng.BranchMatchesRemote(ctx, branchName)
-
 			// Check if draft status needs to change
 			draftStatusNeedsChange := false
-			if opts.Draft && !prInfo.IsDraft {
-				draftStatusNeedsChange = true
-			} else if opts.Publish && prInfo.IsDraft {
-				draftStatusNeedsChange = true
+			if prInfo != nil {
+				if opts.Draft && !prInfo.IsDraft {
+					draftStatusNeedsChange = true
+				} else if opts.Publish && prInfo.IsDraft {
+					draftStatusNeedsChange = true
+				}
 			}
 
-			needsUpdate := baseChanged || !branchChanged || opts.Edit || opts.Always || draftStatusNeedsChange
+			needsUpdate = needsUpdate || opts.Edit || opts.Always || draftStatusNeedsChange
 
 			if !needsUpdate && !opts.Draft && !opts.Publish {
-				ui.ShowBranchPlan(branchName, action, isCurrent, true, "no changes")
+				ui.ShowBranchPlan(branchName, action, isCurrent, true, status.Reason)
 				continue
 			}
 		}
@@ -303,6 +296,7 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 
 		// Get SHAs
 		headSHA, _ := eng.GetRevision(ctx, branchName)
+		parentBranchName := eng.GetParentPrecondition(branchName)
 		baseSHA, _ := eng.GetRevision(ctx, parentBranchName)
 
 		submissionInfo := Info{
@@ -338,10 +332,10 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	var allBranches []string
 	if opts.Stack {
 		// Include descendants and ancestors
-		allBranches = utils.GetFullStack(eng, branchName)
+		allBranches = eng.GetFullStack(branchName)
 	} else {
 		// Just ancestors (including current branch)
-		allBranches = utils.GetDownstack(eng, branchName)
+		allBranches = eng.GetRelativeStackDownstack(branchName)
 		allBranches = append(allBranches, branchName)
 	}
 

@@ -4,24 +4,45 @@
 
 **Stackit** is a command-line tool that makes working with stacked changes fast and intuitive.
 
-Stacked changes (or stacked diffs) are a workflow where you break large features into small, reviewable branches that build on top of each other. Stackit manages the complexity of keeping these branches in sync, rebased, and submitted as pull requests.
+## What is Stacking?
 
-## Why Stacked Changes?
+Stacked changes (or "stacked diffs") is a development workflow where you break a large feature into a sequence of small, focused branches that build on top of each other. Instead of one massive Pull Request, you have a "stack" of smaller PRs.
 
-- **Faster reviews** — Small, focused PRs are easier to review
-- **Ship incrementally** — Merge and deploy pieces of a feature as they're approved
-- **Cleaner history** — Each PR tells a coherent story
-- **Parallel work** — Keep working while waiting for review
+### How it helps engineers:
+
+- **Faster Reviews**: Reviewers can process small, 50-line PRs much faster than a single 500-line PR.
+- **Parallel Work**: You don't have to wait for a PR to be merged before starting the next part of your feature. Just stack a new branch on top.
+- **Incremental Shipping**: Parts of a feature can be merged and deployed as they are approved, reducing the risk of large, complex merges.
+- **Cleaner History**: Each PR represents a logical step in your feature's development, making the Git history easier to follow.
+
+### The Stacked Workflow
+
+```mermaid
+graph TD
+    main[main branch] --> B1[PR 1: API Changes]
+    B1 --> B2[PR 2: Implementation]
+    B2 --> B3[PR 3: UI Components]
+    B3 --> B4[PR 4: Integration Tests]
+    
+    style main stroke-dasharray: 5 5
+```
+
+Stackit manages the complexity of this workflow—automatically handling rebases, keeping track of parent-child relationships, and submitting the entire stack to GitHub with a single command.
+
+---
 
 ## Features
 
 - 🌳 **Visual branch tree** — See your entire stack at a glance with `stackit log`
-- 🔄 **Automatic restacking** — Keep all branches up to date when you rebase
+- 🔄 **Automatic restacking** — Keep all branches up to date when you rebase or modify a parent
 - 📤 **Submit entire stacks** — Push all branches and create/update PRs in one command
 - 🔀 **Smart merging** — Merge stacks bottom-up or squash top-down
 - 🔧 **Absorb changes** — Automatically amend changes to the right commit in your stack
-- 🧭 **Easy navigation** — Move up, down, top, or bottom of your stack
-- 🧹 **Auto cleanup** — Detect and delete merged branches during sync
+- 🧭 **Easy navigation** — Move `up`, `down`, `top`, or `bottom` of your stack
+- 🧹 **Auto cleanup** — Detect and delete merged branches during `sync`
+- 🤖 **AI-Assisted** — `stackit analyze` uses AI to suggest how to split your changes into a stack
+
+---
 
 ## Installation
 
@@ -33,31 +54,14 @@ brew install jonnii/tap/stackit
 
 ### From Source
 
-Requires Go 1.22+:
+Requires Go 1.25+:
 
 ```bash
 git clone https://github.com/jonnii/stackit
 cd stackit
 go build -o stackit ./cmd/stackit
-
 # Move to your PATH
 mv stackit /usr/local/bin/
-```
-
-### Shell Completion
-
-Stackit supports shell completion for Bash, Zsh, Fish, and PowerShell. To enable it:
-
-**Zsh**
-Add this to your `~/.zshrc`:
-```bash
-source <(stackit completion zsh)
-```
-
-**Bash**
-Add this to your `~/.bashrc`:
-```bash
-source <(stackit completion bash)
 ```
 
 ### Using Just
@@ -69,262 +73,148 @@ just build
 just install
 ```
 
-## Quick Start
+---
 
-### 1. Initialize in your repository
+## Getting Started
 
+### 1. Initialize Stackit
+In your repository, run:
 ```bash
-cd your-repo
 stackit init
 ```
+This detects your trunk branch (usually `main`) and prepares the repo for stacking.
 
-This detects your trunk branch (usually `main`) and sets up Stackit.
-
-### 2. (Optional) Enable AI Agent Integration
-
-If you're using AI coding assistants like Cursor or Claude Code:
-
+### 2. Create your first branch
+Stage some changes, then create a branch:
 ```bash
-stackit agent init
+git add internal/api.go
+stackit create add-api -m "feat: add base api"
 ```
 
-This creates configuration files (`.cursor/rules/stackit.md` and `CLAUDE.md`) that help AI assistants understand how to use stackit effectively.
-
-### 2. Create your first stacked branch
-
+### 3. Stack another branch on top
+Make more changes and create another branch:
 ```bash
-# Stage some changes, then:
-stackit create my-feature -m "Add new feature"
+git add internal/logic.go
+stackit create add-logic -m "feat: implement logic"
 ```
 
-### 3. Create another branch on top
-
-```bash
-# Make more changes
-stackit create my-feature-part-2 -m "Continue feature work"
-```
-
-### 4. View your stack
-
+### 4. Visualize the stack
+See your current position in the stack:
 ```bash
 stackit log
 ```
-
 ```
 main
 │
-├─◯ my-feature
+├─◯ add-api
 │ │
-│ └─● my-feature-part-2 ← you are here
+│ └─● add-logic ← you are here
 ```
 
-### 5. Submit your stack
-
+### 5. Submit your PRs
+Submit the entire stack to GitHub:
 ```bash
 stackit submit
 ```
+This pushes both branches and creates two PRs on GitHub, with `add-logic` correctly pointing its base to `add-api`.
 
-This pushes all branches and creates/updates PRs on GitHub.
+---
 
-## AI Agent Integration
+## Command Reference
 
-Stackit works great with AI coding assistants! Run `stackit agent init` to create configuration files that help AI assistants understand how to use stackit commands effectively.
-
-- **Cursor**: Creates `.cursor/rules/stackit.md` with stackit usage guidelines
-- **Claude Code**: Creates `CLAUDE.md` with stackit integration instructions
-
-AI agents can then use stackit commands directly to manage branches, create commits, and submit PRs without needing special flags or internal AI integrations.
-
-## Commands
-
-### Stack Navigation
-
+### Navigation
 | Command | Description |
-|---------|-------------|
-| `stackit log` | Display branch tree with PR info and sync status |
-| `stackit up` | Move to the child branch |
-| `stackit down` | Move to the parent branch |
-| `stackit top` | Move to the top of the current stack |
-| `stackit bottom` | Move to the bottom of the current stack |
-| `stackit trunk` | Move to the trunk branch |
+|:---|:---|
+| `stackit log` | Display the branch tree (aliases: `l`, `ls`, `ll`) |
 | `stackit checkout` | Interactive branch switcher |
+| `stackit up` / `down` | Move to the child or parent branch |
+| `stackit top` / `bottom` | Move to the top or bottom of the stack |
+| `stackit trunk` | Return to the main/trunk branch |
 
 ### Branch Management
-
 | Command | Description |
-|---------|-------------|
+|:---|:---|
 | `stackit create [name]` | Create a new branch on top of current |
-| `stackit delete` | Delete the current branch |
-| `stackit fold` | Merge the current branch into its parent |
-| `stackit split` | Split the current branch's commits |
+| `stackit modify` | Amend the current commit (like `git commit --amend`) |
+| `stackit absorb` | Intelligently amend changes to the correct commits in the stack |
+| `stackit split` | Split the current branch's commits into multiple branches |
 | `stackit squash` | Squash all commits on the current branch |
-| `stackit modify` | Amend the current commit |
-| `stackit absorb` | Intelligently amend changes to the right commits |
+| `stackit fold` | Merge the current branch into its parent |
+| `stackit pop` | Delete current branch but keep its changes in working tree |
+| `stackit delete` | Delete the current branch and its metadata |
 
 ### Stack Operations
-
 | Command | Description |
-|---------|-------------|
-| `stackit restack` | Rebase branches to ensure proper ancestry |
-| `stackit submit` | Push branches and create/update PRs |
-| `stackit sync` | Pull trunk, clean merged branches, restack |
-| `stackit merge` | Merge PRs in the stack via GitHub |
+|:---|:---|
+| `stackit restack` | Rebase all branches in the stack to ensure proper ancestry |
+| `stackit submit` | Push branches and create/update GitHub PRs |
+| `stackit sync` | Pull trunk, delete merged branches, and restack |
+| `stackit merge` | Merge PRs in the stack (bottom-up or top-down) |
+| `stackit reorder` | Interactively reorder branches in your stack |
+| `stackit move` | Rebase a branch (and its children) onto a new parent |
 
-### Utilities
-
+### AI & Automation
 | Command | Description |
-|---------|-------------|
-| `stackit info` | Show info about current branch |
-| `stackit parent` | Print the parent branch name |
-| `stackit children` | Print child branch names |
-| `stackit continue` | Continue after resolving conflicts |
-| `stackit abort` | Abort the current operation |
+|:---|:---|
+| `stackit analyze` | AI analyzes staged changes and suggests a stack structure |
+| `stackit agent init` | Setup integration files for Cursor and Claude Code |
+
+### Utilities & System
+| Command | Description |
+|:---|:---|
+| `stackit undo` | Restore the repository to a state before a command |
+| `stackit doctor` | Diagnose and fix issues with your stackit setup |
+| `stackit info` | Show detailed info about the current branch |
+| `stackit track` / `untrack` | Manually start/stop tracking a branch with stackit |
+| `stackit config` | Manage stackit configuration |
+| `stackit continue` / `abort` | Continue or abort an interrupted operation (like a rebase) |
+
+---
 
 ## Common Workflows
 
-### Starting a new feature
+### Updating after Code Review
+If you receive feedback on a branch in the middle of your stack:
+1. `stackit checkout <branch>` to move to that branch.
+2. Make your changes and run `stackit modify`.
+3. Run `stackit restack` to update all child branches.
+4. Run `stackit submit` to update the PRs on GitHub.
 
-```bash
-stackit trunk                    # Start from main
-stackit create setup -m "Setup infrastructure"
-# ... make more changes ...
-stackit create feature -m "Implement feature"
-# ... make more changes ...
-stackit create tests -m "Add tests"
-```
+### Using `stackit absorb`
+`absorb` is like magic for stacked PRs. If you have small fixes for multiple branches in your stack, just stage them all and run `stackit absorb`. Stackit will figure out which changes belong to which branch and amend them automatically.
 
-### Updating after code review
-
-```bash
-# On any branch in your stack, make changes then:
-stackit modify           # Amend the current commit
-stackit restack          # Update all child branches
-stackit submit           # Push updates
-```
-
-### Smart change absorption
-
-```bash
-# Stage changes that should go to different commits
-git add -p
-
-# Stackit figures out which commits to amend
-stackit absorb
-```
-
-### Syncing with main
-
+### Syncing with the Main Branch
+To keep your stack up-to-date with `main`:
 ```bash
 stackit sync
 ```
+This pulls the latest changes from `main`, deletes branches that have already been merged, and restacks your remaining branches on top of the new `main`.
 
-This will:
-1. Pull the latest trunk
-2. Prompt to delete branches for merged PRs
-3. Restack any branches that need updating
-
-### Merging your stack
-
-```bash
-stackit merge
-```
-
-Interactive wizard helps you choose:
-- **Bottom-up**: Merge each PR individually (preserves history)
-- **Top-down**: Squash everything into one PR
-
-## Command Options
-
-### `stackit create`
-
-```
--m, --message    Commit message
--a, --all        Stage all changes (including untracked)
--u, --update     Stage only tracked file changes  
--p, --patch      Interactively select hunks to stage
--i, --insert     Insert between current branch and its children
-```
-
-### `stackit submit`
-
-```
--s, --stack      Include descendant branches
--d, --draft      Create PRs as drafts
--c, --confirm    Preview and confirm before submitting
---dry-run        Show what would happen without doing it
---restack        Restack before submitting
-```
-
-### `stackit log`
-
-```
--s, --stack      Only show current branch's stack
--r, --reverse    Display bottom-to-top
--n, --steps N    Limit to N levels up/down
--u, --show-untracked  Include untracked branches
-```
-
-### `stackit restack`
-
-```
---only           Restack only current branch
---upstack        Restack current and descendants
---downstack      Restack current and ancestors
-```
-
-## Conflict Resolution
-
-When a rebase has conflicts:
-
-```bash
-# Resolve conflicts in your editor
-git add <resolved-files>
-
-# Continue the operation
-stackit continue
-
-# Or abort and return to previous state
-stackit abort
-```
+---
 
 ## Requirements
 
-- Git 2.0+
-- GitHub CLI (`gh`) for PR operations
-- Go 1.22+ (for building from source)
+- **Git 2.25+**
+- **GitHub CLI (`gh`)** for PR operations
+- **Go 1.25+** (if building from source)
 
 ## Development
 
 ```bash
-# Run tests
-just test
-
-# Run tests with coverage
-just test-coverage
-
-# Format code
-just fmt
-
-# Run linter
-just lint
-
-# Run all checks
+# Run tests and linter
 just check
+
+# Build locally
+just build
 ```
 
 ## Philosophy
 
-Stackit is designed around these principles:
-
-1. **Non-destructive** — Operations are safe by default, with confirmations for dangerous actions
-2. **Fast** — Common operations should be instant
-3. **Intuitive** — Commands do what you expect
-4. **Git-native** — Uses standard Git under the hood, no magic
+1. **Safety First**: Operations are non-destructive and can be undone with `stackit undo`.
+2. **Speed**: Common operations should be fast and require minimal context switching.
+3. **Visibility**: You should always know exactly where you are in your stack.
+4. **Git Native**: Stackit uses standard Git refs and metadata under the hood.
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.

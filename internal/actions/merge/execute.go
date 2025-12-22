@@ -92,6 +92,11 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 	return executeSteps(ctx, eng, splog, githubClient, repoRoot, opts)
 }
 
+// ExecuteInWorktree executes the merge plan in a temporary worktree
+func ExecuteInWorktree(_ context.Context, _ mergeExecuteEngine, _ *tui.Splog, _ github.Client, _ string, _ ExecuteOptions) error {
+	return fmt.Errorf("ExecuteInWorktree not implemented yet")
+}
+
 func calculateGroups(plan *Plan) []tui.MergeGroup {
 	var groups []tui.MergeGroup
 	assigned := make(map[int]bool)

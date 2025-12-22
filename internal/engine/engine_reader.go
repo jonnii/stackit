@@ -1,0 +1,353 @@
+package engine
+
+import (
+	"context"
+	"time"
+
+	"stackit.dev/stackit/internal/git"
+)
+
+// AllBranchNames returns all branch names
+func (e *engineImpl) AllBranchNames() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.branches
+}
+
+// CurrentBranch returns the current branch name
+func (e *engineImpl) CurrentBranch() string {
+	e.mu.Lock()
+	if current, err := git.GetCurrentBranch(); err == nil {
+		e.currentBranch = current
+	} else {
+		// Not on a branch (e.g., detached HEAD)
+		e.currentBranch = ""
+	}
+	e.mu.Unlock()
+
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.currentBranch
+}
+
+// Trunk returns the trunk branch name
+func (e *engineImpl) Trunk() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.trunk
+}
+
+// GetParent returns the parent branch name (empty string if no parent)
+func (e *engineImpl) GetParent(branchName string) string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if parent, ok := e.parentMap[branchName]; ok {
+		return parent
+	}
+	return ""
+}
+
+// GetChildren returns the children branches
+func (e *engineImpl) GetChildren(branchName string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if children, ok := e.childrenMap[branchName]; ok {
+		return children
+	}
+	return []string{}
+}
+
+// GetRelativeStack returns the stack relative to a branch
+// Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
+func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	result := []string{}
+
+	// Add ancestors if RecursiveParents is true (excluding trunk)
+	if scope.RecursiveParents {
+		current := branchName
+		ancestors := []string{}
+		for {
+			if current == e.trunk {
+				break
+			}
+			parent, ok := e.parentMap[current]
+			if !ok || parent == e.trunk {
+				break
+			}
+			ancestors = append([]string{parent}, ancestors...)
+			current = parent
+		}
+		result = append(result, ancestors...)
+	}
+
+	// Add current branch if IncludeCurrent is true
+	if scope.IncludeCurrent {
+		result = append(result, branchName)
+	}
+
+	// Add descendants if RecursiveChildren is true
+	if scope.RecursiveChildren {
+		descendants := e.getRelativeStackUpstackInternal(branchName)
+		result = append(result, descendants...)
+	}
+
+	return result
+}
+
+// IsTrunk checks if a branch is the trunk
+func (e *engineImpl) IsTrunk(branchName string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return branchName == e.trunk
+}
+
+// IsBranchTracked checks if a branch is tracked (has metadata)
+func (e *engineImpl) IsBranchTracked(branchName string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	_, ok := e.parentMap[branchName]
+	return ok
+}
+
+// IsBranchFixed checks if a branch needs restacking
+// A branch is fixed if its parent revision matches the stored parent revision
+func (e *engineImpl) IsBranchFixed(ctx context.Context, branchName string) bool {
+	if e.IsTrunk(branchName) {
+		return true
+	}
+
+	e.mu.RLock()
+	parent, ok := e.parentMap[branchName]
+	e.mu.RUnlock()
+
+	if !ok {
+		return true // Not tracked, consider it fixed
+	}
+
+	// Get current parent revision
+	parentRev, err := git.GetRevision(ctx, parent)
+	if err != nil {
+		return false // Can't determine, assume needs restack
+	}
+
+	// Get stored parent revision from metadata
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return false // No metadata, assume needs restack
+	}
+
+	if meta.ParentBranchRevision == nil {
+		return false // No stored revision, needs restack
+	}
+
+	// Branch is fixed if stored revision matches current parent revision
+	return *meta.ParentBranchRevision == parentRev
+}
+
+// GetCommitDate returns the commit date for a branch
+func (e *engineImpl) GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
+	return git.GetCommitDate(ctx, branchName)
+}
+
+// GetCommitAuthor returns the commit author for a branch
+func (e *engineImpl) GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
+	return git.GetCommitAuthor(ctx, branchName)
+}
+
+// GetRevision returns the SHA of a branch
+func (e *engineImpl) GetRevision(ctx context.Context, branchName string) (string, error) {
+	return git.GetRevision(ctx, branchName)
+}
+
+// GetParentPrecondition returns the parent branch, or trunk if no parent
+// This is used for validation where we expect a parent to exist
+func (e *engineImpl) GetParentPrecondition(branchName string) string {
+	parent := e.GetParent(branchName)
+	if parent == "" {
+		return e.Trunk()
+	}
+	return parent
+}
+
+// BranchMatchesRemote checks if a branch matches its remote
+func (e *engineImpl) BranchMatchesRemote(ctx context.Context, branchName string) (bool, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Get local branch SHA
+	localSha, err := e.GetRevision(ctx, branchName)
+	if err != nil {
+		return false, nil
+	}
+
+	// Get remote SHA from cache
+	remoteSha, exists := e.remoteShas[branchName]
+	if !exists {
+		// No remote branch exists - branch doesn't match remote
+		return false, nil
+	}
+
+	return localSha == remoteSha, nil
+}
+
+// IsMergedIntoTrunk checks if a branch is merged into trunk
+func (e *engineImpl) IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error) {
+	e.mu.RLock()
+	trunk := e.trunk
+	e.mu.RUnlock()
+	return git.IsMerged(ctx, branchName, trunk)
+}
+
+// IsBranchEmpty checks if a branch has no changes compared to its parent
+func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool, error) {
+	e.mu.RLock()
+	parent, ok := e.parentMap[branchName]
+	trunk := e.trunk
+	e.mu.RUnlock()
+
+	if !ok {
+		// If not tracked, compare to trunk
+		parent = trunk
+	}
+
+	// Get parent revision
+	parentRev, err := e.GetRevision(ctx, parent)
+	if err != nil {
+		return false, err
+	}
+
+	return git.IsDiffEmpty(ctx, branchName, parentRev)
+}
+
+// FindMostRecentTrackedAncestors finds the most recent tracked ancestors of a branch
+// by checking the branch's commit history against tracked branch tips.
+// Returns a slice of branch names that point to the most recent tracked commit in history.
+func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	trunk := e.trunk
+
+	// Map of commit SHA to slice of tracked branch names
+	trackedBranchTips := make(map[string][]string)
+
+	// Add trunk tip
+	trunkRev, err := git.GetRevision(ctx, trunk)
+	if err == nil {
+		trackedBranchTips[trunkRev] = append(trackedBranchTips[trunkRev], trunk)
+	}
+
+	// Get all tracked branches and their tips
+	for _, candidate := range e.branches {
+		// Skip the branch itself and trunk (already handled)
+		if candidate == branchName || candidate == trunk {
+			continue
+		}
+
+		// Only consider tracked branches
+		if _, ok := e.parentMap[candidate]; !ok {
+			continue
+		}
+
+		// Skip branches merged into trunk
+		if merged, err := git.IsMerged(ctx, candidate, trunk); err == nil && merged {
+			continue
+		}
+
+		// Get candidate revision
+		candidateRev, err := git.GetRevision(ctx, candidate)
+		if err != nil {
+			continue
+		}
+
+		trackedBranchTips[candidateRev] = append(trackedBranchTips[candidateRev], candidate)
+	}
+
+	// Get history of the branch we're tracking
+	history, err := git.GetCommitHistorySHAs(ctx, branchName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate through history (newest to oldest) and find the first tracked tip(s)
+	for _, sha := range history {
+		if ancestors, ok := trackedBranchTips[sha]; ok {
+			// Found the most recent tracked commit(s)
+			return ancestors, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// FindBranchForCommit finds which branch a commit belongs to
+func (e *engineImpl) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
+	e.mu.RLock()
+	branches := make([]string, len(e.branches))
+	copy(branches, e.branches)
+	e.mu.RUnlock()
+
+	for _, branchName := range branches {
+		commits, err := e.GetAllCommits(ctx, branchName, CommitFormatSHA)
+		if err != nil {
+			continue
+		}
+
+		for _, sha := range commits {
+			if sha == commitSHA {
+				return branchName, nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+// GetAllCommits returns commits for a branch in various formats
+func (e *engineImpl) GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Check if branch is trunk
+	if branchName == e.trunk {
+		// For trunk, get just the one commit
+		branchRevision, err := e.GetRevision(ctx, branchName)
+		if err != nil {
+			return nil, err
+		}
+		return git.GetCommitRange("", branchRevision, string(format))
+	}
+
+	// Get metadata to find parent revision
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get branch revision
+	branchRevision, err := e.GetRevision(ctx, branchName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get parent revision (base)
+	var baseRevision string
+	if meta.ParentBranchRevision != nil {
+		baseRevision = *meta.ParentBranchRevision
+	}
+
+	return git.GetCommitRange(baseRevision, branchRevision, string(format))
+}
+
+// GetRelativeStackUpstack returns all branches in the upstack (descendants)
+func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.getRelativeStackUpstackInternal(branchName)
+}

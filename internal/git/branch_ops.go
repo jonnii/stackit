@@ -45,3 +45,12 @@ func DeleteBranch(ctx context.Context, branchName string) error {
 	}
 	return nil
 }
+
+// MergeAbort aborts an in-progress merge
+func MergeAbort(ctx context.Context) error {
+	_, err := RunGitCommandWithContext(ctx, "merge", "--abort")
+	if err != nil {
+		return fmt.Errorf("merge abort failed: %w", err)
+	}
+	return nil
+}

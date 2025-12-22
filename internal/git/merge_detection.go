@@ -3,7 +3,21 @@ package git
 import (
 	"context"
 	"fmt"
+	"os"
 )
+
+// IsMergeInProgress checks if a merge is currently in progress
+func IsMergeInProgress(ctx context.Context) bool {
+	output, err := RunGitCommandWithContext(ctx, "rev-parse", "--git-dir")
+	if err != nil {
+		return false
+	}
+	gitDir := output
+	if _, err := os.Stat(gitDir + "/MERGE_HEAD"); err == nil {
+		return true
+	}
+	return false
+}
 
 // IsMerged checks if a branch is merged into trunk
 // Uses git cherry to detect if all commits are in trunk

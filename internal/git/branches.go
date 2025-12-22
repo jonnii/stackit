@@ -74,11 +74,21 @@ func GetAllBranchNames() ([]string, error) {
 
 // GetCurrentBranch returns the current branch name
 func GetCurrentBranch() (string, error) {
-	output, err := RunGitCommandWithContext(context.Background(), "branch", "--show-current")
+	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(output), nil
+
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	if !head.Name().IsBranch() {
+		return "", fmt.Errorf("HEAD is not on a branch")
+	}
+
+	return head.Name().Short(), nil
 }
 
 // FindRemoteBranch finds the branch that tracks a remote branch

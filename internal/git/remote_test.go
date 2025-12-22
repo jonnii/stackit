@@ -33,6 +33,10 @@ func TestFetchRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fetch remote SHAs (FetchRemoteShas runs git command in current dir which is scene.Dir)
+		git.SetWorkingDir(scene.Dir)
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		remoteShas, err := git.FetchRemoteShas(context.Background(), "origin")
 		require.NoError(t, err)
 
@@ -58,6 +62,10 @@ func TestFetchRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fetch remote SHAs - should be empty since nothing was pushed
+		git.SetWorkingDir(scene.Dir)
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		remoteShas, err := git.FetchRemoteShas(context.Background(), "origin")
 		require.NoError(t, err)
 		require.Empty(t, remoteShas, "remote should have no branches")
@@ -85,6 +93,10 @@ func TestFetchRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fetch remote SHAs
+		git.SetWorkingDir(scene.Dir)
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		remoteShas, err := git.FetchRemoteShas(context.Background(), "origin")
 		require.NoError(t, err)
 

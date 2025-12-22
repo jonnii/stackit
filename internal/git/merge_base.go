@@ -3,9 +3,6 @@ package git
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GetMergeBase returns the merge base between two branches
@@ -20,24 +17,22 @@ func GetMergeBaseByRef(_ context.Context, ref1Name, ref2Name string) (string, er
 		return "", err
 	}
 
-	ref1, err := repo.Reference(plumbing.ReferenceName(ref1Name), true)
+	hash1, err := resolveRefHash(repo, ref1Name)
 	if err != nil {
-		return "", fmt.Errorf("failed to get ref1 reference: %w", err)
+		return "", fmt.Errorf("failed to resolve ref1: %w", err)
 	}
 
-	ref2, err := repo.Reference(plumbing.ReferenceName(ref2Name), true)
+	hash2, err := resolveRefHash(repo, ref2Name)
 	if err != nil {
-		return "", fmt.Errorf("failed to get ref2 reference: %w", err)
+		return "", fmt.Errorf("failed to resolve ref2: %w", err)
 	}
 
-	var commit1 *object.Commit
-	commit1, err = repo.CommitObject(ref1.Hash())
+	commit1, err := repo.CommitObject(hash1)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit1: %w", err)
 	}
 
-	var commit2 *object.Commit
-	commit2, err = repo.CommitObject(ref2.Hash())
+	commit2, err := repo.CommitObject(hash2)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit2: %w", err)
 	}
@@ -56,12 +51,37 @@ func GetMergeBaseByRef(_ context.Context, ref1Name, ref2Name string) (string, er
 }
 
 // IsAncestor checks if the first ref is an ancestor of the second ref
-func IsAncestor(ctx context.Context, ancestor, descendant string) (bool, error) {
-	// We can use the shell command here as it's very efficient and handles various ref types
-	_, err := RunGitCommandWithContext(ctx, "merge-base", "--is-ancestor", ancestor, descendant)
-	if err == nil {
+func IsAncestor(_ context.Context, ancestor, descendant string) (bool, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return false, err
+	}
+
+	ancestorHash, err := resolveRefHash(repo, ancestor)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve ancestor ref: %w", err)
+	}
+
+	descendantHash, err := resolveRefHash(repo, descendant)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve descendant ref: %w", err)
+	}
+
+	// If they're the same, ancestor is an ancestor
+	if ancestorHash == descendantHash {
 		return true, nil
 	}
-	// Exit code 1 means it's not an ancestor
-	return false, nil
+
+	// Get commit objects
+	ancestorCommit, err := repo.CommitObject(ancestorHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get ancestor commit: %w", err)
+	}
+
+	descendantCommit, err := repo.CommitObject(descendantHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get descendant commit: %w", err)
+	}
+
+	return ancestorCommit.IsAncestor(descendantCommit)
 }

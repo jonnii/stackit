@@ -2,13 +2,30 @@ package git
 
 import (
 	"context"
-	"strings"
+	"errors"
+	"fmt"
+
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
 // PruneRemote prunes stale remote-tracking branches
-func PruneRemote(ctx context.Context, remote string) error {
-	_, err := RunGitCommandWithContext(ctx, "remote", "prune", remote)
+func PruneRemote(_ context.Context, remote string) error {
+	repo, err := GetDefaultRepo()
 	if err != nil {
+		return err
+	}
+
+	r, err := repo.Remote(remote)
+	if err != nil {
+		return err
+	}
+
+	// Fetch with pruning
+	err = r.Fetch(&gogit.FetchOptions{
+		Prune: true,
+	})
+	if err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
 		// Prune is not critical, just log and continue
 		return nil //nolint:nilerr
 	}
@@ -16,14 +33,22 @@ func PruneRemote(ctx context.Context, remote string) error {
 }
 
 // GetRemote returns the default remote name (usually "origin")
-func GetRemote(ctx context.Context) string {
+func GetRemote(_ context.Context) string {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "origin"
+	}
+
 	// Try to get current branch
-	branchName, err := RunGitCommandWithContext(ctx, "symbolic-ref", "--short", "HEAD")
-	if err == nil && branchName != "" {
+	head, err := repo.Head()
+	if err == nil && head.Name().IsBranch() {
+		branchName := head.Name().Short()
 		// Try to get remote for the current branch
-		remote, err := RunGitCommandWithContext(ctx, "config", "--get", "branch."+branchName+".remote")
-		if err == nil && remote != "" {
-			return remote
+		cfg, err := repo.Config()
+		if err == nil {
+			if b, ok := cfg.Branches[branchName]; ok && b.Remote != "" {
+				return b.Remote
+			}
 		}
 	}
 
@@ -33,39 +58,33 @@ func GetRemote(ctx context.Context) string {
 
 // FetchRemoteShas fetches the SHAs of all branches on the remote.
 // Returns a map of branch name -> SHA.
-// Sample git ls-remote output:
-// 7edb7094e4c66892d783c1effdd106df277a860e        refs/heads/main
-func FetchRemoteShas(ctx context.Context, remote string) (map[string]string, error) {
-	output, err := RunGitCommandWithContext(ctx, "ls-remote", "--heads", remote)
+func FetchRemoteShas(_ context.Context, remote string) (map[string]string, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
 		return nil, err
 	}
 
+	r, err := repo.Remote(remote)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote %s: %w", remote, err)
+	}
+
+	// List remote references
+	refs, err := r.List(&gogit.ListOptions{})
+	if err != nil {
+		if errors.Is(err, transport.ErrEmptyRemoteRepository) || errors.Is(err, gogit.NoErrAlreadyUpToDate) {
+			return make(map[string]string), nil
+		}
+		return nil, fmt.Errorf("failed to list remote refs for %s: %w", remote, err)
+	}
+
 	remoteShas := make(map[string]string)
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		// Split on whitespace
-		parts := strings.Fields(line)
-		if len(parts) != 2 {
-			continue
-		}
-
-		sha := parts[0]
-		ref := parts[1]
-
+	for _, ref := range refs {
 		// Only process refs/heads/* (branches)
-		const prefix = "refs/heads/"
-		if !strings.HasPrefix(ref, prefix) {
-			continue
+		if ref.Name().IsBranch() {
+			branchName := ref.Name().Short()
+			remoteShas[branchName] = ref.Hash().String()
 		}
-
-		branchName := ref[len(prefix):]
-		remoteShas[branchName] = sha
 	}
 
 	return remoteShas, nil

@@ -3,6 +3,9 @@ package git
 import (
 	"fmt"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GetCommitRange returns commits in a range in various formats
@@ -10,73 +13,56 @@ import (
 // head: branch revision
 // format: "SHA", "READABLE" (oneline), "MESSAGE" (full), "SUBJECT" (first line)
 func GetCommitRange(base string, head string, format string) ([]string, error) {
-	var formatArg string
-	switch format {
-	case "SHA":
-		formatArg = "%H"
-	case "READABLE":
-		// Oneline format: short SHA + subject ("%h - %s")
-		formatArg = "%h - %s"
-	case "MESSAGE":
-		formatArg = "%B"
-	case "SUBJECT":
-		formatArg = "%s"
-	default:
-		return nil, fmt.Errorf("unknown commit format: %s", format)
-	}
-
-	if base != "" {
-		// Get commits from base to head
-		// First get all SHAs in the range
-		shaOutput, err := RunGitCommand("log", "--pretty=format:%H", fmt.Sprintf("%s..%s", base, head))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get commit SHAs: %w", err)
-		}
-
-		if shaOutput == "" {
-			return []string{}, nil
-		}
-
-		shas := strings.Split(strings.TrimSpace(shaOutput), "\n")
-		result := []string{}
-
-		// For each SHA, get the formatted output
-		for _, sha := range shas {
-			sha = strings.TrimSpace(sha)
-			if sha == "" {
-				continue
-			}
-
-			commitOutput, err := RunGitCommand("log", "-1", "--pretty=format:"+formatArg, sha)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get commit %s: %w", sha, err)
-			}
-
-			commitOutput = strings.TrimSpace(commitOutput)
-			if commitOutput != "" {
-				result = append(result, commitOutput)
-			}
-		}
-
-		return result, nil
-	}
-
-	// For trunk (no base), get just the one commit
-	output, err := RunGitCommand("log", "-1", "--pretty=format:"+formatArg, head)
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit: %w", err)
+		return nil, err
 	}
 
-	if output == "" {
-		return []string{}, nil
+	headHash, err := resolveRefHash(repo, head)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve head: %w", err)
 	}
 
-	output = strings.TrimSpace(output)
-	if output == "" {
-		return []string{}, nil
+	var baseHash plumbing.Hash
+	if base != "" {
+		baseHash, err = resolveRefHash(repo, base)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve base: %w", err)
+		}
 	}
 
-	return []string{output}, nil
+	var commits []*object.Commit
+	commits, err = iterateCommits(repo, headHash, baseHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	result := make([]string, 0, len(commits))
+	for _, commit := range commits {
+		var formatted string
+		switch format {
+		case "SHA":
+			formatted = commit.Hash.String()
+		case "READABLE":
+			// Oneline format: short SHA + subject
+			shortHash := commit.Hash.String()[:7]
+			subject := strings.Split(strings.TrimSpace(commit.Message), "\n")[0]
+			formatted = fmt.Sprintf("%s - %s", shortHash, subject)
+		case "MESSAGE":
+			formatted = strings.TrimSpace(commit.Message)
+		case "SUBJECT":
+			subject := strings.Split(strings.TrimSpace(commit.Message), "\n")[0]
+			formatted = strings.TrimSpace(subject)
+		default:
+			return nil, fmt.Errorf("unknown commit format: %s", format)
+		}
+
+		if formatted != "" {
+			result = append(result, formatted)
+		}
+	}
+
+	return result, nil
 }
 
 // GetCommitSHA returns the SHA at a relative position (0 = HEAD, 1 = HEAD~1)
@@ -86,15 +72,33 @@ func GetCommitSHA(branchName string, offset int) (string, error) {
 		return "", fmt.Errorf("offset must be non-negative")
 	}
 
-	ref := branchName
-	if offset > 0 {
-		ref = fmt.Sprintf("%s~%d", branchName, offset)
-	}
-
-	sha, err := RunGitCommand("rev-parse", ref)
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return "", fmt.Errorf("failed to get commit SHA: %w", err)
+		return "", err
 	}
 
-	return sha, nil
+	// Resolve branch reference
+	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	if err != nil {
+		return "", fmt.Errorf("failed to get branch reference: %w", err)
+	}
+
+	commit, err := repo.CommitObject(branchRef.Hash())
+	if err != nil {
+		return "", fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	// Walk back offset number of commits
+	for i := 0; i < offset; i++ {
+		if commit.NumParents() == 0 {
+			return "", fmt.Errorf("commit has no parent at offset %d", i)
+		}
+		// Get first parent
+		commit, err = commit.Parent(0)
+		if err != nil {
+			return "", fmt.Errorf("failed to get parent commit: %w", err)
+		}
+	}
+
+	return commit.Hash.String(), nil
 }

@@ -3,7 +3,10 @@ package git
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -35,15 +38,19 @@ type PrInfo struct {
 
 // ReadMetadataRef reads metadata for a branch from Git refs
 func ReadMetadataRef(branchName string) (*Meta, error) {
-	// Use shell git commands for consistency with WriteMetadataRef and DeleteMetadataRef
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return &Meta{}, nil //nolint:nilerr
+	}
+
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 
 	// Get the SHA of the ref
-	sha, err := RunGitCommand("rev-parse", "--verify", refName)
+	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
 		// Try deprecated ref
 		deprecatedRefName := fmt.Sprintf("%s%s", DeprecatedMetadataRefPrefix, branchName)
-		sha, err = RunGitCommand("rev-parse", "--verify", deprecatedRefName)
+		ref, err = repo.Reference(plumbing.ReferenceName(deprecatedRefName), true)
 		if err != nil {
 			// Ref doesn't exist - return empty meta
 			return &Meta{}, nil //nolint:nilerr
@@ -51,27 +58,52 @@ func ReadMetadataRef(branchName string) (*Meta, error) {
 
 		// Found deprecated ref, migrate it lazily
 		// We'll read the content first to ensure it's valid
-		content, err := RunGitCommand("cat-file", "-p", sha)
+		blob, err := repo.BlobObject(ref.Hash())
 		if err == nil {
-			var meta Meta
-			if err := json.Unmarshal([]byte(content), &meta); err == nil {
-				// Migrate to new ref
-				_ = WriteMetadataRef(branchName, &meta)
-				// Delete old ref
-				_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
-				return &meta, nil
+			reader, err := blob.Reader()
+			if err == nil {
+				content, err := io.ReadAll(reader)
+				if closeErr := reader.Close(); closeErr != nil {
+					// Ignore close error if we already have a read error
+					if err == nil {
+						err = closeErr
+					}
+				}
+				if err == nil {
+					var meta Meta
+					if err := json.Unmarshal(content, &meta); err == nil {
+						// Migrate to new ref
+						_ = WriteMetadataRef(branchName, &meta)
+						// Delete old ref
+						_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
+						return &meta, nil
+					}
+				}
 			}
 		}
 	}
 
 	// Get the content of the blob
-	content, err := RunGitCommand("cat-file", "-p", sha)
+	blob, err := repo.BlobObject(ref.Hash())
+	if err != nil {
+		return &Meta{}, nil //nolint:nilerr
+	}
+
+	reader, err := blob.Reader()
+	if err != nil {
+		return &Meta{}, nil //nolint:nilerr
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		return &Meta{}, nil //nolint:nilerr
 	}
 
 	var meta Meta
-	if err := json.Unmarshal([]byte(content), &meta); err != nil {
+	if err := json.Unmarshal(content, &meta); err != nil {
 		return &Meta{}, nil //nolint:nilerr
 	}
 

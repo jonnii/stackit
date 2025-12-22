@@ -47,6 +47,9 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 	if opts.Reporter == nil && tui.IsTTY() {
 		reporter := tui.NewChannelMergeProgressReporter()
 
+		// Calculate groups for the TUI
+		groups := calculateGroups(plan)
+
 		// Extract step descriptions
 		stepDescriptions := make([]string, len(plan.Steps))
 		for i, step := range plan.Steps {
@@ -57,7 +60,7 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 		done := make(chan bool, 1)
 		tuiErr := make(chan error, 1)
 		go func() {
-			err := tui.RunMergeTUI(stepDescriptions, reporter.Updates(), done)
+			err := tui.RunMergeTUI(groups, stepDescriptions, reporter.Updates(), done)
 			if err != nil {
 				tuiErr <- err
 			}
@@ -87,6 +90,71 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 
 	// Execute without TUI
 	return executeSteps(ctx, eng, splog, githubClient, repoRoot, opts)
+}
+
+func calculateGroups(plan *Plan) []tui.MergeGroup {
+	var groups []tui.MergeGroup
+	assigned := make(map[int]bool)
+
+	// 1. Create groups for each branch being merged
+	for _, branchInfo := range plan.BranchesToMerge {
+		var indices []int
+		for i, step := range plan.Steps {
+			if step.BranchName == branchInfo.BranchName {
+				indices = append(indices, i)
+				assigned[i] = true
+			}
+		}
+		if len(indices) > 0 {
+			groups = append(groups, tui.MergeGroup{
+				Label:       fmt.Sprintf("PR #%d (%s)", branchInfo.PRNumber, branchInfo.BranchName),
+				StepIndices: indices,
+			})
+		}
+	}
+
+	// 2. Create group for upstack branches
+	if len(plan.UpstackBranches) > 0 {
+		var indices []int
+		for i, step := range plan.Steps {
+			if assigned[i] {
+				continue
+			}
+			for _, ub := range plan.UpstackBranches {
+				if step.BranchName == ub {
+					indices = append(indices, i)
+					assigned[i] = true
+					break
+				}
+			}
+		}
+		if len(indices) > 0 {
+			groups = append(groups, tui.MergeGroup{
+				Label:       "Restack upstack branches",
+				StepIndices: indices,
+			})
+		}
+	}
+
+	// 3. Remaining steps (like PullTrunk)
+	for i := 0; i < len(plan.Steps); i++ {
+		if assigned[i] {
+			continue
+		}
+
+		label := plan.Steps[i].Description
+		if plan.Steps[i].StepType == StepPullTrunk {
+			label = "Sync trunk"
+		}
+
+		groups = append(groups, tui.MergeGroup{
+			Label:       label,
+			StepIndices: []int{i},
+		})
+		assigned[i] = true
+	}
+
+	return groups
 }
 
 // executeSteps executes the merge plan steps

@@ -122,6 +122,15 @@ func RebaseContinue(ctx context.Context) (RebaseResult, error) {
 	return RebaseDone, nil
 }
 
+// RebaseAbort aborts an in-progress rebase
+func RebaseAbort(ctx context.Context) error {
+	_, err := RunGitCommandWithContext(ctx, "rebase", "--abort")
+	if err != nil {
+		return fmt.Errorf("rebase abort failed: %w", err)
+	}
+	return nil
+}
+
 // GetRebaseHead returns the commit being rebased (REBASE_HEAD)
 func GetRebaseHead() (string, error) {
 	repo, err := GetDefaultRepo()

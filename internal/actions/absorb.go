@@ -116,7 +116,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	unabsorbedHunks := []git.Hunk{}
 
 	for _, hunk := range hunks {
-		commitSHA, commitIndex, err := git.FindTargetCommitForHunk(ctx.Context, hunk, commitSHAs)
+		commitSHA, commitIndex, err := git.FindTargetCommitForHunk(hunk, commitSHAs)
 		if err != nil {
 			return fmt.Errorf("failed to find target commit for hunk: %w", err)
 		}
@@ -236,7 +236,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Refresh engine state after modifying branch references directly via git
-	if err := eng.Rebuild(ctx.Context, ""); err != nil {
+	if err := eng.Rebuild(""); err != nil {
 		return fmt.Errorf("failed to refresh engine after absorb: %w", err)
 	}
 

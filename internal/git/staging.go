@@ -30,7 +30,7 @@ func StageTracked(ctx context.Context) error {
 }
 
 // StagePatch performs interactive patch staging
-func StagePatch(_ context.Context) error {
+func StagePatch() error {
 	// Use interactive mode so stdin/stdout/stderr are connected to the terminal
 	// Note: RunGitCommandInteractive doesn't take context yet, but it's okay for now
 	err := RunGitCommandInteractive("add", "-p")

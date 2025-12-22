@@ -1,7 +1,6 @@
 package actions_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -80,7 +79,7 @@ func TestDelete(t *testing.T) {
 
 		// Add a commit to branch1 so it's not merged
 		s.Checkout("branch1").Commit("some change")
-		s.Engine.Rebuild(context.Background(), "main")
+		s.Engine.Rebuild("main")
 
 		err := actions.Delete(s.Context, actions.DeleteOptions{
 			BranchName: "branch1",

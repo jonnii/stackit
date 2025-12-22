@@ -104,7 +104,7 @@ func RebaseContinue(ctx context.Context) (RebaseResult, error) {
 }
 
 // GetRebaseHead returns the commit being rebased (REBASE_HEAD)
-func GetRebaseHead(_ context.Context) (string, error) {
+func GetRebaseHead() (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err

@@ -35,7 +35,7 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 	}
 
 	// Validate no merged/closed branches
-	if err := validateNoMergedOrClosedBranches(ctx, branches, eng, runtimeCtx); err != nil {
+	if err := validateNoMergedOrClosedBranches(branches, eng, runtimeCtx); err != nil {
 		return err
 	}
 
@@ -114,10 +114,10 @@ func validateNoEmptyBranches(ctx context.Context, branches []string, eng engine.
 }
 
 // validateNoMergedOrClosedBranches checks for merged/closed PRs and prompts user if found
-func validateNoMergedOrClosedBranches(ctx context.Context, branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
+func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
 	mergedOrClosedBranches := []string{}
 	for _, branchName := range branches {
-		prInfo, err := eng.GetPrInfo(ctx, branchName)
+		prInfo, err := eng.GetPrInfo(branchName)
 		if err != nil {
 			continue
 		}
@@ -142,7 +142,7 @@ func validateNoMergedOrClosedBranches(ctx context.Context, branches []string, en
 	// TODO: Add interactive prompt when needed
 	for _, branchName := range mergedOrClosedBranches {
 		// Clear PR info to allow creating new PR
-		_ = eng.UpsertPrInfo(ctx, branchName, &engine.PrInfo{})
+		_ = eng.UpsertPrInfo(branchName, &engine.PrInfo{})
 	}
 
 	return nil

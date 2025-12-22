@@ -117,7 +117,7 @@ func (e *engineImpl) IsBranchTracked(branchName string) bool {
 
 // IsBranchFixed checks if a branch needs restacking
 // A branch is fixed if its parent revision matches the stored parent revision
-func (e *engineImpl) IsBranchFixed(ctx context.Context, branchName string) bool {
+func (e *engineImpl) IsBranchFixed(_ context.Context, branchName string) bool {
 	if e.IsTrunk(branchName) {
 		return true
 	}
@@ -131,7 +131,7 @@ func (e *engineImpl) IsBranchFixed(ctx context.Context, branchName string) bool 
 	}
 
 	// Get current parent revision
-	parentRev, err := git.GetRevision(ctx, parent)
+	parentRev, err := git.GetRevision(parent)
 	if err != nil {
 		return false // Can't determine, assume needs restack
 	}
@@ -151,18 +151,18 @@ func (e *engineImpl) IsBranchFixed(ctx context.Context, branchName string) bool 
 }
 
 // GetCommitDate returns the commit date for a branch
-func (e *engineImpl) GetCommitDate(ctx context.Context, branchName string) (time.Time, error) {
-	return git.GetCommitDate(ctx, branchName)
+func (e *engineImpl) GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
+	return git.GetCommitDate(branchName)
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func (e *engineImpl) GetCommitAuthor(ctx context.Context, branchName string) (string, error) {
-	return git.GetCommitAuthor(ctx, branchName)
+func (e *engineImpl) GetCommitAuthor(_ context.Context, branchName string) (string, error) {
+	return git.GetCommitAuthor(branchName)
 }
 
 // GetRevision returns the SHA of a branch
-func (e *engineImpl) GetRevision(ctx context.Context, branchName string) (string, error) {
-	return git.GetRevision(ctx, branchName)
+func (e *engineImpl) GetRevision(_ context.Context, branchName string) (string, error) {
+	return git.GetRevision(branchName)
 }
 
 // GetParentPrecondition returns the parent branch, or trunk if no parent
@@ -238,7 +238,7 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 	trackedBranchTips := make(map[string][]string)
 
 	// Add trunk tip
-	trunkRev, err := git.GetRevision(ctx, trunk)
+	trunkRev, err := git.GetRevision(trunk)
 	if err == nil {
 		trackedBranchTips[trunkRev] = append(trackedBranchTips[trunkRev], trunk)
 	}
@@ -261,7 +261,7 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 		}
 
 		// Get candidate revision
-		candidateRev, err := git.GetRevision(ctx, candidate)
+		candidateRev, err := git.GetRevision(candidate)
 		if err != nil {
 			continue
 		}
@@ -270,7 +270,7 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 	}
 
 	// Get history of the branch we're tracking
-	history, err := git.GetCommitHistorySHAs(ctx, branchName)
+	history, err := git.GetCommitHistorySHAs(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func (e *engineImpl) SortBranchesTopologically(branches []string) []string {
 // GetDeletionStatus checks if a branch should be deleted
 func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error) {
 	// Check PR info
-	prInfo, err := e.GetPrInfo(ctx, branchName)
+	prInfo, err := e.GetPrInfo(branchName)
 	if err == nil && prInfo != nil {
 		const (
 			prStateClosed = "CLOSED"

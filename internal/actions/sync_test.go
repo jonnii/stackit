@@ -1,7 +1,6 @@
 package actions_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -111,7 +110,7 @@ func TestSyncAction(t *testing.T) {
 			Commit("P updated")
 
 		// Refresh engine
-		err := s.Engine.Rebuild(context.Background(), "main")
+		err := s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
 		err = actions.SyncAction(s.Context, actions.SyncOptions{
@@ -154,7 +153,7 @@ func TestSyncAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Refresh engine
-		err = s.Engine.Rebuild(context.Background(), "main")
+		err = s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
 		s.Checkout("P")

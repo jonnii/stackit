@@ -18,7 +18,7 @@ type StagingOptions struct {
 // StageChanges stages changes based on the provided options
 func StageChanges(ctx context.Context, opts StagingOptions) error {
 	if opts.Patch && !opts.All {
-		return git.StagePatch(ctx)
+		return git.StagePatch()
 	}
 
 	if opts.All {

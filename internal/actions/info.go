@@ -36,7 +36,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	// Check if branch exists
 	if !eng.IsBranchTracked(branchName) && !eng.IsTrunk(branchName) {
 		// Check if it's a git branch
-		_, err := git.GetRevision(ctx.Context, branchName)
+		_, err := git.GetRevision(branchName)
 		if err != nil {
 			return fmt.Errorf("branch %s does not exist", branchName)
 		}
@@ -73,7 +73,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	// PR info (skip for trunk)
 	var prInfo *engine.PrInfo
 	if !isTrunk {
-		prInfo, _ = eng.GetPrInfo(ctx.Context, branchName)
+		prInfo, _ = eng.GetPrInfo(branchName)
 		if prInfo != nil && prInfo.Number != nil {
 			prTitleLine := getPRTitleLine(prInfo)
 			if prTitleLine != "" {

@@ -76,7 +76,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumber] = pr
 
 		// Store PR info in engine
-		err = s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
 			Number:  &prNumber,
 			Title:   prData.Title,
 			Body:    prData.Body,
@@ -188,7 +188,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumberB] = prB
 
 		// Store PR info in engine with A as the base (simulating after reorder)
-		err = s.Engine.UpsertPrInfo(context.Background(), "B", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo("B", &engine.PrInfo{
 			Number: &prNumberB,
 			Title:  prDataB.Title,
 			Body:   prDataB.Body,

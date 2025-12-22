@@ -1,17 +1,16 @@
 package git
 
 import (
-	"context"
 	"fmt"
 )
 
 // GetMergeBase returns the merge base between two branches
-func GetMergeBase(ctx context.Context, branch1, branch2 string) (string, error) {
-	return GetMergeBaseByRef(ctx, "refs/heads/"+branch1, "refs/heads/"+branch2)
+func GetMergeBase(branch1, branch2 string) (string, error) {
+	return GetMergeBaseByRef("refs/heads/"+branch1, "refs/heads/"+branch2)
 }
 
 // GetMergeBaseByRef returns the merge base between two refs (can be branches or remote refs)
-func GetMergeBaseByRef(_ context.Context, ref1Name, ref2Name string) (string, error) {
+func GetMergeBaseByRef(ref1Name, ref2Name string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -51,7 +50,7 @@ func GetMergeBaseByRef(_ context.Context, ref1Name, ref2Name string) (string, er
 }
 
 // IsAncestor checks if the first ref is an ancestor of the second ref
-func IsAncestor(_ context.Context, ancestor, descendant string) (bool, error) {
+func IsAncestor(ancestor, descendant string) (bool, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return false, err

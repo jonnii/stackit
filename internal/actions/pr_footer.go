@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -14,10 +13,10 @@ const (
 )
 
 // CreatePRBodyFooter creates a PR body footer with dependency tree
-func CreatePRBodyFooter(ctx context.Context, branch string, eng engine.Engine) string {
+func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 	terminalParent := findTerminalParent(branch, eng)
 
-	tree := buildBranchTree(ctx, eng, []string{terminalParent}, branch, 0)
+	tree := buildBranchTree(eng, []string{terminalParent}, branch, 0)
 
 	return footerTitle + tree + footerFooter
 }
@@ -62,7 +61,7 @@ func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 }
 
 // buildBranchTree builds a tree representation of branch dependencies
-func buildBranchTree(ctx context.Context, eng engine.Engine, currentBranches []string, prBranch string, currentDepth int) string {
+func buildBranchTree(eng engine.Engine, currentBranches []string, prBranch string, currentDepth int) string {
 	var tree strings.Builder
 
 	for _, branch := range currentBranches {
@@ -70,14 +69,14 @@ func buildBranchTree(ctx context.Context, eng engine.Engine, currentBranches []s
 			continue
 		}
 
-		leaf := buildLeaf(ctx, eng, branch, currentDepth, prBranch)
+		leaf := buildLeaf(eng, branch, currentDepth, prBranch)
 		if leaf != "" {
 			tree.WriteString(leaf)
 		}
 
 		children := eng.GetChildren(branch)
 		if len(children) > 0 {
-			childTree := buildBranchTree(ctx, eng, children, prBranch, currentDepth+1)
+			childTree := buildBranchTree(eng, children, prBranch, currentDepth+1)
 			tree.WriteString(childTree)
 		}
 	}
@@ -86,8 +85,8 @@ func buildBranchTree(ctx context.Context, eng engine.Engine, currentBranches []s
 }
 
 // buildLeaf builds a single leaf in the tree
-func buildLeaf(ctx context.Context, eng engine.PRManager, branch string, depth int, prBranch string) string {
-	prInfo, err := eng.GetPrInfo(ctx, branch)
+func buildLeaf(eng engine.PRManager, branch string, depth int, prBranch string) string {
+	prInfo, err := eng.GetPrInfo(branch)
 	if err != nil || prInfo == nil || prInfo.Number == nil {
 		return ""
 	}

@@ -46,21 +46,21 @@ type BranchReader interface {
 type BranchWriter interface {
 	// Branch tracking
 	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
-	UntrackBranch(ctx context.Context, branchName string) error
+	UntrackBranch(branchName string) error
 	SetParent(ctx context.Context, branchName string, parentBranchName string) error
 	DeleteBranch(ctx context.Context, branchName string) error
 	DeleteBranches(ctx context.Context, branchNames []string) ([]string, error)
 
 	// Initialization operations
-	Reset(ctx context.Context, newTrunkName string) error
-	Rebuild(ctx context.Context, newTrunkName string) error
+	Reset(newTrunkName string) error
+	Rebuild(newTrunkName string) error
 }
 
 // PRManager provides operations for managing pull request information
 // Thread-safe: All methods are safe for concurrent use
 type PRManager interface {
-	GetPrInfo(ctx context.Context, branchName string) (*PrInfo, error)
-	UpsertPrInfo(ctx context.Context, branchName string, prInfo *PrInfo) error
+	GetPrInfo(branchName string) (*PrInfo, error)
+	UpsertPrInfo(branchName string, prInfo *PrInfo) error
 	GetPRSubmissionStatus(ctx context.Context, branchName string) (PRSubmissionStatus, error)
 }
 

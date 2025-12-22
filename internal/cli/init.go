@@ -223,12 +223,12 @@ func newInitCmd() *cobra.Command {
 			}
 
 			if reset {
-				if err := eng.Reset(cmd.Context(), trunkName); err != nil {
+				if err := eng.Reset(trunkName); err != nil {
 					return fmt.Errorf("failed to reset branches: %w", err)
 				}
 				splog.Info("All branches have been untracked")
 			} else {
-				if err := eng.Rebuild(cmd.Context(), trunkName); err != nil {
+				if err := eng.Rebuild(trunkName); err != nil {
 					return fmt.Errorf("failed to rebuild engine: %w", err)
 				}
 				splog.Info("Stackit initialized successfully!")

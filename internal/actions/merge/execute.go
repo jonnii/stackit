@@ -202,7 +202,7 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 	switch step.StepType {
 	case StepMergePR:
 		// Validate PR still exists and is open
-		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
+		prInfo, err := eng.GetPrInfo(step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -237,7 +237,7 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 
 	case StepUpdatePRBase:
 		// Validate PR exists
-		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
+		prInfo, err := eng.GetPrInfo(step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -250,7 +250,7 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 
 	case StepWaitCI:
 		// Validate PR exists and is open
-		prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
+		prInfo, err := eng.GetPrInfo(step.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
@@ -326,7 +326,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		case engine.RestackDone:
 			// Success - now push the rebased branch and update PR base
 			// Force push is required since we rebased
-			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(ctx), true, false); err != nil {
+			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(), true, false); err != nil {
 				return fmt.Errorf("failed to push rebased branch %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
@@ -350,7 +350,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		case engine.RestackUnneeded:
 			// Already up to date, but still need to ensure PR base is correct
 			// Push in case local is ahead of remote
-			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(ctx), true, false); err != nil {
+			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(), true, false); err != nil {
 				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
 			}
 			// Update PR base to the actual parent (not always trunk)
@@ -430,7 +430,7 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	}
 
 	// Rebuild engine to reflect changes
-	if err := eng.Rebuild(ctx, trunk); err != nil {
+	if err := eng.Rebuild(trunk); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -483,7 +483,7 @@ func executeWaitCIWithProgress(ctx context.Context, step PlanStep, stepIndex int
 	lastProgressReport := startTime
 
 	// Get PR info for better error messages
-	prInfo, err := eng.GetPrInfo(ctx, step.BranchName)
+	prInfo, err := eng.GetPrInfo(step.BranchName)
 	if err != nil {
 		return fmt.Errorf("failed to get PR info: %w", err)
 	}

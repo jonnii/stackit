@@ -1,7 +1,6 @@
 package merge_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -103,7 +102,7 @@ func TestAction(t *testing.T) {
 			State:  "OPEN",
 			URL:    "https://github.com/owner/repo/pull/123",
 		}
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", prInfo)
+		err := s.Engine.UpsertPrInfo("branch1", prInfo)
 		require.NoError(t, err)
 
 		// Switch to branch1
@@ -111,7 +110,7 @@ func TestAction(t *testing.T) {
 
 		// Verify branch is tracked and has PR info
 		require.True(t, s.Engine.IsBranchTracked("branch1"))
-		prInfo, err = s.Engine.GetPrInfo(context.Background(), "branch1")
+		prInfo, err = s.Engine.GetPrInfo("branch1")
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
@@ -163,7 +162,7 @@ func TestAction(t *testing.T) {
 
 		// Add PR info to engine
 		prA := 101
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch-a", &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo("branch-a", &engine.PrInfo{
 			Number: &prA,
 			State:  "OPEN",
 			Base:   "main",
@@ -172,7 +171,7 @@ func TestAction(t *testing.T) {
 		require.NoError(t, err)
 
 		prB := 102
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch-b", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo("branch-b", &engine.PrInfo{
 			Number: &prB,
 			State:  "OPEN",
 			Base:   "branch-a",
@@ -181,7 +180,7 @@ func TestAction(t *testing.T) {
 		require.NoError(t, err)
 
 		prC := 103
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch-c", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo("branch-c", &engine.PrInfo{
 			Number: &prC,
 			State:  "OPEN",
 			Base:   "branch-b",

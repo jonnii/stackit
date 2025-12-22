@@ -1,7 +1,6 @@
 package merge_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -24,12 +23,12 @@ func TestCreateMergePlan(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
 			Number: &pr1,
 			State:  "OPEN",
 		})
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo(context.Background(), "branch2", &engine.PrInfo{
+		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
 			Number: &pr2,
 			State:  "OPEN",
 		})
@@ -62,7 +61,7 @@ func TestCreateMergePlan(t *testing.T) {
 
 		// Add draft PR
 		pr1 := 101
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
 			Number:  &pr1,
 			State:   "OPEN",
 			IsDraft: true,
@@ -92,7 +91,7 @@ func TestCreateMergePlan(t *testing.T) {
 
 		// Add draft PR
 		pr1 := 101
-		err := s.Engine.UpsertPrInfo(context.Background(), "branch1", &engine.PrInfo{
+		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
 			Number:  &pr1,
 			State:   "OPEN",
 			IsDraft: true,
@@ -129,9 +128,9 @@ func TestCreateMergePlan(t *testing.T) {
 		// Add PR info for P and C1
 		prP := 101
 		prC1 := 102
-		err := s.Engine.UpsertPrInfo(context.Background(), "P", &engine.PrInfo{Number: &prP, State: "OPEN"})
+		err := s.Engine.UpsertPrInfo("P", &engine.PrInfo{Number: &prP, State: "OPEN"})
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo(context.Background(), "C1", &engine.PrInfo{Number: &prC1, State: "OPEN"})
+		err = s.Engine.UpsertPrInfo("C1", &engine.PrInfo{Number: &prC1, State: "OPEN"})
 		require.NoError(t, err)
 
 		plan, _, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{

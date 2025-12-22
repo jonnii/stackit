@@ -9,13 +9,13 @@ import (
 // Uses git cherry to detect if all commits are in trunk
 func IsMerged(ctx context.Context, branchName, trunkName string) (bool, error) {
 	// Get merge base
-	mergeBase, err := GetMergeBase(ctx, branchName, trunkName)
+	mergeBase, err := GetMergeBase(branchName, trunkName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get merge base: %w", err)
 	}
 
 	// Get branch revision
-	branchRev, err := GetRevision(ctx, branchName)
+	branchRev, err := GetRevision(branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get branch revision: %w", err)
 	}
@@ -32,7 +32,7 @@ func IsMerged(ctx context.Context, branchName, trunkName string) (bool, error) {
 	if err != nil {
 		// If cherry fails, fall back to simpler check
 		// Check if branch tip is reachable from trunk
-		return IsAncestor(ctx, branchRev, trunkName)
+		return IsAncestor(branchRev, trunkName)
 	}
 
 	// If cherry output is empty or all lines start with '-', branch is merged

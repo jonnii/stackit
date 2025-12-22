@@ -161,7 +161,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			}
 
 			// Get PR info
-			prInfo, err := eng.GetPrInfo(ctx.Context, branchName)
+			prInfo, err := eng.GetPrInfo(branchName)
 			if err == nil && prInfo != nil {
 				branchInfo.PRInfo = &PRInfo{
 					Number:  prInfo.Number,

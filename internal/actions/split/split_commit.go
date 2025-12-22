@@ -42,7 +42,7 @@ func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitE
 
 	// Show instructions
 	splog.Info("Splitting the commits of %s into multiple branches.", tui.ColorBranchName(branchToSplit, true))
-	prInfo, _ := eng.GetPrInfo(ctx, branchToSplit)
+	prInfo, _ := eng.GetPrInfo(branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
 			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)

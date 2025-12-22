@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +10,7 @@ import (
 )
 
 // GetCommitDate returns the commit date for a branch
-func GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
+func GetCommitDate(branchName string) (time.Time, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return time.Time{}, err
@@ -31,7 +30,7 @@ func GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func GetCommitAuthor(_ context.Context, branchName string) (string, error) {
+func GetCommitAuthor(branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -51,7 +50,7 @@ func GetCommitAuthor(_ context.Context, branchName string) (string, error) {
 }
 
 // GetRevision returns the SHA of a branch
-func GetRevision(_ context.Context, branchName string) (string, error) {
+func GetRevision(branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -66,7 +65,7 @@ func GetRevision(_ context.Context, branchName string) (string, error) {
 }
 
 // GetRemoteRevision returns the SHA of a remote branch (e.g., origin/branchName)
-func GetRemoteRevision(_ context.Context, branchName string) (string, error) {
+func GetRemoteRevision(branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -150,7 +149,7 @@ func resolveRefHash(repo *Repository, ref string) (plumbing.Hash, error) {
 }
 
 // GetCommitMessages returns all commit messages for a branch (excluding parent)
-func GetCommitMessages(_ context.Context, branchName string) ([]string, error) {
+func GetCommitMessages(branchName string) ([]string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return nil, err
@@ -195,7 +194,7 @@ func GetCommitMessages(_ context.Context, branchName string) ([]string, error) {
 }
 
 // GetCommitSubject returns the subject (first line) of the oldest commit on a branch
-func GetCommitSubject(_ context.Context, branchName string) (string, error) {
+func GetCommitSubject(branchName string) (string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return "", err
@@ -246,7 +245,7 @@ func GetCommitSubject(_ context.Context, branchName string) (string, error) {
 }
 
 // GetCommitRangeSHAs returns the commit SHAs between two revisions (base..head)
-func GetCommitRangeSHAs(_ context.Context, base, head string) ([]string, error) {
+func GetCommitRangeSHAs(base, head string) ([]string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return nil, err
@@ -276,7 +275,7 @@ func GetCommitRangeSHAs(_ context.Context, base, head string) ([]string, error) 
 }
 
 // GetCommitHistorySHAs returns the commit SHAs for a branch
-func GetCommitHistorySHAs(_ context.Context, branchName string) ([]string, error) {
+func GetCommitHistorySHAs(branchName string) ([]string, error) {
 	repo, err := GetDefaultRepo()
 	if err != nil {
 		return nil, err

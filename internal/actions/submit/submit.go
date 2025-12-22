@@ -396,7 +396,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 	// Update PR info
 	prNumber := pr.Number
 	prURL := pr.HTMLURL
-	_ = eng.UpsertPrInfo(ctx, submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
 		Number:  &prNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -412,7 +412,7 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 // updatePullRequestQuiet updates an existing pull request without logging
 func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) (string, error) {
 	// Check if base changed
-	prInfo, _ := eng.GetPrInfo(ctx, submissionInfo.BranchName)
+	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
 	baseChanged := false
 	if prInfo != nil && prInfo.Base != submissionInfo.Base {
 		baseChanged = true
@@ -438,7 +438,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		// Only update base if there are commits between base and head
 		if submissionInfo.BaseSHA != submissionInfo.HeadSHA {
 			// Check if there are actually commits between base and head
-			commits, err := git.GetCommitRangeSHAs(ctx, submissionInfo.BaseSHA, submissionInfo.HeadSHA)
+			commits, err := git.GetCommitRangeSHAs(submissionInfo.BaseSHA, submissionInfo.HeadSHA)
 			if err == nil && len(commits) > 0 {
 				// There are commits, safe to update base
 				updateOpts.Base = &submissionInfo.Base
@@ -453,7 +453,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 	}
 
 	// Get PR URL
-	prInfo, _ = eng.GetPrInfo(ctx, submissionInfo.BranchName)
+	prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
 	var prURL string
 	if prInfo != nil && prInfo.URL != "" {
 		prURL = prInfo.URL
@@ -465,7 +465,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		}
 	}
 
-	_ = eng.UpsertPrInfo(ctx, submissionInfo.BranchName, &engine.PrInfo{
+	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
 		Number:  submissionInfo.PRNumber,
 		Title:   submissionInfo.Metadata.Title,
 		Body:    submissionInfo.Metadata.Body,
@@ -485,12 +485,12 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 		wg.Add(1)
 		go func(name string) {
 			defer wg.Done()
-			prInfo, err := eng.GetPrInfo(ctx, name)
+			prInfo, err := eng.GetPrInfo(name)
 			if err != nil || prInfo == nil || prInfo.Number == nil {
 				return
 			}
 
-			footer := actions.CreatePRBodyFooter(ctx, name, eng)
+			footer := actions.CreatePRBodyFooter(name, eng)
 			updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
 
 			if updatedBody != prInfo.Body {
@@ -528,7 +528,7 @@ func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, 
 	}
 
 	for _, branchName := range eng.AllBranchNames() {
-		prInfo, _ := eng.GetPrInfo(ctx, branchName)
+		prInfo, _ := eng.GetPrInfo(branchName)
 		if prInfo == nil && !branchSet[branchName] {
 			continue
 		}

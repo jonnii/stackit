@@ -3,17 +3,17 @@ package merge
 import (
 	"fmt"
 
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
 // Options contains options for the merge command
 type Options struct {
-	DryRun   bool
-	Confirm  bool
-	Strategy Strategy
-	Force    bool
+	DryRun      bool
+	Confirm     bool
+	Strategy    Strategy
+	Force       bool
+	UseWorktree bool
 }
 
 // Action performs the merge operation using the plan/execute pattern
@@ -108,20 +108,18 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// 7. Execute the plan
-	if err := Execute(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, ExecuteOptions{
+	executeOpts := ExecuteOptions{
 		Plan:  plan,
 		Force: opts.Force,
-	}); err != nil {
-		return fmt.Errorf("merge execution failed: %w", err)
 	}
 
-	// 8. Checkout trunk after successful merge
-	trunk := eng.Trunk()
-	if eng.CurrentBranch() != trunk {
-		if err := git.CheckoutBranch(ctx.Context, trunk); err != nil {
-			splog.Warn("Failed to checkout trunk branch %s: %v", trunk, err)
-		} else {
-			splog.Info("Checked out %s.", tui.ColorBranchName(trunk, false))
+	if opts.UseWorktree {
+		if err := ExecuteInWorktree(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, executeOpts); err != nil {
+			return fmt.Errorf("merge execution in worktree failed: %w", err)
+		}
+	} else {
+		if err := Execute(ctx.Context, eng, splog, ctx.GitHubClient, ctx.RepoRoot, executeOpts); err != nil {
+			return fmt.Errorf("merge execution failed: %w", err)
 		}
 	}
 

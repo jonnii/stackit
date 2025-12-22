@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -968,5 +969,109 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 		// New files should appear as untracked (not unstaged)
 		hasUntracked, _ := s.Scene.Repo.HasUntrackedFiles()
 		require.True(t, hasUntracked, "new files should appear as untracked")
+	})
+}
+
+func TestSetParentScenarios(t *testing.T) {
+	t.Run("preserves divergence point when parent is rebased and merged into trunk", func(t *testing.T) {
+		// Scenario: main -> branch1 -> branch2
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
+
+		// 1. Create branch1
+		s.CreateBranch("branch1").
+			CommitChange("file1.txt", "feat: branch1").
+			TrackBranch("branch1", "main")
+
+		branch1OriginalSHA, _ := s.Engine.GetRevision(context.Background(), "branch1")
+
+		// 2. Create branch2 on top of branch1
+		s.CreateBranch("branch2").
+			CommitChange("file2.txt", "feat: branch2").
+			TrackBranch("branch2", "branch1")
+
+		// branch2 diverged from branch1 at branch1OriginalSHA
+
+		// 3. Move main forward
+		s.Checkout("main").
+			CommitChange("main.txt", "feat: main")
+
+		// 4. Rebase branch1 onto main (changing its SHA)
+		s.Checkout("branch1")
+		s.Engine.RestackBranch(context.Background(), "branch1")
+		branch1NewSHA, _ := s.Engine.GetRevision(context.Background(), "branch1")
+		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
+
+		// 5. Merge branch1 into main
+		s.Checkout("main")
+		s.RunGit("merge", "branch1", "--no-ff", "-m", "Merge branch1")
+
+		// 6. Reparent branch2 to main (what happens during 'stackit merge' or 'stackit sync')
+		err := s.Engine.SetParent(context.Background(), "branch2", "main")
+		require.NoError(t, err)
+
+		// VERIFY: ParentBranchRevision should still be branch1OriginalSHA
+		// because it's a valid ancestor and the old parent (branch1) was merged into main.
+		meta, _ := git.ReadMetadataRef("branch2")
+		require.Equal(t, branch1OriginalSHA, *meta.ParentBranchRevision, "Divergence point should be preserved to avoid conflicts during restack")
+	})
+
+	t.Run("updates divergence point when parent is folded into child (upward merge)", func(t *testing.T) {
+		// Scenario: main -> branch1 -> branch2
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
+
+		// 1. Setup stack
+		s.CreateBranch("branch1").
+			CommitChange("file1.txt", "feat: branch1").
+			TrackBranch("branch1", "main")
+
+		s.CreateBranch("branch2").
+			CommitChange("file2.txt", "feat: branch2").
+			TrackBranch("branch2", "branch1")
+
+		// 2. Fold branch1 into branch2 (upward merge)
+		s.Checkout("branch2")
+		s.RunGit("merge", "branch1", "--no-ff", "-m", "Merge branch1 into branch2")
+
+		// 3. Reparent branch2 to main (branch1 will be deleted in a real fold)
+		err := s.Engine.SetParent(context.Background(), "branch2", "main")
+		require.NoError(t, err)
+
+		// VERIFY: ParentBranchRevision should be updated to main's tip
+		// because branch1 was NOT merged into main; it was merged into branch2.
+		// If we kept the old divergence point (before branch1), a restack would
+		// try to re-apply branch1's changes which are already in branch2.
+		mainSHA, _ := s.Engine.GetRevision(context.Background(), "main")
+		meta, _ := git.ReadMetadataRef("branch2")
+		require.Equal(t, mainSHA, *meta.ParentBranchRevision, "Divergence point should be updated to new parent when folding upward")
+	})
+
+	t.Run("updates divergence point after manual rebase onto same parent", func(t *testing.T) {
+		// Scenario: main -> branch1
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
+
+		s.CreateBranch("branch1").
+			CommitChange("file1.txt", "feat: branch1").
+			TrackBranch("branch1", "main")
+
+		originalMeta, _ := git.ReadMetadataRef("branch1")
+
+		// 1. Move main forward
+		s.Checkout("main").
+			CommitChange("main.txt", "feat: main")
+		mainNewSHA, _ := s.Engine.GetRevision(context.Background(), "main")
+
+		// 2. Manually rebase branch1 onto main
+		s.Checkout("branch1")
+		s.RunGit("rebase", "main")
+
+		// 3. Call SetParent with the same parent (main)
+		err := s.Engine.SetParent(context.Background(), "branch1", "main")
+		require.NoError(t, err)
+
+		// VERIFY: ParentBranchRevision should be updated to mainNewSHA
+		// because the branch has moved forward relative to its parent.
+		meta, _ := git.ReadMetadataRef("branch1")
+		require.Equal(t, mainNewSHA, *meta.ParentBranchRevision)
+		require.NotEqual(t, *originalMeta.ParentBranchRevision, *meta.ParentBranchRevision)
 	})
 }

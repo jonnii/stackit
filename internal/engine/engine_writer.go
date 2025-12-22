@@ -227,8 +227,25 @@ func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, p
 		oldParent = *meta.ParentBranchName
 	}
 
+	// Only update ParentBranchRevision if it's currently nil, invalid, or if we're not
+	// in a "parent merged into trunk" situation.
+	shouldUpdateRevision := true
+	if oldParent != "" && oldParent != parentBranchName && meta.ParentBranchRevision != nil && *meta.ParentBranchRevision != "" {
+		// Check if existing revision is still a valid ancestor of the branch
+		if isAncestor, _ := git.IsAncestor(ctx, *meta.ParentBranchRevision, branchName); isAncestor {
+			// Check if the old parent was merged into the new parent (the "merge" case)
+			// OR if the new parent is the same as the old parent (no change)
+			// We use the branch name to check for merging.
+			if merged, _ := git.IsMerged(ctx, oldParent, parentBranchName); merged {
+				shouldUpdateRevision = false
+			}
+		}
+	}
+
 	meta.ParentBranchName = &parentBranchName
-	meta.ParentBranchRevision = &parentRev
+	if shouldUpdateRevision {
+		meta.ParentBranchRevision = &parentRev
+	}
 
 	// Write metadata
 	if err := git.WriteMetadataRef(branchName, meta); err != nil {

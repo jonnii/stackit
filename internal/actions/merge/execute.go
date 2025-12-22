@@ -24,7 +24,8 @@ type ProgressReporter interface {
 	StepStarted(stepIndex int, description string)
 	StepCompleted(stepIndex int)
 	StepFailed(stepIndex int, err error)
-	StepWaiting(stepIndex int, elapsed, timeout time.Duration)
+	StepWaiting(stepIndex int, elapsed, timeout time.Duration, checks []github.CheckDetail)
+	SetEstimatedDuration(duration time.Duration)
 }
 
 // mergeExecuteEngine is a minimal interface needed for executing a merge plan
@@ -45,6 +46,12 @@ type ExecuteOptions struct {
 // Execute executes a validated merge plan step by step
 func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	plan := opts.Plan
+
+	// Calculate initial estimate if possible
+	var initialEstimate time.Duration
+	if githubClient != nil {
+		initialEstimate = calculateBaselineEstimate(ctx, plan, githubClient, splog)
+	}
 
 	// If no reporter provided and we're in a TTY, use TUI
 	if opts.Reporter == nil && tui.IsTTY() {
@@ -71,6 +78,10 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 
 		// Update opts to use the reporter
 		opts.Reporter = reporter
+
+		if initialEstimate > 0 {
+			reporter.SetEstimatedDuration(initialEstimate)
+		}
 
 		// Execute plan (this will send updates to the reporter)
 		err := executeSteps(ctx, eng, splog, githubClient, repoRoot, opts)
@@ -186,6 +197,33 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 	}
 
 	return nil
+}
+
+// calculateBaselineEstimate tries to find a branch with successful CI and use its timing as a baseline
+func calculateBaselineEstimate(ctx context.Context, plan *Plan, client github.Client, splog *tui.Splog) time.Duration {
+	for _, branchInfo := range plan.BranchesToMerge {
+		status, err := client.GetPRChecksStatus(ctx, branchInfo.BranchName)
+		if err != nil || !status.Passing || status.Pending {
+			continue
+		}
+
+		// Found a passing PR, calculate the max duration of its checks
+		var maxDuration time.Duration
+		for _, check := range status.Checks {
+			if !check.FinishedAt.IsZero() && !check.StartedAt.IsZero() {
+				duration := check.FinishedAt.Sub(check.StartedAt)
+				if duration > maxDuration {
+					maxDuration = duration
+				}
+			}
+		}
+
+		if maxDuration > 0 {
+			splog.Debug("Using PR #%d (%s) as timing baseline: %v", branchInfo.PRNumber, branchInfo.BranchName, maxDuration.Round(time.Second))
+			return maxDuration
+		}
+	}
+	return 0
 }
 
 func isConflictError(err error) bool {
@@ -328,12 +366,12 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 		}
 		// Optionally check CI checks haven't changed to failing or pending
 		if !opts.Force && githubClient != nil {
-			passing, pending, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
+			status, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
 			if err == nil {
-				if !passing {
+				if !status.Passing {
 					return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
 				}
-				if pending {
+				if status.Pending {
 					return fmt.Errorf("PR #%d for branch %s has pending CI checks", *prInfo.Number, step.BranchName)
 				}
 			}
@@ -618,25 +656,41 @@ func executeWaitCIWithProgress(ctx context.Context, step PlanStep, stepIndex int
 
 		// Report progress periodically
 		now := time.Now()
-		if opts.Reporter != nil && now.Sub(lastProgressReport) >= progressInterval {
+		status, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
+		if err == nil && opts.Reporter != nil && now.Sub(lastProgressReport) >= progressInterval {
 			elapsed := now.Sub(startTime)
-			opts.Reporter.StepWaiting(stepIndex, elapsed, timeout)
+			opts.Reporter.StepWaiting(stepIndex, elapsed, timeout, status.Checks)
 			lastProgressReport = now
 		}
 
-		// Check CI status
-		passing, pending, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
 		if err != nil {
 			// Log error but continue polling (might be transient)
 			splog.Debug("Error checking CI status: %v", err)
 		} else {
-			if !passing {
+			if !status.Passing {
 				// CI checks failed
 				return fmt.Errorf("CI checks failed on PR #%d (%s)", prNumber, step.BranchName)
 			}
-			if !pending {
+			if !status.Pending {
 				// All checks passed and none are pending
 				elapsed := time.Since(startTime)
+
+				// If we don't have an estimate yet, this successful PR can be our baseline
+				if opts.Reporter != nil {
+					var maxDuration time.Duration
+					for _, check := range status.Checks {
+						if !check.FinishedAt.IsZero() && !check.StartedAt.IsZero() {
+							d := check.FinishedAt.Sub(check.StartedAt)
+							if d > maxDuration {
+								maxDuration = d
+							}
+						}
+					}
+					if maxDuration > 0 {
+						opts.Reporter.SetEstimatedDuration(maxDuration)
+					}
+				}
+
 				if opts.Reporter == nil {
 					splog.Info("CI checks passed on PR #%d (%s) after %v", prNumber, step.BranchName, elapsed.Round(time.Second))
 				}

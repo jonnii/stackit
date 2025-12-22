@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"stackit.dev/stackit/internal/github"
 )
 
 func TestChannelMergeProgressReporter_Close(t *testing.T) {
@@ -78,7 +80,7 @@ func TestChannelMergeProgressReporter_Close(t *testing.T) {
 
 		// Send updates
 		reporter.StepStarted(0, "Step 1")
-		reporter.StepWaiting(0, 5*time.Second, 10*time.Minute)
+		reporter.StepWaiting(0, 5*time.Second, 10*time.Minute, []github.CheckDetail{{Name: "Test", Status: "IN_PROGRESS"}})
 		reporter.StepCompleted(0)
 		reporter.StepFailed(1, nil)
 

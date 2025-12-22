@@ -110,10 +110,18 @@ func (c *GitHubClient) MergePullRequest(_ context.Context, branchName string) er
 }
 
 // GetPRChecksStatus returns simulated check status
-func (c *GitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
+func (c *GitHubClient) GetPRChecksStatus(_ context.Context, _ string) (*github.CheckStatus, error) {
 	// Simulate a small delay
 	time.Sleep(50 * time.Millisecond)
 
 	// In demo mode, always return checks passing
-	return true, false, nil
+	return &github.CheckStatus{
+		Passing: true,
+		Pending: false,
+		Checks: []github.CheckDetail{
+			{Name: "Build", Status: "COMPLETED", Conclusion: "SUCCESS"},
+			{Name: "Test", Status: "COMPLETED", Conclusion: "SUCCESS"},
+			{Name: "Lint", Status: "COMPLETED", Conclusion: "SUCCESS"},
+		},
+	}, nil
 }

@@ -195,16 +195,14 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 		// Get CI check status
 		checksStatus := ChecksNone
-		var passing, pending bool
 		if githubClient != nil {
-			var checkErr error
-			passing, pending, checkErr = githubClient.GetPRChecksStatus(ctx, branchName)
+			status, checkErr := githubClient.GetPRChecksStatus(ctx, branchName)
 			switch {
 			case checkErr != nil:
 				splog.Debug("Failed to get PR checks status for %s: %v", branchName, checkErr)
-			case pending:
+			case status.Pending:
 				checksStatus = ChecksPending
-			case !passing:
+			case !status.Passing:
 				checksStatus = ChecksFailing
 				if !opts.Force {
 					validation.Valid = false

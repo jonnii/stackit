@@ -30,7 +30,6 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	}
 
 	var branchName string
-	var err error
 
 	// Handle --trunk flag
 	switch {
@@ -41,7 +40,11 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		branchName = opts.BranchName
 	default:
 		// Interactive selection
-		branchName, err = interactiveBranchSelection(ctx, opts)
+		branchNames, err := buildBranchChoices(ctx, opts)
+		if err != nil {
+			return err
+		}
+		branchName, err = tui.PromptBranchCheckout(branchNames, eng.CurrentBranch())
 		if err != nil {
 			return err
 		}
@@ -65,17 +68,41 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	return nil
 }
 
-// interactiveBranchSelection shows an interactive branch selector
-func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (string, error) {
-	var choices []tui.BranchChoice
-	initialIndex := -1
-	currentBranch := ctx.Engine.CurrentBranch()
+// collectBranchesDepthFirst returns branches with trunk first, then children recursively
+func collectBranchesDepthFirst(branchName string, eng engine.BranchReader) []string {
+	var result []string
+	result = append(result, branchName)
+
+	children := eng.GetChildren(branchName)
+	for _, child := range children {
+		result = append(result, collectBranchesDepthFirst(child, eng)...)
+	}
+
+	return result
+}
+
+// getUntrackedBranchNamesForCheckout returns all untracked branch names (excluding trunk)
+func getUntrackedBranchNamesForCheckout(eng engine.BranchReader) []string {
+	var untracked []string
+	for _, branchName := range eng.AllBranchNames() {
+		if !eng.IsTrunk(branchName) && !eng.IsBranchTracked(branchName) {
+			untracked = append(untracked, branchName)
+		}
+	}
+	return untracked
+}
+
+// buildBranchChoices builds the list of branch names to show in the interactive selector
+func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, error) {
+	eng := ctx.Engine
+	currentBranch := eng.CurrentBranch()
 	seenBranches := make(map[string]bool)
+	var branchNames []string
 
 	if opts.StackOnly {
 		// Only show current stack (ancestors + descendants)
 		if currentBranch == "" {
-			return "", fmt.Errorf("not on a branch; cannot use --stack flag")
+			return nil, fmt.Errorf("not on a branch; cannot use --stack flag")
 		}
 
 		scope := engine.Scope{
@@ -83,123 +110,66 @@ func interactiveBranchSelection(ctx *runtime.Context, opts CheckoutOptions) (str
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := ctx.Engine.GetRelativeStack(currentBranch, scope)
+		stack := eng.GetRelativeStack(currentBranch, scope)
 
-		// Build choices from stack
+		// Build branch list from stack
 		for _, branchName := range stack {
 			if seenBranches[branchName] {
 				continue
 			}
 			seenBranches[branchName] = true
-			var display string
-			if branchName == currentBranch {
-				display = tui.ColorBranchName(branchName, true)
-				initialIndex = len(choices)
-			} else {
-				display = tui.ColorBranchName(branchName, false)
-			}
-			choices = append(choices, tui.BranchChoice{
-				Display: display,
-				Value:   branchName,
-			})
+			branchNames = append(branchNames, branchName)
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
-		trunkName := ctx.Engine.Trunk()
-		branchOrder := collectBranchesDepthFirst(trunkName, ctx)
+		trunkName := eng.Trunk()
+		branchOrder := collectBranchesDepthFirst(trunkName, eng)
 
 		for _, branchName := range branchOrder {
 			if seenBranches[branchName] {
 				continue
 			}
 			seenBranches[branchName] = true
-
-			isCurrent := branchName == currentBranch
-			display := tui.ColorBranchName(branchName, isCurrent)
-			if isCurrent {
-				initialIndex = len(choices)
-			}
-			choices = append(choices, tui.BranchChoice{
-				Display: display,
-				Value:   branchName,
-			})
+			branchNames = append(branchNames, branchName)
 		}
 	}
 
 	// Add untracked branches if requested
 	if opts.ShowUntracked {
-		untracked := getUntrackedBranchNames(ctx)
+		untracked := getUntrackedBranchNamesForCheckout(eng)
 		for _, branchName := range untracked {
 			if !seenBranches[branchName] {
-				choices = append(choices, tui.BranchChoice{
-					Display: branchName,
-					Value:   branchName,
-				})
+				branchNames = append(branchNames, branchName)
 				seenBranches[branchName] = true
 			}
 		}
 	}
 
 	// Fallback: if we still have no choices, get all branches directly from engine
-	if len(choices) == 0 {
-		allBranches := ctx.Engine.AllBranchNames()
-		trunkName := ctx.Engine.Trunk()
+	if len(branchNames) == 0 {
+		allBranches := eng.AllBranchNames()
+		trunkName := eng.Trunk()
 
 		// Ensure trunk is always included
 		if trunkName != "" && !seenBranches[trunkName] {
-			var display string
-			if trunkName == currentBranch {
-				display = tui.ColorBranchName(trunkName, true)
-				initialIndex = 0
-			} else {
-				display = tui.ColorBranchName(trunkName, false)
-			}
-			choices = append(choices, tui.BranchChoice{
-				Display: display,
-				Value:   trunkName,
-			})
+			branchNames = append(branchNames, trunkName)
 			seenBranches[trunkName] = true
 		}
 
 		// Add all other branches
 		for _, branchName := range allBranches {
 			if !seenBranches[branchName] {
-				var display string
-				if branchName == currentBranch {
-					display = tui.ColorBranchName(branchName, true)
-					initialIndex = len(choices)
-				} else {
-					display = tui.ColorBranchName(branchName, false)
-				}
-				choices = append(choices, tui.BranchChoice{
-					Display: display,
-					Value:   branchName,
-				})
+				branchNames = append(branchNames, branchName)
 				seenBranches[branchName] = true
 			}
 		}
 
-		if len(choices) == 0 {
-			return "", fmt.Errorf("no branches available to checkout")
+		if len(branchNames) == 0 {
+			return nil, fmt.Errorf("no branches available to checkout")
 		}
 	}
 
-	if len(choices) == 0 {
-		return "", fmt.Errorf("no branches available to checkout")
-	}
-
-	// Set initial index if not found
-	if initialIndex < 0 {
-		initialIndex = len(choices) - 1
-	}
-
-	// Show interactive selector
-	selected, err := tui.PromptBranchSelection("Checkout a branch (arrow keys to navigate, type to filter)", choices, initialIndex)
-	if err != nil {
-		return "", err
-	}
-
-	return selected, nil
+	return branchNames, nil
 }
 
 // printBranchInfo prints information about the checked out branch
@@ -241,17 +211,4 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 			return
 		}
 	}
-}
-
-// collectBranchesDepthFirst returns branches with trunk first, then children recursively
-func collectBranchesDepthFirst(branchName string, ctx *runtime.Context) []string {
-	var result []string
-	result = append(result, branchName)
-
-	children := ctx.Engine.GetChildren(branchName)
-	for _, child := range children {
-		result = append(result, collectBranchesDepthFirst(child, ctx)...)
-	}
-
-	return result
 }

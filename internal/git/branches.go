@@ -4,14 +4,31 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 )
 
-var defaultRepo *Repository
+var (
+	defaultRepo   *Repository
+	defaultRepoMu sync.RWMutex
+)
 
 // InitDefaultRepo initializes the default repository from the current directory
 func InitDefaultRepo() error {
+	// Fast path: check without write lock
+	defaultRepoMu.RLock()
 	if defaultRepo != nil {
+		defaultRepoMu.RUnlock()
 		return nil // Already initialized
+	}
+	defaultRepoMu.RUnlock()
+
+	// Slow path: acquire write lock
+	defaultRepoMu.Lock()
+	defer defaultRepoMu.Unlock()
+
+	// Double-check after acquiring lock
+	if defaultRepo != nil {
+		return nil // Already initialized by another goroutine
 	}
 
 	repoRoot, err := GetRepoRoot()
@@ -31,11 +48,15 @@ func InitDefaultRepo() error {
 // ResetDefaultRepo clears the default repository.
 // This should be called in tests to ensure each test gets a fresh repository.
 func ResetDefaultRepo() {
+	defaultRepoMu.Lock()
+	defer defaultRepoMu.Unlock()
 	defaultRepo = nil
 }
 
 // GetDefaultRepo returns the default repository (must call InitDefaultRepo first)
 func GetDefaultRepo() (*Repository, error) {
+	defaultRepoMu.RLock()
+	defer defaultRepoMu.RUnlock()
 	if defaultRepo == nil {
 		return nil, fmt.Errorf("repository not initialized, call InitDefaultRepo first")
 	}

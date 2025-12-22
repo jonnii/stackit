@@ -16,7 +16,6 @@ type RepoConfig struct {
 	Trunks                     []string `json:"trunks,omitempty"`
 	IsGithubIntegrationEnabled *bool    `json:"isGithubIntegrationEnabled,omitempty"`
 	BranchNamePattern          *string  `json:"branchNamePattern,omitempty"`
-	CreateAI                   *bool    `json:"create.ai,omitempty"`
 	SubmitFooter               *bool    `json:"submit.footer,omitempty"`
 	UndoStackDepth             *int     `json:"undo.stackDepth,omitempty"`
 }
@@ -193,40 +192,6 @@ func SetBranchNamePattern(repoRoot string, pattern string) error {
 	}
 
 	config.BranchNamePattern = &pattern
-
-	configJSON, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	return os.WriteFile(configPath, configJSON, 0600)
-}
-
-// GetCreateAI returns whether AI-powered PR description is enabled, or false by default
-func GetCreateAI(repoRoot string) (bool, error) {
-	config, err := GetRepoConfig(repoRoot)
-	if err != nil {
-		return false, err
-	}
-
-	return config.CreateAI != nil && *config.CreateAI, nil
-}
-
-// SetCreateAI updates the create.ai configuration
-func SetCreateAI(repoRoot string, enabled bool) error {
-	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
-
-	// Validate repo root exists
-	if _, err := os.Stat(repoRoot); err != nil {
-		return fmt.Errorf("repository root does not exist: %w", err)
-	}
-
-	config, err := GetRepoConfig(repoRoot)
-	if err != nil {
-		config = &RepoConfig{}
-	}
-
-	config.CreateAI = &enabled
 
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

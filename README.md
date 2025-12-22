@@ -80,6 +80,16 @@ stackit init
 
 This detects your trunk branch (usually `main`) and sets up Stackit.
 
+### 2. (Optional) Enable AI Agent Integration
+
+If you're using AI coding assistants like Cursor or Claude Code:
+
+```bash
+stackit agent init
+```
+
+This creates configuration files (`.cursor/rules/stackit.md` and `CLAUDE.md`) that help AI assistants understand how to use stackit effectively.
+
 ### 2. Create your first stacked branch
 
 ```bash
@@ -115,6 +125,15 @@ stackit submit
 ```
 
 This pushes all branches and creates/updates PRs on GitHub.
+
+## AI Agent Integration
+
+Stackit works great with AI coding assistants! Run `stackit agent init` to create configuration files that help AI assistants understand how to use stackit commands effectively.
+
+- **Cursor**: Creates `.cursor/rules/stackit.md` with stackit usage guidelines
+- **Claude Code**: Creates `CLAUDE.md` with stackit integration instructions
+
+AI agents can then use stackit commands directly to manage branches, create commits, and submit PRs without needing special flags or internal AI integrations.
 
 ## Commands
 

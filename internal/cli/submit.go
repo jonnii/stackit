@@ -9,7 +9,6 @@ import (
 )
 
 type submitFlags struct {
-	ai                   bool
 	branch               string
 	stack                bool
 	force                bool
@@ -39,7 +38,6 @@ type submitFlags struct {
 }
 
 func addSubmitFlags(cmd *cobra.Command, f *submitFlags) {
-	cmd.Flags().BoolVar(&f.ai, "ai", false, "Enable AI-powered PR description generation")
 	cmd.Flags().StringVar(&f.branch, "branch", "", "Which branch to run this command from. Defaults to the current branch.")
 	cmd.Flags().BoolVarP(&f.stack, "stack", "s", false, "Submit descendants of the current branch in addition to its ancestors.")
 	cmd.Flags().BoolVarP(&f.force, "force", "f", false, "Force push: overwrites the remote branch with your local branch. Otherwise defaults to --force-with-lease.")
@@ -102,7 +100,6 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 		Comment:              f.comment,
 		TargetTrunk:          f.targetTrunk,
 		IgnoreOutOfSyncTrunk: f.ignoreOutOfSyncTrunk,
-		AI:                   f.ai,
 	}
 
 	return submit.Action(ctx, opts)

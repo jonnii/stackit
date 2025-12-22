@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -46,7 +45,6 @@ type Options struct {
 	Comment              string
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
-	AI                   bool
 }
 
 // Info contains information about a branch to submit
@@ -239,84 +237,6 @@ func Action(ctx *runtime.Context, opts Options) error {
 func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
 	submissionInfos := make([]Info, 0, len(branches))
 
-	// Determine AI preference: flag takes precedence, then config default
-	aiEnabled := opts.AI
-	if !aiEnabled {
-		// Check config default
-		repoRoot := runtimeCtx.RepoRoot
-		if repoRoot == "" {
-			var err error
-			repoRoot, err = git.GetRepoRoot()
-			if err == nil {
-				configAI, err := config.GetCreateAI(repoRoot)
-				if err == nil {
-					aiEnabled = configAI
-				}
-			}
-		} else {
-			configAI, err := config.GetCreateAI(repoRoot)
-			if err == nil {
-				aiEnabled = configAI
-			}
-		}
-	}
-
-	// Create AI client if enabled
-	var aiClient ai.Client
-	type aiResult struct {
-		title string
-		body  string
-	}
-	aiResults := make(map[string]aiResult)
-
-	if aiEnabled {
-		aiClient = ai.NewMockClient()
-		runtimeCtx.Splog.Debug("AI-powered PR description generation enabled")
-
-		// Pre-generate AI metadata in parallel
-		type aiResponse struct {
-			branchName string
-			title      string
-			body       string
-			err        error
-		}
-		aiChan := make(chan aiResponse, len(branches))
-		var wg sync.WaitGroup
-
-		for _, branchName := range branches {
-			// Only generate if needed (new PR or explicitly requested)
-			prInfo, _ := eng.GetPrInfo(ctx, branchName)
-			if prInfo != nil && prInfo.Title != "" && prInfo.Body != "" && !opts.Edit {
-				continue
-			}
-
-			wg.Add(1)
-			go func(name string) {
-				defer wg.Done()
-				prContext, err := ai.CollectPRContext(runtimeCtx, eng, name)
-				if err != nil {
-					aiChan <- aiResponse{branchName: name, err: err}
-					return
-				}
-				generatedTitle, generatedBody, err := aiClient.GeneratePRDescription(ctx, prContext)
-				aiChan <- aiResponse{branchName: name, title: generatedTitle, body: generatedBody, err: err}
-			}(branchName)
-		}
-
-		go func() {
-			wg.Wait()
-			close(aiChan)
-		}()
-
-		for res := range aiChan {
-			if res.err != nil {
-				runtimeCtx.Splog.Debug("AI generation failed for %s: %v", res.branchName, res.err)
-				continue
-			}
-			aiResults[res.branchName] = aiResult{title: res.title, body: res.body}
-		}
-	}
-
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
 		prInfo, _ := eng.GetPrInfo(ctx, branchName)
@@ -374,10 +294,6 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 			Publish:           opts.Publish,
 			Reviewers:         opts.Reviewers,
 			ReviewersPrompt:   opts.Reviewers == "" && opts.Edit,
-			AI:                aiEnabled,
-			AIClient:          aiClient,
-			AIGeneratedTitle:  aiResults[branchName].title,
-			AIGeneratedBody:   aiResults[branchName].body,
 		}
 
 		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, runtimeCtx)

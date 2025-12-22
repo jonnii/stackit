@@ -2,13 +2,11 @@ package submit_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions/submit"
-	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
@@ -155,118 +153,6 @@ func TestPreparePRMetadata_NoEdit(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, metadata.Title, "Title should be set from commit subject")
 		require.Equal(t, "feat: test feature", metadata.Title)
-	})
-}
-
-func TestPreparePRMetadata_AI(t *testing.T) {
-	t.Run("AI generation when enabled and no existing body", func(t *testing.T) {
-		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
-		branchName := featureBranch
-
-		// Create a commit
-		s.CreateBranch(branchName).
-			CommitChange("change", "feat: add feature")
-
-		// Track the branch
-		err := s.Engine.TrackBranch(context.Background(), branchName, "main")
-		require.NoError(t, err)
-
-		// Create mock AI client with response
-		mockClient := ai.NewMockClient()
-		mockClient.SetMockResponse("AI Generated Title", "AI Generated Body\n\nThis is a test PR description.")
-
-		opts := submit.MetadataOptions{
-			AI:       true,
-			AIClient: mockClient,
-			NoEdit:   true, // Skip editor to test AI generation
-		}
-
-		metadata, err := submit.PreparePRMetadata(branchName, opts, s.Engine, s.Context)
-		require.NoError(t, err)
-		require.Equal(t, "AI Generated Title", metadata.Title)
-		require.Contains(t, metadata.Body, "AI Generated Body")
-	})
-
-	t.Run("AI fallback when generation fails", func(t *testing.T) {
-		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
-		branchName := featureBranch
-
-		// Create a commit
-		s.CreateBranch(branchName).
-			CommitChange("change", "feat: add feature")
-
-		// Track the branch
-		err := s.Engine.TrackBranch(context.Background(), branchName, "main")
-		require.NoError(t, err)
-
-		// Create mock AI client with error
-		mockClient := ai.NewMockClient()
-		mockClient.SetMockError(fmt.Errorf("AI service unavailable"))
-
-		opts := submit.MetadataOptions{
-			AI:       true,
-			AIClient: mockClient,
-			NoEdit:   true, // Skip editor
-		}
-
-		// Should fall back to default behavior (commit message)
-		metadata, err := submit.PreparePRMetadata(branchName, opts, s.Engine, s.Context)
-		require.NoError(t, err)
-		require.Equal(t, "feat: add feature", metadata.Title)
-		// Body should be empty or from commit messages, not AI-generated
-	})
-
-	t.Run("AI disabled uses default behavior", func(t *testing.T) {
-		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
-		branchName := featureBranch
-
-		// Create a commit
-		s.CreateBranch(branchName).
-			CommitChange("change", "feat: add feature")
-
-		// Track the branch
-		err := s.Engine.TrackBranch(context.Background(), branchName, "main")
-		require.NoError(t, err)
-
-		opts := submit.MetadataOptions{
-			AI:       false, // AI disabled
-			AIClient: nil,
-			NoEdit:   true,
-		}
-
-		metadata, err := submit.PreparePRMetadata(branchName, opts, s.Engine, s.Context)
-		require.NoError(t, err)
-		require.Equal(t, "feat: add feature", metadata.Title)
-		// Should not call AI client
-	})
-
-	t.Run("AI skipped when existing body present", func(t *testing.T) {
-		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
-		branchName := featureBranch
-
-		// Create existing PR info with body
-		err := s.Engine.UpsertPrInfo(context.Background(), branchName, &engine.PrInfo{
-			Title: "Existing Title",
-			Body:  "Existing Body",
-		})
-		require.NoError(t, err)
-
-		// Create mock AI client
-		mockClient := ai.NewMockClient()
-		mockClient.SetMockResponse("AI Title", "AI Body")
-
-		opts := submit.MetadataOptions{
-			AI:       true,
-			AIClient: mockClient,
-			NoEdit:   true,
-		}
-
-		metadata, err := submit.PreparePRMetadata(branchName, opts, s.Engine, s.Context)
-		require.NoError(t, err)
-		require.Equal(t, "Existing Title", metadata.Title)
-		require.Equal(t, "Existing Body", metadata.Body)
-		// AI should not be called since body already exists
-		require.Equal(t, 0, mockClient.CallCount(), "AI client should not be called when body exists")
 	})
 }
 

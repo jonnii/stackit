@@ -29,8 +29,6 @@ Examples:
   stackit config --list             # Print all config values
   stackit config get branch.pattern
   stackit config set branch.pattern "{username}/{date}/{message}"
-  stackit config get create.ai
-  stackit config set create.ai true
   stackit config get submit.footer
   stackit config set submit.footer false`,
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -87,12 +85,6 @@ func newConfigGetCmd() *cobra.Command {
 					return fmt.Errorf("failed to get branch.pattern: %w", err)
 				}
 				fmt.Println(pattern)
-			case "create.ai":
-				enabled, err := config.GetCreateAI(repoRoot)
-				if err != nil {
-					return fmt.Errorf("failed to get create.ai: %w", err)
-				}
-				fmt.Println(enabled)
 			case "submit.footer":
 				enabled, err := config.GetSubmitFooter(repoRoot)
 				if err != nil {
@@ -138,15 +130,6 @@ func newConfigSetCmd() *cobra.Command {
 					return fmt.Errorf("failed to set branch.pattern: %w", err)
 				}
 				splog.Info("Set branch.pattern to: %s", value)
-			case "create.ai":
-				enabled, err := strconv.ParseBool(value)
-				if err != nil {
-					return fmt.Errorf("invalid value for create.ai: %s (must be 'true' or 'false')", value)
-				}
-				if err := config.SetCreateAI(repoRoot, enabled); err != nil {
-					return fmt.Errorf("failed to set create.ai: %w", err)
-				}
-				splog.Info("Set create.ai to: %v", enabled)
 			case "submit.footer":
 				enabled, err := strconv.ParseBool(value)
 				if err != nil {

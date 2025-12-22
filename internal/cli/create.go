@@ -4,14 +4,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/ai"
 	"stackit.dev/stackit/internal/runtime"
 )
 
 // newCreateCmd creates the create command
 func newCreateCmd() *cobra.Command {
 	var (
-		aiFlag  bool
 		all     bool
 		insert  bool
 		message string
@@ -26,7 +24,6 @@ func newCreateCmd() *cobra.Command {
 		Long: `Create a new branch stacked on top of the current branch and commit staged changes.
 
 If no branch name is specified, generate a branch name from the commit message.
-If --ai is used without a branch name or message, AI will generate a commit message from staged changes.
 If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,20 +39,6 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 				branchName = args[0]
 			}
 
-			// Create AI client if AI is enabled
-			var aiClient ai.Client
-			if aiFlag {
-				// Try to create real cursor-agent client, fall back to mock if unavailable
-				cursorClient, err := ai.NewCursorAgentClient()
-				if err != nil {
-					// Fall back to mock client if cursor-agent is not available
-					ctx.Splog.Debug("cursor-agent not available, using mock client: %v", err)
-					aiClient = ai.NewMockClient()
-				} else {
-					aiClient = cursorClient
-				}
-			}
-
 			// Prepare options
 			opts := actions.CreateOptions{
 				BranchName: branchName,
@@ -65,8 +48,6 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 				Patch:      patch,
 				Update:     update,
 				Verbose:    verbose,
-				AI:         aiFlag,
-				AIClient:   aiClient,
 			}
 
 			// Execute create action
@@ -76,7 +57,6 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 
 	// Add flags
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Stage all unstaged changes before creating the branch, including to untracked files")
-	cmd.Flags().BoolVarP(&aiFlag, "ai", "", false, "Generate commit message using AI from staged changes. Branch name will be generated from the AI commit message.")
 	cmd.Flags().BoolVarP(&insert, "insert", "i", false, "Insert this branch between the current branch and its child. If there are multiple children, prompts you to select which should be moved onto the new branch")
 	cmd.Flags().StringVarP(&message, "message", "m", "", "Specify a commit message")
 	cmd.Flags().BoolVarP(&patch, "patch", "p", false, "Pick hunks to stage before committing")

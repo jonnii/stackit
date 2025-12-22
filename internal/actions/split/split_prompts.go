@@ -1,4 +1,4 @@
-package actions
+package split
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package actions
+package split
 
 import (
 	"context"
@@ -29,7 +29,7 @@ type splitByFileEngine interface {
 //  5. Checkout the original branch and remove the extracted files.
 //  6. Commit the removals on the original branch.
 //  7. Update the original branch's parent to be the new split branch.
-func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng splitByFileEngine) (*SplitResult, error) {
+func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng splitByFileEngine) (*Result, error) {
 	// Get parent branch
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
 
@@ -100,7 +100,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 		return nil, fmt.Errorf("failed to update parent: %w", err)
 	}
 
-	return &SplitResult{
+	return &Result{
 		BranchNames:  []string{newBranchName},
 		BranchPoints: []int{0}, // Single commit
 	}, nil

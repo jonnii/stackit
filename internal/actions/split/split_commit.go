@@ -1,4 +1,4 @@
-package actions
+package split
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -25,7 +26,7 @@ type splitByCommitEngine interface {
 //  3. Interactively prompt for a name for each new branch.
 //  4. Detach HEAD to the original branch's head to prepare for state changes.
 //  5. Return the selected branch names and points to be applied by the engine.
-func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitEngine, splog *tui.Splog) (*SplitResult, error) {
+func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitEngine, splog *tui.Splog) (*Result, error) {
 	// Get readable commits
 	readableCommits, err := eng.GetAllCommits(ctx, branchToSplit, engine.CommitFormatReadable)
 	if err != nil {
@@ -90,7 +91,7 @@ func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitE
 		return nil, fmt.Errorf("failed to detach: %w", err)
 	}
 
-	return &SplitResult{
+	return &Result{
 		BranchNames:  branchNames,
 		BranchPoints: branchPoints,
 	}, nil
@@ -105,7 +106,7 @@ func getBranchPoints(readableCommits []string, numChildren int, parentBranchName
 	// Build choices for the prompt
 	choices := []string{}
 	if numChildren > 0 {
-		choices = append(choices, fmt.Sprintf("%d %s", numChildren, Pluralize("child", numChildren)))
+		choices = append(choices, fmt.Sprintf("%d %s", numChildren, actions.Pluralize("child", numChildren)))
 	}
 
 	// Add commits

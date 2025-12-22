@@ -1,7 +1,10 @@
 // Package github provides a client for interacting with the GitHub API.
 package github
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // PullRequestInfo contains information about a pull request
 // This is a simplified struct to avoid coupling to go-github library
@@ -15,6 +18,22 @@ type PullRequestInfo struct {
 	Draft   bool
 	Base    string
 	Head    string
+}
+
+// CheckDetail represents the status of an individual CI check
+type CheckDetail struct {
+	Name       string
+	Status     string // QUEUED, IN_PROGRESS, COMPLETED
+	Conclusion string // SUCCESS, FAILURE, NEUTRAL, etc.
+	StartedAt  time.Time
+	FinishedAt time.Time
+}
+
+// CheckStatus represents the combined status of all CI checks for a PR
+type CheckStatus struct {
+	Passing bool
+	Pending bool
+	Checks  []CheckDetail
 }
 
 // Client is an interface for GitHub API interactions
@@ -32,8 +51,7 @@ type Client interface {
 	MergePullRequest(ctx context.Context, branchName string) error
 
 	// GetPRChecksStatus returns the check status for a PR
-	// Returns (passing, pending, error)
-	GetPRChecksStatus(ctx context.Context, branchName string) (passing bool, pending bool, err error)
+	GetPRChecksStatus(ctx context.Context, branchName string) (*CheckStatus, error)
 
 	// GetOwnerRepo returns the repository owner and name
 	GetOwnerRepo() (owner, repo string)

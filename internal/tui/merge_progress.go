@@ -3,6 +3,8 @@ package tui
 import (
 	"sync"
 	"time"
+
+	"stackit.dev/stackit/internal/github"
 )
 
 // ChannelMergeProgressReporter implements merge.ProgressReporter using channels
@@ -57,11 +59,20 @@ func (r *ChannelMergeProgressReporter) StepFailed(stepIndex int, err error) {
 }
 
 // StepWaiting reports progress on a waiting step
-func (r *ChannelMergeProgressReporter) StepWaiting(stepIndex int, elapsed, timeout time.Duration) {
+func (r *ChannelMergeProgressReporter) StepWaiting(stepIndex int, elapsed, timeout time.Duration, checks []github.CheckDetail) {
 	r.updates <- ProgressUpdate{
 		Type:      "waiting",
 		StepIndex: stepIndex,
 		Elapsed:   elapsed,
 		Timeout:   timeout,
+		Checks:    checks,
+	}
+}
+
+// SetEstimatedDuration sets the total estimated duration
+func (r *ChannelMergeProgressReporter) SetEstimatedDuration(duration time.Duration) {
+	r.updates <- ProgressUpdate{
+		Type:              "estimate",
+		EstimatedDuration: duration,
 	}
 }

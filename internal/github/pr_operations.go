@@ -259,19 +259,14 @@ func MergePullRequest(ctx context.Context, client *github.Client, owner, repo, b
 }
 
 // GetPRChecksStatus returns the check status for a PR
-// Returns (passing, pending, error)
-// passing: true if all checks are passing, false if any are failing
-// pending: true if any checks are still pending
-func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, branchName string) (bool, bool, error) {
+func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, branchName string) (*CheckStatus, error) {
 	// First, get the PR for this branch to get the head SHA
 	pr, err := GetPullRequestByBranch(ctx, client, owner, repo, branchName)
 	if err != nil {
-		// If we can't get the PR, assume checks are passing (safe default)
-		return true, false, nil //nolint:nilerr
+		return &CheckStatus{Passing: true, Pending: false}, nil //nolint:nilerr
 	}
 	if pr == nil || pr.Head == nil || pr.Head.SHA == nil {
-		// No PR found or no head SHA, assume passing
-		return true, false, nil
+		return &CheckStatus{Passing: true, Pending: false}, nil
 	}
 
 	headSHA := *pr.Head.SHA
@@ -279,110 +274,79 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 	// Get check runs for the head commit
 	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, owner, repo, headSHA, &github.ListCheckRunsOptions{
 		ListOptions: github.ListOptions{
-			PerPage: 100, // Get up to 100 check runs
+			PerPage: 100,
 		},
 	})
-	if err != nil {
-		// If we can't get check runs, also try combined status
-		return getCombinedStatus(ctx, client, owner, repo, headSHA)
-	}
 
-	// Also get combined status for a complete picture
-	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, headSHA, nil)
-	if err != nil {
-		// If we can't get combined status, just use check runs
-		passing, pending := evaluateCheckRuns(checkRuns.CheckRuns)
-		return passing, pending, nil //nolint:nilerr
-	}
-
-	// Combine results from both check runs and status
+	var checks []CheckDetail
 	hasPending := false
 	hasFailing := false
 
-	// Process check runs - these are the most accurate source of truth
-	for _, run := range checkRuns.CheckRuns {
-		if run.Status != nil {
-			status := strings.ToUpper(*run.Status)
-			// Only consider a check as pending if it's actively queued or in progress
-			// If status is "COMPLETED", it's not pending regardless of conclusion
-			if status == "QUEUED" || status == "IN_PROGRESS" {
+	if err == nil && checkRuns != nil {
+		for _, run := range checkRuns.CheckRuns {
+			detail := CheckDetail{
+				Name:   run.GetName(),
+				Status: strings.ToUpper(run.GetStatus()),
+			}
+			if run.Conclusion != nil {
+				detail.Conclusion = strings.ToUpper(*run.Conclusion)
+			}
+			if run.StartedAt != nil {
+				detail.StartedAt = run.StartedAt.Time
+			}
+			if run.CompletedAt != nil {
+				detail.FinishedAt = run.CompletedAt.Time
+			}
+			checks = append(checks, detail)
+
+			if detail.Status == "QUEUED" || detail.Status == "IN_PROGRESS" {
 				hasPending = true
 			}
-		}
-		if run.Conclusion != nil {
-			conclusion := strings.ToUpper(*run.Conclusion)
-			if conclusion == checkConclusionFailure || conclusion == checkConclusionCanceled || conclusion == checkConclusionTimedOut || conclusion == checkConclusionActionRequired {
+			if detail.Conclusion == checkConclusionFailure || detail.Conclusion == checkConclusionCanceled || detail.Conclusion == checkConclusionTimedOut || detail.Conclusion == checkConclusionActionRequired {
 				hasFailing = true
 			}
 		}
 	}
 
-	// Process combined status as a fallback
-	// Only use combined status if we don't have check runs data or if it indicates failure
-	// Combined status can be stale, so we prioritize check runs above
-	if combinedStatus != nil && combinedStatus.State != nil {
-		state := strings.ToUpper(*combinedStatus.State)
-		// Only trust combined status for pending if we have no check runs or if check runs also indicate pending
-		// This prevents false positives from stale combined status
-		if len(checkRuns.CheckRuns) == 0 {
-			// No check runs available, use combined status
+	// Also get combined status
+	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, headSHA, nil)
+	if err == nil && combinedStatus != nil {
+		for _, status := range combinedStatus.Statuses {
+			detail := CheckDetail{
+				Name:   status.GetContext(),
+				Status: "COMPLETED",
+			}
+			state := strings.ToUpper(status.GetState())
+			switch state {
+			case checkStatePending:
+				detail.Status = "IN_PROGRESS"
+				hasPending = true
+			case checkStateFailure, checkStateError:
+				detail.Conclusion = checkConclusionFailure
+				hasFailing = true
+			case "SUCCESS":
+				detail.Conclusion = "SUCCESS"
+			}
+			// Combined status doesn't give us precise times usually in this struct
+			checks = append(checks, detail)
+		}
+
+		// If no check runs but combined status shows something, use it
+		if len(checks) == 0 && combinedStatus.State != nil {
+			state := strings.ToUpper(*combinedStatus.State)
 			if state == checkStatePending {
 				hasPending = true
 			} else if state == checkStateFailure || state == checkStateError {
 				hasFailing = true
 			}
-		} else {
-			// We have check runs, only use combined status for failures (more reliable)
-			if state == checkStateFailure || state == checkStateError {
-				hasFailing = true
-			}
-			// Don't use combined status for pending if we have check runs - check runs are more accurate
 		}
 	}
 
-	return !hasFailing, hasPending, nil
-}
-
-// getCombinedStatus is a fallback that only uses combined status
-func getCombinedStatus(ctx context.Context, client *github.Client, owner, repo, ref string) (bool, bool, error) {
-	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, ref, nil)
-	if err != nil {
-		// If we can't get status, assume passing (safe default)
-		return true, false, nil //nolint:nilerr
-	}
-
-	if combinedStatus == nil || combinedStatus.State == nil {
-		return true, false, nil
-	}
-
-	state := strings.ToUpper(*combinedStatus.State)
-	hasPending := state == checkStatePending
-	hasFailing := state == checkStateFailure || state == checkStateError
-
-	return !hasFailing, hasPending, nil
-}
-
-// evaluateCheckRuns evaluates check runs and returns (passing, pending)
-func evaluateCheckRuns(checkRuns []*github.CheckRun) (bool, bool) {
-	hasPending := false
-	hasFailing := false
-
-	for _, run := range checkRuns {
-		if run.Status != nil {
-			status := strings.ToUpper(*run.Status)
-			if status == "QUEUED" || status == "IN_PROGRESS" {
-				hasPending = true
-			}
-		}
-		if run.Conclusion != nil {
-			conclusion := strings.ToUpper(*run.Conclusion)
-			if conclusion == checkConclusionFailure || conclusion == checkConclusionCanceled || conclusion == checkConclusionTimedOut || conclusion == checkConclusionActionRequired {
-				hasFailing = true
-			}
-		}
-	}
-
-	return !hasFailing, hasPending
+	return &CheckStatus{
+		Passing: !hasFailing,
+		Pending: hasPending,
+		Checks:  checks,
+	}, nil
 }
 
 // updatePRDraftStatus updates the draft status of a PR using GitHub's GraphQL API

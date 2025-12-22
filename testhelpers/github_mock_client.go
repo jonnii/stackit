@@ -100,9 +100,15 @@ func (c *MockGitHubClient) MergePullRequest(_ context.Context, _ string) error {
 }
 
 // GetPRChecksStatus returns the check status for a PR
-func (c *MockGitHubClient) GetPRChecksStatus(_ context.Context, _ string) (bool, bool, error) {
+func (c *MockGitHubClient) GetPRChecksStatus(_ context.Context, _ string) (*githubpkg.CheckStatus, error) {
 	// In tests, always return passing
-	return true, false, nil
+	return &githubpkg.CheckStatus{
+		Passing: true,
+		Pending: false,
+		Checks: []githubpkg.CheckDetail{
+			{Name: "Mock Check", Status: "COMPLETED", Conclusion: "SUCCESS"},
+		},
+	}, nil
 }
 
 // toPullRequestInfo converts a github.PullRequest to githubpkg.PullRequestInfo

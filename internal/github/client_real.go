@@ -176,7 +176,7 @@ func (c *RealGitHubClient) MergePullRequest(ctx context.Context, branchName stri
 }
 
 // GetPRChecksStatus returns the check status for a PR
-func (c *RealGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (bool, bool, error) {
+func (c *RealGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (*CheckStatus, error) {
 	return GetPRChecksStatus(ctx, c.client, c.owner, c.repo, branchName)
 }
 

@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"stackit.dev/stackit/internal/github"
 )
 
 // MergeGroup represents a group of steps that should be displayed as a single line
@@ -25,19 +27,21 @@ type MergeStepItem struct {
 	Error       error
 	WaitElapsed time.Duration
 	WaitTimeout time.Duration
+	Checks      []github.CheckDetail
 }
 
 // MergeTUIModel is the bubbletea model for merge progress
 type MergeTUIModel struct {
-	groups     []MergeGroup
-	steps      []MergeStepItem
-	currentIdx int
-	spinner    spinner.Model
-	done       bool
-	quitting   bool
-	styles     mergeStyles
-	updates    <-chan ProgressUpdate
-	doneChan   chan<- bool
+	groups            []MergeGroup
+	steps             []MergeStepItem
+	currentIdx        int
+	spinner           spinner.Model
+	done              bool
+	quitting          bool
+	styles            mergeStyles
+	updates           <-chan ProgressUpdate
+	doneChan          chan<- bool
+	estimatedDuration time.Duration
 }
 
 type mergeStyles struct {
@@ -57,6 +61,13 @@ const (
 	mergeStatusError   = "error"
 )
 
+const (
+	dotSymbol        = "●"
+	statusCompleted  = "COMPLETED"
+	statusInProgress = "IN_PROGRESS"
+	statusQueued     = "QUEUED"
+)
+
 // StepUpdateMsg is sent when a step status changes
 type StepUpdateMsg struct {
 	StepIndex int
@@ -69,7 +80,11 @@ type StepWaitUpdateMsg struct {
 	StepIndex int
 	Elapsed   time.Duration
 	Timeout   time.Duration
+	Checks    []github.CheckDetail
 }
+
+// EstimatedDurationMsg is sent when the total estimated duration is updated
+type EstimatedDurationMsg time.Duration
 
 // NewMergeTUIModel creates a new merge TUI model
 func NewMergeTUIModel(groups []MergeGroup, stepDescriptions []string) MergeTUIModel {
@@ -155,7 +170,10 @@ func (m MergeTUIModel) checkForUpdates() tea.Cmd {
 					StepIndex: update.StepIndex,
 					Elapsed:   update.Elapsed,
 					Timeout:   update.Timeout,
+					Checks:    update.Checks,
 				}
+			case "estimate":
+				msg = EstimatedDurationMsg(update.EstimatedDuration)
 			}
 			return msg
 		default:
@@ -206,9 +224,14 @@ func (m MergeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.StepIndex < len(m.steps) {
 			m.steps[msg.StepIndex].WaitElapsed = msg.Elapsed
 			m.steps[msg.StepIndex].WaitTimeout = msg.Timeout
+			m.steps[msg.StepIndex].Checks = msg.Checks
 			m.steps[msg.StepIndex].Status = mergeStatusWaiting
 		}
 		// Continue checking for updates
+		return m, m.checkForUpdates()
+
+	case EstimatedDurationMsg:
+		m.estimatedDuration = time.Duration(msg)
 		return m, m.checkForUpdates()
 
 	case tea.QuitMsg:
@@ -226,12 +249,10 @@ func (m MergeTUIModel) View() string {
 
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString("Merge Progress:\n")
-	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Merge Progress:"))
+	b.WriteString("\n\n")
 
 	for i, group := range m.groups {
-		var icon string
-		var status string
 		var groupStatus string
 		var activeStep *MergeStepItem
 		var failedStep *MergeStepItem
@@ -268,64 +289,76 @@ func (m MergeTUIModel) View() string {
 			}
 		}
 
+		// Don't show completed groups if they are not the last one or have errors
+		// (optional: can be enabled for ultra-compact mode)
+
+		var line strings.Builder
+		var icon string
+		var labelStyle lipgloss.Style
+
 		switch groupStatus {
 		case mergeStatusPending:
 			icon = m.styles.dimStyle.Render("○")
-			status = m.styles.dimStyle.Render("pending")
+			labelStyle = m.styles.dimStyle
 		case mergeStatusRunning:
 			icon = m.spinner.View()
-			if activeStep != nil {
-				if activeStep.Status == mergeStatusWaiting {
-					elapsed := activeStep.WaitElapsed.Round(time.Second)
-					timeout := activeStep.WaitTimeout.Round(time.Second)
-					if timeout == 0 {
-						timeout = 10 * time.Minute
-					}
-					timeStr := fmt.Sprintf("(%v / %v)", elapsed, timeout)
-					status = m.styles.waitStyle.Render("waiting for CI...") + " " + m.styles.timeStyle.Render(timeStr)
-				} else {
-					// Shorten the description if it's redundant with the group label
-					desc := activeStep.Description
-					if strings.Contains(desc, group.Label) {
-						// Extract the action from the description
-						// e.g. "Merge PR #101 (branch-a)" -> "merging"
-						switch {
-						case strings.HasPrefix(desc, "Merge PR"):
-							desc = "merging"
-						case strings.HasPrefix(desc, "Delete local branch"):
-							desc = "deleting local branch"
-						case strings.HasPrefix(desc, "Restack"):
-							desc = "restacking"
-						}
-					}
-					status = m.styles.spinnerStyle.Render(desc + "...")
-				}
-			} else {
-				status = m.styles.spinnerStyle.Render("running...")
-			}
+			labelStyle = lipgloss.NewStyle().Bold(true)
 		case mergeStatusDone:
 			icon = m.styles.doneStyle.Render("✓")
-			status = m.styles.doneStyle.Render("done")
+			labelStyle = m.styles.doneStyle
 		case mergeStatusError:
 			icon = m.styles.errorStyle.Render("✗")
-			status = m.styles.errorStyle.Render("failed")
+			labelStyle = m.styles.errorStyle
 		}
 
-		line := fmt.Sprintf("  %s %d. %s %s", icon, i+1, group.Label, status)
+		line.WriteString(fmt.Sprintf("  %s %s ", icon, labelStyle.Render(group.Label)))
 
-		if groupStatus == mergeStatusError && failedStep != nil && failedStep.Error != nil {
-			line += " " + m.styles.errorStyle.Render("→ "+failedStep.Error.Error())
+		if groupStatus == mergeStatusRunning && activeStep != nil {
+			if activeStep.Status == mergeStatusWaiting {
+				elapsed := activeStep.WaitElapsed.Round(time.Second)
+
+				// Show check indicators
+				if len(activeStep.Checks) > 0 {
+					line.WriteString(m.renderCheckIndicators(activeStep.Checks))
+					line.WriteString(" ")
+				}
+
+				// Show progress bar if we have an estimate
+				if m.estimatedDuration > 0 {
+					line.WriteString(m.renderProgressBar(elapsed, m.estimatedDuration))
+					line.WriteString(" ")
+				}
+
+				line.WriteString(m.styles.timeStyle.Render(fmt.Sprintf("%v elapsed", elapsed)))
+
+				// Show detailed check status on next line if waiting
+				line.WriteString("\n")
+				line.WriteString(m.renderDetailedChecks(activeStep.Checks))
+			} else {
+				desc := activeStep.Description
+				// Simplify common descriptions
+				switch {
+				case strings.HasPrefix(desc, "Merge PR"):
+					desc = "merging"
+				case strings.HasPrefix(desc, "Delete local branch"):
+					desc = "deleting"
+				case strings.HasPrefix(desc, "Restack"):
+					desc = "restacking"
+				}
+				line.WriteString(m.styles.spinnerStyle.Render("[" + desc + "]"))
+			}
+		} else if groupStatus == mergeStatusError && failedStep != nil && failedStep.Error != nil {
+			line.WriteString(m.styles.errorStyle.Render("→ " + failedStep.Error.Error()))
 		}
 
-		b.WriteString(line)
+		b.WriteString(line.String())
 		if i < len(m.groups)-1 {
 			b.WriteString("\n")
 		}
 	}
 
-	b.WriteString("\n")
-
 	if m.done {
+		// ...
 		completedGroups := 0
 		failedGroups := 0
 		for _, group := range m.groups {
@@ -358,14 +391,100 @@ func (m MergeTUIModel) View() string {
 	return b.String()
 }
 
+func (m MergeTUIModel) renderCheckIndicators(checks []github.CheckDetail) string {
+	var b strings.Builder
+	b.WriteString("[")
+	for _, check := range checks {
+		var symbol string
+		var style lipgloss.Style
+		switch check.Status {
+		case statusCompleted:
+			symbol = dotSymbol
+			switch check.Conclusion {
+			case "SUCCESS":
+				style = m.styles.doneStyle
+			case "NEUTRAL", "SKIPPED":
+				style = m.styles.dimStyle
+			default:
+				style = m.styles.errorStyle
+			}
+		case statusQueued:
+			symbol = "○"
+			style = m.styles.dimStyle
+		case statusInProgress:
+			symbol = dotSymbol
+			style = m.styles.waitStyle
+		default:
+			symbol = "?"
+			style = m.styles.dimStyle
+		}
+		b.WriteString(style.Render(symbol))
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
+func (m MergeTUIModel) renderProgressBar(elapsed, estimate time.Duration) string {
+	width := 10
+	if estimate == 0 {
+		return ""
+	}
+	progress := float64(elapsed) / float64(estimate)
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	filled := int(progress * float64(width))
+
+	var b strings.Builder
+	b.WriteString("[")
+	for i := 0; i < width; i++ {
+		if i < filled {
+			b.WriteString(m.styles.doneStyle.Render("█"))
+		} else {
+			b.WriteString(m.styles.dimStyle.Render("░"))
+		}
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
+func (m MergeTUIModel) renderDetailedChecks(checks []github.CheckDetail) string {
+	if len(checks) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("    └ ")
+	var activeChecks []string
+	for _, check := range checks {
+		if check.Status == statusInProgress || (check.Status == statusCompleted && check.Conclusion != "SUCCESS" && check.Conclusion != "NEUTRAL" && check.Conclusion != "SKIPPED") {
+			status := "running"
+			style := m.styles.waitStyle
+			if check.Status == statusCompleted {
+				status = strings.ToLower(check.Conclusion)
+				style = m.styles.errorStyle
+			}
+			activeChecks = append(activeChecks, fmt.Sprintf("%s (%s)", check.Name, style.Render(status)))
+		}
+	}
+	if len(activeChecks) == 0 {
+		b.WriteString(m.styles.dimStyle.Render("waiting for checks to start..."))
+	} else {
+		b.WriteString(strings.Join(activeChecks, ", "))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
 // ProgressUpdate represents an update to merge progress
 type ProgressUpdate struct {
-	Type        string // "started", "completed", "failed", "waiting"
-	StepIndex   int
-	Description string
-	Error       error
-	Elapsed     time.Duration
-	Timeout     time.Duration
+	Type              string // "started", "completed", "failed", "waiting", "estimate"
+	StepIndex         int
+	Description       string
+	Error             error
+	Elapsed           time.Duration
+	Timeout           time.Duration
+	Checks            []github.CheckDetail
+	EstimatedDuration time.Duration
 }
 
 // RunMergeTUI runs the merge TUI with channel-based updates

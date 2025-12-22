@@ -11,6 +11,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// MergeGroup represents a group of steps that should be displayed as a single line
+type MergeGroup struct {
+	Label       string
+	StepIndices []int
+}
+
 // MergeStepItem represents a step in the merge process
 type MergeStepItem struct {
 	StepIndex   int
@@ -23,6 +29,7 @@ type MergeStepItem struct {
 
 // MergeTUIModel is the bubbletea model for merge progress
 type MergeTUIModel struct {
+	groups     []MergeGroup
 	steps      []MergeStepItem
 	currentIdx int
 	spinner    spinner.Model
@@ -65,7 +72,7 @@ type StepWaitUpdateMsg struct {
 }
 
 // NewMergeTUIModel creates a new merge TUI model
-func NewMergeTUIModel(stepDescriptions []string) MergeTUIModel {
+func NewMergeTUIModel(groups []MergeGroup, stepDescriptions []string) MergeTUIModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -79,7 +86,19 @@ func NewMergeTUIModel(stepDescriptions []string) MergeTUIModel {
 		}
 	}
 
+	// If no groups provided, create one group per step
+	if len(groups) == 0 {
+		groups = make([]MergeGroup, len(stepDescriptions))
+		for i, desc := range stepDescriptions {
+			groups[i] = MergeGroup{
+				Label:       desc,
+				StepIndices: []int{i},
+			}
+		}
+	}
+
 	return MergeTUIModel{
+		groups:     groups,
 		steps:      steps,
 		currentIdx: 0,
 		spinner:    s,
@@ -171,6 +190,9 @@ func (m MergeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If step completed, move to next
 			if msg.Status == mergeStatusDone && msg.StepIndex == m.currentIdx {
 				m.currentIdx++
+				if m.currentIdx == len(m.steps) {
+					m.done = true
+				}
 			}
 			// If step failed, mark as done
 			if msg.Status == mergeStatusError {
@@ -207,26 +229,80 @@ func (m MergeTUIModel) View() string {
 	b.WriteString("Merge Progress:\n")
 	b.WriteString("\n")
 
-	for i, step := range m.steps {
+	for i, group := range m.groups {
 		var icon string
 		var status string
+		var groupStatus string
+		var activeStep *MergeStepItem
+		var failedStep *MergeStepItem
 
-		switch step.Status {
+		allDone := true
+		allPending := true
+
+		for _, idx := range group.StepIndices {
+			step := &m.steps[idx]
+			if step.Status == mergeStatusError {
+				failedStep = step
+				groupStatus = mergeStatusError
+				break
+			}
+			if step.Status != mergeStatusDone {
+				allDone = false
+			}
+			if step.Status != mergeStatusPending {
+				allPending = false
+			}
+			if (step.Status == mergeStatusRunning || step.Status == mergeStatusWaiting) && activeStep == nil {
+				activeStep = step
+			}
+		}
+
+		if groupStatus != mergeStatusError {
+			switch {
+			case allDone:
+				groupStatus = mergeStatusDone
+			case allPending:
+				groupStatus = mergeStatusPending
+			default:
+				groupStatus = mergeStatusRunning
+			}
+		}
+
+		switch groupStatus {
 		case mergeStatusPending:
 			icon = m.styles.dimStyle.Render("○")
 			status = m.styles.dimStyle.Render("pending")
 		case mergeStatusRunning:
 			icon = m.spinner.View()
-			status = m.styles.spinnerStyle.Render("running...")
-		case mergeStatusWaiting:
-			icon = m.spinner.View()
-			elapsed := step.WaitElapsed.Round(time.Second)
-			timeout := step.WaitTimeout.Round(time.Second)
-			if timeout == 0 {
-				timeout = 10 * time.Minute // Default display
+			if activeStep != nil {
+				if activeStep.Status == mergeStatusWaiting {
+					elapsed := activeStep.WaitElapsed.Round(time.Second)
+					timeout := activeStep.WaitTimeout.Round(time.Second)
+					if timeout == 0 {
+						timeout = 10 * time.Minute
+					}
+					timeStr := fmt.Sprintf("(%v / %v)", elapsed, timeout)
+					status = m.styles.waitStyle.Render("waiting for CI...") + " " + m.styles.timeStyle.Render(timeStr)
+				} else {
+					// Shorten the description if it's redundant with the group label
+					desc := activeStep.Description
+					if strings.Contains(desc, group.Label) {
+						// Extract the action from the description
+						// e.g. "Merge PR #101 (branch-a)" -> "merging"
+						switch {
+						case strings.HasPrefix(desc, "Merge PR"):
+							desc = "merging"
+						case strings.HasPrefix(desc, "Delete local branch"):
+							desc = "deleting local branch"
+						case strings.HasPrefix(desc, "Restack"):
+							desc = "restacking"
+						}
+					}
+					status = m.styles.spinnerStyle.Render(desc + "...")
+				}
+			} else {
+				status = m.styles.spinnerStyle.Render("running...")
 			}
-			timeStr := fmt.Sprintf("(%v / %v)", elapsed, timeout)
-			status = m.styles.waitStyle.Render("waiting for CI...") + " " + m.styles.timeStyle.Render(timeStr)
 		case mergeStatusDone:
 			icon = m.styles.doneStyle.Render("✓")
 			status = m.styles.doneStyle.Render("done")
@@ -235,14 +311,14 @@ func (m MergeTUIModel) View() string {
 			status = m.styles.errorStyle.Render("failed")
 		}
 
-		line := fmt.Sprintf("  %s %d. %s %s", icon, i+1, step.Description, status)
+		line := fmt.Sprintf("  %s %d. %s %s", icon, i+1, group.Label, status)
 
-		if step.Status == mergeStatusError && step.Error != nil {
-			line += " " + m.styles.errorStyle.Render("→ "+step.Error.Error())
+		if groupStatus == mergeStatusError && failedStep != nil && failedStep.Error != nil {
+			line += " " + m.styles.errorStyle.Render("→ "+failedStep.Error.Error())
 		}
 
 		b.WriteString(line)
-		if i < len(m.steps)-1 {
+		if i < len(m.groups)-1 {
 			b.WriteString("\n")
 		}
 	}
@@ -250,20 +326,31 @@ func (m MergeTUIModel) View() string {
 	b.WriteString("\n")
 
 	if m.done {
-		completed := 0
-		failed := 0
-		for _, step := range m.steps {
-			if step.Status == mergeStatusDone {
-				completed++
-			} else if step.Status == mergeStatusError {
-				failed++
+		completedGroups := 0
+		failedGroups := 0
+		for _, group := range m.groups {
+			groupDone := true
+			groupFailed := false
+			for _, idx := range group.StepIndices {
+				if m.steps[idx].Status == mergeStatusError {
+					groupFailed = true
+					break
+				}
+				if m.steps[idx].Status != mergeStatusDone {
+					groupDone = false
+				}
+			}
+			if groupFailed {
+				failedGroups++
+			} else if groupDone {
+				completedGroups++
 			}
 		}
 		b.WriteString("\n")
-		if failed > 0 {
-			b.WriteString(m.styles.errorStyle.Render(fmt.Sprintf("Completed: %d, Failed: %d", completed, failed)))
+		if failedGroups > 0 {
+			b.WriteString(m.styles.errorStyle.Render(fmt.Sprintf("Completed: %d, Failed: %d", completedGroups, failedGroups)))
 		} else {
-			b.WriteString(m.styles.doneStyle.Render(fmt.Sprintf("✓ All %d steps completed successfully", completed)))
+			b.WriteString(m.styles.doneStyle.Render(fmt.Sprintf("✓ All %d steps completed successfully", completedGroups)))
 		}
 		b.WriteString("\n")
 	}
@@ -282,8 +369,8 @@ type ProgressUpdate struct {
 }
 
 // RunMergeTUI runs the merge TUI with channel-based updates
-func RunMergeTUI(stepDescriptions []string, updates <-chan ProgressUpdate, done chan<- bool) error {
-	m := NewMergeTUIModel(stepDescriptions)
+func RunMergeTUI(groups []MergeGroup, stepDescriptions []string, updates <-chan ProgressUpdate, done chan<- bool) error {
+	m := NewMergeTUIModel(groups, stepDescriptions)
 	m.updates = updates
 	m.doneChan = done
 

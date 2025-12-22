@@ -437,9 +437,23 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 	if opts.Draft || opts.Publish {
 		updateOpts.Draft = &submissionInfo.Metadata.IsDraft
 	}
+
+	// Before updating the base, check if there are commits between the new base and head
+	// GitHub will reject the update if there are no commits between them
 	if baseChanged {
-		updateOpts.Base = &submissionInfo.Base
+		// Only update base if there are commits between base and head
+		if submissionInfo.BaseSHA != submissionInfo.HeadSHA {
+			// Check if there are actually commits between base and head
+			commits, err := git.GetCommitRangeSHAs(ctx, submissionInfo.BaseSHA, submissionInfo.HeadSHA)
+			if err == nil && len(commits) > 0 {
+				// There are commits, safe to update base
+				updateOpts.Base = &submissionInfo.Base
+			}
+			// If no commits or error, skip base update to avoid GitHub 422 error
+		}
+		// If base SHA equals head SHA, skip base update (no commits between them)
 	}
+
 	if err := githubClient.UpdatePullRequest(ctx, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
 		return "", fmt.Errorf("failed to update PR for %s: %w", submissionInfo.BranchName, err)
 	}

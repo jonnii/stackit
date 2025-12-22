@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/runtime"
 )
 
 // newDeleteCmd creates the delete command
@@ -27,11 +28,23 @@ If you delete a branch with an open pull request, you will need to manually
 close the pull request.`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeBranches,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			_ = downstack // Will be used when implemented
-			_ = force     // Will be used when implemented
-			_ = upstack   // Will be used when implemented
-			return fmt.Errorf("delete command not yet implemented")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, err := runtime.GetContext(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			branchName := ""
+			if len(args) > 0 {
+				branchName = args[0]
+			}
+
+			return actions.Delete(ctx, actions.DeleteOptions{
+				BranchName: branchName,
+				Downstack:  downstack,
+				Force:      force,
+				Upstack:    upstack,
+			})
 		},
 	}
 

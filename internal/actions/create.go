@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/config"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -22,6 +23,9 @@ type CreateOptions struct {
 	Patch      bool
 	Update     bool
 	Verbose    int
+	// SelectedChildren is used to specify which children to move during insert
+	// in non-interactive mode (mostly for tests)
+	SelectedChildren []string
 }
 
 // CreateAction creates a new branch stacked on top of the current branch
@@ -178,7 +182,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 	// Handle insert logic
 	if opts.Insert {
-		if err := handleInsert(ctx.Context, branchName, currentBranch, ctx); err != nil {
+		if err := handleInsert(ctx.Context, branchName, currentBranch, ctx, opts); err != nil {
 			splog.Info("Warning: failed to insert branch: %v", err)
 		}
 	} else {
@@ -199,7 +203,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 }
 
 // handleInsert moves children of the current branch to be children of the new branch
-func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context) error {
+func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context, opts CreateOptions) error {
 	children := runtimeCtx.Engine.GetChildren(currentBranch)
 	siblings := []string{}
 	for _, child := range children {
@@ -214,16 +218,37 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 
 	// If multiple children, prompt user to select which to move
 	var toMove []string
-	if len(siblings) > 1 && utils.IsInteractive() {
+	switch {
+	case len(opts.SelectedChildren) > 0:
+		// Use pre-selected children (for tests)
+		for _, selected := range opts.SelectedChildren {
+			for _, sibling := range siblings {
+				if selected == sibling {
+					toMove = append(toMove, sibling)
+					break
+				}
+			}
+		}
+	case len(siblings) > 1 && utils.IsInteractive():
 		runtimeCtx.Splog.Info("Current branch has multiple children. Select which should be moved onto the new branch:")
-		response, err := tui.PromptTextInput("Enter numbers separated by commas (or 'all' for all):", "all")
+		options := []tui.SelectOption{
+			{Label: "All children", Value: "all"},
+		}
+		for _, child := range siblings {
+			options = append(options, tui.SelectOption{Label: child, Value: child})
+		}
+
+		selected, err := tui.PromptSelect("Which child should be moved onto the new branch?", options, 0)
 		if err != nil {
 			return err
 		}
 
-		toMove = siblings
-		_ = response // For now, just move all - proper parsing can be added later
-	} else {
+		if selected == "all" {
+			toMove = siblings
+		} else {
+			toMove = []string{selected}
+		}
+	default:
 		// Single child or non-interactive - move all
 		toMove = siblings
 	}
@@ -232,6 +257,18 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	for _, child := range toMove {
 		if err := runtimeCtx.Engine.TrackBranch(ctx, child, newBranch); err != nil {
 			return fmt.Errorf("failed to update parent for %s: %w", child, err)
+		}
+
+		// Restack the child onto the new branch to physically insert it
+		res, err := runtimeCtx.Engine.RestackBranch(ctx, child)
+		if err != nil {
+			runtimeCtx.Splog.Info("Warning: failed to restack %s onto %s: %v", child, newBranch, err)
+			continue
+		}
+		if res.Result == engine.RestackConflict {
+			runtimeCtx.Splog.Info("Conflict restacking %s onto %s. Please resolve manually or run 'stackit sync --restack'.", child, newBranch)
+		} else if res.Result == engine.RestackDone {
+			runtimeCtx.Splog.Info("Restacked %s onto %s.", child, newBranch)
 		}
 	}
 

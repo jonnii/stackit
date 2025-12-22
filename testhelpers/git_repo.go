@@ -372,3 +372,12 @@ func (r *GitRepo) HasUntrackedFiles() (bool, error) {
 	}
 	return strings.TrimSpace(output) != "", nil
 }
+
+// IsAncestor checks if the first ref is an ancestor of the second ref.
+func (r *GitRepo) IsAncestor(ancestor, descendant string) (bool, error) {
+	err := r.runGitCommand("merge-base", "--is-ancestor", ancestor, descendant)
+	if err == nil {
+		return true, nil
+	}
+	return false, nil
+}

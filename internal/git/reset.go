@@ -3,6 +3,8 @@ package git
 import (
 	"context"
 	"fmt"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // HardReset performs a hard reset to a specific SHA
@@ -24,10 +26,17 @@ func SoftReset(ctx context.Context, sha string) error {
 }
 
 // GetRemoteSha returns the SHA of a remote branch
-func GetRemoteSha(ctx context.Context, remote, branchName string) (string, error) {
-	sha, err := RunGitCommandWithContext(ctx, "rev-parse", fmt.Sprintf("%s/%s", remote, branchName))
+func GetRemoteSha(_ context.Context, remote, branchName string) (string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "", err
+	}
+
+	refName := plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/%s", remote, branchName))
+	ref, err := repo.Reference(refName, true)
 	if err != nil {
 		return "", fmt.Errorf("failed to get remote SHA for %s/%s: %w", remote, branchName, err)
 	}
-	return sha, nil
+
+	return ref.Hash().String(), nil
 }

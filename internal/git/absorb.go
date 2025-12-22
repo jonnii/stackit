@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // HunkTarget represents a hunk and its target commit
@@ -121,21 +123,62 @@ func hunkOverlaps(h1, h2 Hunk) bool {
 }
 
 // GetCommitDiff returns the diff for a commit
-func GetCommitDiff(ctx context.Context, commitSHA, parentSHA string) (string, error) {
-	output, err := RunGitCommandRawWithContext(ctx, "diff", parentSHA, commitSHA)
+func GetCommitDiff(_ context.Context, commitSHA, parentSHA string) (string, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return "", fmt.Errorf("failed to get commit diff: %w", err)
+		return "", err
 	}
-	return output, nil
-}
 
-// GetParentCommitSHA returns the parent commit SHA of a commit
-func GetParentCommitSHA(ctx context.Context, commitSHA string) (string, error) {
-	output, err := RunGitCommandWithContext(ctx, "rev-parse", commitSHA+"^")
+	h1, err := resolveRefHash(repo, parentSHA)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve parent: %w", err)
+	}
+
+	h2, err := resolveRefHash(repo, commitSHA)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve commit: %w", err)
+	}
+
+	c1, err := repo.CommitObject(h1)
 	if err != nil {
 		return "", fmt.Errorf("failed to get parent commit: %w", err)
 	}
-	return strings.TrimSpace(output), nil
+
+	c2, err := repo.CommitObject(h2)
+	if err != nil {
+		return "", fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	patch, err := c1.Patch(c2)
+	if err != nil {
+		return "", fmt.Errorf("failed to get patch: %w", err)
+	}
+
+	return patch.String(), nil
+}
+
+// GetParentCommitSHA returns the parent commit SHA of a commit
+func GetParentCommitSHA(_ context.Context, commitSHA string) (string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "", err
+	}
+
+	hash, err := resolveRefHash(repo, commitSHA)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve commit: %w", err)
+	}
+
+	commit, err := repo.CommitObject(hash)
+	if err != nil {
+		return "", fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	if commit.NumParents() == 0 {
+		return "", fmt.Errorf("commit has no parents")
+	}
+
+	return commit.ParentHashes[0].String(), nil
 }
 
 // parseDiffHunks parses a diff output and extracts hunks for a specific file
@@ -400,12 +443,23 @@ func CheckoutDetached(ctx context.Context, commitSHA string) error {
 }
 
 // GetCommitMessage returns the full commit message for a commit
-func GetCommitMessage(ctx context.Context, commitSHA string) (string, error) {
-	output, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%B", commitSHA)
+func GetCommitMessage(_ context.Context, commitSHA string) (string, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return "", fmt.Errorf("failed to get commit message: %w", err)
+		return "", err
 	}
-	return strings.TrimSpace(output), nil
+
+	hash, err := resolveRefHash(repo, commitSHA)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve commit: %w", err)
+	}
+
+	commit, err := repo.CommitObject(hash)
+	if err != nil {
+		return "", fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	return strings.TrimSpace(commit.Message), nil
 }
 
 // CommitAuthor represents a commit author
@@ -415,51 +469,66 @@ type CommitAuthor struct {
 }
 
 // GetCommitAuthorFromSHA returns the author for a commit
-func GetCommitAuthorFromSHA(ctx context.Context, commitSHA string) (*CommitAuthor, error) {
-	name, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%an", commitSHA)
+func GetCommitAuthorFromSHA(_ context.Context, commitSHA string) (*CommitAuthor, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get author name: %w", err)
+		return nil, err
 	}
 
-	email, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%ae", commitSHA)
+	hash, err := resolveRefHash(repo, commitSHA)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get author email: %w", err)
+		return nil, fmt.Errorf("failed to resolve commit: %w", err)
+	}
+
+	commit, err := repo.CommitObject(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit: %w", err)
 	}
 
 	return &CommitAuthor{
-		Name:  strings.TrimSpace(name),
-		Email: strings.TrimSpace(email),
+		Name:  commit.Author.Name,
+		Email: commit.Author.Email,
 	}, nil
 }
 
 // GetCommitDateFromSHA returns the commit date
-func GetCommitDateFromSHA(ctx context.Context, commitSHA string) (time.Time, error) {
-	// Use git command to get the commit date (ISO 8601 format)
-	// This avoids using the global defaultRepo which can cause issues in parallel tests
-	output, err := RunGitCommandWithContext(ctx, "log", "-1", "--format=%aI", commitSHA)
+func GetCommitDateFromSHA(_ context.Context, commitSHA string) (time.Time, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get commit date: %w", err)
+		return time.Time{}, err
 	}
 
-	dateStr := strings.TrimSpace(output)
-	if dateStr == "" {
-		return time.Time{}, fmt.Errorf("empty date for commit %s", commitSHA)
-	}
-
-	// Parse ISO 8601 format
-	t, err := time.Parse(time.RFC3339, dateStr)
+	hash, err := resolveRefHash(repo, commitSHA)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse commit date %q: %w", dateStr, err)
+		return time.Time{}, fmt.Errorf("failed to resolve commit: %w", err)
 	}
 
-	return t, nil
+	commit, err := repo.CommitObject(hash)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to get commit: %w", err)
+	}
+
+	return commit.Author.When, nil
 }
 
 // UpdateBranchRef updates a branch reference to point to a new commit
-func UpdateBranchRef(ctx context.Context, branchName, commitSHA string) error {
-	_, err := RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, commitSHA)
+func UpdateBranchRef(_ context.Context, branchName, commitSHA string) error {
+	repo, err := GetDefaultRepo()
 	if err != nil {
+		return err
+	}
+
+	hash, err := resolveRefHash(repo, commitSHA)
+	if err != nil {
+		return fmt.Errorf("failed to resolve commit SHA: %w", err)
+	}
+
+	// Update the reference
+	refName := plumbing.ReferenceName("refs/heads/" + branchName)
+	ref := plumbing.NewHashReference(refName, hash)
+	if err := repo.Storer.SetReference(ref); err != nil {
 		return fmt.Errorf("failed to update branch ref: %w", err)
 	}
+
 	return nil
 }

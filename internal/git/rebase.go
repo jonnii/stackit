@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // RebaseResult represents the result of a rebase operation
@@ -102,6 +104,25 @@ func RebaseContinue(ctx context.Context) (RebaseResult, error) {
 }
 
 // GetRebaseHead returns the commit being rebased (REBASE_HEAD)
-func GetRebaseHead(ctx context.Context) (string, error) {
-	return RunGitCommandWithContext(ctx, "rev-parse", "REBASE_HEAD")
+func GetRebaseHead(_ context.Context) (string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "", err
+	}
+
+	// Try the standard rebase head refs
+	refs := []plumbing.ReferenceName{
+		"refs/rebase-merge/head",
+		"refs/rebase-apply/head",
+		"REBASE_HEAD",
+	}
+
+	for _, refName := range refs {
+		ref, err := repo.Reference(refName, true)
+		if err == nil {
+			return ref.Hash().String(), nil
+		}
+	}
+
+	return "", fmt.Errorf("rebase head not found")
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GetCommitDate returns the commit date for a branch
@@ -16,12 +17,12 @@ func GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	hash, err := resolveRefHash(repo, branchName)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get branch reference: %w", err)
+		return time.Time{}, fmt.Errorf("failed to resolve branch reference: %w", err)
 	}
 
-	commit, err := repo.CommitObject(ref.Hash())
+	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get commit: %w", err)
 	}
@@ -36,12 +37,12 @@ func GetCommitAuthor(_ context.Context, branchName string) (string, error) {
 		return "", err
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	hash, err := resolveRefHash(repo, branchName)
 	if err != nil {
-		return "", fmt.Errorf("failed to get branch reference: %w", err)
+		return "", fmt.Errorf("failed to resolve branch reference: %w", err)
 	}
 
-	commit, err := repo.CommitObject(ref.Hash())
+	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit: %w", err)
 	}
@@ -56,12 +57,12 @@ func GetRevision(_ context.Context, branchName string) (string, error) {
 		return "", err
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	hash, err := resolveRefHash(repo, branchName)
 	if err != nil {
-		return "", fmt.Errorf("failed to get branch reference: %w", err)
+		return "", fmt.Errorf("failed to resolve branch reference: %w", err)
 	}
 
-	return ref.Hash().String(), nil
+	return hash.String(), nil
 }
 
 // GetRemoteRevision returns the SHA of a remote branch (e.g., origin/branchName)
@@ -71,50 +72,122 @@ func GetRemoteRevision(_ context.Context, branchName string) (string, error) {
 		return "", err
 	}
 
-	// Try origin/branchName first
-	ref, err := repo.Reference(plumbing.ReferenceName("refs/remotes/origin/"+branchName), true)
+	// Try refs/remotes/origin/branchName
+	hash, err := resolveRefHash(repo, "origin/"+branchName)
 	if err != nil {
-		// Try to fetch it first, or return error
 		return "", fmt.Errorf("failed to get remote branch reference: %w", err)
 	}
 
-	return ref.Hash().String(), nil
+	return hash.String(), nil
+}
+
+// iterateCommits iterates commits from head to base (exclusive of base)
+// Returns commits in order from head to base (newest first)
+func iterateCommits(repo *Repository, headHash, baseHash plumbing.Hash) ([]*object.Commit, error) {
+	var commits []*object.Commit
+	visited := make(map[plumbing.Hash]bool)
+
+	// If base is zero, we want all reachable commits
+	// If base is non-zero, we want commits reachable from head but NOT from base (base..head)
+
+	// Use BFS to collect all commits
+	queue := []plumbing.Hash{headHash}
+	for len(queue) > 0 {
+		hash := queue[0]
+		queue = queue[1:]
+
+		if visited[hash] || (!baseHash.IsZero() && hash == baseHash) {
+			continue
+		}
+		visited[hash] = true
+
+		commit, err := repo.CommitObject(hash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get commit %s: %w", hash, err)
+		}
+
+		commits = append(commits, commit)
+
+		for _, parentHash := range commit.ParentHashes {
+			if !visited[parentHash] && (baseHash.IsZero() || parentHash != baseHash) {
+				queue = append(queue, parentHash)
+			}
+		}
+	}
+
+	return commits, nil
+}
+
+// resolveRefHash resolves a ref (branch name, SHA, or ref path) to a hash
+func resolveRefHash(repo *Repository, ref string) (plumbing.Hash, error) {
+	// 1. Try as a full reference name
+	if r, err := repo.Reference(plumbing.ReferenceName(ref), true); err == nil {
+		return r.Hash(), nil
+	}
+
+	// 2. Try as a local branch
+	if r, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+ref), true); err == nil {
+		return r.Hash(), nil
+	}
+
+	// 3. Try as a remote branch
+	if r, err := repo.Reference(plumbing.ReferenceName("refs/remotes/origin/"+ref), true); err == nil {
+		return r.Hash(), nil
+	}
+
+	// 4. Try as a tag
+	if r, err := repo.Reference(plumbing.ReferenceName("refs/tags/"+ref), true); err == nil {
+		return r.Hash(), nil
+	}
+
+	// 5. Try ResolveRevision (handles SHAs, short SHAs, and complex expressions like HEAD~1)
+	hash, err := repo.ResolveRevision(plumbing.Revision(ref))
+	if err == nil {
+		return *hash, nil
+	}
+
+	return plumbing.ZeroHash, fmt.Errorf("failed to resolve ref %s: reference not found", ref)
 }
 
 // GetCommitMessages returns all commit messages for a branch (excluding parent)
-func GetCommitMessages(ctx context.Context, branchName string) ([]string, error) {
+func GetCommitMessages(_ context.Context, branchName string) ([]string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return nil, err
+	}
+
 	// Get parent branch to determine range
 	meta, err := ReadMetadataRef(branchName)
 	if err != nil {
 		return nil, err
 	}
 
-	const delimiter = "---STACKIT-COMMIT-END---"
-	var args []string
-	if meta.ParentBranchRevision != nil {
-		// Get commits from parent to branch
-		args = []string{"log", "--format=%B" + delimiter, fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
-	} else {
-		// No parent, get all commits from branch
-		args = []string{"log", "--format=%B" + delimiter, branchName}
-	}
-
-	output, err := RunGitCommandWithContext(ctx, args...)
+	// Resolve branch head
+	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit messages: %w", err)
+		return nil, fmt.Errorf("failed to get branch reference: %w", err)
+	}
+	headHash := branchRef.Hash()
+
+	// Resolve base (parent revision or zero)
+	var baseHash plumbing.Hash
+	if meta.ParentBranchRevision != nil {
+		baseHash, err = resolveRefHash(repo, *meta.ParentBranchRevision)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve parent revision: %w", err)
+		}
 	}
 
-	if output == "" {
-		return []string{}, nil
+	commits, err := iterateCommits(repo, headHash, baseHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
 	}
 
-	// Split by delimiter and filter empty
-	commits := strings.Split(output, delimiter)
 	var messages []string
 	for _, commit := range commits {
-		commit = strings.TrimSpace(commit)
-		if commit != "" {
-			messages = append(messages, commit)
+		message := strings.TrimSpace(commit.Message)
+		if message != "" {
+			messages = append(messages, message)
 		}
 	}
 
@@ -122,58 +195,108 @@ func GetCommitMessages(ctx context.Context, branchName string) ([]string, error)
 }
 
 // GetCommitSubject returns the subject (first line) of the oldest commit on a branch
-func GetCommitSubject(ctx context.Context, branchName string) (string, error) {
+func GetCommitSubject(_ context.Context, branchName string) (string, error) {
+	repo, err := GetDefaultRepo()
+	if err != nil {
+		return "", err
+	}
+
 	// Get parent branch to determine range
 	meta, err := ReadMetadataRef(branchName)
 	if err != nil {
 		return "", err
 	}
 
-	var args []string
-	if meta.ParentBranchRevision != nil {
-		// Get oldest commit subject from parent to branch
-		args = []string{"log", "--format=%s", "--reverse", fmt.Sprintf("%s..%s", *meta.ParentBranchRevision, branchName)}
-	} else {
-		// No parent, get all commits from branch
-		args = []string{"log", "--format=%s", "--reverse", branchName}
-	}
-
-	output, err := RunGitCommandWithContext(ctx, args...)
+	// Resolve branch head
+	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
 	if err != nil {
-		return "", fmt.Errorf("failed to get commit subject: %w", err)
+		return "", fmt.Errorf("failed to get branch reference: %w", err)
+	}
+	headHash := branchRef.Hash()
+
+	// Resolve base (parent revision or zero)
+	var baseHash plumbing.Hash
+	if meta.ParentBranchRevision != nil {
+		baseHash, err = resolveRefHash(repo, *meta.ParentBranchRevision)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve parent revision: %w", err)
+		}
 	}
 
-	if output == "" {
+	commits, err := iterateCommits(repo, headHash, baseHash)
+	if err != nil {
+		return "", fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	if len(commits) == 0 {
 		return "", nil
 	}
 
-	// Take the first line (oldest subject due to --reverse)
-	lines := strings.Split(output, "\n")
+	// Get the oldest commit (last in the list, or first if we walked backwards)
+	// Since we walk from head to base, the oldest is the last one
+	oldestCommit := commits[len(commits)-1]
+	message := strings.TrimSpace(oldestCommit.Message)
+	if message == "" {
+		return "", nil
+	}
+
+	// Get first line (subject)
+	lines := strings.Split(message, "\n")
 	return strings.TrimSpace(lines[0]), nil
 }
 
 // GetCommitRangeSHAs returns the commit SHAs between two revisions (base..head)
-func GetCommitRangeSHAs(ctx context.Context, base, head string) ([]string, error) {
-	args := []string{"log", "--format=%H", fmt.Sprintf("%s..%s", base, head)}
-	output, err := RunGitCommandWithContext(ctx, args...)
+func GetCommitRangeSHAs(_ context.Context, base, head string) ([]string, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit range: %w", err)
+		return nil, err
 	}
-	if output == "" {
-		return []string{}, nil
+
+	headHash, err := resolveRefHash(repo, head)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve head: %w", err)
 	}
-	return strings.Split(strings.TrimSpace(output), "\n"), nil
+
+	baseHash, err := resolveRefHash(repo, base)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve base: %w", err)
+	}
+
+	commits, err := iterateCommits(repo, headHash, baseHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	shas := make([]string, 0, len(commits))
+	for _, commit := range commits {
+		shas = append(shas, commit.Hash.String())
+	}
+
+	return shas, nil
 }
 
 // GetCommitHistorySHAs returns the commit SHAs for a branch
-func GetCommitHistorySHAs(ctx context.Context, branchName string) ([]string, error) {
-	args := []string{"log", "--format=%H", branchName}
-	output, err := RunGitCommandWithContext(ctx, args...)
+func GetCommitHistorySHAs(_ context.Context, branchName string) ([]string, error) {
+	repo, err := GetDefaultRepo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit history: %w", err)
+		return nil, err
 	}
-	if output == "" {
-		return []string{}, nil
+
+	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get branch reference: %w", err)
 	}
-	return strings.Split(strings.TrimSpace(output), "\n"), nil
+
+	// Get all commits (base is zero hash)
+	commits, err := iterateCommits(repo, branchRef.Hash(), plumbing.ZeroHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	shas := make([]string, 0, len(commits))
+	for _, commit := range commits {
+		shas = append(shas, commit.Hash.String())
+	}
+
+	return shas, nil
 }

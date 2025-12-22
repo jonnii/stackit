@@ -211,6 +211,11 @@ func TestGetRebaseHead(t *testing.T) {
 		// Verify we're in a conflict state
 		require.True(t, git.IsRebaseInProgress(context.Background()))
 
+		// Initialize default repo for GetRebaseHead
+		git.SetWorkingDir(scene.Repo.Dir)
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
 		// Get rebase head
 		rebaseHead, err := git.GetRebaseHead(context.Background())
 		require.NoError(t, err)

@@ -64,3 +64,43 @@ func (e *engineImpl) UpsertPrInfo(_ context.Context, branchName string, prInfo *
 
 	return git.WriteMetadataRef(branchName, meta)
 }
+
+// GetPRSubmissionStatus returns the submission status of a branch
+func (e *engineImpl) GetPRSubmissionStatus(ctx context.Context, branchName string) (PRSubmissionStatus, error) {
+	prInfo, err := e.GetPrInfo(ctx, branchName)
+	if err != nil {
+		return PRSubmissionStatus{}, err
+	}
+
+	parentBranchName := e.GetParent(branchName)
+	if parentBranchName == "" {
+		parentBranchName = e.trunk
+	}
+
+	if prInfo == nil || prInfo.Number == nil {
+		return PRSubmissionStatus{
+			Action:      "create",
+			NeedsUpdate: true,
+			PRInfo:      prInfo,
+		}, nil
+	}
+
+	// It's an update
+	baseChanged := prInfo.Base != parentBranchName
+	branchChanged, _ := e.BranchMatchesRemote(ctx, branchName)
+
+	needsUpdate := baseChanged || !branchChanged
+
+	reason := ""
+	if !needsUpdate {
+		reason = "no changes"
+	}
+
+	return PRSubmissionStatus{
+		Action:      "update",
+		NeedsUpdate: needsUpdate,
+		Reason:      reason,
+		PRNumber:    prInfo.Number,
+		PRInfo:      prInfo,
+	}, nil
+}

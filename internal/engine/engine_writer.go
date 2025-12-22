@@ -167,6 +167,39 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	return nil
 }
 
+// DeleteBranches deletes multiple branches and returns the children that need restacking
+func (e *engineImpl) DeleteBranches(ctx context.Context, branchNames []string) ([]string, error) {
+	// Identify all children of all branches to be deleted
+	allChildren := make(map[string]bool)
+	toDeleteSet := make(map[string]bool)
+	for _, b := range branchNames {
+		toDeleteSet[b] = true
+		for _, child := range e.GetChildren(b) {
+			allChildren[child] = true
+		}
+	}
+
+	// Remove branches that are also being deleted from the children set
+	for _, b := range branchNames {
+		delete(allChildren, b)
+	}
+
+	// Delete branches
+	for _, b := range branchNames {
+		if err := e.DeleteBranch(ctx, b); err != nil {
+			return nil, fmt.Errorf("failed to delete branch %s: %w", b, err)
+		}
+	}
+
+	// Convert children map to slice
+	childrenToRestack := make([]string, 0, len(allChildren))
+	for child := range allChildren {
+		childrenToRestack = append(childrenToRestack, child)
+	}
+
+	return childrenToRestack, nil
+}
+
 // SetParent updates a branch's parent
 func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBranchName string) error {
 	e.mu.Lock()

@@ -212,6 +212,22 @@ func (e *Engine) GetRelativeStackUpstack(branchName string) []string {
 	return e.getDescendants(branchName)
 }
 
+// GetRelativeStackDownstack returns ancestors in the demo engine
+func (e *Engine) GetRelativeStackDownstack(branchName string) []string {
+	return e.GetRelativeStack(branchName, engine.Scope{RecursiveParents: true, IncludeCurrent: false, RecursiveChildren: false})
+}
+
+// GetFullStack returns the entire stack in the demo engine
+func (e *Engine) GetFullStack(branchName string) []string {
+	return e.GetRelativeStack(branchName, engine.Scope{RecursiveParents: true, IncludeCurrent: true, RecursiveChildren: true})
+}
+
+// SortBranchesTopologically simulates topological sort in the demo engine
+func (e *Engine) SortBranchesTopologically(branches []string) []string {
+	// For demo, just return the branches as-is or do a simple sort if needed
+	return branches
+}
+
 // IsMergedIntoTrunk returns false in the demo engine
 func (e *Engine) IsMergedIntoTrunk(_ context.Context, _ string) (bool, error) {
 	return false, nil
@@ -220,6 +236,17 @@ func (e *Engine) IsMergedIntoTrunk(_ context.Context, _ string) (bool, error) {
 // IsBranchEmpty returns false in the demo engine
 func (e *Engine) IsBranchEmpty(_ context.Context, _ string) (bool, error) {
 	return false, nil
+}
+
+// GetDeletionStatus checks if a branch can be deleted in the demo engine
+func (e *Engine) GetDeletionStatus(_ context.Context, branchName string) (engine.DeletionStatus, error) {
+	// In demo mode, some branches are simulated as merged
+	for _, b := range GetDemoBranches() {
+		if b.Name == branchName && b.PRState == "MERGED" {
+			return engine.DeletionStatus{SafeToDelete: true, Reason: "merged in demo"}, nil
+		}
+	}
+	return engine.DeletionStatus{SafeToDelete: false}, nil
 }
 
 // FindMostRecentTrackedAncestors returns the parent in the demo engine
@@ -265,6 +292,14 @@ func (e *Engine) DeleteBranch(_ context.Context, branchName string) error {
 	return nil
 }
 
+// DeleteBranches deletes multiple branches in the demo engine
+func (e *Engine) DeleteBranches(ctx context.Context, branchNames []string) ([]string, error) {
+	for _, b := range branchNames {
+		_ = e.DeleteBranch(ctx, b)
+	}
+	return nil, nil
+}
+
 // Reset resets the demo engine
 func (e *Engine) Reset(_ context.Context, _ string) error {
 	return nil
@@ -290,6 +325,15 @@ func (e *Engine) UpsertPrInfo(_ context.Context, branchName string, prInfo *engi
 	simulateDelay(delayLong) // GitHub API call to create/update PR
 	e.prInfoMap[branchName] = prInfo
 	return nil
+}
+
+// GetPRSubmissionStatus returns the submission status in the demo engine
+func (e *Engine) GetPRSubmissionStatus(ctx context.Context, branchName string) (engine.PRSubmissionStatus, error) {
+	info, _ := e.GetPrInfo(ctx, branchName)
+	if info == nil {
+		return engine.PRSubmissionStatus{Action: "create", NeedsUpdate: true}, nil
+	}
+	return engine.PRSubmissionStatus{Action: "update", NeedsUpdate: true, PRNumber: info.Number, PRInfo: info}, nil
 }
 
 // SyncManager interface implementation
@@ -328,6 +372,16 @@ func (e *Engine) RestackBranch(_ context.Context, _ string) (engine.RestackBranc
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
 	}, nil
+}
+
+// RestackBranches simulates batch restack in the demo engine
+func (e *Engine) RestackBranches(ctx context.Context, branchNames []string) (engine.RestackBatchResult, error) {
+	results := make(map[string]engine.RestackBranchResult)
+	for _, b := range branchNames {
+		res, _ := e.RestackBranch(ctx, b)
+		results[b] = res
+	}
+	return engine.RestackBatchResult{Results: results}, nil
 }
 
 // ContinueRebase simulates continuing rebase in the demo engine

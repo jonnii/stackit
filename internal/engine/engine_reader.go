@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -350,4 +351,114 @@ func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
 	defer e.mu.RUnlock()
 
 	return e.getRelativeStackUpstackInternal(branchName)
+}
+
+// GetRelativeStackDownstack returns all branches in the downstack (ancestors)
+func (e *engineImpl) GetRelativeStackDownstack(branchName string) []string {
+	scope := Scope{
+		RecursiveParents:  true,
+		IncludeCurrent:    false,
+		RecursiveChildren: false,
+	}
+	return e.GetRelativeStack(branchName, scope)
+}
+
+// GetFullStack returns the entire stack containing the branch
+func (e *engineImpl) GetFullStack(branchName string) []string {
+	scope := Scope{
+		RecursiveParents:  true,
+		IncludeCurrent:    true,
+		RecursiveChildren: true,
+	}
+	return e.GetRelativeStack(branchName, scope)
+}
+
+// SortBranchesTopologically sorts branches so parents come before children.
+// This ensures correct restack order (bottom of stack first).
+func (e *engineImpl) SortBranchesTopologically(branches []string) []string {
+	if len(branches) == 0 {
+		return branches
+	}
+
+	// Calculate depth for each branch (distance from trunk)
+	depths := make(map[string]int)
+	var getDepth func(branch string) int
+	getDepth = func(branch string) int {
+		if depth, ok := depths[branch]; ok {
+			return depth
+		}
+
+		e.mu.RLock()
+		isTrunk := branch == e.trunk
+		parent := e.parentMap[branch]
+		e.mu.RUnlock()
+
+		if isTrunk {
+			depths[branch] = 0
+			return 0
+		}
+		if parent == "" || e.IsTrunk(parent) {
+			depths[branch] = 1
+			return 1
+		}
+		depths[branch] = getDepth(parent) + 1
+		return depths[branch]
+	}
+
+	// Calculate depth for all branches
+	for _, branch := range branches {
+		getDepth(branch)
+	}
+
+	// Sort by depth (parents first, then children)
+	result := make([]string, len(branches))
+	copy(result, branches)
+	for i := 0; i < len(result)-1; i++ {
+		for j := i + 1; j < len(result); j++ {
+			if depths[result[i]] > depths[result[j]] {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+
+	return result
+}
+
+// GetDeletionStatus checks if a branch should be deleted
+func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error) {
+	// Check PR info
+	prInfo, err := e.GetPrInfo(ctx, branchName)
+	if err == nil && prInfo != nil {
+		const (
+			prStateClosed = "CLOSED"
+			prStateMerged = "MERGED"
+		)
+		if prInfo.State == prStateClosed {
+			return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is closed on GitHub", branchName)}, nil
+		}
+		if prInfo.State == prStateMerged {
+			base := prInfo.Base
+			if base == "" {
+				base = e.Trunk()
+			}
+			return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, base)}, nil
+		}
+	}
+
+	// Check if merged into trunk
+	merged, err := e.IsMergedIntoTrunk(ctx, branchName)
+	if err == nil && merged {
+		return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, e.Trunk())}, nil
+	}
+
+	// Check if empty
+	empty, err := e.IsBranchEmpty(ctx, branchName)
+	if err == nil && empty {
+		// Only delete empty branches if they have a PR
+		if prInfo != nil && prInfo.Number != nil {
+			return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is empty", branchName)}, nil
+		}
+	}
+
+	return DeletionStatus{SafeToDelete: false, Reason: ""}, nil
 }

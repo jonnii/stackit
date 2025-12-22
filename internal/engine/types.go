@@ -67,10 +67,33 @@ type RestackBranchResult struct {
 	NewParent         string // The new parent branch name (only set if Reparented is true)
 }
 
+// RestackBatchResult represents the result of restacking multiple branches
+type RestackBatchResult struct {
+	ConflictBranch    string                         // The branch that hit a conflict
+	RebasedBranchBase string                         // The parent revision for the conflict
+	RemainingBranches []string                       // Branches that weren't reached
+	Results           map[string]RestackBranchResult // Results for each branch attempted
+}
+
 // ContinueRebaseResult represents the result of continuing a rebase
 type ContinueRebaseResult struct {
 	Result     int    // git.RebaseResult value (0 = RebaseDone, 1 = RebaseConflict)
 	BranchName string // Only set if Result is RebaseDone
+}
+
+// DeletionStatus represents the deletion status of a branch
+type DeletionStatus struct {
+	SafeToDelete bool   // True if the branch is merged, closed, or empty (with PR)
+	Reason       string // Reason why it's safe (or not) to delete
+}
+
+// PRSubmissionStatus represents the submission status of a branch
+type PRSubmissionStatus struct {
+	Action      string // "create", "update", or "skip"
+	NeedsUpdate bool   // True if the branch has changes or metadata needs update
+	Reason      string // Reason for the status
+	PRNumber    *int
+	PRInfo      *PrInfo
 }
 
 // SquashOptions contains options for squashing commits

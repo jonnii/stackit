@@ -91,7 +91,7 @@ func getBranchPoints(readableCommits []string, numChildren int, parentBranchName
 	// Build choices for the prompt
 	choices := []string{}
 	if numChildren > 0 {
-		choices = append(choices, fmt.Sprintf("%d %s", numChildren, pluralize("child", numChildren)))
+		choices = append(choices, fmt.Sprintf("%d %s", numChildren, Pluralize("child", numChildren)))
 	}
 
 	// Add commits

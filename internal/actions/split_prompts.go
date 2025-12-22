@@ -6,13 +6,14 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/utils"
 )
 
 func promptBranchName(existingNames []string, originalBranchName string, branchNum int, eng engine.BranchReader) (string, error) {
 	defaultName := originalBranchName
-	if containsString(existingNames, defaultName) {
+	if utils.ContainsString(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"
-		for containsString(existingNames, defaultName) {
+		for utils.ContainsString(existingNames, defaultName) {
 			defaultName += "_split"
 		}
 	}
@@ -27,7 +28,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 	}
 
 	// Validate name - don't allow names already picked in this split session
-	if containsString(existingNames, branchName) {
+	if utils.ContainsString(existingNames, branchName) {
 		return "", fmt.Errorf("branch name %s is already used by another branch in this split", branchName)
 	}
 
@@ -35,28 +36,12 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 	// but don't allow other existing branch names
 	if branchName != originalBranchName {
 		allBranches := eng.AllBranchNames()
-		if containsString(allBranches, branchName) {
+		if utils.ContainsString(allBranches, branchName) {
 			return "", fmt.Errorf("branch name %s is already in use", branchName)
 		}
 	}
 
 	return branchName, nil
-}
-
-func pluralize(word string, count int) string {
-	if count == 1 {
-		return word
-	}
-	return word + "ren" // "child" -> "children"
-}
-
-func containsString(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 func makeRange(n int) []int {

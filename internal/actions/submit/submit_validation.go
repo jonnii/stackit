@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
@@ -99,11 +100,11 @@ func validateNoEmptyBranches(ctx context.Context, branches []string, eng engine.
 	}
 
 	hasMultiple := len(emptyBranches) > 1
-	runtimeCtx.Splog.Warn("The following branch%s have no changes:", pluralSuffix(hasMultiple))
+	runtimeCtx.Splog.Warn("The following branch%s have no changes:", actions.PluralSuffix(hasMultiple))
 	for _, b := range emptyBranches {
 		runtimeCtx.Splog.Warn("▸ %s", b)
 	}
-	runtimeCtx.Splog.Warn("Are you sure you want to submit %s?", pluralIt(hasMultiple))
+	runtimeCtx.Splog.Warn("Are you sure you want to submit %s?", actions.PluralIt(hasMultiple))
 
 	// For now, we'll allow empty branches (non-interactive mode)
 	// In interactive mode, we would prompt here
@@ -131,7 +132,7 @@ func validateNoMergedOrClosedBranches(ctx context.Context, branches []string, en
 
 	hasMultiple := len(mergedOrClosedBranches) > 1
 	runtimeCtx.Splog.Tip("You can use 'stackit sync' to find and delete all merged/closed branches automatically and rebase their children.")
-	runtimeCtx.Splog.Warn("PR%s for the following branch%s already been merged or closed:", pluralSuffix(hasMultiple), pluralSuffix(hasMultiple))
+	runtimeCtx.Splog.Warn("PR%s for the following branch%s already been merged or closed:", actions.PluralSuffix(hasMultiple), actions.PluralSuffix(hasMultiple))
 	for _, b := range mergedOrClosedBranches {
 		runtimeCtx.Splog.Warn("▸ %s", b)
 	}
@@ -145,19 +146,4 @@ func validateNoMergedOrClosedBranches(ctx context.Context, branches []string, en
 	}
 
 	return nil
-}
-
-// Helper functions for pluralization
-func pluralSuffix(plural bool) string {
-	if plural {
-		return "es"
-	}
-	return ""
-}
-
-func pluralIt(plural bool) string {
-	if plural {
-		return "them"
-	}
-	return "it"
 }

@@ -47,12 +47,12 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 	splog.Info("Squashed commits in %s.", tui.ColorBranchName(currentBranch.Name, true))
 
 	// Get upstack branches (recursive children only, excluding current branch)
-	scope := engine.Scope{
+	rng := engine.StackRange{
 		RecursiveParents:  false,
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := currentBranch.GetRelativeStack(scope)
+	upstackBranches := currentBranch.GetRelativeStack(rng)
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {

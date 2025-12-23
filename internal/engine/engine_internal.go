@@ -33,6 +33,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	// Reset maps
 	e.parentMap = make(map[string]string)
 	e.childrenMap = make(map[string][]string)
+	e.scopeMap = make(map[string]string)
 
 	// Load metadata for each branch in parallel
 	type branchMeta struct {
@@ -66,6 +67,9 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 			parent := *bm.meta.ParentBranchName
 			e.parentMap[bm.name] = parent
 			e.childrenMap[parent] = append(e.childrenMap[parent], bm.name)
+		}
+		if bm.meta.Scope != nil {
+			e.scopeMap[bm.name] = *bm.meta.Scope
 		}
 	}
 

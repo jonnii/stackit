@@ -90,6 +90,19 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	// Include current branch
 	downstackBranches = append([]engine.Branch{*currentBranch}, downstackBranches...)
 
+	// Terminate downstack search if a scope boundary is hit
+	currentScope := currentBranch.GetScope()
+	if currentScope.IsDefined() {
+		limitedDownstack := []engine.Branch{}
+		for _, branch := range downstackBranches {
+			if branch.IsTrunk() || !branch.GetScope().Equal(currentScope) {
+				break
+			}
+			limitedDownstack = append(limitedDownstack, branch)
+		}
+		downstackBranches = limitedDownstack
+	}
+
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}
 	for _, branch := range downstackBranches {

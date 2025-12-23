@@ -132,7 +132,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 
 			// Checkout the target branch
 			targetBranchObj := ctx.Engine.GetBranch(targetBranch)
-			if err := git.CheckoutBranch(ctx.Context, targetBranchObj); err != nil {
+			if err := git.CheckoutBranch(ctx.Context, targetBranchObj.Name); err != nil {
 				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 			}
 

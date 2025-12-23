@@ -134,12 +134,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 			return err
 		}
 		// Restack upstack branches if any
-		scope := engine.Scope{
+		rng := engine.StackRange{
 			RecursiveParents:  false,
 			IncludeCurrent:    false,
 			RecursiveChildren: true,
 		}
-		upstackBranches := currentBranch.GetRelativeStack(scope)
+		upstackBranches := currentBranch.GetRelativeStack(rng)
 		if len(upstackBranches) > 0 {
 			if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
@@ -155,12 +155,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Get upstack branches (children)
-	scope := engine.Scope{
+	rng := engine.StackRange{
 		RecursiveParents:  false,
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := currentBranch.GetRelativeStack(scope)
+	upstackBranches := currentBranch.GetRelativeStack(rng)
 
 	// Apply the split
 	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{

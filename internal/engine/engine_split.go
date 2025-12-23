@@ -111,7 +111,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 	// Checkout last branch
 	e.currentBranch = lastBranchName
 	lastBranch := e.GetBranch(lastBranchName)
-	if err := git.CheckoutBranch(ctx, lastBranch); err != nil {
+	if err := git.CheckoutBranch(ctx, lastBranch.Name); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", lastBranchName, err)
 	}
 

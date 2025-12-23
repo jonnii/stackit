@@ -12,10 +12,6 @@ import (
 const (
 	// MetadataRefPrefix is the prefix for Git refs where branch metadata is stored
 	MetadataRefPrefix = "refs/stackit/metadata/"
-
-	// DeprecatedMetadataRefPrefix is the old prefix for Git refs where branch metadata was stored.
-	// Deprecated: Use MetadataRefPrefix instead. This will be removed in a future release.
-	DeprecatedMetadataRefPrefix = "refs/branch-metadata/"
 )
 
 // Meta represents branch metadata stored in Git refs
@@ -23,6 +19,7 @@ type Meta struct {
 	ParentBranchName     *string `json:"parentBranchName,omitempty"`
 	ParentBranchRevision *string `json:"parentBranchRevision,omitempty"`
 	PrInfo               *PrInfo `json:"prInfo,omitempty"`
+	Scope                *string `json:"scope,omitempty"`
 }
 
 // PrInfo represents PR information
@@ -48,39 +45,8 @@ func ReadMetadataRef(branchName string) (*Meta, error) {
 	// Get the SHA of the ref
 	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
-		// Try deprecated ref
-		deprecatedRefName := fmt.Sprintf("%s%s", DeprecatedMetadataRefPrefix, branchName)
-		ref, err = repo.Reference(plumbing.ReferenceName(deprecatedRefName), true)
-		if err != nil {
-			// Ref doesn't exist - return empty meta
-			return &Meta{}, nil //nolint:nilerr
-		}
-
-		// Found deprecated ref, migrate it lazily
-		// We'll read the content first to ensure it's valid
-		blob, err := repo.BlobObject(ref.Hash())
-		if err == nil {
-			reader, err := blob.Reader()
-			if err == nil {
-				content, err := io.ReadAll(reader)
-				if closeErr := reader.Close(); closeErr != nil {
-					// Ignore close error if we already have a read error
-					if err == nil {
-						err = closeErr
-					}
-				}
-				if err == nil {
-					var meta Meta
-					if err := json.Unmarshal(content, &meta); err == nil {
-						// Migrate to new ref
-						_ = WriteMetadataRef(branchName, &meta)
-						// Delete old ref
-						_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
-						return &meta, nil
-					}
-				}
-			}
-		}
+		// Ref doesn't exist - return empty meta
+		return &Meta{}, nil //nolint:nilerr
 	}
 
 	// Get the content of the blob
@@ -136,32 +102,6 @@ func GetMetadataRefList() (map[string]string, error) {
 		}
 	}
 
-	// Also get deprecated metadata refs
-	// Deprecated: This section supports migration from the old prefix.
-	output, err = RunGitCommand("for-each-ref", "--format=%(refname) %(objectname)", DeprecatedMetadataRefPrefix)
-	if err == nil && output != "" {
-		lines := strings.Split(output, "\n")
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			parts := strings.SplitN(line, " ", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			refName := parts[0]
-			sha := parts[1]
-
-			if strings.HasPrefix(refName, DeprecatedMetadataRefPrefix) {
-				branchName := refName[len(DeprecatedMetadataRefPrefix):]
-				// Only add if not already present in the new prefix (new prefix takes precedence)
-				if _, exists := result[branchName]; !exists {
-					result[branchName] = sha
-				}
-			}
-		}
-	}
-
 	return result, nil
 }
 
@@ -169,10 +109,6 @@ func GetMetadataRefList() (map[string]string, error) {
 func DeleteMetadataRef(branchName string) error {
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 	_, err := RunGitCommand("update-ref", "-d", refName)
-
-	// Also delete deprecated ref if it exists
-	deprecatedRefName := fmt.Sprintf("%s%s", DeprecatedMetadataRefPrefix, branchName)
-	_, _ = RunGitCommand("update-ref", "-d", deprecatedRefName)
 
 	return err
 }
@@ -196,6 +132,32 @@ func WriteMetadataRef(branchName string, meta *Meta) error {
 	_, err = RunGitCommand("update-ref", refName, sha)
 	if err != nil {
 		return fmt.Errorf("failed to write metadata ref: %w", err)
+	}
+
+	return nil
+}
+
+// RenameMetadataRef renames a metadata ref from one branch name to another
+func RenameMetadataRef(oldBranchName, newBranchName string) error {
+	oldRefName := fmt.Sprintf("%s%s", MetadataRefPrefix, oldBranchName)
+	newRefName := fmt.Sprintf("%s%s", MetadataRefPrefix, newBranchName)
+
+	// Get the SHA of the old ref
+	sha, err := RunGitCommand("rev-parse", "--verify", oldRefName)
+	if err != nil {
+		return nil //nolint:nilerr // Nothing to rename
+	}
+
+	// Create the new ref
+	_, err = RunGitCommand("update-ref", newRefName, sha)
+	if err != nil {
+		return fmt.Errorf("failed to create new metadata ref: %w", err)
+	}
+
+	// Delete the old ref
+	_, err = RunGitCommand("update-ref", "-d", oldRefName)
+	if err != nil {
+		return fmt.Errorf("failed to delete old metadata ref: %w", err)
 	}
 
 	return nil

@@ -1,5 +1,182 @@
 package engine
 
+import (
+	"encoding/json"
+	"time"
+)
+
+// StackRange specifies the range of branches to include in stack operations
+type StackRange struct {
+	RecursiveParents  bool
+	IncludeCurrent    bool
+	RecursiveChildren bool
+}
+
+// CommitFormat specifies the format for commit output
+type CommitFormat string
+
+const (
+	// CommitFormatSHA is the full commit SHA
+	CommitFormatSHA CommitFormat = "SHA" // Full SHA
+	// CommitFormatReadable is a readable one-line format
+	CommitFormatReadable CommitFormat = "READABLE" // Oneline format: "abc123 Commit message"
+	// CommitFormatMessage is the full commit message
+	CommitFormatMessage CommitFormat = "MESSAGE" // Full commit message
+	// CommitFormatSubject is the first line of the commit message
+	CommitFormatSubject CommitFormat = "SUBJECT" // First line of commit message
+)
+
+// Scope represents a branch scope that can be empty, a regular scope, or an inheritance breaker
+type Scope struct {
+	value string
+}
+
+// NewScope creates a new scope with the given value
+func NewScope(value string) Scope {
+	return Scope{value: value}
+}
+
+// Empty returns an empty scope
+func Empty() Scope {
+	return Scope{value: ""}
+}
+
+// None returns a scope that breaks inheritance
+func None() Scope {
+	return Scope{value: "none"}
+}
+
+// String returns the string representation of the scope
+func (s Scope) String() string {
+	return s.value
+}
+
+// IsEmpty returns true if the scope is empty
+func (s Scope) IsEmpty() bool {
+	return s.value == ""
+}
+
+// IsNone returns true if the scope breaks inheritance
+func (s Scope) IsNone() bool {
+	return s.value == "none" || s.value == "clear"
+}
+
+// IsDefined returns true if the scope has a meaningful value (not empty and not none)
+func (s Scope) IsDefined() bool {
+	return !s.IsEmpty() && !s.IsNone()
+}
+
+// Equal checks if two scopes are equal
+func (s Scope) Equal(other Scope) bool {
+	return s.value == other.value
+}
+
+// MarshalJSON implements json.Marshaler
+func (s Scope) MarshalJSON() ([]byte, error) {
+	if s.IsEmpty() {
+		return []byte("null"), nil
+	}
+	return json.Marshal(s.value)
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (s *Scope) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*s = Empty()
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*s = NewScope(str)
+	return nil
+}
+
+// DeletionStatus represents the deletion status of a branch
+type DeletionStatus struct {
+	SafeToDelete bool   // True if the branch is merged, closed, or empty (with PR)
+	Reason       string // Reason why it's safe (or not) to delete
+}
+
+// Branch represents a branch in the stack
+type Branch struct {
+	Name   string
+	Reader BranchReader
+}
+
+// GetName returns the branch name. This method allows Branch to implement
+// the engine.Branch interface without creating circular dependencies.
+func (b Branch) GetName() string {
+	return b.Name
+}
+
+// Equal checks if two branches are equal by comparing their names
+func (b Branch) Equal(other Branch) bool {
+	return b.Name == other.Name
+}
+
+// IsTrunk checks if this branch is the trunk
+func (b Branch) IsTrunk() bool {
+	return b.Reader.IsTrunkInternal(b.Name)
+}
+
+// IsTracked checks if this branch is tracked (has metadata)
+func (b Branch) IsTracked() bool {
+	return b.Reader.IsBranchTrackedInternal(b.Name)
+}
+
+// GetScope returns the scope for this branch, inheriting from parent if not set
+func (b Branch) GetScope() Scope {
+	return b.Reader.GetScopeInternal(b.Name)
+}
+
+// GetChildren returns the children branches
+func (b Branch) GetChildren() []Branch {
+	return b.Reader.GetChildrenInternal(b.Name)
+}
+
+// GetParentPrecondition returns the parent branch name, or trunk if no parent
+// This is used for validation where we expect a parent to exist
+func (b Branch) GetParentPrecondition() string {
+	parent := b.Reader.GetParent(b)
+	if parent == nil {
+		return b.Reader.Trunk().Name
+	}
+	return parent.Name
+}
+
+// IsBranchUpToDate checks if this branch is up to date with its parent
+// A branch is up to date if its parent revision matches the stored parent revision
+func (b Branch) IsBranchUpToDate() bool {
+	return b.Reader.IsBranchUpToDateInternal(b.Name)
+}
+
+// GetRelativeStack returns the stack relative to this branch
+func (b Branch) GetRelativeStack(scope StackRange) []Branch {
+	return b.Reader.GetRelativeStackInternal(b.Name, scope)
+}
+
+// GetCommitDate returns the commit date for this branch
+func (b Branch) GetCommitDate() (time.Time, error) {
+	return b.Reader.GetCommitDateInternal(b.Name)
+}
+
+// GetCommitAuthor returns the commit author for this branch
+func (b Branch) GetCommitAuthor() (string, error) {
+	return b.Reader.GetCommitAuthorInternal(b.Name)
+}
+
+// GetRevision returns the SHA of this branch
+func (b Branch) GetRevision() (string, error) {
+	return b.Reader.GetRevisionInternal(b.Name)
+}
+
+// GetAllCommits returns commits for this branch in various formats
+func (b Branch) GetAllCommits(format CommitFormat) ([]string, error) {
+	return b.Reader.GetAllCommitsInternal(b.Name, format)
+}
+
 // PrInfo represents PR information for a branch
 type PrInfo struct {
 	Number  *int
@@ -9,13 +186,6 @@ type PrInfo struct {
 	State   string // MERGED, CLOSED, OPEN
 	Base    string // Base branch name
 	URL     string // PR URL
-}
-
-// Scope specifies the scope for stack operations
-type Scope struct {
-	RecursiveParents  bool
-	IncludeCurrent    bool
-	RecursiveChildren bool
 }
 
 // ValidationResult represents the validation state of a branch
@@ -79,12 +249,6 @@ type RestackBatchResult struct {
 type ContinueRebaseResult struct {
 	Result     int    // git.RebaseResult value (0 = RebaseDone, 1 = RebaseConflict)
 	BranchName string // Only set if Result is RebaseDone
-}
-
-// DeletionStatus represents the deletion status of a branch
-type DeletionStatus struct {
-	SafeToDelete bool   // True if the branch is merged, closed, or empty (with PR)
-	Reason       string // Reason why it's safe (or not) to delete
 }
 
 // PRSubmissionStatus represents the submission status of a branch

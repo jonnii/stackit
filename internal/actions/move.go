@@ -2,10 +2,12 @@ package actions
 
 import (
 	"fmt"
+	"strings"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // MoveOptions contains options for the move command
@@ -81,7 +83,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 
 	// Cycle detection: ensure onto is not a descendant of source
 	sourceBranch = eng.GetBranch(source)
-	descendants := sourceBranch.GetRelativeStack(engine.Scope{
+	descendants := sourceBranch.GetRelativeStack(engine.StackRange{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
@@ -89,6 +91,25 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	for _, d := range descendants {
 		if d.Name == onto {
 			return fmt.Errorf("cannot move %s onto its own descendant %s", source, onto)
+		}
+	}
+
+	// Check for scope change and potential rename
+	sourceScope := sourceBranch.GetScope()
+	ontoScope := ontoBranch.GetScope()
+	if sourceScope.IsDefined() && ontoScope.IsDefined() && !sourceScope.Equal(ontoScope) {
+		if utils.IsInteractive() && strings.Contains(source, sourceScope.String()) {
+			confirmed, err := tui.PromptConfirm(fmt.Sprintf("Branch name contains '%s', but its scope will now be '%s'. Would you like to rename the branch?", sourceScope.String(), ontoScope.String()), true)
+			if err == nil && confirmed {
+				newName := strings.Replace(source, sourceScope.String(), ontoScope.String(), 1)
+				if err := eng.RenameBranch(gctx, eng.GetBranch(source), eng.GetBranch(newName)); err != nil {
+					splog.Info("Warning: failed to rename branch: %v", err)
+				} else {
+					splog.Info("Renamed branch %s to %s.", tui.ColorBranchName(source, false), tui.ColorBranchName(newName, true))
+					source = newName
+					sourceBranch = eng.GetBranch(source)
+				}
+			}
 		}
 	}
 
@@ -113,7 +134,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 		tui.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
-	branchesToRestack := sourceBranch.GetRelativeStack(engine.Scope{
+	branchesToRestack := sourceBranch.GetRelativeStack(engine.StackRange{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

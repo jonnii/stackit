@@ -12,6 +12,7 @@ type BranchAnnotation struct {
 	IsDraft      bool
 	NeedsRestack bool
 	CustomLabel  string // Additional text to display after branch name
+	Scope        string
 }
 
 // TreeRenderOptions configures rendering behavior
@@ -375,6 +376,10 @@ func (r *StackTreeRenderer) formatAnnotation(annotation BranchAnnotation, _ bool
 		parts = append(parts, formatPRNumberPlain(*annotation.PRNumber))
 	}
 
+	if annotation.Scope != "" {
+		parts = append(parts, "["+annotation.Scope+"]")
+	}
+
 	if annotation.PRAction != "" {
 		parts = append(parts, annotation.PRAction)
 	}
@@ -404,6 +409,10 @@ func (r *StackTreeRenderer) formatAnnotationColored(annotation BranchAnnotation)
 
 	if annotation.PRNumber != nil {
 		parts = append(parts, ColorPRNumber(*annotation.PRNumber))
+	}
+
+	if annotation.Scope != "" {
+		parts = append(parts, ColorDim("["+annotation.Scope+"]"))
 	}
 
 	if annotation.PRAction != "" {

@@ -311,9 +311,9 @@ func TestGetRelativeStack(t *testing.T) {
 			})
 
 		// Get downstack from branch2 - should NOT include trunk (main)
-		scope := engine.Scope{RecursiveParents: true}
+		rng := engine.StackRange{RecursiveParents: true}
 		branch2 := s.Engine.GetBranch("branch2")
-		stack := s.Engine.GetRelativeStack(branch2, scope)
+		stack := s.Engine.GetRelativeStack(branch2, rng)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -331,9 +331,9 @@ func TestGetRelativeStack(t *testing.T) {
 			})
 
 		// Get upstack from branch1
-		scope := engine.Scope{RecursiveChildren: true}
+		rng := engine.StackRange{RecursiveChildren: true}
 		branch1 := s.Engine.GetBranch("branch1")
-		stack := s.Engine.GetRelativeStack(branch1, scope)
+		stack := s.Engine.GetRelativeStack(branch1, rng)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -349,9 +349,9 @@ func TestGetRelativeStack(t *testing.T) {
 				"branch1": "main",
 			})
 
-		scope := engine.Scope{IncludeCurrent: true}
+		rng := engine.StackRange{IncludeCurrent: true}
 		branch1 := s.Engine.GetBranch("branch1")
-		stack := s.Engine.GetRelativeStack(branch1, scope)
+		stack := s.Engine.GetRelativeStack(branch1, rng)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -368,13 +368,13 @@ func TestGetRelativeStack(t *testing.T) {
 			})
 
 		// Get full stack from branch2 - should NOT include trunk (main)
-		scope := engine.Scope{
+		rng := engine.StackRange{
 			RecursiveParents:  true,
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
 		branch2 := s.Engine.GetBranch("branch2")
-		stack := s.Engine.GetRelativeStack(branch2, scope)
+		stack := s.Engine.GetRelativeStack(branch2, rng)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -396,13 +396,13 @@ func TestGetRelativeStack(t *testing.T) {
 			})
 
 		// Get all descendants from trunk
-		scope := engine.Scope{RecursiveChildren: true}
+		rng := engine.StackRange{RecursiveChildren: true}
 		trunk := s.Engine.Trunk()
-		stack := s.Engine.GetRelativeStack(trunk, scope)
+		stack := s.Engine.GetRelativeStack(trunk, rng)
 
 		// Should have all 4 branches
 		require.Len(t, stack, 4)
-		// Convert []Branch to []string for require.Contains and indexOf
+		// Convert []engine.Branch to []string for require.Contains and indexOf
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name

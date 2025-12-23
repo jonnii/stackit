@@ -18,6 +18,13 @@ func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 	terminalParent := eng.GetBranch(terminalParentName)
 
 	var tree strings.Builder
+
+	// Add scope if present
+	scope := eng.GetScopeInternal(branch)
+	if !scope.IsEmpty() {
+		tree.WriteString(fmt.Sprintf("**Scope**: %s\n\n", scope.String()))
+	}
+
 	for branchObj, depth := range eng.BranchesDepthFirst(terminalParent) {
 		// Only include branches related to the PR branch
 		if branchObj.Name != branch && !isParentOrChild(eng, branchObj.Name, branch) {

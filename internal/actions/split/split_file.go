@@ -47,13 +47,13 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 
 	// First checkout the parent branch so the new branch starts from there
 	parentBranch := eng.GetBranch(parentBranchName)
-	if err := git.CheckoutBranch(ctx, parentBranch); err != nil {
+	if err := git.CheckoutBranch(ctx, parentBranch.Name); err != nil {
 		return nil, fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
 	// Create new branch from parent (GetBranch just wraps the name, branch doesn't need to exist yet)
 	newBranch := eng.GetBranch(newBranchName)
-	if err := git.CreateAndCheckoutBranch(ctx, newBranch); err != nil {
+	if err := git.CreateAndCheckoutBranch(ctx, newBranch.Name); err != nil {
 		return nil, fmt.Errorf("failed to create branch: %w", err)
 	}
 
@@ -61,31 +61,31 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 	args := append([]string{"checkout", branchToSplit, "--"}, pathspecs...)
 	if _, err := git.RunGitCommandWithContext(ctx, args...); err != nil {
 		// Cleanup: delete the new branch
-		_ = git.DeleteBranch(ctx, newBranch)
+		_ = git.DeleteBranch(ctx, newBranch.Name)
 		return nil, fmt.Errorf("failed to checkout files: %w", err)
 	}
 
 	// Stage all changes
 	if err := git.StageAll(ctx); err != nil {
-		_ = git.DeleteBranch(ctx, newBranch)
+		_ = git.DeleteBranch(ctx, newBranch.Name)
 		return nil, fmt.Errorf("failed to stage changes: %w", err)
 	}
 
 	// Commit
 	commitMessage := fmt.Sprintf("Extract %s from %s", strings.Join(pathspecs, ", "), branchToSplit)
 	if err := git.Commit(commitMessage, 0); err != nil {
-		_ = git.DeleteBranch(ctx, newBranch)
+		_ = git.DeleteBranch(ctx, newBranch.Name)
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Track the new branch
 	if err := eng.TrackBranch(ctx, newBranchName, parentBranchName); err != nil {
-		_ = git.DeleteBranch(ctx, newBranch)
+		_ = git.DeleteBranch(ctx, newBranch.Name)
 		return nil, fmt.Errorf("failed to track branch: %w", err)
 	}
 
 	// Checkout original branch and remove the files
-	if err := git.CheckoutBranch(ctx, branchToSplitObj); err != nil {
+	if err := git.CheckoutBranch(ctx, branchToSplitObj.Name); err != nil {
 		return nil, fmt.Errorf("failed to checkout original branch: %w", err)
 	}
 

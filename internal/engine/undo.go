@@ -345,14 +345,14 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 		if branchName == e.currentBranch {
 			// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
 			trunkBranch := Branch{Name: trunkName, Reader: e}
-			if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
+			if err := git.CheckoutBranch(ctx, trunkBranch.Name); err != nil {
 				return fmt.Errorf("failed to switch to trunk before deleting branch: %w", err)
 			}
 			e.currentBranch = trunkName
 		}
 		// Delete the branch
 		branch := e.GetBranch(branchName)
-		if err := git.DeleteBranch(ctx, branch); err != nil {
+		if err := git.DeleteBranch(ctx, branch.Name); err != nil {
 			// Log but continue - branch might not exist or might be protected
 			continue
 		}
@@ -431,7 +431,7 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 
 		if branchExists {
 			branch := e.GetBranch(snapshot.CurrentBranch)
-			if err := git.CheckoutBranch(ctx, branch); err != nil {
+			if err := git.CheckoutBranch(ctx, branch.Name); err != nil {
 				// If checkout fails, try to continue - we're still in a valid state
 				_ = err
 			} else {
@@ -441,7 +441,7 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 			// Branch was deleted, switch to trunk
 			// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
 			trunkBranch := Branch{Name: e.trunk, Reader: e}
-			if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
+			if err := git.CheckoutBranch(ctx, trunkBranch.Name); err != nil {
 				return fmt.Errorf("failed to checkout trunk after restore: %w", err)
 			}
 			e.currentBranch = e.trunk

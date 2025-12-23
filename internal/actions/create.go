@@ -97,49 +97,29 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		}
 	}
 
-	// Determine branch name
-	branchName := opts.BranchName
-	if branchName == "" {
-		if commitMessage == "" {
-			if !utils.IsInteractive() {
-				return fmt.Errorf("must specify either a branch name or commit message")
-			}
-
-			// Interactive: get commit message from editor
-			msg, err := getCommitMessage(ctx.Context)
-			if err != nil {
-				return err
-			}
-			if msg == "" {
-				return fmt.Errorf("aborting due to empty commit message")
-			}
-			commitMessage = msg
-		}
-
-		// Get pattern from options (always valid, default applied in GetBranchPattern)
-		pattern := opts.BranchPattern
-
-		// Generate branch name from pattern
-		var err error
-		branchName, err = pattern.GetBranchName(ctx.Context, commitMessage)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Sanitize provided branch name
-		branchName = utils.SanitizeBranchName(branchName)
+	// Get commit message for branch name generation (if needed)
+	commitMessage, err = getCommitMessageForBranch(ctx, opts, commitMessage)
+	if err != nil {
+		return err
 	}
+
+	// Determine branch
+	branch, err := determineBranch(ctx, opts, commitMessage)
+	if err != nil {
+		return err
+	}
+	branchName := branch.Name
 
 	// Check if branch already exists
 	allBranches := eng.AllBranches()
-	for _, branch := range allBranches {
-		if branch.Name == branchName {
+	for _, existingBranch := range allBranches {
+		if branch.Equal(existingBranch) {
 			return fmt.Errorf("branch %s already exists", branchName)
 		}
 	}
 
 	// Create and checkout new branch
-	if err := git.CreateAndCheckoutBranch(ctx.Context, branchName); err != nil {
+	if err := git.CreateAndCheckoutBranch(ctx.Context, branch); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
@@ -147,7 +127,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	if hasStaged {
 		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
-			_ = git.DeleteBranch(ctx.Context, branchName)
+			_ = git.DeleteBranch(ctx.Context, branch)
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
@@ -271,4 +251,54 @@ func getCommitMessage(ctx context.Context) (string, error) {
 	}
 
 	return utils.CleanCommitMessage(msg), nil
+}
+
+// getCommitMessageForBranch gets the commit message needed for branch name generation.
+// If branch name is not provided and commit message is empty, it will prompt for one in interactive mode.
+func getCommitMessageForBranch(ctx *runtime.Context, opts CreateOptions, commitMessage string) (string, error) {
+	// If branch name is provided, we don't need commit message for branch generation
+	if opts.BranchName != "" {
+		return commitMessage, nil
+	}
+
+	// If commit message is empty, we need to get it
+	if commitMessage == "" {
+		if !utils.IsInteractive() {
+			return "", fmt.Errorf("must specify either a branch name or commit message")
+		}
+
+		// Interactive: get commit message from editor
+		msg, err := getCommitMessage(ctx.Context)
+		if err != nil {
+			return "", err
+		}
+		if msg == "" {
+			return "", fmt.Errorf("aborting due to empty commit message")
+		}
+		return msg, nil
+	}
+
+	return commitMessage, nil
+}
+
+// determineBranch determines the branch name and returns a Branch object.
+// It expects a clean commit message to be provided if branch name is not specified.
+func determineBranch(ctx *runtime.Context, opts CreateOptions, commitMessage string) (engine.Branch, error) {
+	branchName := opts.BranchName
+	if branchName == "" {
+		// Get pattern from options (always valid, default applied in GetBranchPattern)
+		pattern := opts.BranchPattern
+
+		// Generate branch name from pattern
+		var err error
+		branchName, err = pattern.GetBranchName(ctx.Context, commitMessage)
+		if err != nil {
+			return engine.Branch{}, err
+		}
+	} else {
+		// Sanitize provided branch name
+		branchName = utils.SanitizeBranchName(branchName)
+	}
+
+	return ctx.Engine.GetBranch(branchName), nil
 }

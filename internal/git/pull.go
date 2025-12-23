@@ -61,7 +61,7 @@ func PullBranch(ctx context.Context, remote, branchName string) (PullResult, err
 
 	// If we are currently ON this branch in this worktree, we need to update HEAD
 	if currentBranch == branchName {
-		_ = CheckoutBranch(ctx, branchName)
+		_ = CheckoutBranch(ctx, NewBranch(branchName))
 	} else if currentRev != "" {
 		_ = CheckoutDetached(ctx, currentRev)
 	}

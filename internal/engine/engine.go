@@ -15,6 +15,17 @@ type Branch struct {
 	Reader BranchReader
 }
 
+// GetName returns the branch name. This method allows Branch to implement
+// the git.Branch interface without creating circular dependencies.
+func (b Branch) GetName() string {
+	return b.Name
+}
+
+// Equal checks if two branches are equal by comparing their names
+func (b Branch) Equal(other Branch) bool {
+	return b.Name == other.Name
+}
+
 // IsTrunk checks if this branch is the trunk
 func (b Branch) IsTrunk() bool {
 	return b.Reader.IsTrunkInternal(b.Name)

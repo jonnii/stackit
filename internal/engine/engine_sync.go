@@ -55,7 +55,8 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	}
 
 	// Checkout trunk
-	if err := git.CheckoutBranch(ctx, trunk); err != nil {
+	trunkBranch := e.Trunk()
+	if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
 		return fmt.Errorf("failed to checkout trunk: %w", err)
 	}
 
@@ -63,14 +64,16 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	if err := git.HardReset(ctx, remoteSha); err != nil {
 		// Try to switch back
 		if currentBranch != "" {
-			_ = git.CheckoutBranch(ctx, currentBranch)
+			currentBranchObj := e.GetBranch(currentBranch)
+			_ = git.CheckoutBranch(ctx, currentBranchObj)
 		}
 		return fmt.Errorf("failed to reset trunk: %w", err)
 	}
 
 	// Switch back to original branch
 	if currentBranch != "" && currentBranch != trunk {
-		if err := git.CheckoutBranch(ctx, currentBranch); err != nil {
+		currentBranchObj := e.GetBranch(currentBranch)
+		if err := git.CheckoutBranch(ctx, currentBranchObj); err != nil {
 			return fmt.Errorf("failed to switch back: %w", err)
 		}
 	}

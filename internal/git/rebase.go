@@ -50,7 +50,7 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 
 		// Restore original state
 		if currentBranch != "" {
-			_ = CheckoutBranch(ctx, currentBranch)
+			_ = CheckoutBranch(ctx, NewBranch(currentBranch))
 		} else if currentRev != "" {
 			_ = CheckoutDetached(ctx, currentRev)
 		}
@@ -71,7 +71,7 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 
 	// Restore original state
 	if currentBranch != "" {
-		if err := CheckoutBranch(ctx, currentBranch); err != nil {
+		if err := CheckoutBranch(ctx, NewBranch(currentBranch)); err != nil {
 			// If original branch is now used elsewhere (unlikely but possible), checkout detached
 			_ = CheckoutDetached(ctx, currentBranch)
 		}

@@ -120,14 +120,17 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 
 	// If deleting current branch, switch to trunk first
 	if branchName == e.currentBranch {
-		if err := git.CheckoutBranch(ctx, e.trunk); err != nil {
+		// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
+		trunkBranch := Branch{Name: e.trunk, Reader: e}
+		if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
 			return fmt.Errorf("failed to switch to trunk before deleting current branch: %w", err)
 		}
 		e.currentBranch = e.trunk
 	}
 
 	// Delete git branch
-	if err := git.DeleteBranch(ctx, branchName); err != nil {
+	branch := e.GetBranch(branchName)
+	if err := git.DeleteBranch(ctx, branch); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 

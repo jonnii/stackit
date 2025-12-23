@@ -84,7 +84,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Checkout the target branch
-			if err := git.CheckoutBranch(ctx.Context, targetBranch.Name); err != nil {
+			if err := git.CheckoutBranch(ctx.Context, targetBranch); err != nil {
 				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch.Name, err)
 			}
 

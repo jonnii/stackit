@@ -91,7 +91,8 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 // foldNormal performs a normal fold: merge current branch into parent, then delete current branch
 func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog) error {
 	// Checkout parent branch
-	if err := git.CheckoutBranch(gctx, parent); err != nil {
+	parentBranch := eng.GetBranch(parent)
+	if err := git.CheckoutBranch(gctx, parentBranch); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
@@ -111,7 +112,6 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Get all descendants of parent before deletion (for restacking)
-	parentBranch := eng.GetBranch(parent)
 	descendants := parentBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    false,
@@ -165,7 +165,8 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 	}
 
 	// Ensure we're on the current branch
-	if err := git.CheckoutBranch(gctx, currentBranch); err != nil {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if err := git.CheckoutBranch(gctx, currentBranchObj); err != nil {
 		return fmt.Errorf("failed to checkout current branch: %w", err)
 	}
 
@@ -202,7 +203,6 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		tui.ColorBranchName(currentBranch, false))
 
 	// Restack current branch and all its descendants
-	currentBranchObj := eng.GetBranch(currentBranch)
 	branchesToRestack := currentBranchObj.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,

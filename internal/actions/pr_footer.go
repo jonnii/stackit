@@ -14,7 +14,8 @@ const (
 
 // CreatePRBodyFooter creates a PR body footer with dependency tree
 func CreatePRBodyFooter(branch string, eng engine.Engine) string {
-	terminalParent := findTerminalParent(branch, eng)
+	terminalParentName := findTerminalParent(branch, eng)
+	terminalParent := eng.GetBranch(terminalParentName)
 
 	var tree strings.Builder
 	for branchObj, depth := range eng.BranchesDepthFirst(terminalParent) {

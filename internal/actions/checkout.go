@@ -65,7 +65,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 
 	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
 	branch := eng.GetBranch(branchName)
-	printBranchInfo(branch, ctx)
+	printBranchInfo(ctx, branch)
 
 	return nil
 }
@@ -112,7 +112,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
-		for branch := range eng.BranchesDepthFirst(trunk.Name) {
+		for branch := range eng.BranchesDepthFirst(trunk) {
 			if seenBranches[branch.Name] {
 				continue
 			}
@@ -159,7 +159,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 }
 
 // printBranchInfo prints information about the checked out branch
-func printBranchInfo(branch engine.Branch, ctx *runtime.Context) {
+func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	if branch.IsTrunk() {
 		return
 	}

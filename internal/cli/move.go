@@ -91,10 +91,9 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 
 	// Get branches in stack order: trunk first, then children recursively
 	trunk := eng.Trunk()
-	trunkName := trunk.Name
 	choices := make([]tui.BranchChoice, 0)
 
-	for branch := range eng.BranchesDepthFirst(trunkName) {
+	for branch := range eng.BranchesDepthFirst(trunk) {
 		// Skip source and its descendants
 		if excludedBranches[branch.Name] {
 			continue
@@ -122,20 +121,20 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 		allBranches := eng.AllBranches()
 
 		// Ensure trunk is always included if not excluded
-		if trunkName != "" && !excludedBranches[trunkName] && !seenBranches[trunkName] {
+		if trunk.Name != "" && !excludedBranches[trunk.Name] && !seenBranches[trunk.Name] {
 			currentBranch := eng.CurrentBranch()
 			var display string
-			if trunkName == currentBranch.Name {
-				display = tui.ColorBranchName(trunkName, true)
+			if trunk.Name == currentBranch.Name {
+				display = tui.ColorBranchName(trunk.Name, true)
 				initialIndex = 0
 			} else {
-				display = tui.ColorBranchName(trunkName, false)
+				display = tui.ColorBranchName(trunk.Name, false)
 			}
 			choices = append(choices, tui.BranchChoice{
 				Display: display,
-				Value:   trunkName,
+				Value:   trunk.Name,
 			})
-			seenBranches[trunkName] = true
+			seenBranches[trunk.Name] = true
 		}
 
 		// Add all other branches

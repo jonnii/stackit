@@ -107,7 +107,7 @@ type BranchReader interface {
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 
 	// Traversal
-	BranchesDepthFirst(startBranch string) iter.Seq2[Branch, int]
+	BranchesDepthFirst(startBranch Branch) iter.Seq2[Branch, int]
 }
 
 // BranchWriter provides write operations for branch management

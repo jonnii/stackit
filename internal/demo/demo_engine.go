@@ -324,7 +324,7 @@ func (e *Engine) FindMostRecentTrackedAncestors(_ context.Context, branchName st
 // BranchesDepthFirst returns an iterator that yields branches starting from startBranch in depth-first order.
 // Each iteration yields (branch, depth) where depth is 0 for the start branch.
 // The iterator can be used with range loops and supports early termination with break.
-func (e *Engine) BranchesDepthFirst(startBranch string) iter.Seq2[engine.Branch, int] {
+func (e *Engine) BranchesDepthFirst(startBranch engine.Branch) iter.Seq2[engine.Branch, int] {
 	return func(yield func(engine.Branch, int) bool) {
 		visited := make(map[string]bool)
 		var visit func(branch string, depth int) bool
@@ -347,7 +347,7 @@ func (e *Engine) BranchesDepthFirst(startBranch string) iter.Seq2[engine.Branch,
 			return true
 		}
 
-		visit(startBranch, 0)
+		visit(startBranch.Name, 0)
 	}
 }
 

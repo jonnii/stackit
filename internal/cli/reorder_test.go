@@ -58,7 +58,6 @@ func TestReorderCommand(t *testing.T) {
 
 		// Create editor script that reorders: branch2, branch1 (reversed)
 		editorScript := createEditorScript(t, "branch2\nbranch1\n")
-		defer os.RemoveAll(filepath.Dir(editorScript))
 
 		// Run reorder command
 		cmd = exec.Command(binaryPath, "reorder")
@@ -141,7 +140,6 @@ func TestReorderCommand(t *testing.T) {
 		// After reordering: trunk -> branch2 -> branch1 -> branch3
 		// branch3's parent becomes branch1 (the branch before it in the new order)
 		editorScript := createEditorScript(t, "branch2\nbranch1\nbranch3\n")
-		defer os.RemoveAll(filepath.Dir(editorScript))
 
 		// Run reorder command
 		cmd = exec.Command(binaryPath, "reorder")
@@ -194,7 +192,6 @@ func TestReorderCommand(t *testing.T) {
 
 		// Create editor script that removes branch1
 		editorScript := createEditorScript(t, "branch2\n")
-		defer os.RemoveAll(filepath.Dir(editorScript))
 
 		// Run reorder command - should fail
 		cmd := exec.Command(binaryPath, "reorder")
@@ -242,7 +239,6 @@ func TestReorderCommand(t *testing.T) {
 
 		// Create editor script with original order (branch1, branch2)
 		editorScript := createEditorScript(t, "branch1\nbranch2\n")
-		defer os.RemoveAll(filepath.Dir(editorScript))
 
 		// Run reorder command
 		cmd := exec.Command(binaryPath, "reorder")
@@ -315,10 +311,7 @@ func TestReorderCommand(t *testing.T) {
 // passed as the first argument, simulating an editor
 func createEditorScript(t *testing.T, content string) string {
 	// Create temp directory outside the repo to avoid git seeing it as uncommitted changes
-	tmpDir, err := os.MkdirTemp("", "stackit-test-editor-*")
-	require.NoError(t, err)
-
-	// Cleanup will be handled by the caller using defer
+	tmpDir := t.TempDir()
 	scriptPath := filepath.Join(tmpDir, "editor.sh")
 	// Use a heredoc to safely write content
 	scriptContent := "#!/bin/sh\n"
@@ -326,7 +319,7 @@ func createEditorScript(t *testing.T, content string) string {
 	scriptContent += content
 	scriptContent += "EOF\n"
 
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	err := os.WriteFile(scriptPath, []byte(scriptContent), 0755)
 	require.NoError(t, err)
 
 	// Return absolute path for EDITOR environment variable

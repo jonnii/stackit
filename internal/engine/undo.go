@@ -42,6 +42,12 @@ type SnapshotInfo struct {
 	DisplayName string    // Human-readable description
 }
 
+// SnapshotOptions contains options for taking a snapshot
+type SnapshotOptions struct {
+	Command string
+	Args    []string
+}
+
 // getUndoDir returns the path to the undo directory
 func getUndoDir(repoRoot string) string {
 	return filepath.Join(repoRoot, UndoDir)
@@ -97,7 +103,7 @@ func parseSnapshotFilename(filename string) (time.Time, string, error) {
 }
 
 // TakeSnapshot captures the current state of the repository
-func (e *engineImpl) TakeSnapshot(command string, args []string) error {
+func (e *engineImpl) TakeSnapshot(opts SnapshotOptions) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -138,8 +144,8 @@ func (e *engineImpl) TakeSnapshot(command string, args []string) error {
 	timestamp := time.Now()
 	snapshot := &Snapshot{
 		Timestamp:     timestamp,
-		Command:       command,
-		Args:          args,
+		Command:       opts.Command,
+		Args:          opts.Args,
 		CurrentBranch: currentBranch,
 		BranchSHAs:    branchSHAs,
 		MetadataSHAs:  metadataSHAs,
@@ -152,7 +158,7 @@ func (e *engineImpl) TakeSnapshot(command string, args []string) error {
 	}
 
 	// Write to file
-	filename := getSnapshotFilename(timestamp, command)
+	filename := getSnapshotFilename(timestamp, opts.Command)
 	filePath := filepath.Join(getUndoDir(e.repoRoot), filename)
 	if err := os.WriteFile(filePath, jsonData, 0600); err != nil {
 		return fmt.Errorf("failed to write snapshot: %w", err)

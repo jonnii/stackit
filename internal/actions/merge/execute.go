@@ -38,9 +38,10 @@ type mergeExecuteEngine interface {
 
 // ExecuteOptions contains options for executing a merge plan
 type ExecuteOptions struct {
-	Plan     *Plan
-	Force    bool
-	Reporter ProgressReporter // Optional progress reporter
+	Plan           *Plan
+	Force          bool
+	Reporter       ProgressReporter // Optional progress reporter
+	UndoStackDepth int              // Maximum undo stack depth (from config)
 }
 
 // Execute executes a validated merge plan step by step
@@ -107,7 +108,7 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 }
 
 // ExecuteInWorktree executes the merge plan in a temporary worktree
-func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
+func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, _ string, opts ExecuteOptions) error {
 	// If using TUI, show a brief message about the worktree
 	if tui.IsTTY() {
 		splog.Debug("🔨 Creating temporary worktree for merge execution...")
@@ -150,7 +151,7 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 
 	// 4. Create a new engine for the worktree
 	trunk := eng.Trunk()
-	maxUndoDepth, _ := config.GetUndoStackDepth(repoRoot)
+	maxUndoDepth := opts.UndoStackDepth
 	if maxUndoDepth <= 0 {
 		maxUndoDepth = engine.DefaultMaxUndoStackDepth
 	}

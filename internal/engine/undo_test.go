@@ -9,10 +9,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
+
+// snapshotOpts is a helper to create SnapshotOptions for tests
+func snapshotOpts(command string, args ...string) engine.SnapshotOptions {
+	return engine.SnapshotOptions{
+		Command: command,
+		Args:    args,
+	}
+}
 
 func TestTakeSnapshot(t *testing.T) {
 	t.Run("creates snapshot with branch and metadata SHAs", func(t *testing.T) {
@@ -32,7 +41,7 @@ func TestTakeSnapshot(t *testing.T) {
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot("test", []string{"arg1", "arg2"})
+		err = s.Engine.TakeSnapshot(snapshotOpts("test", "arg1", "arg2"))
 		require.NoError(t, err)
 
 		// Verify snapshot was created
@@ -58,7 +67,7 @@ func TestTakeSnapshot(t *testing.T) {
 		undoDir := filepath.Join(s.Scene.Dir, ".git", "stackit", "undo")
 		require.NoDirExists(t, undoDir)
 
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		require.DirExists(t, undoDir)
@@ -71,7 +80,7 @@ func TestTakeSnapshot(t *testing.T) {
 			Commit("feature change")
 
 		// Take snapshot while on feature branch
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		snapshots, err := s.Engine.GetSnapshots()
@@ -97,13 +106,13 @@ func TestGetSnapshots(t *testing.T) {
 		s.WithInitialCommit()
 
 		// Take multiple snapshots with small delays
-		err := s.Engine.TakeSnapshot("first", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("first"))
 		require.NoError(t, err)
 		time.Sleep(50 * time.Millisecond) // Longer delay to ensure different timestamps
-		err = s.Engine.TakeSnapshot("second", nil)
+		err = s.Engine.TakeSnapshot(snapshotOpts("second"))
 		require.NoError(t, err)
 		time.Sleep(50 * time.Millisecond)
-		err = s.Engine.TakeSnapshot("third", nil)
+		err = s.Engine.TakeSnapshot(snapshotOpts("third"))
 		require.NoError(t, err)
 
 		snapshots, err := s.Engine.GetSnapshots()
@@ -130,7 +139,7 @@ func TestGetSnapshots(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 		s.WithInitialCommit()
 
-		err := s.Engine.TakeSnapshot("move", []string{"branch-a", "onto", "branch-b"})
+		err := s.Engine.TakeSnapshot(snapshotOpts("move", "branch-a", "onto", "branch-b"))
 		require.NoError(t, err)
 
 		snapshots, err := s.Engine.GetSnapshots()
@@ -150,7 +159,7 @@ func TestLoadSnapshot(t *testing.T) {
 			Checkout("main").
 			TrackBranch("feature", "main")
 
-		err := s.Engine.TakeSnapshot("test", []string{"arg"})
+		err := s.Engine.TakeSnapshot(snapshotOpts("test", "arg"))
 		require.NoError(t, err)
 
 		snapshots, err := s.Engine.GetSnapshots()
@@ -190,7 +199,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot("test", nil)
+		err = s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Make changes: add commits to both branches
@@ -232,7 +241,7 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Take snapshot
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Create new branch after snapshot
@@ -279,7 +288,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.NotEmpty(t, initialFeatureMetadataSHA)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot("test", nil)
+		err = s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Modify metadata by changing parent
@@ -306,7 +315,7 @@ func TestRestoreSnapshot(t *testing.T) {
 			Checkout("main")
 
 		// Take snapshot while on main
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Switch to feature branch
@@ -337,7 +346,7 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Take snapshot
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Delete feature branch manually
@@ -367,7 +376,7 @@ func TestRestoreSnapshot(t *testing.T) {
 			Commit("feature change")
 
 		// Take snapshot while on feature
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(snapshotOpts("test"))
 		require.NoError(t, err)
 
 		// Delete feature branch
@@ -407,7 +416,7 @@ func TestEnforceMaxStackDepth(t *testing.T) {
 
 		// Create more snapshots than default max (10)
 		for i := 0; i < 12; i++ {
-			err := s.Engine.TakeSnapshot("test", []string{string(rune('a' + i))})
+			err := s.Engine.TakeSnapshot(snapshotOpts("test", string(rune('a'+i))))
 			require.NoError(t, err)
 			time.Sleep(10 * time.Millisecond) // Ensure different timestamps
 		}
@@ -431,7 +440,7 @@ func TestSnapshotFileFormat(t *testing.T) {
 			Checkout("main").
 			TrackBranch("feature", "main")
 
-		err := s.Engine.TakeSnapshot("test", []string{"arg1", "arg2"})
+		err := s.Engine.TakeSnapshot(snapshotOpts("test", "arg1", "arg2"))
 		require.NoError(t, err)
 
 		// Read the snapshot file directly

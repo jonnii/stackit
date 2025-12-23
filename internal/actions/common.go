@@ -143,3 +143,52 @@ func PluralIt(plural bool) string {
 	}
 	return "it"
 }
+
+// SnapshotOption is a function that modifies SnapshotOptions
+type SnapshotOption func(*engine.SnapshotOptions)
+
+// NewSnapshot creates a new SnapshotOptions with the given command and options
+func NewSnapshot(command string, options ...SnapshotOption) engine.SnapshotOptions {
+	opts := engine.SnapshotOptions{
+		Command: command,
+		Args:    []string{},
+	}
+	for _, option := range options {
+		option(&opts)
+	}
+	return opts
+}
+
+// WithArg appends a single argument if it's not empty
+func WithArg(arg string) SnapshotOption {
+	return func(opts *engine.SnapshotOptions) {
+		if arg != "" {
+			opts.Args = append(opts.Args, arg)
+		}
+	}
+}
+
+// WithArgs appends multiple arguments
+func WithArgs(args ...string) SnapshotOption {
+	return func(opts *engine.SnapshotOptions) {
+		opts.Args = append(opts.Args, args...)
+	}
+}
+
+// WithFlag appends a flag if condition is true
+func WithFlag(condition bool, flag string) SnapshotOption {
+	return func(opts *engine.SnapshotOptions) {
+		if condition {
+			opts.Args = append(opts.Args, flag)
+		}
+	}
+}
+
+// WithFlagValue appends a flag with a value if the value is not empty
+func WithFlagValue(flag string, value string) SnapshotOption {
+	return func(opts *engine.SnapshotOptions) {
+		if value != "" {
+			opts.Args = append(opts.Args, flag, value)
+		}
+	}
+}

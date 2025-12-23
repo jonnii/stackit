@@ -16,13 +16,14 @@ import (
 
 // CreateOptions contains options for the create command
 type CreateOptions struct {
-	BranchName string
-	Message    string
-	All        bool
-	Insert     bool
-	Patch      bool
-	Update     bool
-	Verbose    int
+	BranchName    string
+	Message       string
+	All           bool
+	Insert        bool
+	Patch         bool
+	Update        bool
+	Verbose       int
+	BranchPattern config.BranchPattern // Branch name pattern from config
 	// SelectedChildren is used to specify which children to move during insert
 	// in non-interactive mode (mostly for tests)
 	SelectedChildren []string
@@ -40,26 +41,15 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.BranchName != "" {
-		args = append(args, opts.BranchName)
-	}
-	if opts.Message != "" {
-		args = append(args, "-m", opts.Message)
-	}
-	if opts.All {
-		args = append(args, "--all")
-	}
-	if opts.Insert {
-		args = append(args, "--insert")
-	}
-	if opts.Patch {
-		args = append(args, "--patch")
-	}
-	if opts.Update {
-		args = append(args, "--update")
-	}
-	if err := eng.TakeSnapshot("create", args); err != nil {
+	snapshotOpts := NewSnapshot("create",
+		WithArg(opts.BranchName),
+		WithFlagValue("-m", opts.Message),
+		WithFlag(opts.All, "--all"),
+		WithFlag(opts.Insert, "--insert"),
+		WithFlag(opts.Patch, "--patch"),
+		WithFlag(opts.Update, "--update"),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}
@@ -126,24 +116,14 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 			commitMessage = msg
 		}
 
-		// Get pattern from config
-		pattern, err := config.GetBranchNamePattern(ctx.RepoRoot)
-		if err != nil {
-			return fmt.Errorf("failed to get branch name pattern: %w", err)
-		}
+		// Get pattern from options (always valid, default applied in GetBranchPattern)
+		pattern := opts.BranchPattern
 
-		// Get username and date for pattern processing
-		username, err := git.GetUserName(ctx.Context)
+		// Generate branch name from pattern
+		var err error
+		branchName, err = pattern.GetBranchName(ctx.Context, commitMessage)
 		if err != nil {
-			// If we can't get username, use empty string (will be sanitized)
-			username = ""
-		}
-		date := git.GetCurrentDate()
-
-		// Process the pattern
-		branchName = utils.ProcessBranchNamePattern(pattern, username, date, commitMessage)
-		if branchName == "" {
-			return fmt.Errorf("failed to generate branch name from commit message")
+			return err
 		}
 	} else {
 		// Sanitize provided branch name

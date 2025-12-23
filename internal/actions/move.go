@@ -31,14 +31,11 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.Source != "" {
-		args = append(args, "--source", opts.Source)
-	}
-	if opts.Onto != "" {
-		args = append(args, "--onto", opts.Onto)
-	}
-	if err := eng.TakeSnapshot("move", args); err != nil {
+	snapshotOpts := NewSnapshot("move",
+		WithFlagValue("--source", opts.Source),
+		WithFlagValue("--onto", opts.Onto),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

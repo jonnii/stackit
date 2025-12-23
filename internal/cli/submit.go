@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/submit"
+	"stackit.dev/stackit/internal/config"
 	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -73,6 +74,9 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 		return err
 	}
 
+	// Get config values
+	submitFooter, _ := config.GetSubmitFooter(ctx.RepoRoot)
+
 	// Run submit action
 	opts := submit.Options{
 		Branch:               f.branch,
@@ -100,6 +104,7 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 		Comment:              f.comment,
 		TargetTrunk:          f.targetTrunk,
 		IgnoreOutOfSyncTrunk: f.ignoreOutOfSyncTrunk,
+		SubmitFooter:         submitFooter,
 	}
 
 	return submit.Action(ctx, opts)

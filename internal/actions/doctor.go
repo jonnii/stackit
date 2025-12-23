@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
@@ -17,7 +16,8 @@ import (
 
 // DoctorOptions contains options for the doctor command
 type DoctorOptions struct {
-	Fix bool
+	Fix   bool
+	Trunk string // Trunk branch name from config
 }
 
 // DoctorAction runs diagnostic checks on the stackit environment and repository
@@ -43,7 +43,7 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 
 	// Repository checks
 	splog.Info("Repository:")
-	warnings, errors = checkRepository(ctx, splog, warnings, errors)
+	warnings, errors = checkRepository(ctx, splog, warnings, errors, opts.Trunk)
 
 	splog.Newline()
 
@@ -138,18 +138,15 @@ func checkEnvironment(splog *tui.Splog, warnings []string, errors []string) ([]s
 }
 
 // checkRepository performs repository-related checks
-func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, errors []string) ([]string, []string) {
+func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, errors []string, trunk string) ([]string, []string) {
 	// Check if we're in a git repository
-	repoRoot := ctx.RepoRoot
-	if repoRoot == "" {
-		var err error
-		if err = git.InitDefaultRepo(); err != nil {
+	if ctx.RepoRoot == "" {
+		if err := git.InitDefaultRepo(); err != nil {
 			errors = append(errors, "not in a git repository")
 			splog.Warn("  ❌ not in a git repository")
 			return warnings, errors
 		}
-		repoRoot, err = git.GetRepoRoot()
-		if err != nil {
+		if _, err := git.GetRepoRoot(); err != nil {
 			errors = append(errors, fmt.Sprintf("failed to get repo root: %v", err))
 			splog.Warn("  ❌ failed to get repo root: %v", err)
 			return warnings, errors
@@ -174,13 +171,12 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 	}
 
 	// Check trunk branch
-	trunk, err := config.GetTrunk(repoRoot)
-	if err != nil {
-		errors = append(errors, fmt.Sprintf("failed to get trunk: %v", err))
-		splog.Warn("  ❌ failed to get trunk: %v", err)
+	if trunk == "" {
+		errors = append(errors, "trunk branch not configured")
+		splog.Warn("  ❌ trunk branch not configured")
 	} else {
 		// Check if trunk branch exists
-		_, err = git.GetRevision(trunk)
+		_, err := git.GetRevision(trunk)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("trunk branch '%s' does not exist", trunk))
 			splog.Warn("  ❌ trunk branch '%s' does not exist", trunk)
@@ -189,8 +185,8 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 		}
 	}
 
-	// Check if stackit is initialized
-	if !config.IsInitialized(repoRoot) {
+	// Check if stackit is initialized (if trunk is set, it's initialized)
+	if trunk == "" {
 		errors = append(errors, "stackit is not initialized (run 'stackit init')")
 		splog.Warn("  ❌ stackit is not initialized")
 	} else {

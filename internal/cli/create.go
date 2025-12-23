@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -39,15 +40,19 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 				branchName = args[0]
 			}
 
+			// Get config values
+			branchPattern, _ := config.GetBranchPattern(ctx.RepoRoot)
+
 			// Prepare options
 			opts := actions.CreateOptions{
-				BranchName: branchName,
-				Message:    message,
-				All:        all,
-				Insert:     insert,
-				Patch:      patch,
-				Update:     update,
-				Verbose:    verbose,
+				BranchName:    branchName,
+				Message:       message,
+				All:           all,
+				Insert:        insert,
+				Patch:         patch,
+				Update:        update,
+				Verbose:       verbose,
+				BranchPattern: branchPattern,
 			}
 
 			// Execute create action

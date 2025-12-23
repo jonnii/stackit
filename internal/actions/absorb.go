@@ -32,20 +32,13 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.All {
-		args = append(args, "--all")
-	}
-	if opts.DryRun {
-		args = append(args, "--dry-run")
-	}
-	if opts.Force {
-		args = append(args, "--force")
-	}
-	if opts.Patch {
-		args = append(args, "--patch")
-	}
-	if err := eng.TakeSnapshot("absorb", args); err != nil {
+	snapshotOpts := NewSnapshot("absorb",
+		WithFlag(opts.All, "--all"),
+		WithFlag(opts.DryRun, "--dry-run"),
+		WithFlag(opts.Force, "--force"),
+		WithFlag(opts.Patch, "--patch"),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

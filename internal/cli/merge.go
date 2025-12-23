@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/merge"
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -57,13 +58,17 @@ If no flags are provided, an interactive wizard will guide you through the merge
 				return runInteractiveMergeWizard(ctx, dryRun, force)
 			}
 
+			// Get config values
+			undoStackDepth, _ := config.GetUndoStackDepth(ctx.RepoRoot)
+
 			// Run merge action
 			return merge.Action(ctx, merge.Options{
-				DryRun:      dryRun,
-				Confirm:     !yes, // If --yes is set, don't confirm
-				Strategy:    mergeStrategy,
-				Force:       force,
-				UseWorktree: worktree,
+				DryRun:         dryRun,
+				Confirm:        !yes, // If --yes is set, don't confirm
+				Strategy:       mergeStrategy,
+				Force:          force,
+				UseWorktree:    worktree,
+				UndoStackDepth: undoStackDepth,
 			})
 		},
 	}
@@ -262,14 +267,18 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		return fmt.Errorf("worktree confirmation canceled: %w", err)
 	}
 
+	// Get config values
+	undoStackDepth, _ := config.GetUndoStackDepth(ctx.RepoRoot)
+
 	// Execute the plan
 	mergeOpts := merge.Options{
-		DryRun:      dryRun,
-		Confirm:     false, // Already confirmed
-		Strategy:    mergeStrategy,
-		Force:       forceFlag,
-		UseWorktree: useWorktree,
-		Plan:        plan,
+		DryRun:         dryRun,
+		Confirm:        false, // Already confirmed
+		Strategy:       mergeStrategy,
+		Force:          forceFlag,
+		UseWorktree:    useWorktree,
+		Plan:           plan,
+		UndoStackDepth: undoStackDepth,
 	}
 
 	if err := merge.Action(ctx, mergeOpts); err != nil {

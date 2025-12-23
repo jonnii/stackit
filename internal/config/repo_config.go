@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // RepoConfig represents the repository configuration
@@ -18,6 +17,20 @@ type RepoConfig struct {
 	BranchNamePattern          *string  `json:"branchNamePattern,omitempty"`
 	SubmitFooter               *bool    `json:"submit.footer,omitempty"`
 	UndoStackDepth             *int     `json:"undo.stackDepth,omitempty"`
+}
+
+// GetBranchPattern returns the branch name pattern as a BranchPattern type
+// Always returns a valid pattern (default if not set or invalid)
+func (c *RepoConfig) GetBranchPattern() BranchPattern {
+	if c.BranchNamePattern != nil && *c.BranchNamePattern != "" {
+		pattern, err := NewBranchPattern(*c.BranchNamePattern)
+		if err != nil {
+			// If invalid, return default
+			return DefaultBranchPattern
+		}
+		return pattern.WithDefault()
+	}
+	return DefaultBranchPattern
 }
 
 // GetRepoConfig reads the repository configuration
@@ -169,19 +182,26 @@ func GetBranchNamePattern(repoRoot string) (string, error) {
 		return "", err
 	}
 
-	if config.BranchNamePattern != nil {
-		return *config.BranchNamePattern, nil
+	return config.GetBranchPattern().String(), nil
+}
+
+// GetBranchPattern returns the branch name pattern as a BranchPattern type
+// Always returns a valid pattern (default if not set or invalid)
+func GetBranchPattern(repoRoot string) (BranchPattern, error) {
+	config, err := GetRepoConfig(repoRoot)
+	if err != nil {
+		return DefaultBranchPattern, err
 	}
 
-	// Default pattern
-	return "{username}/{date}/{message}", nil
+	return config.GetBranchPattern().WithDefault(), nil
 }
 
 // SetBranchNamePattern updates the branch name pattern in the config
 func SetBranchNamePattern(repoRoot string, pattern string) error {
-	// Validate that pattern contains {message} placeholder
-	if !strings.Contains(pattern, "{message}") {
-		return fmt.Errorf("branch name pattern must contain {message} placeholder")
+	// Validate the pattern
+	branchPattern, err := NewBranchPattern(pattern)
+	if err != nil {
+		return err
 	}
 
 	configPath := filepath.Join(repoRoot, ".git", ".stackit_config")
@@ -191,7 +211,8 @@ func SetBranchNamePattern(repoRoot string, pattern string) error {
 		config = &RepoConfig{}
 	}
 
-	config.BranchNamePattern = &pattern
+	patternStr := branchPattern.String()
+	config.BranchNamePattern = &patternStr
 
 	configJSON, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -28,9 +29,13 @@ The doctor command checks:
 				return err
 			}
 
+			// Get config values
+			trunk, _ := config.GetTrunk(ctx.RepoRoot)
+
 			// Run doctor action
 			return actions.DoctorAction(ctx, actions.DoctorOptions{
-				Fix: fix,
+				Fix:   fix,
+				Trunk: trunk,
 			})
 		},
 	}

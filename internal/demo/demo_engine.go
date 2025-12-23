@@ -526,7 +526,7 @@ func (e *Engine) ForceCheckoutBranch(_ context.Context, _ string) error {
 // UndoManager interface implementation
 
 // TakeSnapshot simulates taking a snapshot in the demo engine
-func (e *Engine) TakeSnapshot(_ string, _ []string) error {
+func (e *Engine) TakeSnapshot(_ engine.SnapshotOptions) error {
 	// In demo mode, snapshots are not persisted
 	return nil
 }

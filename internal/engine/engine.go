@@ -5,6 +5,7 @@ package engine
 
 import (
 	"context"
+	"iter"
 	"time"
 )
 
@@ -41,7 +42,7 @@ type BranchReader interface {
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 
 	// Traversal
-	VisitBranchesDepthFirst(startBranch string, visitor BranchVisitor)
+	BranchesDepthFirst(startBranch string) iter.Seq2[string, int]
 }
 
 // BranchWriter provides write operations for branch management
@@ -104,12 +105,6 @@ type SplitManager interface {
 	// ForceCheckoutBranch force checks out a branch
 	ForceCheckoutBranch(ctx context.Context, branchName string) error
 }
-
-// BranchVisitor is called for each branch during depth-first traversal.
-// branchName: the current branch being visited
-// depth: depth from the starting branch (0 for start branch)
-// Returns false to stop traversal of this branch's subtree, true to continue
-type BranchVisitor func(branchName string, depth int) bool
 
 // CommitFormat specifies the format for commit output
 type CommitFormat string

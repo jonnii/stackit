@@ -17,18 +17,17 @@ func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 	terminalParent := findTerminalParent(branch, eng)
 
 	var tree strings.Builder
-	eng.VisitBranchesDepthFirst(terminalParent, func(branchName string, depth int) bool {
+	for branchName, depth := range eng.BranchesDepthFirst(terminalParent) {
 		// Only include branches related to the PR branch
 		if branchName != branch && !isParentOrChild(eng, branchName, branch) {
-			return true // skip but continue traversal
+			continue // skip but continue traversal
 		}
 
 		leaf := buildLeaf(eng, branchName, depth, branch)
 		if leaf != "" {
 			tree.WriteString(leaf)
 		}
-		return true // continue traversal
-	})
+	}
 
 	return footerTitle + tree.String() + footerFooter
 }

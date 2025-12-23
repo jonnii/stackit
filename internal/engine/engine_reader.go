@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -463,30 +464,32 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 	return DeletionStatus{SafeToDelete: false, Reason: ""}, nil
 }
 
-// VisitBranchesDepthFirst visits branches starting from startBranch in depth-first order.
-// The visitor is called for each branch before visiting its children (pre-order).
-// Returns false from the visitor to stop traversal of that branch's subtree.
-func (e *engineImpl) VisitBranchesDepthFirst(startBranch string, visitor BranchVisitor) {
-	visited := make(map[string]bool)
-	var visit func(branch string, depth int) bool
-	visit = func(branch string, depth int) bool {
-		if visited[branch] {
-			return true // cycle detection
-		}
-		visited[branch] = true
-
-		if !visitor(branch, depth) {
-			return false // visitor wants to stop
-		}
-
-		children := e.GetChildren(branch)
-		for _, child := range children {
-			if !visit(child, depth+1) {
-				return false
+// BranchesDepthFirst returns an iterator that yields branches starting from startBranch in depth-first order.
+// Each iteration yields (branchName, depth) where depth is 0 for the start branch.
+// The iterator can be used with range loops and supports early termination with break.
+func (e *engineImpl) BranchesDepthFirst(startBranch string) iter.Seq2[string, int] {
+	return func(yield func(string, int) bool) {
+		visited := make(map[string]bool)
+		var visit func(branch string, depth int) bool
+		visit = func(branch string, depth int) bool {
+			if visited[branch] {
+				return true // cycle detection
 			}
-		}
-		return true
-	}
+			visited[branch] = true
 
-	visit(startBranch, 0)
+			if !yield(branch, depth) {
+				return false // iterator wants to stop
+			}
+
+			children := e.GetChildren(branch)
+			for _, child := range children {
+				if !visit(child, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+
+		visit(startBranch, 0)
+	}
 }

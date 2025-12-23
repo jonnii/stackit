@@ -91,14 +91,14 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	trunkName := eng.Trunk()
 	choices := make([]tui.BranchChoice, 0)
 
-	eng.VisitBranchesDepthFirst(trunkName, func(branchName string, _ int) bool {
+	for branchName := range eng.BranchesDepthFirst(trunkName) {
 		// Skip source and its descendants
 		if excludedBranches[branchName] {
-			return true // continue traversal
+			continue
 		}
 
 		if seenBranches[branchName] {
-			return true // continue traversal
+			continue
 		}
 		seenBranches[branchName] = true
 
@@ -111,8 +111,7 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 			Display: display,
 			Value:   branchName,
 		})
-		return true // continue traversal
-	})
+	}
 
 	// Fallback: if we still have no choices, get all branches directly from engine
 	if len(choices) == 0 {

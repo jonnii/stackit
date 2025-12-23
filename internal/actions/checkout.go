@@ -110,14 +110,13 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
-		eng.VisitBranchesDepthFirst(trunkName, func(branchName string, _ int) bool {
+		for branchName := range eng.BranchesDepthFirst(trunkName) {
 			if seenBranches[branchName] {
-				return true // continue traversal
+				continue
 			}
 			seenBranches[branchName] = true
 			branchNames = append(branchNames, branchName)
-			return true // continue traversal
-		})
+		}
 	}
 
 	// Add untracked branches if requested

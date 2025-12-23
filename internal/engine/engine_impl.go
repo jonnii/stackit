@@ -117,7 +117,7 @@ func (e *engineImpl) PopulateRemoteShas() error {
 	e.remoteShas = make(map[string]string)
 
 	// Fetch remote SHAs using git ls-remote
-	remote := "origin" // TODO: Get from config
+	remote := git.GetRemote()
 	remoteShas, err := git.FetchRemoteShas(remote)
 	if err != nil {
 		// Don't fail if we can't fetch remote SHAs (e.g., offline)

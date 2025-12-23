@@ -208,7 +208,7 @@ type Options struct {
 // UndoManager provides operations for undo/redo functionality
 // Thread-safe: All methods are safe for concurrent use
 type UndoManager interface {
-	TakeSnapshot(command string, args []string) error
+	TakeSnapshot(opts SnapshotOptions) error
 	GetSnapshots() ([]SnapshotInfo, error)
 	LoadSnapshot(snapshotID string) (*Snapshot, error)
 	RestoreSnapshot(ctx context.Context, snapshotID string) error

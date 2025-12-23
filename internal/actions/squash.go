@@ -27,14 +27,11 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.Message != "" {
-		args = append(args, "-m", opts.Message)
-	}
-	if opts.NoEdit {
-		args = append(args, "--no-edit")
-	}
-	if err := eng.TakeSnapshot("squash", args); err != nil {
+	snapshotOpts := NewSnapshot("squash",
+		WithFlagValue("-m", opts.Message),
+		WithFlag(opts.NoEdit, "--no-edit"),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

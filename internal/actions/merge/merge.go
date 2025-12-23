@@ -9,12 +9,13 @@ import (
 
 // Options contains options for the merge command
 type Options struct {
-	DryRun      bool
-	Confirm     bool
-	Strategy    Strategy
-	Force       bool
-	UseWorktree bool
-	Plan        *Plan // Optional pre-calculated plan
+	DryRun         bool
+	Confirm        bool
+	Strategy       Strategy
+	Force          bool
+	UseWorktree    bool
+	Plan           *Plan // Optional pre-calculated plan
+	UndoStackDepth int   // Maximum undo stack depth (from config)
 }
 
 // Action performs the merge operation using the plan/execute pattern
@@ -102,8 +103,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// 7. Execute the plan
 	executeOpts := ExecuteOptions{
-		Plan:  plan,
-		Force: opts.Force,
+		Plan:           plan,
+		Force:          opts.Force,
+		UndoStackDepth: opts.UndoStackDepth,
 	}
 
 	if opts.UseWorktree {

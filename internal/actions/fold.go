@@ -30,14 +30,11 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.Keep {
-		args = append(args, "--keep")
-	}
-	if opts.AllowTrunk {
-		args = append(args, "--allow-trunk")
-	}
-	if err := eng.TakeSnapshot("fold", args); err != nil {
+	snapshotOpts := NewSnapshot("fold",
+		WithFlag(opts.Keep, "--keep"),
+		WithFlag(opts.AllowTrunk, "--allow-trunk"),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

@@ -26,11 +26,10 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	args := []string{}
-	if opts.BranchName != "" {
-		args = append(args, opts.BranchName)
-	}
-	if err := eng.TakeSnapshot("restack", args); err != nil {
+	snapshotOpts := NewSnapshot("restack",
+		WithArg(opts.BranchName),
+	)
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

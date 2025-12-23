@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
@@ -45,6 +44,7 @@ type Options struct {
 	Comment              string
 	TargetTrunk          string
 	IgnoreOutOfSyncTrunk bool
+	SubmitFooter         bool // Whether to include PR footer (from config)
 }
 
 // Info contains information about a branch to submit
@@ -159,7 +159,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 	repoOwner, repoName := githubClient.GetOwnerRepo()
 
-	remote := "origin" // TODO: Get from config
+	remote := git.GetRemote()
 	var wg sync.WaitGroup
 	var submitErr error
 	var errMu sync.Mutex
@@ -220,18 +220,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Update PR body footers silently
-	footerEnabled := true
-	repoRoot := ctx.RepoRoot
-	if repoRoot == "" {
-		repoRoot, _ = git.GetRepoRoot()
-	}
-	if repoRoot != "" {
-		if enabled, err := config.GetSubmitFooter(repoRoot); err == nil {
-			footerEnabled = enabled
-		}
-	}
-
-	if footerEnabled {
+	if opts.SubmitFooter {
 		updatePRFootersQuiet(context, branches, eng, githubClient, repoOwner, repoName)
 	}
 

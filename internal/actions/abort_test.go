@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -39,7 +40,10 @@ func TestAbortAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot("restack", []string{"feature"})
+		err = s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "restack",
+			Args:    []string{"feature"},
+		})
 		require.NoError(t, err)
 
 		// Manually create continuation state

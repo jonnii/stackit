@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -38,7 +39,10 @@ func TestUndoAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot("move", []string{"feature", "onto", "main"})
+		err = s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "move",
+			Args:    []string{"feature", "onto", "main"},
+		})
 		require.NoError(t, err)
 
 		// Make changes
@@ -70,7 +74,7 @@ func TestUndoAction(t *testing.T) {
 		s.WithInitialCommit()
 
 		// Create at least one snapshot so GetSnapshots doesn't return empty
-		err := s.Engine.TakeSnapshot("test", nil)
+		err := s.Engine.TakeSnapshot(engine.SnapshotOptions{Command: "test"})
 		require.NoError(t, err)
 
 		err = actions.UndoAction(s.Context, actions.UndoOptions{
@@ -93,7 +97,10 @@ func TestUndoAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Take first snapshot (captures initial state)
-		err = s.Engine.TakeSnapshot("create", []string{"feature1"})
+		err = s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "create",
+			Args:    []string{"feature1"},
+		})
 		require.NoError(t, err)
 
 		// Make first change
@@ -106,7 +113,10 @@ func TestUndoAction(t *testing.T) {
 		require.NotEqual(t, initialFeature1SHA, afterFirstChangeSHA)
 
 		// Take second snapshot (captures state after first change)
-		err = s.Engine.TakeSnapshot("move", []string{"feature1", "onto", "main"})
+		err = s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "move",
+			Args:    []string{"feature1", "onto", "main"},
+		})
 		require.NoError(t, err)
 
 		// Make second change
@@ -142,7 +152,10 @@ func TestUndoAfterCreate(t *testing.T) {
 		s.WithInitialCommit()
 
 		// Take snapshot BEFORE creating branch
-		err := s.Engine.TakeSnapshot("create", []string{"feature"})
+		err := s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "create",
+			Args:    []string{"feature"},
+		})
 		require.NoError(t, err)
 
 		// Create branch after snapshot
@@ -198,7 +211,10 @@ func TestUndoAfterMove(t *testing.T) {
 		require.Equal(t, "feature1", initialParent.Name)
 
 		// Take snapshot before move
-		err := s.Engine.TakeSnapshot("move", []string{"feature2", "onto", "main"})
+		err := s.Engine.TakeSnapshot(engine.SnapshotOptions{
+			Command: "move",
+			Args:    []string{"feature2", "onto", "main"},
+		})
 		require.NoError(t, err)
 
 		// Move feature2 to main

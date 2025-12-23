@@ -96,6 +96,7 @@ func getUntrackedBranchNamesForCheckout(eng engine.BranchReader) []string {
 func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, error) {
 	eng := ctx.Engine
 	currentBranch := eng.CurrentBranch()
+	trunkName := eng.Trunk() // Cache trunk for this function scope
 	seenBranches := make(map[string]bool)
 	var branchNames []string
 
@@ -122,7 +123,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
-		trunkName := eng.Trunk()
 		branchOrder := collectBranchesDepthFirst(trunkName, eng)
 
 		for _, branchName := range branchOrder {
@@ -148,7 +148,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 	// Fallback: if we still have no choices, get all branches directly from engine
 	if len(branchNames) == 0 {
 		allBranches := eng.AllBranchNames()
-		trunkName := eng.Trunk()
 
 		// Ensure trunk is always included
 		if trunkName != "" && !seenBranches[trunkName] {

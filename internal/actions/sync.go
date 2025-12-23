@@ -22,6 +22,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 	gctx := ctx.Context
+	trunk := eng.Trunk() // Cache trunk for this function scope
 
 	// Handle --all flag (stub for now)
 	if opts.All {
@@ -36,7 +37,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Pull trunk
-	splog.Info("Pulling %s from remote...", tui.ColorBranchName(eng.Trunk(), false))
+	splog.Info("Pulling %s from remote...", tui.ColorBranchName(trunk, false))
 	pullResult, err := eng.PullTrunk(gctx)
 	if err != nil {
 		return fmt.Errorf("failed to pull trunk: %w", err)
@@ -44,18 +45,18 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	switch pullResult {
 	case engine.PullDone:
-		rev, _ := eng.GetRevision(gctx, eng.Trunk())
+		rev, _ := eng.GetRevision(gctx, trunk)
 		revShort := rev
 		if len(rev) > 7 {
 			revShort = rev[:7]
 		}
 		splog.Info("%s fast-forwarded to %s.",
-			tui.ColorBranchName(eng.Trunk(), true),
+			tui.ColorBranchName(trunk, true),
 			tui.ColorDim(revShort))
 	case engine.PullUnneeded:
-		splog.Info("%s is up to date.", tui.ColorBranchName(eng.Trunk(), true))
+		splog.Info("%s is up to date.", tui.ColorBranchName(trunk, true))
 	case engine.PullConflict:
-		splog.Warn("%s could not be fast-forwarded.", tui.ColorBranchName(eng.Trunk(), false))
+		splog.Warn("%s could not be fast-forwarded.", tui.ColorBranchName(trunk, false))
 
 		// Prompt to overwrite (or use force flag)
 		shouldReset := opts.Force
@@ -69,13 +70,13 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 			if err := eng.ResetTrunkToRemote(gctx); err != nil {
 				return fmt.Errorf("failed to reset trunk: %w", err)
 			}
-			rev, _ := eng.GetRevision(gctx, eng.Trunk())
+			rev, _ := eng.GetRevision(gctx, trunk)
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
 			}
 			splog.Info("%s set to %s.",
-				tui.ColorBranchName(eng.Trunk(), true),
+				tui.ColorBranchName(trunk, true),
 				tui.ColorDim(revShort))
 		}
 	}

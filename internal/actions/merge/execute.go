@@ -432,6 +432,7 @@ func executeStepWithProgress(ctx context.Context, step PlanStep, stepIndex int, 
 
 // executeStep executes a single step
 func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, _ ExecuteOptions) error {
+	trunk := eng.Trunk() // Cache trunk for this function scope
 	switch step.StepType {
 	case StepMergePR:
 		if githubClient == nil {
@@ -448,7 +449,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(ctx, eng.Trunk())
+			rev, _ := eng.GetRevision(ctx, trunk)
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -475,7 +476,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			actualParent = eng.GetParent(step.BranchName)
 		}
 		if actualParent == "" {
-			actualParent = eng.Trunk()
+			actualParent = trunk
 		}
 
 		switch result.Result {

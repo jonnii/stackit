@@ -92,8 +92,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Display the stack tree with PR annotations
-	renderer, rootBranch := getStackTreeRenderer(context, branches, opts, eng, currentBranch)
-	ui.ShowStack(renderer, rootBranch)
+	renderer := getStackTreeRenderer(context, branches, opts, eng, currentBranch)
+	ui.ShowStack(renderer, eng.Trunk())
 
 	// Restack if requested
 	if opts.Restack {
@@ -507,7 +507,7 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
-func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, eng engine.Engine, currentBranch string) (*tui.StackTreeRenderer, string) {
+func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, eng engine.Engine, currentBranch string) *tui.StackTreeRenderer {
 	// Create the tree renderer
 	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
@@ -555,5 +555,5 @@ func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, 
 	}
 	renderer.SetAnnotations(annotations)
 
-	return renderer, eng.Trunk()
+	return renderer
 }

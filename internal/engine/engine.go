@@ -22,7 +22,7 @@ type BranchReader interface {
 	GetRelativeStack(branchName string, scope Scope) []string
 	IsTrunk(branchName string) bool
 	IsBranchTracked(branchName string) bool
-	IsBranchFixed(branchName string) bool
+	IsBranchUpToDate(branchName string) bool
 
 	// Commit information
 	GetCommitDate(branchName string) (time.Time, error)

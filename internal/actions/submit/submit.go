@@ -516,7 +516,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		eng.GetParent,
 		eng.IsTrunk,
 		func(branchName string) bool {
-			return eng.IsBranchFixed(branchName)
+			return eng.IsBranchUpToDate(branchName)
 		},
 	)
 
@@ -534,7 +534,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		}
 
 		annotation := tui.BranchAnnotation{
-			NeedsRestack: !eng.IsBranchFixed(branchName),
+			NeedsRestack: !eng.IsBranchUpToDate(branchName),
 		}
 
 		const actionUpdate = "update"

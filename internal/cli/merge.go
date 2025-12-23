@@ -118,7 +118,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			eng.GetParent,
 			eng.IsTrunk,
 			func(branchName string) bool {
-				return eng.IsBranchFixed(branchName)
+				return eng.IsBranchUpToDate(branchName)
 			},
 		)
 

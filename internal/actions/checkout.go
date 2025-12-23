@@ -167,7 +167,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		return
 	}
 
-	if !ctx.Engine.IsBranchFixed(branchName) {
+	if !ctx.Engine.IsBranchUpToDate(branchName) {
 		parent := ctx.Engine.GetParentPrecondition(branchName)
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
 			tui.ColorBranchName(parent, false),
@@ -186,7 +186,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 	// Reverse to check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {
 		ancestor := downstack[i]
-		if !ctx.Engine.IsBranchFixed(ancestor) {
+		if !ctx.Engine.IsBranchUpToDate(ancestor) {
 			parent := ctx.Engine.GetParentPrecondition(ancestor)
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
 				tui.ColorBranchName(ancestor, false),

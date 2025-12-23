@@ -138,7 +138,7 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	}
 
 	// Check if branch needs restacking
-	if e.IsBranchFixed(branchName) {
+	if e.IsBranchUpToDate(branchName) {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
 			RebasedBranchBase: parentRev,

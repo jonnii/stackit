@@ -58,7 +58,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
-	if !isTrunk && !eng.IsBranchFixed(branchName) {
+	if !isTrunk && !eng.IsBranchUpToDate(branchName) {
 		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)

@@ -180,11 +180,11 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			branchInfo.MetadataRefSHA = metadataSHA
 		}
 
-		// Check if branch is fixed (needs restacking)
+		// Check if branch is up to date with its parent
 		if !branchInfo.IsTrunk {
-			branchInfo.IsFixed = eng.IsBranchFixed(branchName)
+			branchInfo.IsFixed = eng.IsBranchUpToDate(branchName)
 		} else {
-			branchInfo.IsFixed = true // Trunk is always "fixed"
+			branchInfo.IsFixed = true // Trunk is always up to date
 		}
 
 		branchInfos = append(branchInfos, branchInfo)

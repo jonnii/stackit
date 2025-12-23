@@ -116,9 +116,9 @@ func (e *engineImpl) IsBranchTracked(branchName string) bool {
 	return ok
 }
 
-// IsBranchFixed checks if a branch needs restacking
-// A branch is fixed if its parent revision matches the stored parent revision
-func (e *engineImpl) IsBranchFixed(branchName string) bool {
+// IsBranchUpToDate checks if a branch is up to date with its parent
+// A branch is up to date if its parent revision matches the stored parent revision
+func (e *engineImpl) IsBranchUpToDate(branchName string) bool {
 	if e.IsTrunk(branchName) {
 		return true
 	}

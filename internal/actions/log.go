@@ -32,7 +32,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 		ctx.Engine.GetParent,
 		ctx.Engine.IsTrunk,
 		func(branchName string) bool {
-			return ctx.Engine.IsBranchFixed(branchName)
+			return ctx.Engine.IsBranchUpToDate(branchName)
 		},
 	)
 

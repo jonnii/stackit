@@ -181,8 +181,8 @@ func (e *Engine) IsBranchTracked(branchName string) bool {
 	return exists
 }
 
-// IsBranchFixed returns true in the demo engine
-func (e *Engine) IsBranchFixed(_ string) bool {
+// IsBranchUpToDate returns true in the demo engine
+func (e *Engine) IsBranchUpToDate(_ string) bool {
 	return true // All demo branches are "fixed" (not needing restack)
 }
 

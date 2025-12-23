@@ -330,7 +330,7 @@ func TestRestackBranch(t *testing.T) {
 		require.Equal(t, engine.RestackDone, result.Result)
 
 		// Verify branch1 is now fixed
-		require.True(t, s.Engine.IsBranchFixed("branch1"))
+		require.True(t, s.Engine.IsBranchUpToDate("branch1"))
 	})
 
 	t.Run("returns unneeded when branch is already fixed", func(t *testing.T) {

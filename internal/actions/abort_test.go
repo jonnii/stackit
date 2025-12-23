@@ -35,11 +35,11 @@ func TestAbortAction(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get initial state
-		initialSHA, err := s.Engine.GetRevision(s.Context, "feature")
+		initialSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot(s.Context, "restack", []string{"feature"})
+		err = s.Engine.TakeSnapshot("restack", []string{"feature"})
 		require.NoError(t, err)
 
 		// Manually create continuation state
@@ -57,7 +57,7 @@ func TestAbortAction(t *testing.T) {
 
 		// Verify state restored
 		s.Engine.Rebuild(s.Engine.Trunk())
-		restoredSHA, err := s.Engine.GetRevision(s.Context, "feature")
+		restoredSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 		require.Equal(t, initialSHA, restoredSHA)
 	})

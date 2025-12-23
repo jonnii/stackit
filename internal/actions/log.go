@@ -20,7 +20,7 @@ type LogOptions struct {
 // LogAction displays the branch tree
 func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	// Populate remote SHAs if needed
-	if err := ctx.Engine.PopulateRemoteShas(ctx.Context); err != nil {
+	if err := ctx.Engine.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
 	}
 
@@ -32,7 +32,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 		ctx.Engine.GetParent,
 		ctx.Engine.IsTrunk,
 		func(branchName string) bool {
-			return ctx.Engine.IsBranchFixed(ctx.Context, branchName)
+			return ctx.Engine.IsBranchFixed(branchName)
 		},
 	)
 

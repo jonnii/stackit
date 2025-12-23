@@ -190,7 +190,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 		eng.GetChildren,
 		eng.GetParent,
 		eng.IsTrunk,
-		func(b string) bool { return eng.IsBranchFixed(ctx.Context, b) },
+		func(b string) bool { return eng.IsBranchFixed(b) },
 	)
 
 	// Render the full tree from trunk

@@ -59,7 +59,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	if opts.Update {
 		args = append(args, "--update")
 	}
-	if err := eng.TakeSnapshot(ctx.Context, "create", args); err != nil {
+	if err := eng.TakeSnapshot("create", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

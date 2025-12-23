@@ -89,17 +89,16 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 
 	// Get branches in stack order: trunk first, then children recursively
 	trunkName := eng.Trunk()
-	branchOrder := collectBranchesDepthFirst(trunkName, ctx)
+	choices := make([]tui.BranchChoice, 0)
 
-	choices := make([]tui.BranchChoice, 0, len(branchOrder))
-	for _, branchName := range branchOrder {
+	eng.VisitBranchesDepthFirst(trunkName, func(branchName string, _ int) bool {
 		// Skip source and its descendants
 		if excludedBranches[branchName] {
-			continue
+			return true // continue traversal
 		}
 
 		if seenBranches[branchName] {
-			continue
+			return true // continue traversal
 		}
 		seenBranches[branchName] = true
 
@@ -112,7 +111,8 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 			Display: display,
 			Value:   branchName,
 		})
-	}
+		return true // continue traversal
+	})
 
 	// Fallback: if we still have no choices, get all branches directly from engine
 	if len(choices) == 0 {
@@ -176,17 +176,4 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	}
 
 	return selected, nil
-}
-
-// collectBranchesDepthFirst returns branches with trunk first, then children recursively
-func collectBranchesDepthFirst(branchName string, ctx *runtime.Context) []string {
-	var result []string
-	result = append(result, branchName)
-
-	children := ctx.Engine.GetChildren(branchName)
-	for _, child := range children {
-		result = append(result, collectBranchesDepthFirst(child, ctx)...)
-	}
-
-	return result
 }

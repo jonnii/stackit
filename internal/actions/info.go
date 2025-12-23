@@ -58,13 +58,13 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
-	if !isTrunk && !eng.IsBranchFixed(ctx.Context, branchName) {
+	if !isTrunk && !eng.IsBranchFixed(branchName) {
 		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
 	// Commit date
-	commitDate, err := eng.GetCommitDate(ctx.Context, branchName)
+	commitDate, err := eng.GetCommitDate(branchName)
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
 		outputLines = append(outputLines, tui.ColorDim(dateStr))
@@ -122,7 +122,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 				baseRevision = *meta.ParentBranchRevision
 			}
 		}
-		branchRevision, err := eng.GetRevision(ctx.Context, branchName)
+		branchRevision, err := eng.GetRevision(branchName)
 		if err == nil {
 			commitsOutput, err := git.ShowCommits(ctx.Context, baseRevision, branchRevision, true, opts.Stat)
 			if err == nil && commitsOutput != "" {
@@ -131,7 +131,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	} else {
 		// Show commit list (readable format)
-		commits, err := eng.GetAllCommits(ctx.Context, branchName, engine.CommitFormatReadable)
+		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
 				outputLines = append(outputLines, tui.ColorDim(commit))
@@ -144,7 +144,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		outputLines = append(outputLines, "")
 		if isTrunk {
 			// For trunk, show diff from HEAD~1 to HEAD
-			headRevision, err := eng.GetRevision(ctx.Context, branchName)
+			headRevision, err := eng.GetRevision(branchName)
 			if err == nil {
 				// Get parent commit
 				parentSHA, err := git.GetCommitSHA(branchName, 1)
@@ -159,7 +159,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			// For regular branches, show diff from parent revision
 			meta, err := git.ReadMetadataRef(branchName)
 			if err == nil && meta.ParentBranchRevision != nil {
-				branchRevision, err := eng.GetRevision(ctx.Context, branchName)
+				branchRevision, err := eng.GetRevision(branchName)
 				if err == nil {
 					diffOutput, err := git.ShowDiff(ctx.Context, *meta.ParentBranchRevision, branchRevision, opts.Stat)
 					if err == nil && diffOutput != "" {

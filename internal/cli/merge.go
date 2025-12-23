@@ -86,7 +86,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	splog.Newline()
 
 	// Populate remote SHAs so we can accurately check if branches match remote
-	if err := eng.PopulateRemoteShas(ctx.Context); err != nil {
+	if err := eng.PopulateRemoteShas(); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			eng.GetParent,
 			eng.IsTrunk,
 			func(branchName string) bool {
-				return eng.IsBranchFixed(ctx.Context, branchName)
+				return eng.IsBranchFixed(branchName)
 			},
 		)
 

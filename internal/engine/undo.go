@@ -97,7 +97,7 @@ func parseSnapshotFilename(filename string) (time.Time, string, error) {
 }
 
 // TakeSnapshot captures the current state of the repository
-func (e *engineImpl) TakeSnapshot(ctx context.Context, command string, args []string) error {
+func (e *engineImpl) TakeSnapshot(command string, args []string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -112,7 +112,7 @@ func (e *engineImpl) TakeSnapshot(ctx context.Context, command string, args []st
 	// Get all branch SHAs
 	branchSHAs := make(map[string]string)
 	for _, branchName := range e.branches {
-		sha, err := e.GetRevision(ctx, branchName)
+		sha, err := e.GetRevision(branchName)
 		if err != nil {
 			// Skip branches that can't be resolved (might be deleted)
 			continue

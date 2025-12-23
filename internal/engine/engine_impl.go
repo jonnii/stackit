@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -110,7 +109,7 @@ func (e *engineImpl) Rebuild(newTrunkName string) error {
 }
 
 // PopulateRemoteShas populates remote branch information by fetching SHAs from remote
-func (e *engineImpl) PopulateRemoteShas(_ context.Context) error {
+func (e *engineImpl) PopulateRemoteShas() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

@@ -449,7 +449,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(ctx, trunk)
+			rev, _ := eng.GetRevision(trunk)
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -555,7 +555,7 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	}
 
 	// Get the old parent revision
-	oldParentRev, err := eng.GetRevision(ctx, parent)
+	oldParentRev, err := eng.GetRevision(parent)
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}
@@ -736,7 +736,7 @@ func CheckSyncStatus(ctx context.Context, eng engine.Engine, splog *tui.Splog) (
 			continue
 		}
 
-		matchesRemote, err := eng.BranchMatchesRemote(ctx, branchName)
+		matchesRemote, err := eng.BranchMatchesRemote(branchName)
 		if err != nil {
 			splog.Debug("Failed to check if %s matches remote: %v", branchName, err)
 			continue

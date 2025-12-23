@@ -181,28 +181,28 @@ func (e *Engine) IsBranchTracked(branchName string) bool {
 }
 
 // IsBranchFixed returns true in the demo engine
-func (e *Engine) IsBranchFixed(_ context.Context, _ string) bool {
+func (e *Engine) IsBranchFixed(_ string) bool {
 	return true // All demo branches are "fixed" (not needing restack)
 }
 
 // GetCommitDate returns a fake commit date in the demo engine
-func (e *Engine) GetCommitDate(_ context.Context, _ string) (time.Time, error) {
+func (e *Engine) GetCommitDate(_ string) (time.Time, error) {
 	return time.Now().Add(-24 * time.Hour), nil
 }
 
 // GetCommitAuthor returns a fake commit author in the demo engine
-func (e *Engine) GetCommitAuthor(_ context.Context, _ string) (string, error) {
+func (e *Engine) GetCommitAuthor(_ string) (string, error) {
 	return "Demo User <demo@example.com>", nil
 }
 
 // GetRevision returns a fake revision in the demo engine
-func (e *Engine) GetRevision(_ context.Context, branchName string) (string, error) {
+func (e *Engine) GetRevision(branchName string) (string, error) {
 	// Return fake SHA based on branch name
 	return fmt.Sprintf("abc%x123", len(branchName)), nil
 }
 
 // FindBranchForCommit returns the current branch in the demo engine
-func (e *Engine) FindBranchForCommit(_ context.Context, _ string) (string, error) {
+func (e *Engine) FindBranchForCommit(_ string) (string, error) {
 	// For demo, just return the current branch
 	return e.CurrentBranch(), nil
 }
@@ -256,6 +256,34 @@ func (e *Engine) FindMostRecentTrackedAncestors(_ context.Context, branchName st
 		return nil, fmt.Errorf("no tracked ancestor found for branch %s", branchName)
 	}
 	return []string{parent}, nil
+}
+
+// VisitBranchesDepthFirst visits branches starting from startBranch in depth-first order.
+// The visitor is called for each branch before visiting its children (pre-order).
+// Returns false from the visitor to stop traversal of that branch's subtree.
+func (e *Engine) VisitBranchesDepthFirst(startBranch string, visitor engine.BranchVisitor) {
+	visited := make(map[string]bool)
+	var visit func(branch string, depth int) bool
+	visit = func(branch string, depth int) bool {
+		if visited[branch] {
+			return true // cycle detection
+		}
+		visited[branch] = true
+
+		if !visitor(branch, depth) {
+			return false // visitor wants to stop
+		}
+
+		children := e.GetChildren(branch)
+		for _, child := range children {
+			if !visit(child, depth+1) {
+				return false
+			}
+		}
+		return true
+	}
+
+	visit(startBranch, 0)
 }
 
 // BranchWriter interface implementation
@@ -328,7 +356,7 @@ func (e *Engine) UpsertPrInfo(branchName string, prInfo *engine.PrInfo) error {
 }
 
 // GetPRSubmissionStatus returns the submission status in the demo engine
-func (e *Engine) GetPRSubmissionStatus(_ context.Context, branchName string) (engine.PRSubmissionStatus, error) {
+func (e *Engine) GetPRSubmissionStatus(branchName string) (engine.PRSubmissionStatus, error) {
 	info, _ := e.GetPrInfo(branchName)
 	if info == nil {
 		return engine.PRSubmissionStatus{Action: "create", NeedsUpdate: true}, nil
@@ -339,12 +367,12 @@ func (e *Engine) GetPRSubmissionStatus(_ context.Context, branchName string) (en
 // SyncManager interface implementation
 
 // BranchMatchesRemote returns false in the demo engine
-func (e *Engine) BranchMatchesRemote(_ context.Context, _ string) (bool, error) {
+func (e *Engine) BranchMatchesRemote(_ string) (bool, error) {
 	return false, nil // Demo branches never match remote (so submit always has work to do)
 }
 
 // PopulateRemoteShas simulates fetching remote refs in the demo engine
-func (e *Engine) PopulateRemoteShas(_ context.Context) error {
+func (e *Engine) PopulateRemoteShas() error {
 	simulateDelay(delayMedium) // Fetching remote refs takes time
 	return nil
 }
@@ -403,7 +431,7 @@ func (e *Engine) SquashCurrentBranch(_ context.Context, _ engine.SquashOptions) 
 // SplitManager interface implementation
 
 // GetAllCommits returns fake commits in the demo engine
-func (e *Engine) GetAllCommits(_ context.Context, branchName string, _ engine.CommitFormat) ([]string, error) {
+func (e *Engine) GetAllCommits(branchName string, _ engine.CommitFormat) ([]string, error) {
 	return []string{
 		"abc1234 Initial commit for " + branchName,
 		"def5678 Add feature implementation",
@@ -435,7 +463,7 @@ func (e *Engine) ForceCheckoutBranch(_ context.Context, _ string) error {
 // UndoManager interface implementation
 
 // TakeSnapshot simulates taking a snapshot in the demo engine
-func (e *Engine) TakeSnapshot(_ context.Context, _ string, _ []string) error {
+func (e *Engine) TakeSnapshot(_ string, _ []string) error {
 	// In demo mode, snapshots are not persisted
 	return nil
 }

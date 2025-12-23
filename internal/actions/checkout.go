@@ -25,7 +25,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	context := ctx.Context
 
 	// Populate remote SHAs if needed
-	if err := eng.PopulateRemoteShas(context); err != nil {
+	if err := eng.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
 	}
 
@@ -66,19 +66,6 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	printBranchInfo(branchName, ctx)
 
 	return nil
-}
-
-// collectBranchesDepthFirst returns branches with trunk first, then children recursively
-func collectBranchesDepthFirst(branchName string, eng engine.BranchReader) []string {
-	var result []string
-	result = append(result, branchName)
-
-	children := eng.GetChildren(branchName)
-	for _, child := range children {
-		result = append(result, collectBranchesDepthFirst(child, eng)...)
-	}
-
-	return result
 }
 
 // getUntrackedBranchNamesForCheckout returns all untracked branch names (excluding trunk)
@@ -123,15 +110,14 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
-		branchOrder := collectBranchesDepthFirst(trunkName, eng)
-
-		for _, branchName := range branchOrder {
+		eng.VisitBranchesDepthFirst(trunkName, func(branchName string, _ int) bool {
 			if seenBranches[branchName] {
-				continue
+				return true // continue traversal
 			}
 			seenBranches[branchName] = true
 			branchNames = append(branchNames, branchName)
-		}
+			return true // continue traversal
+		})
 	}
 
 	// Add untracked branches if requested
@@ -182,7 +168,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		return
 	}
 
-	if !ctx.Engine.IsBranchFixed(ctx.Context, branchName) {
+	if !ctx.Engine.IsBranchFixed(branchName) {
 		parent := ctx.Engine.GetParentPrecondition(branchName)
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
 			tui.ColorBranchName(parent, false),
@@ -201,7 +187,7 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 	// Reverse to check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {
 		ancestor := downstack[i]
-		if !ctx.Engine.IsBranchFixed(ctx.Context, ancestor) {
+		if !ctx.Engine.IsBranchFixed(ancestor) {
 			parent := ctx.Engine.GetParentPrecondition(ancestor)
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
 				tui.ColorBranchName(ancestor, false),

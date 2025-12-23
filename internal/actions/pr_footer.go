@@ -16,9 +16,21 @@ const (
 func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 	terminalParent := findTerminalParent(branch, eng)
 
-	tree := buildBranchTree(eng, []string{terminalParent}, branch, 0)
+	var tree strings.Builder
+	eng.VisitBranchesDepthFirst(terminalParent, func(branchName string, depth int) bool {
+		// Only include branches related to the PR branch
+		if branchName != branch && !isParentOrChild(eng, branchName, branch) {
+			return true // skip but continue traversal
+		}
 
-	return footerTitle + tree + footerFooter
+		leaf := buildLeaf(eng, branchName, depth, branch)
+		if leaf != "" {
+			tree.WriteString(leaf)
+		}
+		return true // continue traversal
+	})
+
+	return footerTitle + tree.String() + footerFooter
 }
 
 // UpdatePRBodyFooter updates an existing PR body with a new footer
@@ -58,30 +70,6 @@ func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 	}
 
 	return findTerminalParent(parent, eng)
-}
-
-// buildBranchTree builds a tree representation of branch dependencies
-func buildBranchTree(eng engine.Engine, currentBranches []string, prBranch string, currentDepth int) string {
-	var tree strings.Builder
-
-	for _, branch := range currentBranches {
-		if branch != prBranch && !isParentOrChild(eng, branch, prBranch) {
-			continue
-		}
-
-		leaf := buildLeaf(eng, branch, currentDepth, prBranch)
-		if leaf != "" {
-			tree.WriteString(leaf)
-		}
-
-		children := eng.GetChildren(branch)
-		if len(children) > 0 {
-			childTree := buildBranchTree(eng, children, prBranch, currentDepth+1)
-			tree.WriteString(childTree)
-		}
-	}
-
-	return tree.String()
 }
 
 // buildLeaf builds a single leaf in the tree

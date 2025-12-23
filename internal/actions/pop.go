@@ -52,7 +52,7 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Get parent branch revision
-	parentRev, err := eng.GetRevision(ctx.Context, parent)
+	parentRev, err := eng.GetRevision(parent)
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}

@@ -34,11 +34,11 @@ func TestUndoAction(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get initial state
-		initialFeatureSHA, err := s.Engine.GetRevision(s.Context, "feature")
+		initialFeatureSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 
 		// Take snapshot
-		err = s.Engine.TakeSnapshot(s.Context, "move", []string{"feature", "onto", "main"})
+		err = s.Engine.TakeSnapshot("move", []string{"feature", "onto", "main"})
 		require.NoError(t, err)
 
 		// Make changes
@@ -46,7 +46,7 @@ func TestUndoAction(t *testing.T) {
 			Commit("additional change")
 
 		// Verify SHA changed
-		newFeatureSHA, err := s.Engine.GetRevision(s.Context, "feature")
+		newFeatureSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 		require.NotEqual(t, initialFeatureSHA, newFeatureSHA)
 
@@ -60,7 +60,7 @@ func TestUndoAction(t *testing.T) {
 
 		// Verify state restored
 		s.Engine.Rebuild(s.Engine.Trunk())
-		restoredFeatureSHA, err := s.Engine.GetRevision(s.Context, "feature")
+		restoredFeatureSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 		require.Equal(t, initialFeatureSHA, restoredFeatureSHA)
 	})
@@ -70,7 +70,7 @@ func TestUndoAction(t *testing.T) {
 		s.WithInitialCommit()
 
 		// Create at least one snapshot so GetSnapshots doesn't return empty
-		err := s.Engine.TakeSnapshot(s.Context, "test", nil)
+		err := s.Engine.TakeSnapshot("test", nil)
 		require.NoError(t, err)
 
 		err = actions.UndoAction(s.Context, actions.UndoOptions{
@@ -89,11 +89,11 @@ func TestUndoAction(t *testing.T) {
 			TrackBranch("feature1", "main")
 
 		// Get initial state BEFORE taking snapshot
-		initialFeature1SHA, err := s.Engine.GetRevision(s.Context, "feature1")
+		initialFeature1SHA, err := s.Engine.GetRevision("feature1")
 		require.NoError(t, err)
 
 		// Take first snapshot (captures initial state)
-		err = s.Engine.TakeSnapshot(s.Context, "create", []string{"feature1"})
+		err = s.Engine.TakeSnapshot("create", []string{"feature1"})
 		require.NoError(t, err)
 
 		// Make first change
@@ -101,19 +101,19 @@ func TestUndoAction(t *testing.T) {
 			Commit("feature1 change 2")
 
 		// Get SHA after first change
-		afterFirstChangeSHA, err := s.Engine.GetRevision(s.Context, "feature1")
+		afterFirstChangeSHA, err := s.Engine.GetRevision("feature1")
 		require.NoError(t, err)
 		require.NotEqual(t, initialFeature1SHA, afterFirstChangeSHA)
 
 		// Take second snapshot (captures state after first change)
-		err = s.Engine.TakeSnapshot(s.Context, "move", []string{"feature1", "onto", "main"})
+		err = s.Engine.TakeSnapshot("move", []string{"feature1", "onto", "main"})
 		require.NoError(t, err)
 
 		// Make second change
 		s.Commit("feature1 change 3")
 
 		// Get SHA after second change
-		afterSecondChangeSHA, err := s.Engine.GetRevision(s.Context, "feature1")
+		afterSecondChangeSHA, err := s.Engine.GetRevision("feature1")
 		require.NoError(t, err)
 		require.NotEqual(t, afterFirstChangeSHA, afterSecondChangeSHA)
 
@@ -129,7 +129,7 @@ func TestUndoAction(t *testing.T) {
 
 		// Verify state restored to Snapshot 2 (after first change, not initial)
 		s.Engine.Rebuild(s.Engine.Trunk())
-		restoredFeature1SHA, err := s.Engine.GetRevision(s.Context, "feature1")
+		restoredFeature1SHA, err := s.Engine.GetRevision("feature1")
 		require.NoError(t, err)
 		// Should restore to state after first change
 		require.Equal(t, afterFirstChangeSHA, restoredFeature1SHA)
@@ -142,7 +142,7 @@ func TestUndoAfterCreate(t *testing.T) {
 		s.WithInitialCommit()
 
 		// Take snapshot BEFORE creating branch
-		err := s.Engine.TakeSnapshot(s.Context, "create", []string{"feature"})
+		err := s.Engine.TakeSnapshot("create", []string{"feature"})
 		require.NoError(t, err)
 
 		// Create branch after snapshot
@@ -188,7 +188,7 @@ func TestUndoAfterMove(t *testing.T) {
 		require.Equal(t, "feature1", initialParent)
 
 		// Take snapshot before move
-		err := s.Engine.TakeSnapshot(s.Context, "move", []string{"feature2", "onto", "main"})
+		err := s.Engine.TakeSnapshot("move", []string{"feature2", "onto", "main"})
 		require.NoError(t, err)
 
 		// Move feature2 to main

@@ -45,7 +45,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	switch pullResult {
 	case engine.PullDone:
-		rev, _ := eng.GetRevision(gctx, trunk)
+		rev, _ := eng.GetRevision(trunk)
 		revShort := rev
 		if len(rev) > 7 {
 			revShort = rev[:7]
@@ -70,7 +70,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 			if err := eng.ResetTrunkToRemote(gctx); err != nil {
 				return fmt.Errorf("failed to reset trunk: %w", err)
 			}
-			rev, _ := eng.GetRevision(gctx, trunk)
+			rev, _ := eng.GetRevision(trunk)
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]

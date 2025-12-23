@@ -136,7 +136,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get SHA
-		sha, err := eng.GetRevision(ctx.Context, branchName)
+		sha, err := eng.GetRevision(branchName)
 		if err == nil {
 			branchInfo.SHA = sha
 		}
@@ -182,7 +182,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 		// Check if branch is fixed (needs restacking)
 		if !branchInfo.IsTrunk {
-			branchInfo.IsFixed = eng.IsBranchFixed(ctx.Context, branchName)
+			branchInfo.IsFixed = eng.IsBranchFixed(branchName)
 		} else {
 			branchInfo.IsFixed = true // Trunk is always "fixed"
 		}

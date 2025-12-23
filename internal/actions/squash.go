@@ -34,7 +34,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 	if opts.NoEdit {
 		args = append(args, "--no-edit")
 	}
-	if err := eng.TakeSnapshot(context, "squash", args); err != nil {
+	if err := eng.TakeSnapshot("squash", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

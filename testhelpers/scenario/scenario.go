@@ -214,14 +214,14 @@ func (s *Scenario) ExpectStackStructure(expected map[string]string) *Scenario {
 // ExpectBranchFixed asserts that a branch is considered "fixed" (no restack needed) by the engine.
 func (s *Scenario) ExpectBranchFixed(branch string) *Scenario {
 	s.T.Helper()
-	require.True(s.T, s.Engine.IsBranchFixed(context.Background(), branch), "Branch %s should be fixed", branch)
+	require.True(s.T, s.Engine.IsBranchUpToDate(branch), "Branch %s should be up to date", branch)
 	return s
 }
 
 // ExpectBranchNotFixed asserts that a branch is NOT considered "fixed" by the engine.
 func (s *Scenario) ExpectBranchNotFixed(branch string) *Scenario {
 	s.T.Helper()
-	require.False(s.T, s.Engine.IsBranchFixed(context.Background(), branch), "Branch %s should NOT be fixed", branch)
+	require.False(s.T, s.Engine.IsBranchUpToDate(branch), "Branch %s should NOT be up to date", branch)
 	return s
 }
 

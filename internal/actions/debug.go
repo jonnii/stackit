@@ -136,7 +136,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get SHA
-		sha, err := eng.GetRevision(ctx.Context, branchName)
+		sha, err := eng.GetRevision(branchName)
 		if err == nil {
 			branchInfo.SHA = sha
 		}
@@ -180,11 +180,11 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			branchInfo.MetadataRefSHA = metadataSHA
 		}
 
-		// Check if branch is fixed (needs restacking)
+		// Check if branch is up to date with its parent
 		if !branchInfo.IsTrunk {
-			branchInfo.IsFixed = eng.IsBranchFixed(ctx.Context, branchName)
+			branchInfo.IsFixed = eng.IsBranchUpToDate(branchName)
 		} else {
-			branchInfo.IsFixed = true // Trunk is always "fixed"
+			branchInfo.IsFixed = true // Trunk is always up to date
 		}
 
 		branchInfos = append(branchInfos, branchInfo)

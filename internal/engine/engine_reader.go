@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -115,9 +116,9 @@ func (e *engineImpl) IsBranchTracked(branchName string) bool {
 	return ok
 }
 
-// IsBranchFixed checks if a branch needs restacking
-// A branch is fixed if its parent revision matches the stored parent revision
-func (e *engineImpl) IsBranchFixed(_ context.Context, branchName string) bool {
+// IsBranchUpToDate checks if a branch is up to date with its parent
+// A branch is up to date if its parent revision matches the stored parent revision
+func (e *engineImpl) IsBranchUpToDate(branchName string) bool {
 	if e.IsTrunk(branchName) {
 		return true
 	}
@@ -151,17 +152,17 @@ func (e *engineImpl) IsBranchFixed(_ context.Context, branchName string) bool {
 }
 
 // GetCommitDate returns the commit date for a branch
-func (e *engineImpl) GetCommitDate(_ context.Context, branchName string) (time.Time, error) {
+func (e *engineImpl) GetCommitDate(branchName string) (time.Time, error) {
 	return git.GetCommitDate(branchName)
 }
 
 // GetCommitAuthor returns the commit author for a branch
-func (e *engineImpl) GetCommitAuthor(_ context.Context, branchName string) (string, error) {
+func (e *engineImpl) GetCommitAuthor(branchName string) (string, error) {
 	return git.GetCommitAuthor(branchName)
 }
 
 // GetRevision returns the SHA of a branch
-func (e *engineImpl) GetRevision(_ context.Context, branchName string) (string, error) {
+func (e *engineImpl) GetRevision(branchName string) (string, error) {
 	return git.GetRevision(branchName)
 }
 
@@ -176,12 +177,12 @@ func (e *engineImpl) GetParentPrecondition(branchName string) string {
 }
 
 // BranchMatchesRemote checks if a branch matches its remote
-func (e *engineImpl) BranchMatchesRemote(ctx context.Context, branchName string) (bool, error) {
+func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	// Get local branch SHA
-	localSha, err := e.GetRevision(ctx, branchName)
+	localSha, err := e.GetRevision(branchName)
 	if err != nil {
 		return false, nil
 	}
@@ -217,7 +218,7 @@ func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool
 	}
 
 	// Get parent revision
-	parentRev, err := e.GetRevision(ctx, parent)
+	parentRev, err := e.GetRevision(parent)
 	if err != nil {
 		return false, err
 	}
@@ -287,14 +288,14 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 }
 
 // FindBranchForCommit finds which branch a commit belongs to
-func (e *engineImpl) FindBranchForCommit(ctx context.Context, commitSHA string) (string, error) {
+func (e *engineImpl) FindBranchForCommit(commitSHA string) (string, error) {
 	e.mu.RLock()
 	branches := make([]string, len(e.branches))
 	copy(branches, e.branches)
 	e.mu.RUnlock()
 
 	for _, branchName := range branches {
-		commits, err := e.GetAllCommits(ctx, branchName, CommitFormatSHA)
+		commits, err := e.GetAllCommits(branchName, CommitFormatSHA)
 		if err != nil {
 			continue
 		}
@@ -310,14 +311,14 @@ func (e *engineImpl) FindBranchForCommit(ctx context.Context, commitSHA string) 
 }
 
 // GetAllCommits returns commits for a branch in various formats
-func (e *engineImpl) GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error) {
+func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	// Check if branch is trunk
 	if branchName == e.trunk {
 		// For trunk, get just the one commit
-		branchRevision, err := e.GetRevision(ctx, branchName)
+		branchRevision, err := e.GetRevision(branchName)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +332,7 @@ func (e *engineImpl) GetAllCommits(ctx context.Context, branchName string, forma
 	}
 
 	// Get branch revision
-	branchRevision, err := e.GetRevision(ctx, branchName)
+	branchRevision, err := e.GetRevision(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -461,4 +462,34 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 	}
 
 	return DeletionStatus{SafeToDelete: false, Reason: ""}, nil
+}
+
+// BranchesDepthFirst returns an iterator that yields branches starting from startBranch in depth-first order.
+// Each iteration yields (branchName, depth) where depth is 0 for the start branch.
+// The iterator can be used with range loops and supports early termination with break.
+func (e *engineImpl) BranchesDepthFirst(startBranch string) iter.Seq2[string, int] {
+	return func(yield func(string, int) bool) {
+		visited := make(map[string]bool)
+		var visit func(branch string, depth int) bool
+		visit = func(branch string, depth int) bool {
+			if visited[branch] {
+				return true // cycle detection
+			}
+			visited[branch] = true
+
+			if !yield(branch, depth) {
+				return false // iterator wants to stop
+			}
+
+			children := e.GetChildren(branch)
+			for _, child := range children {
+				if !visit(child, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+
+		visit(startBranch, 0)
+	}
 }

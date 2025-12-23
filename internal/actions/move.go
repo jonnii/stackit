@@ -37,7 +37,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	if opts.Onto != "" {
 		args = append(args, "--onto", opts.Onto)
 	}
-	if err := eng.TakeSnapshot(gctx, "move", args); err != nil {
+	if err := eng.TakeSnapshot("move", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

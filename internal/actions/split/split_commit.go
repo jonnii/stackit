@@ -28,7 +28,7 @@ type splitByCommitEngine interface {
 //  5. Return the selected branch names and points to be applied by the engine.
 func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitEngine, splog *tui.Splog) (*Result, error) {
 	// Get readable commits
-	readableCommits, err := eng.GetAllCommits(ctx, branchToSplit, engine.CommitFormatReadable)
+	readableCommits, err := eng.GetAllCommits(branchToSplit, engine.CommitFormatReadable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commits: %w", err)
 	}
@@ -83,7 +83,7 @@ func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitE
 	}
 
 	// Detach HEAD to the branch revision
-	branchRevision, err := eng.GetRevision(ctx, branchToSplit)
+	branchRevision, err := eng.GetRevision(branchToSplit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branch revision: %w", err)
 	}

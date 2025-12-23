@@ -74,7 +74,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	style := opts.Style
 	if style == "" {
 		// Check if there's more than one commit
-		commits, err := eng.GetAllCommits(context, currentBranch, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(currentBranch, engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits: %w", err)
 		}

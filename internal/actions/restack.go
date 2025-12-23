@@ -29,7 +29,7 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	if opts.BranchName != "" {
 		args = append(args, opts.BranchName)
 	}
-	if err := eng.TakeSnapshot(ctx.Context, "restack", args); err != nil {
+	if err := eng.TakeSnapshot("restack", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

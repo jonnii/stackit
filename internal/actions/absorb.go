@@ -1,7 +1,6 @@
 package actions
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -46,7 +45,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	if opts.Patch {
 		args = append(args, "--patch")
 	}
-	if err := eng.TakeSnapshot(ctx.Context, "absorb", args); err != nil {
+	if err := eng.TakeSnapshot("absorb", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}
@@ -101,7 +100,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}
 	for _, branchName := range downstackBranches {
-		commits, err := eng.GetAllCommits(ctx.Context, branchName, engine.CommitFormatSHA)
+		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
 		}
@@ -154,12 +153,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Print dry-run output or confirmation
 	if opts.DryRun {
-		printDryRunOutput(ctx.Context, hunksByCommit, unabsorbedHunks, eng, splog)
+		printDryRunOutput(hunksByCommit, unabsorbedHunks, eng, splog)
 		return nil
 	}
 
 	// Print what will be absorbed
-	printAbsorbPlan(ctx.Context, hunksByCommit, unabsorbedHunks, eng, splog)
+	printAbsorbPlan(hunksByCommit, unabsorbedHunks, eng, splog)
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
@@ -197,7 +196,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	// Track the oldest modified branch to know where to start restacking from
 	var oldestModifiedBranch string
 	if len(commitList) > 0 {
-		oldestModifiedBranch, _ = eng.FindBranchForCommit(ctx.Context, commitList[0])
+		oldestModifiedBranch, _ = eng.FindBranchForCommit(commitList[0])
 	}
 
 	// Stash all changes (staged and unstaged) before starting to rewrite commits
@@ -214,7 +213,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		hunks := hunksByCommit[commitSHA]
 
 		// Find branch for this commit
-		branchName, err := eng.FindBranchForCommit(ctx.Context, commitSHA)
+		branchName, err := eng.FindBranchForCommit(commitSHA)
 		if err != nil {
 			return fmt.Errorf("failed to find branch for commit %s: %w", commitSHA[:8], err)
 		}
@@ -255,19 +254,19 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 }
 
 // printDryRunOutput prints what would be absorbed in dry-run mode
-func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
+func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Would absorb the following changes:")
 	splog.Newline()
 
 	// Get commit info for display
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := eng.FindBranchForCommit(ctx, commitSHA)
+		branchName, err := eng.FindBranchForCommit(commitSHA)
 		if err != nil {
 			branchName = "unknown"
 		}
 
 		// Get commit message - show first commit message from the branch
-		commits, err := eng.GetAllCommits(ctx, branchName, engine.CommitFormatReadable)
+		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
 			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])
@@ -290,12 +289,12 @@ func printDryRunOutput(ctx context.Context, hunksByCommit map[string][]git.Hunk,
 }
 
 // printAbsorbPlan prints the plan for absorbing changes
-func printAbsorbPlan(ctx context.Context, hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
+func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.Hunk, eng engine.Engine, splog *tui.Splog) {
 	splog.Info("Will absorb the following changes:")
 	splog.Newline()
 
 	for commitSHA, hunks := range hunksByCommit {
-		branchName, err := eng.FindBranchForCommit(ctx, commitSHA)
+		branchName, err := eng.FindBranchForCommit(commitSHA)
 		if err != nil {
 			branchName = "unknown"
 		}

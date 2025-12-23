@@ -179,7 +179,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		}
 
 		// Check if local matches remote
-		matchesRemote, err := eng.BranchMatchesRemote(ctx, branchName)
+		matchesRemote, err := eng.BranchMatchesRemote(branchName)
 		if err != nil {
 			splog.Debug("Failed to check if branch matches remote: %v", err)
 			matchesRemote = true // Assume matches if check fails

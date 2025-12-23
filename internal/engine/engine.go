@@ -5,6 +5,7 @@ package engine
 
 import (
 	"context"
+	"iter"
 	"time"
 )
 
@@ -21,14 +22,14 @@ type BranchReader interface {
 	GetRelativeStack(branchName string, scope Scope) []string
 	IsTrunk(branchName string) bool
 	IsBranchTracked(branchName string) bool
-	IsBranchFixed(ctx context.Context, branchName string) bool
+	IsBranchUpToDate(branchName string) bool
 
 	// Commit information
-	GetCommitDate(ctx context.Context, branchName string) (time.Time, error)
-	GetCommitAuthor(ctx context.Context, branchName string) (string, error)
-	GetRevision(ctx context.Context, branchName string) (string, error)
-	GetAllCommits(ctx context.Context, branchName string, format CommitFormat) ([]string, error)
-	FindBranchForCommit(ctx context.Context, commitSHA string) (string, error)
+	GetCommitDate(branchName string) (time.Time, error)
+	GetCommitAuthor(branchName string) (string, error)
+	GetRevision(branchName string) (string, error)
+	GetAllCommits(branchName string, format CommitFormat) ([]string, error)
+	FindBranchForCommit(commitSHA string) (string, error)
 
 	// Stack queries
 	GetRelativeStackUpstack(branchName string) []string
@@ -39,6 +40,9 @@ type BranchReader interface {
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
 	FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error)
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
+
+	// Traversal
+	BranchesDepthFirst(startBranch string) iter.Seq2[string, int]
 }
 
 // BranchWriter provides write operations for branch management
@@ -61,15 +65,15 @@ type BranchWriter interface {
 type PRManager interface {
 	GetPrInfo(branchName string) (*PrInfo, error)
 	UpsertPrInfo(branchName string, prInfo *PrInfo) error
-	GetPRSubmissionStatus(ctx context.Context, branchName string) (PRSubmissionStatus, error)
+	GetPRSubmissionStatus(branchName string) (PRSubmissionStatus, error)
 }
 
 // SyncManager provides operations for syncing and restacking branches
 // Thread-safe: All methods are safe for concurrent use
 type SyncManager interface {
 	// Remote operations
-	BranchMatchesRemote(ctx context.Context, branchName string) (bool, error)
-	PopulateRemoteShas(ctx context.Context) error
+	BranchMatchesRemote(branchName string) (bool, error)
+	PopulateRemoteShas() error
 	PushBranch(ctx context.Context, branchName string, remote string, force bool, forceWithLease bool) error
 
 	// Sync operations
@@ -139,7 +143,7 @@ type Options struct {
 // UndoManager provides operations for undo/redo functionality
 // Thread-safe: All methods are safe for concurrent use
 type UndoManager interface {
-	TakeSnapshot(ctx context.Context, command string, args []string) error
+	TakeSnapshot(command string, args []string) error
 	GetSnapshots() ([]SnapshotInfo, error)
 	LoadSnapshot(snapshotID string) (*Snapshot, error)
 	RestoreSnapshot(ctx context.Context, snapshotID string) error

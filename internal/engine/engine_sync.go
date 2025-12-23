@@ -132,13 +132,13 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	}
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
-	parentRev, err := e.GetRevision(ctx, parent)
+	parentRev, err := e.GetRevision(parent)
 	if err != nil {
 		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
 	}
 
 	// Check if branch needs restacking
-	if e.IsBranchFixed(ctx, branchName) {
+	if e.IsBranchUpToDate(branchName) {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
 			RebasedBranchBase: parentRev,

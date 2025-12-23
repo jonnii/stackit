@@ -87,13 +87,13 @@ func Action(ctx *runtime.Context, opts Options) error {
 	currentBranch := eng.CurrentBranch()
 
 	// Populate remote SHAs early for accurate display
-	if err := eng.PopulateRemoteShas(context); err != nil {
+	if err := eng.PopulateRemoteShas(); err != nil {
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
 	// Display the stack tree with PR annotations
-	renderer, rootBranch := getStackTreeRenderer(context, branches, opts, eng, currentBranch)
-	ui.ShowStack(renderer, rootBranch)
+	renderer := getStackTreeRenderer(branches, opts, eng, currentBranch)
+	ui.ShowStack(renderer, eng.Trunk())
 
 	// Restack if requested
 	if opts.Restack {
@@ -116,7 +116,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(context, branches, opts, eng, ctx, currentBranch, ui)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch, ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -234,11 +234,11 @@ func Action(ctx *runtime.Context, opts Options) error {
 }
 
 // prepareBranchesForSubmit prepares submission info for each branch, outputting via UI
-func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
+func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine, runtimeCtx *runtime.Context, currentBranch string, ui tui.SubmitUI) ([]Info, error) {
 	submissionInfos := make([]Info, 0, len(branches))
 
 	for _, branchName := range branches {
-		status, err := eng.GetPRSubmissionStatus(ctx, branchName)
+		status, err := eng.GetPRSubmissionStatus(branchName)
 		if err != nil {
 			return nil, err
 		}
@@ -295,9 +295,9 @@ func prepareBranchesForSubmit(ctx context.Context, branches []string, opts Optio
 		}
 
 		// Get SHAs
-		headSHA, _ := eng.GetRevision(ctx, branchName)
+		headSHA, _ := eng.GetRevision(branchName)
 		parentBranchName := eng.GetParentPrecondition(branchName)
-		baseSHA, _ := eng.GetRevision(ctx, parentBranchName)
+		baseSHA, _ := eng.GetRevision(parentBranchName)
 
 		submissionInfo := Info{
 			BranchName: branchName,
@@ -507,7 +507,7 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
-func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, eng engine.Engine, currentBranch string) (*tui.StackTreeRenderer, string) {
+func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, currentBranch string) *tui.StackTreeRenderer {
 	// Create the tree renderer
 	renderer := tui.NewStackTreeRenderer(
 		currentBranch,
@@ -516,7 +516,7 @@ func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, 
 		eng.GetParent,
 		eng.IsTrunk,
 		func(branchName string) bool {
-			return eng.IsBranchFixed(ctx, branchName)
+			return eng.IsBranchUpToDate(branchName)
 		},
 	)
 
@@ -534,7 +534,7 @@ func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, 
 		}
 
 		annotation := tui.BranchAnnotation{
-			NeedsRestack: !eng.IsBranchFixed(ctx, branchName),
+			NeedsRestack: !eng.IsBranchUpToDate(branchName),
 		}
 
 		const actionUpdate = "update"
@@ -555,5 +555,5 @@ func getStackTreeRenderer(ctx context.Context, branches []string, opts Options, 
 	}
 	renderer.SetAnnotations(annotations)
 
-	return renderer, eng.Trunk()
+	return renderer
 }

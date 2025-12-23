@@ -330,7 +330,7 @@ func TestRestackBranch(t *testing.T) {
 		require.Equal(t, engine.RestackDone, result.Result)
 
 		// Verify branch1 is now fixed
-		require.True(t, s.Engine.IsBranchFixed(context.Background(), "branch1"))
+		require.True(t, s.Engine.IsBranchUpToDate("branch1"))
 	})
 
 	t.Run("returns unneeded when branch is already fixed", func(t *testing.T) {
@@ -625,11 +625,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// Branch should match remote
-		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote("feature")
 		require.NoError(t, err)
 		require.True(t, matches, "branch should match remote after push")
 	})
@@ -656,11 +656,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 			Checkout("main")
 
 		// Populate remote SHAs
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local has extra commit)
-		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote("feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote with local changes")
 	})
@@ -682,11 +682,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 			Checkout("main")
 
 		// Populate remote SHAs
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (doesn't exist on remote)
-		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote("feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match when it doesn't exist on remote")
 	})
@@ -715,11 +715,11 @@ func TestBranchMatchesRemote(t *testing.T) {
 		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// Branch should NOT match remote (local was amended)
-		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "feature")
+		matches, err := s.Engine.BranchMatchesRemote("feature")
 		require.NoError(t, err)
 		require.False(t, matches, "branch should not match remote after amend")
 	})
@@ -751,12 +751,12 @@ func TestPopulateRemoteShas(t *testing.T) {
 		s.Checkout("main")
 
 		// Populate remote SHAs
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// All branches should match remote
 		for _, branch := range []string{"main", "feature1", "feature2"} {
-			matches, err := s.Engine.BranchMatchesRemote(context.Background(), branch)
+			matches, err := s.Engine.BranchMatchesRemote(branch)
 			require.NoError(t, err)
 			require.True(t, matches, "branch %s should match remote", branch)
 		}
@@ -770,11 +770,11 @@ func TestPopulateRemoteShas(t *testing.T) {
 		require.NoError(t, err)
 
 		// Populate should not fail
-		err = s.Engine.PopulateRemoteShas(context.Background())
+		err = s.Engine.PopulateRemoteShas()
 		require.NoError(t, err)
 
 		// Branches should not match (nothing on remote)
-		matches, err := s.Engine.BranchMatchesRemote(context.Background(), "main")
+		matches, err := s.Engine.BranchMatchesRemote("main")
 		require.NoError(t, err)
 		require.False(t, matches, "main should not match empty remote")
 	})
@@ -982,7 +982,7 @@ func TestSetParentScenarios(t *testing.T) {
 			CommitChange("file1.txt", "feat: branch1").
 			TrackBranch("branch1", "main")
 
-		branch1OriginalSHA, _ := s.Engine.GetRevision(context.Background(), "branch1")
+		branch1OriginalSHA, _ := s.Engine.GetRevision("branch1")
 
 		// 2. Create branch2 on top of branch1
 		s.CreateBranch("branch2").
@@ -998,7 +998,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 4. Rebase branch1 onto main (changing its SHA)
 		s.Checkout("branch1")
 		s.Engine.RestackBranch(context.Background(), "branch1")
-		branch1NewSHA, _ := s.Engine.GetRevision(context.Background(), "branch1")
+		branch1NewSHA, _ := s.Engine.GetRevision("branch1")
 		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
 
 		// 5. Merge branch1 into main
@@ -1040,7 +1040,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// because branch1 was NOT merged into main; it was merged into branch2.
 		// If we kept the old divergence point (before branch1), a restack would
 		// try to re-apply branch1's changes which are already in branch2.
-		mainSHA, _ := s.Engine.GetRevision(context.Background(), "main")
+		mainSHA, _ := s.Engine.GetRevision("main")
 		meta, _ := git.ReadMetadataRef("branch2")
 		require.Equal(t, mainSHA, *meta.ParentBranchRevision, "Divergence point should be updated to new parent when folding upward")
 	})
@@ -1058,7 +1058,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 1. Move main forward
 		s.Checkout("main").
 			CommitChange("main.txt", "feat: main")
-		mainNewSHA, _ := s.Engine.GetRevision(context.Background(), "main")
+		mainNewSHA, _ := s.Engine.GetRevision("main")
 
 		// 2. Manually rebase branch1 onto main
 		s.Checkout("branch1")

@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"context"
-
 	"stackit.dev/stackit/internal/git"
 )
 
@@ -66,7 +64,7 @@ func (e *engineImpl) UpsertPrInfo(branchName string, prInfo *PrInfo) error {
 }
 
 // GetPRSubmissionStatus returns the submission status of a branch
-func (e *engineImpl) GetPRSubmissionStatus(ctx context.Context, branchName string) (PRSubmissionStatus, error) {
+func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatus, error) {
 	prInfo, err := e.GetPrInfo(branchName)
 	if err != nil {
 		return PRSubmissionStatus{}, err
@@ -87,7 +85,7 @@ func (e *engineImpl) GetPRSubmissionStatus(ctx context.Context, branchName strin
 
 	// It's an update
 	baseChanged := prInfo.Base != parentBranchName
-	branchChanged, _ := e.BranchMatchesRemote(ctx, branchName)
+	branchChanged, _ := e.BranchMatchesRemote(branchName)
 
 	needsUpdate := baseChanged || !branchChanged
 

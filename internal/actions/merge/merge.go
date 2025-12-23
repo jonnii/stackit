@@ -33,7 +33,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 
 		// 1. Populate remote SHAs so we can accurately check if branches match remote
-		if err := eng.PopulateRemoteShas(ctx.Context); err != nil {
+		if err := eng.PopulateRemoteShas(); err != nil {
 			splog.Debug("Failed to populate remote SHAs: %v", err)
 		}
 

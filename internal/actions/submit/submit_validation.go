@@ -25,7 +25,7 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 	}
 
 	// Validate base revisions
-	if err := validateBaseRevisions(ctx, branches, eng, runtimeCtx); err != nil {
+	if err := validateBaseRevisions(branches, eng, runtimeCtx); err != nil {
 		return err
 	}
 
@@ -46,7 +46,7 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 // 1. Its parent is trunk, OR
 // 2. We are submitting its parent before it and it does not need restacking, OR
 // 3. Its base matches the existing head for its parent's PR
-func validateBaseRevisions(ctx context.Context, branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
+func validateBaseRevisions(branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
 	validatedBranches := make(map[string]bool)
 
 	for _, branchName := range branches {
@@ -54,19 +54,19 @@ func validateBaseRevisions(ctx context.Context, branches []string, eng engine.En
 
 		switch {
 		case eng.IsTrunk(parentBranchName):
-			if !eng.IsBranchFixed(ctx, branchName) {
+			if !eng.IsBranchUpToDate(branchName) {
 				runtimeCtx.Splog.Info("Note that %s has fallen behind trunk. You may encounter conflicts if you attempt to merge it.",
 					tui.ColorBranchName(branchName, false))
 			}
 		case validatedBranches[parentBranchName]:
 			// Parent is in the submission list
-			if !eng.IsBranchFixed(ctx, branchName) {
+			if !eng.IsBranchUpToDate(branchName) {
 				return fmt.Errorf("you are trying to submit at least one branch that has not been restacked on its parent. To resolve this, check out %s and run 'stackit restack'",
 					tui.ColorBranchName(branchName, false))
 			}
 		default:
 			// Parent is not in submission list
-			matchesRemote, err := eng.BranchMatchesRemote(ctx, parentBranchName)
+			matchesRemote, err := eng.BranchMatchesRemote(parentBranchName)
 			if err != nil {
 				return fmt.Errorf("failed to check if parent branch matches remote: %w", err)
 			}

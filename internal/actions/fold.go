@@ -37,7 +37,7 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	if opts.AllowTrunk {
 		args = append(args, "--allow-trunk")
 	}
-	if err := eng.TakeSnapshot(gctx, "fold", args); err != nil {
+	if err := eng.TakeSnapshot("fold", args); err != nil {
 		// Log but don't fail - snapshot is best effort
 		splog.Debug("Failed to take snapshot: %v", err)
 	}

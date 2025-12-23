@@ -450,3 +450,40 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 
 	return "", fmt.Errorf("unexpected model type")
 }
+
+// PromptBranchCheckout shows an interactive branch selector for checkout.
+// It takes a list of branch names and the current branch name, formats them,
+// and presents them for selection.
+func PromptBranchCheckout(branchNames []string, currentBranch string) (string, error) {
+	if len(branchNames) == 0 {
+		return "", fmt.Errorf("no branches available to checkout")
+	}
+
+	choices := make([]BranchChoice, 0, len(branchNames))
+	initialIndex := -1
+
+	for _, branchName := range branchNames {
+		isCurrent := branchName == currentBranch
+		display := ColorBranchName(branchName, isCurrent)
+		if isCurrent {
+			initialIndex = len(choices)
+		}
+		choices = append(choices, BranchChoice{
+			Display: display,
+			Value:   branchName,
+		})
+	}
+
+	// Set initial index if not found
+	if initialIndex < 0 {
+		initialIndex = len(choices) - 1
+	}
+
+	// Show interactive selector
+	selected, err := PromptBranchSelection("Checkout a branch (arrow keys to navigate, type to filter)", choices, initialIndex)
+	if err != nil {
+		return "", err
+	}
+
+	return selected, nil
+}

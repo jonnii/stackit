@@ -167,13 +167,18 @@ func (e *Engine) getDescendants(branchName string) []string {
 	return result
 }
 
-// IsTrunk returns true if the branch is trunk in the demo engine
-func (e *Engine) IsTrunk(branchName string) bool {
+// GetBranch returns a Branch wrapper for the given branch name
+func (e *Engine) GetBranch(branchName string) engine.Branch {
+	return engine.Branch{Name: branchName, Reader: e}
+}
+
+// IsTrunkInternal returns true if the branch is trunk in the demo engine (internal method used by Branch type)
+func (e *Engine) IsTrunkInternal(branchName string) bool {
 	return branchName == GetDemoTrunk()
 }
 
-// IsBranchTracked returns true if the branch is tracked in the demo engine
-func (e *Engine) IsBranchTracked(branchName string) bool {
+// IsBranchTrackedInternal returns true if the branch is tracked in the demo engine (internal method used by Branch type)
+func (e *Engine) IsBranchTrackedInternal(branchName string) bool {
 	if branchName == GetDemoTrunk() {
 		return true
 	}

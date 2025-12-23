@@ -29,11 +29,12 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 		return fmt.Errorf("no branch specified and not on a branch")
 	}
 
-	if eng.IsTrunk(branchName) {
+	branch := eng.GetBranch(branchName)
+	if branch.IsTrunk() {
 		return fmt.Errorf("cannot delete trunk branch %s", branchName)
 	}
 
-	if !eng.IsBranchTracked(branchName) {
+	if !branch.IsTracked() {
 		return fmt.Errorf("branch %s is not tracked by stackit", branchName)
 	}
 

@@ -33,8 +33,11 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	}
 
+	// Get branch wrapper
+	branch := eng.GetBranch(branchName)
+
 	// Check if branch exists
-	if !eng.IsBranchTracked(branchName) && !eng.IsTrunk(branchName) {
+	if !branch.IsTracked() && !branch.IsTrunk() {
 		// Check if it's a git branch
 		_, err := git.GetRevision(branchName)
 		if err != nil {
@@ -52,7 +55,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 
 	// Get branch info
 	isCurrent := branchName == eng.CurrentBranch()
-	isTrunk := eng.IsTrunk(branchName)
+	isTrunk := branch.IsTrunk()
 
 	// Branch name with current indicator
 	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)

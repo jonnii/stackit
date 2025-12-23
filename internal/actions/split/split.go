@@ -58,7 +58,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Ensure branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if !currentBranchObj.IsTracked() {
 		// Auto-track the branch
 		parent := eng.GetParent(currentBranch)
 		if parent == "" {

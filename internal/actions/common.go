@@ -18,7 +18,8 @@ type Restacker interface {
 // RestackBranches restacks a list of branches
 func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, splog *tui.Splog, repoRoot string) error {
 	for i, branchName := range branchNames {
-		if eng.IsTrunk(branchName) {
+		branch := eng.GetBranch(branchName)
+		if branch.IsTrunk() {
 			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
 			continue
 		}

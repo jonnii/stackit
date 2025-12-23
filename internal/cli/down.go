@@ -54,7 +54,8 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Check if on trunk
-			if ctx.Engine.IsTrunk(currentBranch) {
+			currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+			if currentBranchObj.IsTrunk() {
 				ctx.Splog.Info("Already at trunk (%s).", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}

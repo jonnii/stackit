@@ -72,7 +72,8 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 func getUntrackedBranchNamesForCheckout(eng engine.BranchReader) []string {
 	var untracked []string
 	for _, branchName := range eng.AllBranchNames() {
-		if !eng.IsTrunk(branchName) && !eng.IsBranchTracked(branchName) {
+		branch := eng.GetBranch(branchName)
+		if !branch.IsTrunk() && !branch.IsTracked() {
 			untracked = append(untracked, branchName)
 		}
 	}
@@ -158,11 +159,12 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 
 // printBranchInfo prints information about the checked out branch
 func printBranchInfo(branchName string, ctx *runtime.Context) {
-	if ctx.Engine.IsTrunk(branchName) {
+	branch := ctx.Engine.GetBranch(branchName)
+	if branch.IsTrunk() {
 		return
 	}
 
-	if !ctx.Engine.IsBranchTracked(branchName) {
+	if !branch.IsTracked() {
 		ctx.Splog.Info("This branch is not tracked by Stackit.")
 		return
 	}

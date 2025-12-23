@@ -129,10 +129,11 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
 	for _, branchName := range allBranches {
+		branch := eng.GetBranch(branchName)
 		branchInfo := BranchInfo{
 			Name:      branchName,
-			IsTrunk:   eng.IsTrunk(branchName),
-			IsTracked: eng.IsBranchTracked(branchName),
+			IsTrunk:   branch.IsTrunk(),
+			IsTracked: branch.IsTracked(),
 		}
 
 		// Get SHA

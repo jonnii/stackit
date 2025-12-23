@@ -112,12 +112,13 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		return nil, nil, fmt.Errorf("not on a branch")
 	}
 
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return nil, nil, fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
 	}
 
 	// Check if current branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	if !currentBranchObj.IsTracked() {
 		return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch)
 	}
 
@@ -129,7 +130,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	// Filter out trunk (it shouldn't be in the list, but be safe)
 	allBranches := make([]string, 0, len(parentBranches)+1)
 	for _, branchName := range parentBranches {
-		if !eng.IsTrunk(branchName) {
+		branchObj := eng.GetBranch(branchName)
+		if !branchObj.IsTrunk() {
 			allBranches = append(allBranches, branchName)
 		}
 	}
@@ -236,7 +238,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	}
 
 	for _, ancestor := range allBranches {
-		if eng.IsTrunk(ancestor) {
+		ancestorBranch := eng.GetBranch(ancestor)
+		if ancestorBranch.IsTrunk() {
 			continue
 		}
 		children := eng.GetChildren(ancestor)
@@ -251,7 +254,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	upstackBranches := []string{}
 	upstack := eng.GetRelativeStackUpstack(currentBranch)
 	for _, branchName := range upstack {
-		if eng.IsBranchTracked(branchName) {
+		branchObj := eng.GetBranch(branchName)
+		if branchObj.IsTracked() {
 			upstackBranches = append(upstackBranches, branchName)
 		}
 	}

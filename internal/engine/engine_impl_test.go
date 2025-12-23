@@ -149,7 +149,7 @@ func TestDeleteBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify branch1 is removed
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 		require.NotContains(t, s.Engine.AllBranchNames(), "branch1")
 
 		// Verify children now point to main
@@ -180,7 +180,7 @@ func TestDeleteBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify P is removed
-		require.False(t, s.Engine.IsBranchTracked("P"))
+		require.False(t, s.Engine.GetBranch("P").IsTracked())
 
 		// Verify all direct children of P now point to main
 		require.Equal(t, "main", s.Engine.GetParent("C1"))
@@ -358,7 +358,7 @@ func TestRestackBranch(t *testing.T) {
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 
 		// Verify it is now tracked
-		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
 		require.Equal(t, "main", s.Engine.GetParent("branch1"))
 	})
 }
@@ -386,7 +386,7 @@ func TestRebuild(t *testing.T) {
 		// New branch should be in list
 		require.Contains(t, s.Engine.AllBranchNames(), "branch2")
 		// But not tracked yet
-		require.False(t, s.Engine.IsBranchTracked("branch2"))
+		require.False(t, s.Engine.GetBranch("branch2").IsTracked())
 	})
 }
 
@@ -397,12 +397,12 @@ func TestIsBranchTracked(t *testing.T) {
 			Commit("branch1 change").
 			Checkout("main")
 
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 
 		err := s.Engine.TrackBranch(context.Background(), "branch1", "main")
 		require.NoError(t, err)
 
-		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
 	})
 
 	t.Run("returns false for untracked branch", func(t *testing.T) {
@@ -411,7 +411,7 @@ func TestIsBranchTracked(t *testing.T) {
 			Commit("branch1 change").
 			Checkout("main")
 
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 	})
 }
 
@@ -419,8 +419,8 @@ func TestIsTrunk(t *testing.T) {
 	t.Run("returns true for trunk branch", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		require.True(t, s.Engine.IsTrunk("main"))
-		require.False(t, s.Engine.IsTrunk("other"))
+		require.True(t, s.Engine.GetBranch("main").IsTrunk())
+		require.False(t, s.Engine.GetBranch("other").IsTrunk())
 	})
 }
 
@@ -575,7 +575,7 @@ func TestReset(t *testing.T) {
 
 		// Branch should still exist but not be tracked
 		require.Contains(t, s.Engine.AllBranchNames(), "branch1")
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 	})
 }
 
@@ -592,7 +592,7 @@ func TestConcurrentAccess(t *testing.T) {
 			go func() {
 				_ = s.Engine.GetParent("branch1")
 				_ = s.Engine.GetChildren("main")
-				_ = s.Engine.IsBranchTracked("branch1")
+				_ = s.Engine.GetBranch("branch1").IsTracked()
 				_ = s.Engine.AllBranchNames()
 				done <- true
 			}()

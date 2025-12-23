@@ -9,6 +9,22 @@ import (
 	"time"
 )
 
+// Branch represents a branch in the stack
+type Branch struct {
+	Name   string
+	Reader BranchReader
+}
+
+// IsTrunk checks if this branch is the trunk
+func (b Branch) IsTrunk() bool {
+	return b.Reader.IsTrunkInternal(b.Name)
+}
+
+// IsTracked checks if this branch is tracked (has metadata)
+func (b Branch) IsTracked() bool {
+	return b.Reader.IsBranchTrackedInternal(b.Name)
+}
+
 // BranchReader provides read-only access to branch information
 // Thread-safe: All methods are safe for concurrent use
 type BranchReader interface {
@@ -16,13 +32,16 @@ type BranchReader interface {
 	AllBranchNames() []string
 	CurrentBranch() string
 	Trunk() string
+	GetBranch(branchName string) Branch             // Returns a Branch wrapper
 	GetParent(branchName string) string             // Returns empty string if no parent
 	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)
 	GetChildren(branchName string) []string
 	GetRelativeStack(branchName string, scope Scope) []string
-	IsTrunk(branchName string) bool
-	IsBranchTracked(branchName string) bool
 	IsBranchUpToDate(branchName string) bool
+
+	// Internal methods used by Branch type (exported so implementations outside this package can provide them)
+	IsTrunkInternal(branchName string) bool
+	IsBranchTrackedInternal(branchName string) bool
 
 	// Commit information
 	GetCommitDate(branchName string) (time.Time, error)

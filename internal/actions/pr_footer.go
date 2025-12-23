@@ -64,7 +64,8 @@ func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 		return eng.Trunk()
 	}
 
-	if eng.IsTrunk(parent) {
+	parentBranch := eng.GetBranch(parent)
+	if parentBranch.IsTrunk() {
 		return currentBranch
 	}
 

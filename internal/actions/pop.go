@@ -26,12 +26,13 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Check if on trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot pop trunk branch")
 	}
 
 	// Check if branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	if !currentBranchObj.IsTracked() {
 		return fmt.Errorf("cannot pop untracked branch %s", currentBranch)
 	}
 

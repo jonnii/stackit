@@ -116,7 +116,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			eng.Trunk(),
 			eng.GetChildren,
 			eng.GetParent,
-			eng.IsTrunk,
+			func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
 			func(branchName string) bool {
 				return eng.IsBranchUpToDate(branchName)
 			},

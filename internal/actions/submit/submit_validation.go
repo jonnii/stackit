@@ -52,8 +52,9 @@ func validateBaseRevisions(branches []string, eng engine.Engine, runtimeCtx *run
 	for _, branchName := range branches {
 		parentBranchName := eng.GetParentPrecondition(branchName)
 
+		parentBranch := eng.GetBranch(parentBranchName)
 		switch {
-		case eng.IsTrunk(parentBranchName):
+		case parentBranch.IsTrunk():
 			if !eng.IsBranchUpToDate(branchName) {
 				runtimeCtx.Splog.Info("Note that %s has fallen behind trunk. You may encounter conflicts if you attempt to merge it.",
 					tui.ColorBranchName(branchName, false))

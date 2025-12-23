@@ -43,12 +43,13 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	}
 
 	// Check if on trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot fold trunk branch")
 	}
 
 	// Check if branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	if !currentBranchObj.IsTracked() {
 		return fmt.Errorf("cannot fold untracked branch %s", currentBranch)
 	}
 
@@ -68,16 +69,18 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 		parent = eng.Trunk()
 	}
 
+	parentBranch := eng.GetBranch(parent)
+
 	if opts.Keep {
 		// Prevent folding onto trunk with --keep, as that would delete trunk
-		if eng.IsTrunk(parent) {
+		if parentBranch.IsTrunk() {
 			return fmt.Errorf("cannot fold into trunk with --keep because it would delete the trunk branch")
 		}
 		return foldWithKeep(gctx, ctx, currentBranch, parent, eng, splog)
 	}
 
 	// Check if folding into trunk
-	if eng.IsTrunk(parent) && !opts.AllowTrunk {
+	if parentBranch.IsTrunk() && !opts.AllowTrunk {
 		return fmt.Errorf("cannot fold into trunk branch %s without --allow-trunk. Folding into trunk will modify your local main branch directly", parent)
 	}
 

@@ -24,8 +24,8 @@ func TestDelete(t *testing.T) {
 		require.NoError(t, err)
 
 		// branch1 should be gone, branch2 should be reparented to main
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
-		require.True(t, s.Engine.IsBranchTracked("branch2"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
+		require.True(t, s.Engine.GetBranch("branch2").IsTracked())
 		require.Equal(t, "main", s.Engine.GetParent("branch2"))
 	})
 
@@ -45,9 +45,9 @@ func TestDelete(t *testing.T) {
 		require.NoError(t, err)
 
 		// All branches should be gone
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
-		require.False(t, s.Engine.IsBranchTracked("branch2"))
-		require.False(t, s.Engine.IsBranchTracked("branch3"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
+		require.False(t, s.Engine.GetBranch("branch2").IsTracked())
+		require.False(t, s.Engine.GetBranch("branch3").IsTracked())
 	})
 
 	t.Run("deletes downstack", func(t *testing.T) {
@@ -66,9 +66,9 @@ func TestDelete(t *testing.T) {
 		require.NoError(t, err)
 
 		// All branches should be gone
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
-		require.False(t, s.Engine.IsBranchTracked("branch2"))
-		require.False(t, s.Engine.IsBranchTracked("branch3"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
+		require.False(t, s.Engine.GetBranch("branch2").IsTracked())
+		require.False(t, s.Engine.GetBranch("branch3").IsTracked())
 	})
 
 	t.Run("fails without force if not merged", func(t *testing.T) {
@@ -122,11 +122,11 @@ func TestDelete(t *testing.T) {
 		require.NoError(t, err)
 
 		// parent should be gone
-		require.False(t, s.Engine.IsBranchTracked("parent"))
+		require.False(t, s.Engine.GetBranch("parent").IsTracked())
 
 		// Both children should be reparented to main and still be tracked
-		require.True(t, s.Engine.IsBranchTracked("child1"))
-		require.True(t, s.Engine.IsBranchTracked("child2"))
+		require.True(t, s.Engine.GetBranch("child1").IsTracked())
+		require.True(t, s.Engine.GetBranch("child2").IsTracked())
 		require.Equal(t, "main", s.Engine.GetParent("child1"))
 		require.Equal(t, "main", s.Engine.GetParent("child2"))
 	})

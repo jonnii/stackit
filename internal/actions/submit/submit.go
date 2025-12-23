@@ -343,7 +343,8 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	branches := []string{}
 	branchSet := make(map[string]bool)
 	for _, b := range allBranches {
-		if !eng.IsTrunk(b) && !branchSet[b] {
+		branchObj := eng.GetBranch(b)
+		if !branchObj.IsTrunk() && !branchSet[b] {
 			branches = append(branches, b)
 			branchSet[b] = true
 		}
@@ -514,7 +515,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		eng.Trunk(),
 		eng.GetChildren,
 		eng.GetParent,
-		eng.IsTrunk,
+		func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
 			return eng.IsBranchUpToDate(branchName)
 		},

@@ -116,15 +116,18 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Add current branch stack to restack list
 	currentBranch := eng.CurrentBranch()
-	if currentBranch != "" && eng.IsBranchTracked(currentBranch) {
-		// Get full stack (up to trunk)
-		stack := eng.GetFullStack(currentBranch)
-		// Add branches to restack list
-		branchesToRestack = append(branchesToRestack, stack...)
-	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
-		// If on trunk, restack all branches
-		stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveChildren: true})
-		branchesToRestack = append(branchesToRestack, stack...)
+	if currentBranch != "" {
+		currentBranchObj := eng.GetBranch(currentBranch)
+		if currentBranchObj.IsTracked() {
+			// Get full stack (up to trunk)
+			stack := eng.GetFullStack(currentBranch)
+			// Add branches to restack list
+			branchesToRestack = append(branchesToRestack, stack...)
+		} else if currentBranchObj.IsTrunk() {
+			// If on trunk, restack all branches
+			stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveChildren: true})
+			branchesToRestack = append(branchesToRestack, stack...)
+		}
 	}
 
 	// Remove duplicates

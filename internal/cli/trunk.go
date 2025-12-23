@@ -118,7 +118,8 @@ func handleShowTrunk(ctx *runtime.Context) error {
 	}
 
 	// If current branch is trunk, show it
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		fmt.Println(currentBranch)
 		return nil
 	}

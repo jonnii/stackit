@@ -51,7 +51,8 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 		}
 
 		// Validate parent is tracked (or is trunk)
-		if !eng.IsTrunk(parent) && !eng.IsBranchTracked(parent) {
+		parentBranch := eng.GetBranch(parent)
+		if !parentBranch.IsTrunk() && !parentBranch.IsTracked() {
 			return fmt.Errorf("parent branch %s must be tracked (or be trunk)", parent)
 		}
 
@@ -108,7 +109,8 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	eng := ctx.Engine
 
 	// Check if branch is already tracked
-	if eng.IsBranchTracked(branchName) {
+	branch := eng.GetBranch(branchName)
+	if branch.IsTracked() {
 		ctx.Splog.Info("%s is already tracked.", tui.ColorBranchName(branchName, false))
 		// Still ask if user wants to track descendants
 	} else {
@@ -155,7 +157,8 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		}
 
 		// If merge base is the branch we just tracked, candidate is a child
-		if mergeBase == branchRev && !eng.IsBranchTracked(candidate) {
+		candidateBranch := eng.GetBranch(candidate)
+		if mergeBase == branchRev && !candidateBranch.IsTracked() {
 			untrackedChildren = append(untrackedChildren, candidate)
 		}
 	}
@@ -189,7 +192,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 		trunk,
 		eng.GetChildren,
 		eng.GetParent,
-		eng.IsTrunk,
+		func(b string) bool { return eng.GetBranch(b).IsTrunk() },
 		func(b string) bool { return eng.IsBranchUpToDate(b) },
 	)
 
@@ -233,7 +236,8 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 			continue
 		}
 
-		if eng.IsBranchTracked(candidate) {
+		candidateBranch := eng.GetBranch(candidate)
+		if candidateBranch.IsTracked() {
 			display := branchToDisplay[candidate]
 			if display == "" {
 				display = tui.ColorBranchName(candidate, false)

@@ -34,7 +34,8 @@ and seeing which branch the current branch is based on.`,
 			}
 
 			// Check if on trunk
-			if ctx.Engine.IsTrunk(currentBranch) {
+			currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+			if currentBranchObj.IsTrunk() {
 				ctx.Splog.Info("%s is trunk and has no parent.", tui.ColorBranchName(currentBranch, true))
 				return nil
 			}

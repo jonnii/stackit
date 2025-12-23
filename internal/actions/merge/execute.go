@@ -383,7 +383,8 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 
 	case StepRestack:
 		// Validate branch still exists
-		if !eng.IsBranchTracked(step.BranchName) {
+		branch := eng.GetBranch(step.BranchName)
+		if !branch.IsTracked() {
 			return fmt.Errorf("branch %s is not tracked", step.BranchName)
 		}
 
@@ -518,7 +519,8 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 
 	case StepDeleteBranch:
 		// Only delete if branch is tracked
-		if eng.IsBranchTracked(step.BranchName) {
+		branch := eng.GetBranch(step.BranchName)
+		if branch.IsTracked() {
 			if err := eng.DeleteBranch(ctx, step.BranchName); err != nil {
 				// Non-fatal - branch might already be deleted
 				splog.Debug("Failed to delete branch %s (may already be deleted): %v", step.BranchName, err)
@@ -732,7 +734,8 @@ func CheckSyncStatus(ctx context.Context, eng engine.Engine, splog *tui.Splog) (
 	// Check all tracked branches
 	allBranches := eng.AllBranchNames()
 	for _, branchName := range allBranches {
-		if eng.IsTrunk(branchName) {
+		branch := eng.GetBranch(branchName)
+		if branch.IsTrunk() {
 			continue
 		}
 

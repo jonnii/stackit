@@ -30,7 +30,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 		ctx.Engine.Trunk(),
 		ctx.Engine.GetChildren,
 		ctx.Engine.GetParent,
-		ctx.Engine.IsTrunk,
+		func(branchName string) bool { return ctx.Engine.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
 			return ctx.Engine.IsBranchUpToDate(branchName)
 		},
@@ -63,7 +63,8 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 func getUntrackedBranchNames(ctx *runtime.Context) []string {
 	var untracked []string
 	for _, branchName := range ctx.Engine.AllBranchNames() {
-		if !ctx.Engine.IsTrunk(branchName) && !ctx.Engine.IsBranchTracked(branchName) {
+		branch := ctx.Engine.GetBranch(branchName)
+		if !branch.IsTrunk() && !branch.IsTracked() {
 			untracked = append(untracked, branchName)
 		}
 	}

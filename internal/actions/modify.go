@@ -40,7 +40,8 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	}
 
 	// Check if we're on trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot modify trunk branch %s", currentBranch)
 	}
 

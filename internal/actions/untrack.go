@@ -19,7 +19,8 @@ func UntrackAction(ctx *runtime.Context, opts UntrackOptions) error {
 	branchName := opts.BranchName
 
 	// Check if branch is tracked
-	if !eng.IsBranchTracked(branchName) {
+	branch := eng.GetBranch(branchName)
+	if !branch.IsTracked() {
 		return fmt.Errorf("branch %s is not tracked", branchName)
 	}
 

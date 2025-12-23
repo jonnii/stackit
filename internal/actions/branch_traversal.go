@@ -65,7 +65,8 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 
 // traverseDownward walks down the parent chain to find the first branch from trunk
 func traverseDownward(currentBranch string, ctx *runtime.Context) string {
-	if ctx.Engine.IsTrunk(currentBranch) {
+	currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return currentBranch
 	}
 
@@ -76,7 +77,8 @@ func traverseDownward(currentBranch string, ctx *runtime.Context) string {
 	}
 
 	// If parent is trunk, we're at the first branch from trunk
-	if ctx.Engine.IsTrunk(parent) {
+	parentBranch := ctx.Engine.GetBranch(parent)
+	if parentBranch.IsTrunk() {
 		return currentBranch
 	}
 

@@ -43,12 +43,13 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Prevent moving trunk (check before tracking check since trunk might not be tracked)
-	if eng.IsTrunk(source) {
+	sourceBranch := eng.GetBranch(source)
+	if sourceBranch.IsTrunk() {
 		return fmt.Errorf("cannot move trunk branch")
 	}
 
 	// Validate source exists and is tracked
-	if !eng.IsBranchTracked(source) {
+	if !sourceBranch.IsTracked() {
 		return fmt.Errorf("branch %s is not tracked by Stackit", source)
 	}
 
@@ -59,7 +60,8 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Validate onto exists
-	if !eng.IsTrunk(onto) && !eng.IsBranchTracked(onto) {
+	ontoBranch := eng.GetBranch(onto)
+	if !ontoBranch.IsTrunk() && !ontoBranch.IsTracked() {
 		// Check if it's an untracked branch
 		allBranches := eng.AllBranchNames()
 		found := false

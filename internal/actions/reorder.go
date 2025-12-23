@@ -34,7 +34,8 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Prevent reordering trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot reorder trunk branch")
 	}
 
@@ -48,7 +49,8 @@ func ReorderAction(ctx *runtime.Context) error {
 	// Filter out trunk and get only tracked branches
 	branches := []string{}
 	for _, branch := range stack {
-		if !eng.IsTrunk(branch) && eng.IsBranchTracked(branch) {
+		branchObj := eng.GetBranch(branch)
+		if !branchObj.IsTrunk() && branchObj.IsTracked() {
 			branches = append(branches, branch)
 		}
 	}

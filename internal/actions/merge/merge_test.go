@@ -40,7 +40,7 @@ func TestAction(t *testing.T) {
 		s.Checkout("main")
 
 		// Verify we're on trunk
-		require.True(t, s.Engine.IsTrunk(s.Engine.CurrentBranch()))
+		require.True(t, s.Engine.GetBranch(s.Engine.CurrentBranch()).IsTrunk())
 
 		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
@@ -56,7 +56,7 @@ func TestAction(t *testing.T) {
 			CreateBranch("untracked")
 
 		// Verify branch is not tracked
-		require.False(t, s.Engine.IsBranchTracked("untracked"))
+		require.False(t, s.Engine.GetBranch("untracked").IsTracked())
 
 		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
@@ -77,7 +77,7 @@ func TestAction(t *testing.T) {
 		s.Checkout("branch1")
 
 		// Verify branch is tracked
-		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
 
 		err := merge.Action(s.Context, merge.Options{
 			DryRun:   false,
@@ -109,7 +109,7 @@ func TestAction(t *testing.T) {
 		s.Checkout("branch1")
 
 		// Verify branch is tracked and has PR info
-		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
 		prInfo, err = s.Engine.GetPrInfo("branch1")
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)

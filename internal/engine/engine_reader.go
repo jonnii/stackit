@@ -39,6 +39,11 @@ func (e *engineImpl) Trunk() string {
 	return e.trunk
 }
 
+// GetBranch returns a Branch wrapper for the given branch name
+func (e *engineImpl) GetBranch(branchName string) Branch {
+	return Branch{Name: branchName, Reader: e}
+}
+
 // GetParent returns the parent branch name (empty string if no parent)
 func (e *engineImpl) GetParent(branchName string) string {
 	e.mu.RLock()
@@ -101,15 +106,15 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 	return result
 }
 
-// IsTrunk checks if a branch is the trunk
-func (e *engineImpl) IsTrunk(branchName string) bool {
+// IsTrunkInternal checks if a branch is the trunk (internal method used by Branch type)
+func (e *engineImpl) IsTrunkInternal(branchName string) bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return branchName == e.trunk
 }
 
-// IsBranchTracked checks if a branch is tracked (has metadata)
-func (e *engineImpl) IsBranchTracked(branchName string) bool {
+// IsBranchTrackedInternal checks if a branch is tracked (has metadata) (internal method used by Branch type)
+func (e *engineImpl) IsBranchTrackedInternal(branchName string) bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	_, ok := e.parentMap[branchName]
@@ -119,7 +124,7 @@ func (e *engineImpl) IsBranchTracked(branchName string) bool {
 // IsBranchUpToDate checks if a branch is up to date with its parent
 // A branch is up to date if its parent revision matches the stored parent revision
 func (e *engineImpl) IsBranchUpToDate(branchName string) bool {
-	if e.IsTrunk(branchName) {
+	if e.IsTrunkInternal(branchName) {
 		return true
 	}
 
@@ -398,7 +403,7 @@ func (e *engineImpl) SortBranchesTopologically(branches []string) []string {
 			depths[branch] = 0
 			return 0
 		}
-		if parent == "" || e.IsTrunk(parent) {
+		if parent == "" || e.IsTrunkInternal(parent) {
 			depths[branch] = 1
 			return 1
 		}

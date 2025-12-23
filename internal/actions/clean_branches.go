@@ -38,7 +38,8 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	var wg sync.WaitGroup
 
 	for _, branchName := range allTrackedBranches {
-		if eng.IsTrunk(branchName) {
+		branch := eng.GetBranch(branchName)
+		if branch.IsTrunk() {
 			continue
 		}
 		wg.Add(1)

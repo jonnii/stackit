@@ -112,7 +112,8 @@ func (e *engineImpl) TakeSnapshot(command string, args []string) error {
 	// Get all branch SHAs
 	branchSHAs := make(map[string]string)
 	for _, branchName := range e.branches {
-		sha, err := e.GetRevision(branchName)
+		branch := e.GetBranch(branchName)
+		sha, err := branch.GetRevision()
 		if err != nil {
 			// Skip branches that can't be resolved (might be deleted)
 			continue

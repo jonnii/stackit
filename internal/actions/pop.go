@@ -26,12 +26,13 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Check if on trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot pop trunk branch")
 	}
 
 	// Check if branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	if !currentBranchObj.IsTracked() {
 		return fmt.Errorf("cannot pop untracked branch %s", currentBranch)
 	}
 
@@ -47,12 +48,16 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 
 	// Get parent branch
 	parent := eng.GetParent(currentBranch)
-	if parent == "" {
-		parent = eng.Trunk()
+	parentName := ""
+	if parent == nil {
+		parentName = eng.Trunk().Name
+	} else {
+		parentName = parent.Name
 	}
 
 	// Get parent branch revision
-	parentRev, err := eng.GetRevision(parent)
+	parentBranch := eng.GetBranch(parentName)
+	parentRev, err := parentBranch.GetRevision()
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}
@@ -64,7 +69,7 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Checkout parent branch
-	if err := git.CheckoutBranch(ctx.Context, parent); err != nil {
+	if err := git.CheckoutBranch(ctx.Context, parentName); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
@@ -78,11 +83,11 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	if err == nil && hasStaged {
 		splog.Info("Popped branch %s. Changes are now staged on %s.",
 			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parent, false))
+			tui.ColorBranchName(parentName, false))
 	} else {
 		splog.Info("Popped branch %s. Switched to %s.",
 			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parent, false))
+			tui.ColorBranchName(parentName, false))
 	}
 
 	return nil

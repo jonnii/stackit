@@ -23,10 +23,11 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	// Default source to current branch
 	source := opts.Source
 	if source == "" {
-		source = eng.CurrentBranch()
-		if source == "" {
+		currentBranch := eng.CurrentBranch()
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no source branch specified")
 		}
+		source = currentBranch.Name
 	}
 
 	// Take snapshot before modifying the repository
@@ -43,12 +44,13 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Prevent moving trunk (check before tracking check since trunk might not be tracked)
-	if eng.IsTrunk(source) {
+	sourceBranch := eng.GetBranch(source)
+	if sourceBranch.IsTrunk() {
 		return fmt.Errorf("cannot move trunk branch")
 	}
 
 	// Validate source exists and is tracked
-	if !eng.IsBranchTracked(source) {
+	if !sourceBranch.IsTracked() {
 		return fmt.Errorf("branch %s is not tracked by Stackit", source)
 	}
 
@@ -59,12 +61,13 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Validate onto exists
-	if !eng.IsTrunk(onto) && !eng.IsBranchTracked(onto) {
+	ontoBranch := eng.GetBranch(onto)
+	if !ontoBranch.IsTrunk() && !ontoBranch.IsTracked() {
 		// Check if it's an untracked branch
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 		found := false
-		for _, b := range allBranches {
-			if b == onto {
+		for _, branch := range allBranches {
+			if branch.Name == onto {
 				found = true
 				break
 			}
@@ -80,21 +83,25 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Cycle detection: ensure onto is not a descendant of source
-	descendants := eng.GetRelativeStack(source, engine.Scope{
+	sourceBranch = eng.GetBranch(source)
+	descendants := sourceBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
 	})
 	for _, d := range descendants {
-		if d == onto {
+		if d.Name == onto {
 			return fmt.Errorf("cannot move %s onto its own descendant %s", source, onto)
 		}
 	}
 
 	// Get current parent for logging
 	oldParent := eng.GetParent(source)
-	if oldParent == "" {
-		oldParent = eng.Trunk()
+	oldParentName := ""
+	if oldParent == nil {
+		oldParentName = eng.Trunk().Name
+	} else {
+		oldParentName = oldParent.Name
 	}
 
 	// Update parent in engine
@@ -104,18 +111,23 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 
 	splog.Info("Moved %s from %s to %s.",
 		tui.ColorBranchName(source, true),
-		tui.ColorBranchName(oldParent, false),
+		tui.ColorBranchName(oldParentName, false),
 		tui.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
-	branchesToRestack := eng.GetRelativeStack(source, engine.Scope{
+	branchesToRestack := sourceBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
 	})
 
 	// Restack source and all its descendants
-	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	// Convert []Branch to []string
+	branchNamesToRestack := make([]string, len(branchesToRestack))
+	for i, b := range branchesToRestack {
+		branchNamesToRestack[i] = b.Name
+	}
+	if err := RestackBranches(gctx, branchNamesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

@@ -44,7 +44,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -58,14 +58,18 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Ensure branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch.Name)
+	if !currentBranchObj.IsTracked() {
 		// Auto-track the branch
-		parent := eng.GetParent(currentBranch)
-		if parent == "" {
+		parent := eng.GetParent(currentBranch.Name)
+		parentName := ""
+		if parent == nil {
 			// Try to find parent from git
-			parent = eng.Trunk()
+			parentName = eng.Trunk().Name
+		} else {
+			parentName = parent.Name
 		}
-		if err := eng.TrackBranch(context, currentBranch, parent); err != nil {
+		if err := eng.TrackBranch(context, currentBranch.Name, parentName); err != nil {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 	}
@@ -74,7 +78,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	style := opts.Style
 	if style == "" {
 		// Check if there's more than one commit
-		commits, err := eng.GetAllCommits(currentBranch, engine.CommitFormatSHA)
+		commits, err := currentBranch.GetAllCommits(engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits: %w", err)
 		}
@@ -83,7 +87,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 			// Prompt for style
 			var styleStr string
 			prompt := &survey.Select{
-				Message: fmt.Sprintf("How would you like to split %s?", currentBranch),
+				Message: fmt.Sprintf("How would you like to split %s?", currentBranch.Name),
 				Options: []string{"By commit - slice up the history of this branch", "By hunk - split into new single-commit branches", "Cancel"},
 			}
 			if err := survey.AskOne(prompt, &styleStr); err != nil {
@@ -108,14 +112,14 @@ func Action(ctx *runtime.Context, opts Options) error {
 	var result *Result
 	switch style {
 	case StyleCommit:
-		result, err = splitByCommit(context, currentBranch, eng, splog)
+		result, err = splitByCommit(context, currentBranch.Name, eng, splog)
 	case StyleHunk:
-		result, err = splitByHunk(context, currentBranch, eng, splog)
+		result, err = splitByHunk(context, currentBranch.Name, eng, splog)
 	case StyleFile:
 		pathspecs := opts.Pathspecs
 		// If no pathspecs provided, prompt interactively
 		if len(pathspecs) == 0 {
-			pathspecs, err = promptForFiles(context, currentBranch, eng, splog)
+			pathspecs, err = promptForFiles(context, currentBranch.Name, eng, splog)
 			if err != nil {
 				return err
 			}
@@ -125,7 +129,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(context, currentBranch, pathspecs, eng)
+		_, err = splitByFile(context, currentBranch.Name, pathspecs, eng)
 		if err != nil {
 			return err
 		}
@@ -135,9 +139,14 @@ func Action(ctx *runtime.Context, opts Options) error {
 			IncludeCurrent:    false,
 			RecursiveChildren: true,
 		}
-		upstackBranches := eng.GetRelativeStack(currentBranch, scope)
+		upstackBranches := currentBranch.GetRelativeStack(scope)
 		if len(upstackBranches) > 0 {
-			if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			// Convert []Branch to []string
+			upstackNames := make([]string, len(upstackBranches))
+			for i, b := range upstackBranches {
+				upstackNames[i] = b.Name
+			}
+			if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -156,11 +165,11 @@ func Action(ctx *runtime.Context, opts Options) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
+	upstackBranches := currentBranch.GetRelativeStack(scope)
 
 	// Apply the split
 	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{
-		BranchToSplit: currentBranch,
+		BranchToSplit: currentBranch.Name,
 		BranchNames:   result.BranchNames,
 		BranchPoints:  result.BranchPoints,
 	}); err != nil {
@@ -169,7 +178,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

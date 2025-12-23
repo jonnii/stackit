@@ -144,8 +144,8 @@ func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName st
 }
 
 // getRelativeStackUpstackInternal is the internal implementation without lock
-func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []string {
-	result := []string{}
+func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []Branch {
+	result := []Branch{}
 	visited := make(map[string]bool)
 
 	var collectDescendants func(string)
@@ -157,12 +157,12 @@ func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []string
 
 		// Don't include the starting branch
 		if branch != branchName {
-			result = append(result, branch)
+			result = append(result, Branch{Name: branch, Reader: e})
 		}
 
-		children := e.childrenMap[branch]
+		children := e.GetChildrenInternal(branch)
 		for _, child := range children {
-			collectDescendants(child)
+			collectDescendants(child.Name)
 		}
 	}
 

@@ -9,32 +9,97 @@ import (
 	"time"
 )
 
+// Branch represents a branch in the stack
+type Branch struct {
+	Name   string
+	Reader BranchReader
+}
+
+// IsTrunk checks if this branch is the trunk
+func (b Branch) IsTrunk() bool {
+	return b.Reader.IsTrunkInternal(b.Name)
+}
+
+// IsTracked checks if this branch is tracked (has metadata)
+func (b Branch) IsTracked() bool {
+	return b.Reader.IsBranchTrackedInternal(b.Name)
+}
+
+// GetChildren returns the children branches
+func (b Branch) GetChildren() []Branch {
+	return b.Reader.GetChildrenInternal(b.Name)
+}
+
+// GetParentPrecondition returns the parent branch name, or trunk if no parent
+// This is used for validation where we expect a parent to exist
+func (b Branch) GetParentPrecondition() string {
+	parent := b.Reader.GetParent(b.Name)
+	if parent == nil {
+		return b.Reader.Trunk().Name
+	}
+	return parent.Name
+}
+
+// IsBranchUpToDate checks if this branch is up to date with its parent
+// A branch is up to date if its parent revision matches the stored parent revision
+func (b Branch) IsBranchUpToDate() bool {
+	return b.Reader.IsBranchUpToDateInternal(b.Name)
+}
+
+// GetRelativeStack returns the stack relative to this branch
+func (b Branch) GetRelativeStack(scope Scope) []Branch {
+	return b.Reader.GetRelativeStackInternal(b.Name, scope)
+}
+
+// GetCommitDate returns the commit date for this branch
+func (b Branch) GetCommitDate() (time.Time, error) {
+	return b.Reader.GetCommitDateInternal(b.Name)
+}
+
+// GetCommitAuthor returns the commit author for this branch
+func (b Branch) GetCommitAuthor() (string, error) {
+	return b.Reader.GetCommitAuthorInternal(b.Name)
+}
+
+// GetRevision returns the SHA of this branch
+func (b Branch) GetRevision() (string, error) {
+	return b.Reader.GetRevisionInternal(b.Name)
+}
+
+// GetAllCommits returns commits for this branch in various formats
+func (b Branch) GetAllCommits(format CommitFormat) ([]string, error) {
+	return b.Reader.GetAllCommitsInternal(b.Name, format)
+}
+
 // BranchReader provides read-only access to branch information
 // Thread-safe: All methods are safe for concurrent use
 type BranchReader interface {
 	// State queries
-	AllBranchNames() []string
-	CurrentBranch() string
-	Trunk() string
-	GetParent(branchName string) string             // Returns empty string if no parent
-	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)
-	GetChildren(branchName string) []string
-	GetRelativeStack(branchName string, scope Scope) []string
-	IsTrunk(branchName string) bool
-	IsBranchTracked(branchName string) bool
-	IsBranchUpToDate(branchName string) bool
+	AllBranches() []Branch                          // Returns all branches
+	CurrentBranch() *Branch                         // Returns current branch (nil if not on a branch)
+	Trunk() Branch                                  // Returns the trunk branch
+	GetBranch(branchName string) Branch             // Returns a Branch wrapper
+	GetParent(branchName string) *Branch            // Returns nil if no parent
+	GetChildrenInternal(branchName string) []Branch // Internal method for Branch type
+	GetRelativeStack(branch Branch, scope Scope) []Branch
+
+	// Internal methods used by Branch type (exported so implementations outside this package can provide them)
+	IsTrunkInternal(branchName string) bool
+	IsBranchTrackedInternal(branchName string) bool
+	IsBranchUpToDateInternal(branchName string) bool                                // Internal method for Branch type
+	GetCommitDateInternal(branchName string) (time.Time, error)                     // Internal method for Branch type
+	GetCommitAuthorInternal(branchName string) (string, error)                      // Internal method for Branch type
+	GetRevisionInternal(branchName string) (string, error)                          // Internal method for Branch type
+	GetAllCommitsInternal(branchName string, format CommitFormat) ([]string, error) // Internal method for Branch type
+	GetRelativeStackInternal(branchName string, scope Scope) []Branch               // Internal method for Branch type
 
 	// Commit information
-	GetCommitDate(branchName string) (time.Time, error)
-	GetCommitAuthor(branchName string) (string, error)
-	GetRevision(branchName string) (string, error)
-	GetAllCommits(branchName string, format CommitFormat) ([]string, error)
 	FindBranchForCommit(commitSHA string) (string, error)
 
 	// Stack queries
-	GetRelativeStackUpstack(branchName string) []string
-	GetRelativeStackDownstack(branchName string) []string
-	GetFullStack(branchName string) []string
+	GetRelativeStackUpstack(branchName string) []Branch
+	GetRelativeStackDownstack(branchName string) []Branch
+	GetFullStack(branchName string) []Branch
 	SortBranchesTopologically(branches []string) []string
 	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
@@ -42,7 +107,7 @@ type BranchReader interface {
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 
 	// Traversal
-	BranchesDepthFirst(startBranch string) iter.Seq2[string, int]
+	BranchesDepthFirst(startBranch Branch) iter.Seq2[Branch, int]
 }
 
 // BranchWriter provides write operations for branch management

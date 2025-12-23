@@ -122,7 +122,7 @@ func (s *Scenario) Rebuild() *Scenario {
 	err := git.InitDefaultRepo()
 	require.NoError(s.T, err)
 	if s.Engine != nil {
-		err = s.Engine.Rebuild(s.Engine.Trunk())
+		err = s.Engine.Rebuild(s.Engine.Trunk().Name)
 		require.NoError(s.T, err)
 	}
 	return s
@@ -159,7 +159,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	s.T.Helper()
 
 	// Ensure we have an initial commit on main if it's the root
-	if s.Engine.Trunk() == "main" {
+	if s.Engine.Trunk().Name == "main" {
 		messages, _ := s.Scene.Repo.ListCurrentBranchCommitMessages()
 		if len(messages) == 0 {
 			s.WithInitialCommit()
@@ -170,7 +170,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	// For simplicity in tests, we'll just keep trying until all are created
 	// or we stop making progress.
 	created := make(map[string]bool)
-	created[s.Engine.Trunk()] = true
+	created[s.Engine.Trunk().Name] = true
 
 	for len(created) < len(structure)+1 {
 		progress := false
@@ -206,7 +206,11 @@ func (s *Scenario) ExpectStackStructure(expected map[string]string) *Scenario {
 	s.T.Helper()
 	for branch, expectedParent := range expected {
 		actualParent := s.Engine.GetParent(branch)
-		require.Equal(s.T, expectedParent, actualParent, "Parent of %s does not match", branch)
+		if actualParent == nil {
+			s.T.Errorf("Parent of %s is nil, expected %s", branch, expectedParent)
+			continue
+		}
+		require.Equal(s.T, expectedParent, actualParent.Name, "Parent of %s does not match", branch)
 	}
 	return s
 }
@@ -214,14 +218,14 @@ func (s *Scenario) ExpectStackStructure(expected map[string]string) *Scenario {
 // ExpectBranchFixed asserts that a branch is considered "fixed" (no restack needed) by the engine.
 func (s *Scenario) ExpectBranchFixed(branch string) *Scenario {
 	s.T.Helper()
-	require.True(s.T, s.Engine.IsBranchUpToDate(branch), "Branch %s should be up to date", branch)
+	require.True(s.T, s.Engine.GetBranch(branch).IsBranchUpToDate(), "Branch %s should be up to date", branch)
 	return s
 }
 
 // ExpectBranchNotFixed asserts that a branch is NOT considered "fixed" by the engine.
 func (s *Scenario) ExpectBranchNotFixed(branch string) *Scenario {
 	s.T.Helper()
-	require.False(s.T, s.Engine.IsBranchUpToDate(branch), "Branch %s should NOT be up to date", branch)
+	require.False(s.T, s.Engine.GetBranch(branch).IsBranchUpToDate(), "Branch %s should NOT be up to date", branch)
 	return s
 }
 

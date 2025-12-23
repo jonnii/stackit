@@ -140,7 +140,8 @@ func (e *engineImpl) DetachAndResetBranchChanges(ctx context.Context, branchName
 	defer e.mu.Unlock()
 
 	// Get branch revision
-	branchRevision, err := e.GetRevision(branchName)
+	branch := e.GetBranch(branchName)
+	branchRevision, err := branch.GetRevision()
 	if err != nil {
 		return fmt.Errorf("failed to get branch revision: %w", err)
 	}

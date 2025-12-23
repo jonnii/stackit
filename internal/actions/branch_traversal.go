@@ -24,20 +24,20 @@ const (
 // SwitchBranchAction switches to a branch based on the given direction
 func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 	currentBranch := ctx.Engine.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch == nil {
 		return errors.ErrNotOnBranch
 	}
 
-	ctx.Splog.Info("%s", currentBranch)
+	ctx.Splog.Info("%s", currentBranch.Name)
 
 	var targetBranch string
 	var err error
 
 	switch direction {
 	case DirectionBottom:
-		targetBranch = traverseDownward(currentBranch, ctx)
+		targetBranch = traverseDownward(currentBranch.Name, ctx)
 	case DirectionTop:
-		targetBranch, err = traverseUpward(currentBranch, ctx)
+		targetBranch, err = traverseUpward(currentBranch.Name, ctx)
 		if err != nil {
 			return err
 		}
@@ -45,7 +45,7 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 		return fmt.Errorf("invalid direction: %s", direction)
 	}
 
-	if targetBranch == currentBranch {
+	if targetBranch == currentBranch.Name {
 		directionText := "bottom most"
 		if direction == DirectionTop {
 			directionText = "top most"
@@ -65,28 +65,30 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 
 // traverseDownward walks down the parent chain to find the first branch from trunk
 func traverseDownward(currentBranch string, ctx *runtime.Context) string {
-	if ctx.Engine.IsTrunk(currentBranch) {
+	currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return currentBranch
 	}
 
 	parent := ctx.Engine.GetParent(currentBranch)
-	if parent == "" {
+	if parent == nil {
 		// No parent, we're at the bottom
 		return currentBranch
 	}
 
 	// If parent is trunk, we're at the first branch from trunk
-	if ctx.Engine.IsTrunk(parent) {
+	if parent.IsTrunk() {
 		return currentBranch
 	}
 
-	ctx.Splog.Info("⮑  %s", parent)
-	return traverseDownward(parent, ctx)
+	ctx.Splog.Info("⮑  %s", parent.Name)
+	return traverseDownward(parent.Name, ctx)
 }
 
 // traverseUpward walks up the children chain to find the tip branch
 func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) {
-	children := ctx.Engine.GetChildren(currentBranch)
+	currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+	children := currentBranchObj.GetChildren()
 	if len(children) == 0 {
 		// No children, we're at the tip
 		return currentBranch, nil
@@ -97,10 +99,14 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 
 	if len(children) == 1 {
 		// Single child, follow it
-		nextBranch = children[0]
+		nextBranch = children[0].Name
 	} else {
 		// Multiple children, prompt user
-		nextBranch, err = handleMultipleChildren(children)
+		childNames := make([]string, len(children))
+		for i, c := range children {
+			childNames[i] = c.Name
+		}
+		nextBranch, err = handleMultipleChildren(childNames)
 		if err != nil {
 			return "", err
 		}

@@ -118,7 +118,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	// Collect stack state
 	trunk := eng.Trunk()
 	currentBranch := eng.CurrentBranch()
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
 
 	// Get all metadata refs
 	metadataRefs, err := git.GetMetadataRefList()
@@ -128,29 +128,36 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
-	for _, branchName := range allBranches {
+	for _, branch := range allBranches {
+		branchName := branch.Name
 		branchInfo := BranchInfo{
 			Name:      branchName,
-			IsTrunk:   eng.IsTrunk(branchName),
-			IsTracked: eng.IsBranchTracked(branchName),
+			IsTrunk:   branch.IsTrunk(),
+			IsTracked: branch.IsTracked(),
 		}
 
 		// Get SHA
-		sha, err := eng.GetRevision(branchName)
+		branch := eng.GetBranch(branchName)
+		sha, err := branch.GetRevision()
 		if err == nil {
 			branchInfo.SHA = sha
 		}
 
 		// Get parent
 		parent := eng.GetParent(branchName)
-		if parent != "" {
-			branchInfo.Parent = parent
+		if parent != nil {
+			branchInfo.Parent = parent.Name
 		}
 
 		// Get children
-		children := eng.GetChildren(branchName)
+		branch = eng.GetBranch(branchName)
+		children := branch.GetChildren()
 		if len(children) > 0 {
-			branchInfo.Children = children
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			branchInfo.Children = childNames
 		}
 
 		// Get metadata
@@ -182,7 +189,8 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 		// Check if branch is up to date with its parent
 		if !branchInfo.IsTrunk {
-			branchInfo.IsFixed = eng.IsBranchUpToDate(branchName)
+			branch := eng.GetBranch(branchName)
+			branchInfo.IsFixed = branch.IsBranchUpToDate()
 		} else {
 			branchInfo.IsFixed = true // Trunk is always up to date
 		}
@@ -216,9 +224,14 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		Timestamp:      time.Now(),
 		RecentCommands: recentCommands,
 		StackState: StackStateInfo{
-			Trunk:         trunk,
-			CurrentBranch: currentBranch,
-			Branches:      branchInfos,
+			Trunk: trunk.Name,
+			CurrentBranch: func() string {
+				if currentBranch != nil {
+					return currentBranch.Name
+				}
+				return ""
+			}(),
+			Branches: branchInfos,
 		},
 		ContinuationState: continuationState,
 		RepositoryInfo:    repoInfo,

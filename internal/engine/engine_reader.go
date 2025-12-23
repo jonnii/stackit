@@ -9,15 +9,19 @@ import (
 	"stackit.dev/stackit/internal/git"
 )
 
-// AllBranchNames returns all branch names
-func (e *engineImpl) AllBranchNames() []string {
+// AllBranches returns all branches
+func (e *engineImpl) AllBranches() []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.branches
+	branches := make([]Branch, len(e.branches))
+	for i, name := range e.branches {
+		branches[i] = Branch{Name: name, Reader: e}
+	}
+	return branches
 }
 
-// CurrentBranch returns the current branch name
-func (e *engineImpl) CurrentBranch() string {
+// CurrentBranch returns the current branch (nil if not on a branch)
+func (e *engineImpl) CurrentBranch() *Branch {
 	e.mu.Lock()
 	if current, err := git.GetCurrentBranch(); err == nil {
 		e.currentBranch = current
@@ -29,50 +33,62 @@ func (e *engineImpl) CurrentBranch() string {
 
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.currentBranch
+	if e.currentBranch == "" {
+		return nil
+	}
+	return &Branch{Name: e.currentBranch, Reader: e}
 }
 
-// Trunk returns the trunk branch name
-func (e *engineImpl) Trunk() string {
+// Trunk returns the trunk branch
+func (e *engineImpl) Trunk() Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.trunk
+	return Branch{Name: e.trunk, Reader: e}
 }
 
-// GetParent returns the parent branch name (empty string if no parent)
-func (e *engineImpl) GetParent(branchName string) string {
+// GetBranch returns a Branch wrapper for the given branch name
+func (e *engineImpl) GetBranch(branchName string) Branch {
+	return Branch{Name: branchName, Reader: e}
+}
+
+// GetParent returns the parent branch (nil if no parent)
+func (e *engineImpl) GetParent(branchName string) *Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	if parent, ok := e.parentMap[branchName]; ok {
-		return parent
+		return &Branch{Name: parent, Reader: e}
 	}
-	return ""
+	return nil
 }
 
-// GetChildren returns the children branches
-func (e *engineImpl) GetChildren(branchName string) []string {
+// GetChildrenInternal returns the children branches (internal method for Branch type)
+func (e *engineImpl) GetChildrenInternal(branchName string) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	if children, ok := e.childrenMap[branchName]; ok {
-		return children
+		branches := make([]Branch, len(children))
+		for i, name := range children {
+			branches[i] = Branch{Name: name, Reader: e}
+		}
+		return branches
 	}
-	return []string{}
+	return []Branch{}
 }
 
 // GetRelativeStack returns the stack relative to a branch
 // Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
-func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
+func (e *engineImpl) GetRelativeStack(branch Branch, scope Scope) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	result := []string{}
+	result := []Branch{}
 
 	// Add ancestors if RecursiveParents is true (excluding trunk)
 	if scope.RecursiveParents {
-		current := branchName
-		ancestors := []string{}
+		current := branch.Name
+		ancestors := []Branch{}
 		for {
 			if current == e.trunk {
 				break
@@ -81,7 +97,7 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 			if !ok || parent == e.trunk {
 				break
 			}
-			ancestors = append([]string{parent}, ancestors...)
+			ancestors = append([]Branch{{Name: parent, Reader: e}}, ancestors...)
 			current = parent
 		}
 		result = append(result, ancestors...)
@@ -89,7 +105,47 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 
 	// Add current branch if IncludeCurrent is true
 	if scope.IncludeCurrent {
-		result = append(result, branchName)
+		result = append(result, branch)
+	}
+
+	// Add descendants if RecursiveChildren is true
+	if scope.RecursiveChildren {
+		descendants := e.getRelativeStackUpstackInternal(branch.Name)
+		result = append(result, descendants...)
+	}
+
+	return result
+}
+
+// GetRelativeStackInternal returns the stack relative to a branch (internal method used by Branch type)
+// Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
+func (e *engineImpl) GetRelativeStackInternal(branchName string, scope Scope) []Branch {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	result := []Branch{}
+
+	// Add ancestors if RecursiveParents is true (excluding trunk)
+	if scope.RecursiveParents {
+		current := branchName
+		ancestors := []Branch{}
+		for {
+			if current == e.trunk {
+				break
+			}
+			parent, ok := e.parentMap[current]
+			if !ok || parent == e.trunk {
+				break
+			}
+			ancestors = append([]Branch{{Name: parent, Reader: e}}, ancestors...)
+			current = parent
+		}
+		result = append(result, ancestors...)
+	}
+
+	// Add current branch if IncludeCurrent is true
+	if scope.IncludeCurrent {
+		result = append(result, Branch{Name: branchName, Reader: e})
 	}
 
 	// Add descendants if RecursiveChildren is true
@@ -101,25 +157,25 @@ func (e *engineImpl) GetRelativeStack(branchName string, scope Scope) []string {
 	return result
 }
 
-// IsTrunk checks if a branch is the trunk
-func (e *engineImpl) IsTrunk(branchName string) bool {
+// IsTrunkInternal checks if a branch is the trunk (internal method used by Branch type)
+func (e *engineImpl) IsTrunkInternal(branchName string) bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return branchName == e.trunk
 }
 
-// IsBranchTracked checks if a branch is tracked (has metadata)
-func (e *engineImpl) IsBranchTracked(branchName string) bool {
+// IsBranchTrackedInternal checks if a branch is tracked (has metadata) (internal method used by Branch type)
+func (e *engineImpl) IsBranchTrackedInternal(branchName string) bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	_, ok := e.parentMap[branchName]
 	return ok
 }
 
-// IsBranchUpToDate checks if a branch is up to date with its parent
+// IsBranchUpToDateInternal checks if a branch is up to date with its parent
 // A branch is up to date if its parent revision matches the stored parent revision
-func (e *engineImpl) IsBranchUpToDate(branchName string) bool {
-	if e.IsTrunk(branchName) {
+func (e *engineImpl) IsBranchUpToDateInternal(branchName string) bool {
+	if e.IsTrunkInternal(branchName) {
 		return true
 	}
 
@@ -151,29 +207,19 @@ func (e *engineImpl) IsBranchUpToDate(branchName string) bool {
 	return *meta.ParentBranchRevision == parentRev
 }
 
-// GetCommitDate returns the commit date for a branch
-func (e *engineImpl) GetCommitDate(branchName string) (time.Time, error) {
+// GetCommitDateInternal returns the commit date for a branch
+func (e *engineImpl) GetCommitDateInternal(branchName string) (time.Time, error) {
 	return git.GetCommitDate(branchName)
 }
 
-// GetCommitAuthor returns the commit author for a branch
-func (e *engineImpl) GetCommitAuthor(branchName string) (string, error) {
+// GetCommitAuthorInternal returns the commit author for a branch
+func (e *engineImpl) GetCommitAuthorInternal(branchName string) (string, error) {
 	return git.GetCommitAuthor(branchName)
 }
 
-// GetRevision returns the SHA of a branch
-func (e *engineImpl) GetRevision(branchName string) (string, error) {
+// GetRevisionInternal returns the SHA of a branch
+func (e *engineImpl) GetRevisionInternal(branchName string) (string, error) {
 	return git.GetRevision(branchName)
-}
-
-// GetParentPrecondition returns the parent branch, or trunk if no parent
-// This is used for validation where we expect a parent to exist
-func (e *engineImpl) GetParentPrecondition(branchName string) string {
-	parent := e.GetParent(branchName)
-	if parent == "" {
-		return e.Trunk()
-	}
-	return parent
 }
 
 // BranchMatchesRemote checks if a branch matches its remote
@@ -182,7 +228,7 @@ func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
 	defer e.mu.RUnlock()
 
 	// Get local branch SHA
-	localSha, err := e.GetRevision(branchName)
+	localSha, err := e.GetRevisionInternal(branchName)
 	if err != nil {
 		return false, nil
 	}
@@ -218,7 +264,7 @@ func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool
 	}
 
 	// Get parent revision
-	parentRev, err := e.GetRevision(parent)
+	parentRev, err := e.GetRevisionInternal(parent)
 	if err != nil {
 		return false, err
 	}
@@ -295,7 +341,7 @@ func (e *engineImpl) FindBranchForCommit(commitSHA string) (string, error) {
 	e.mu.RUnlock()
 
 	for _, branchName := range branches {
-		commits, err := e.GetAllCommits(branchName, CommitFormatSHA)
+		commits, err := e.GetAllCommitsInternal(branchName, CommitFormatSHA)
 		if err != nil {
 			continue
 		}
@@ -310,15 +356,15 @@ func (e *engineImpl) FindBranchForCommit(commitSHA string) (string, error) {
 	return "", nil
 }
 
-// GetAllCommits returns commits for a branch in various formats
-func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]string, error) {
+// GetAllCommitsInternal returns commits for a branch in various formats
+func (e *engineImpl) GetAllCommitsInternal(branchName string, format CommitFormat) ([]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	// Check if branch is trunk
 	if branchName == e.trunk {
 		// For trunk, get just the one commit
-		branchRevision, err := e.GetRevision(branchName)
+		branchRevision, err := e.GetRevisionInternal(branchName)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +378,7 @@ func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]st
 	}
 
 	// Get branch revision
-	branchRevision, err := e.GetRevision(branchName)
+	branchRevision, err := e.GetRevisionInternal(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +393,7 @@ func (e *engineImpl) GetAllCommits(branchName string, format CommitFormat) ([]st
 }
 
 // GetRelativeStackUpstack returns all branches in the upstack (descendants)
-func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
+func (e *engineImpl) GetRelativeStackUpstack(branchName string) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -355,23 +401,23 @@ func (e *engineImpl) GetRelativeStackUpstack(branchName string) []string {
 }
 
 // GetRelativeStackDownstack returns all branches in the downstack (ancestors)
-func (e *engineImpl) GetRelativeStackDownstack(branchName string) []string {
+func (e *engineImpl) GetRelativeStackDownstack(branchName string) []Branch {
 	scope := Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    false,
 		RecursiveChildren: false,
 	}
-	return e.GetRelativeStack(branchName, scope)
+	return e.GetRelativeStackInternal(branchName, scope)
 }
 
 // GetFullStack returns the entire stack containing the branch
-func (e *engineImpl) GetFullStack(branchName string) []string {
+func (e *engineImpl) GetFullStack(branchName string) []Branch {
 	scope := Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    true,
 		RecursiveChildren: true,
 	}
-	return e.GetRelativeStack(branchName, scope)
+	return e.GetRelativeStackInternal(branchName, scope)
 }
 
 // SortBranchesTopologically sorts branches so parents come before children.
@@ -398,7 +444,7 @@ func (e *engineImpl) SortBranchesTopologically(branches []string) []string {
 			depths[branch] = 0
 			return 0
 		}
-		if parent == "" || e.IsTrunk(parent) {
+		if parent == "" || e.IsTrunkInternal(parent) {
 			depths[branch] = 1
 			return 1
 		}
@@ -440,7 +486,7 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 		if prInfo.State == prStateMerged {
 			base := prInfo.Base
 			if base == "" {
-				base = e.Trunk()
+				base = e.Trunk().Name
 			}
 			return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, base)}, nil
 		}
@@ -449,7 +495,7 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 	// Check if merged into trunk
 	merged, err := e.IsMergedIntoTrunk(ctx, branchName)
 	if err == nil && merged {
-		return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, e.Trunk())}, nil
+		return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, e.Trunk().Name)}, nil
 	}
 
 	// Check if empty
@@ -467,8 +513,8 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 // BranchesDepthFirst returns an iterator that yields branches starting from startBranch in depth-first order.
 // Each iteration yields (branchName, depth) where depth is 0 for the start branch.
 // The iterator can be used with range loops and supports early termination with break.
-func (e *engineImpl) BranchesDepthFirst(startBranch string) iter.Seq2[string, int] {
-	return func(yield func(string, int) bool) {
+func (e *engineImpl) BranchesDepthFirst(startBranch Branch) iter.Seq2[Branch, int] {
+	return func(yield func(Branch, int) bool) {
 		visited := make(map[string]bool)
 		var visit func(branch string, depth int) bool
 		visit = func(branch string, depth int) bool {
@@ -477,19 +523,19 @@ func (e *engineImpl) BranchesDepthFirst(startBranch string) iter.Seq2[string, in
 			}
 			visited[branch] = true
 
-			if !yield(branch, depth) {
+			if !yield(Branch{Name: branch, Reader: e}, depth) {
 				return false // iterator wants to stop
 			}
 
-			children := e.GetChildren(branch)
+			children := e.GetChildrenInternal(branch)
 			for _, child := range children {
-				if !visit(child, depth+1) {
+				if !visit(child.Name, depth+1) {
 					return false
 				}
 			}
 			return true
 		}
 
-		visit(startBranch, 0)
+		visit(startBranch.Name, 0)
 	}
 }

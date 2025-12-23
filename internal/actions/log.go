@@ -25,14 +25,34 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	}
 
 	// Create tree renderer
+	currentBranch := ctx.Engine.CurrentBranch()
+	trunk := ctx.Engine.Trunk()
+	currentBranchName := ""
+	if currentBranch != nil {
+		currentBranchName = currentBranch.Name
+	}
 	renderer := tui.NewStackTreeRenderer(
-		ctx.Engine.CurrentBranch(),
-		ctx.Engine.Trunk(),
-		ctx.Engine.GetChildren,
-		ctx.Engine.GetParent,
-		ctx.Engine.IsTrunk,
+		currentBranchName,
+		trunk.Name,
+		func(branchName string) []string {
+			branch := ctx.Engine.GetBranch(branchName)
+			children := branch.GetChildren()
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			return childNames
+		},
+		func(branchName string) string {
+			parent := ctx.Engine.GetParent(branchName)
+			if parent == nil {
+				return ""
+			}
+			return parent.Name
+		},
+		func(branchName string) bool { return ctx.Engine.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
-			return ctx.Engine.IsBranchUpToDate(branchName)
+			return ctx.Engine.GetBranch(branchName).IsBranchUpToDate()
 		},
 	)
 
@@ -62,8 +82,9 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 
 func getUntrackedBranchNames(ctx *runtime.Context) []string {
 	var untracked []string
-	for _, branchName := range ctx.Engine.AllBranchNames() {
-		if !ctx.Engine.IsTrunk(branchName) && !ctx.Engine.IsBranchTracked(branchName) {
+	for _, branch := range ctx.Engine.AllBranches() {
+		branchName := branch.Name
+		if !branch.IsTrunk() && !branch.IsTracked() {
 			untracked = append(untracked, branchName)
 		}
 	}

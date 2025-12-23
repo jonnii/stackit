@@ -83,7 +83,7 @@ func (e *engineImpl) TrackBranch(ctx context.Context, branchName string, parentB
 
 // UntrackBranch stops tracking a branch by deleting its metadata
 func (e *engineImpl) UntrackBranch(branchName string) error {
-	if e.IsTrunk(branchName) {
+	if e.IsTrunkInternal(branchName) {
 		return fmt.Errorf("cannot untrack trunk branch")
 	}
 
@@ -101,7 +101,7 @@ func (e *engineImpl) UntrackBranch(branchName string) error {
 
 // DeleteBranch deletes a branch and its metadata
 func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error {
-	if e.IsTrunk(branchName) {
+	if e.IsTrunkInternal(branchName) {
 		return fmt.Errorf("cannot delete trunk branch")
 	}
 
@@ -174,8 +174,9 @@ func (e *engineImpl) DeleteBranches(ctx context.Context, branchNames []string) (
 	toDeleteSet := make(map[string]bool)
 	for _, b := range branchNames {
 		toDeleteSet[b] = true
-		for _, child := range e.GetChildren(b) {
-			allChildren[child] = true
+		children := e.GetChildrenInternal(b)
+		for _, child := range children {
+			allChildren[child.Name] = true
 		}
 	}
 

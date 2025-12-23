@@ -43,10 +43,12 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// branch1 should be deleted
-		require.False(t, s.Engine.IsBranchTracked("branch1"))
+		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 
 		// branch2 should have new parent (main)
-		require.Equal(t, "main", s.Engine.GetParent("branch2"))
+		parent2 := s.Engine.GetParent("branch2")
+		require.NotNil(t, parent2)
+		require.Equal(t, "main", parent2.Name)
 		require.Contains(t, result.BranchesWithNewParents, "branch2")
 	})
 
@@ -81,8 +83,12 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both children should have new parent
-		require.Equal(t, "main", s.Engine.GetParent("branch2"))
-		require.Equal(t, "main", s.Engine.GetParent("branch3"))
+		parent2 := s.Engine.GetParent("branch2")
+		require.NotNil(t, parent2)
+		require.Equal(t, "main", parent2.Name)
+		parent3 := s.Engine.GetParent("branch3")
+		require.NotNil(t, parent3)
+		require.Equal(t, "main", parent3.Name)
 		require.Contains(t, result.BranchesWithNewParents, "branch2")
 		require.Contains(t, result.BranchesWithNewParents, "branch3")
 	})
@@ -99,7 +105,7 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch should still exist
-		require.True(t, s.Engine.IsBranchTracked("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
 		require.Empty(t, result.BranchesWithNewParents)
 	})
 }

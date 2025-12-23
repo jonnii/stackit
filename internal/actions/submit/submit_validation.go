@@ -50,17 +50,19 @@ func validateBaseRevisions(branches []string, eng engine.Engine, runtimeCtx *run
 	validatedBranches := make(map[string]bool)
 
 	for _, branchName := range branches {
-		parentBranchName := eng.GetParentPrecondition(branchName)
+		branch := eng.GetBranch(branchName)
+		parentBranchName := branch.GetParentPrecondition()
 
+		parentBranch := eng.GetBranch(parentBranchName)
 		switch {
-		case eng.IsTrunk(parentBranchName):
-			if !eng.IsBranchUpToDate(branchName) {
+		case parentBranch.IsTrunk():
+			if !branch.IsBranchUpToDate() {
 				runtimeCtx.Splog.Info("Note that %s has fallen behind trunk. You may encounter conflicts if you attempt to merge it.",
 					tui.ColorBranchName(branchName, false))
 			}
 		case validatedBranches[parentBranchName]:
 			// Parent is in the submission list
-			if !eng.IsBranchUpToDate(branchName) {
+			if !branch.IsBranchUpToDate() {
 				return fmt.Errorf("you are trying to submit at least one branch that has not been restacked on its parent. To resolve this, check out %s and run 'stackit restack'",
 					tui.ColorBranchName(branchName, false))
 			}

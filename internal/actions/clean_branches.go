@@ -28,7 +28,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	c := ctx.Context
 
 	// Pre-calculate which branches should be deleted in parallel
-	allTrackedBranches := eng.AllBranchNames()
+	allTrackedBranches := eng.AllBranches()
 	type deleteStatus struct {
 		shouldDelete bool
 		reason       string
@@ -37,8 +37,9 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, branchName := range allTrackedBranches {
-		if eng.IsTrunk(branchName) {
+	for _, branch := range allTrackedBranches {
+		branchName := branch.Name
+		if branch.IsTrunk() {
 			continue
 		}
 		wg.Add(1)
@@ -53,7 +54,12 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	wg.Wait()
 
 	// Start from trunk children
-	branchesToProcess := eng.GetChildren(eng.Trunk())
+	trunk := eng.Trunk()
+	trunkChildren := trunk.GetChildren()
+	branchesToProcess := make([]string, len(trunkChildren))
+	for i, c := range trunkChildren {
+		branchesToProcess[i] = c.Name
+	}
 	branchesToDelete := make(map[string]map[string]bool) // branch -> set of blocking children
 	branchesWithNewParents := []string{}
 
@@ -71,14 +77,17 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 		// Use pre-calculated status
 		status := deleteStatuses[branchName]
 		if status.shouldDelete {
-			children := eng.GetChildren(branchName)
+			branch := eng.GetBranch(branchName)
+			children := branch.GetChildren()
 			// Add children to process (DFS)
-			branchesToProcess = append(branchesToProcess, children...)
+			for _, child := range children {
+				branchesToProcess = append(branchesToProcess, child.Name)
+			}
 
 			// Mark for deletion with blockers
 			blockers := make(map[string]bool)
 			for _, child := range children {
-				blockers[child] = true
+				blockers[child.Name] = true
 			}
 			branchesToDelete[branchName] = blockers
 
@@ -87,38 +96,41 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 			// Branch is not being deleted
 			// If its parent IS being deleted, update parent
 			parent := eng.GetParent(branchName)
-			if parent == "" {
-				parent = eng.Trunk()
+			parentName := ""
+			if parent == nil {
+				parentName = eng.Trunk().Name
+			} else {
+				parentName = parent.Name
 			}
 
 			// Find nearest ancestor that isn't being deleted
-			newParent := parent
+			newParentName := parentName
 			for {
-				if _, isDeleting := branchesToDelete[newParent]; !isDeleting {
+				if _, isDeleting := branchesToDelete[newParentName]; !isDeleting {
 					break
 				}
-				ancestor := eng.GetParent(newParent)
-				if ancestor == "" {
-					newParent = eng.Trunk()
+				ancestor := eng.GetParent(newParentName)
+				if ancestor == nil {
+					newParentName = eng.Trunk().Name
 					break
 				}
-				newParent = ancestor
+				newParentName = ancestor.Name
 			}
 
 			// If parent changed, update it
-			if newParent != parent {
-				if err := eng.SetParent(c, branchName, newParent); err != nil {
+			if newParentName != parentName {
+				if err := eng.SetParent(c, branchName, newParentName); err != nil {
 					return nil, fmt.Errorf("failed to set parent for %s: %w", branchName, err)
 				}
 				splog.Info("Set parent of %s to %s.",
 					tui.ColorBranchName(branchName, false),
-					tui.ColorBranchName(newParent, false))
+					tui.ColorBranchName(newParentName, false))
 				branchesWithNewParents = append(branchesWithNewParents, branchName)
 
 				// Remove this branch as a blocker for its old parent
-				if blockers, ok := branchesToDelete[parent]; ok {
+				if blockers, ok := branchesToDelete[parentName]; ok {
 					delete(blockers, branchName)
-					branchesToDelete[parent] = blockers
+					branchesToDelete[parentName] = blockers
 				}
 			}
 		}
@@ -138,8 +150,11 @@ func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[s
 		if len(blockers) == 0 {
 			// No blockers, safe to delete
 			parent := eng.GetParent(branchName)
-			if parent == "" {
-				parent = eng.Trunk()
+			parentName := ""
+			if parent == nil {
+				parentName = eng.Trunk().Name
+			} else {
+				parentName = parent.Name
 			}
 
 			// Delete the branch
@@ -154,9 +169,9 @@ func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[s
 			delete(branchesToDelete, branchName)
 
 			// Remove this branch as a blocker for its parent
-			if parentBlockers, ok := branchesToDelete[parent]; ok {
+			if parentBlockers, ok := branchesToDelete[parentName]; ok {
 				delete(parentBlockers, branchName)
-				branchesToDelete[parent] = parentBlockers
+				branchesToDelete[parentName] = parentBlockers
 			}
 
 			// Recursively check if parent is now unblocked

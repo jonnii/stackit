@@ -49,10 +49,11 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			// Determine target branch
 			targetBranch := branch
 			if targetBranch == "" {
-				targetBranch = ctx.Engine.CurrentBranch()
-				if targetBranch == "" {
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch == nil {
 					return fmt.Errorf("not on a branch and --branch not specified")
 				}
+				targetBranch = currentBranch.Name
 			}
 
 			// Determine scope based on flags

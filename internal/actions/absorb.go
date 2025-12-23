@@ -27,7 +27,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -93,16 +93,16 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get all commits downstack from current branch
 	// We need commits from all branches downstack, not just current branch
-	downstackBranches := eng.GetRelativeStackDownstack(currentBranch)
+	downstackBranches := eng.GetRelativeStackDownstack(currentBranch.Name)
 	// Include current branch
-	downstackBranches = append([]string{currentBranch}, downstackBranches...)
+	downstackBranches = append([]engine.Branch{*currentBranch}, downstackBranches...)
 
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}
-	for _, branchName := range downstackBranches {
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatSHA)
+	for _, branch := range downstackBranches {
+		commits, err := branch.GetAllCommits(engine.CommitFormatSHA)
 		if err != nil {
-			return fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
+			return fmt.Errorf("failed to get commits for branch %s: %w", branch.Name, err)
 		}
 		// Commits are returned oldest to newest, but we want newest to oldest for search
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -244,7 +244,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		upstackBranches := eng.GetRelativeStackUpstack(oldestModifiedBranch)
 
 		if len(upstackBranches) > 0 {
-			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			// Convert []Branch to []string
+			upstackNames := make([]string, len(upstackBranches))
+			for i, b := range upstackBranches {
+				upstackNames[i] = b.Name
+			}
+			if err := RestackBranches(ctx.Context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -266,7 +271,8 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 		}
 
 		// Get commit message - show first commit message from the branch
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
+		branch := eng.GetBranch(branchName)
+		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
 			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])

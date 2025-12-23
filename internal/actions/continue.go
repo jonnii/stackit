@@ -35,21 +35,25 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		// Try to continue the rebase anyway (user might have started it manually)
 		// But we need a rebasedBranchBase - try to get it from current branch's parent
 		currentBranch := eng.CurrentBranch()
-		if currentBranch == "" {
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch")
 		}
-		parent := eng.GetParent(currentBranch)
-		if parent == "" {
-			parent = eng.Trunk()
+		parent := eng.GetParent(currentBranch.Name)
+		parentName := ""
+		if parent == nil {
+			parentName = eng.Trunk().Name
+		} else {
+			parentName = parent.Name
 		}
-		parentRev, err := eng.GetRevision(parent)
+		parentBranch := eng.GetBranch(parentName)
+		parentRev, err := parentBranch.GetRevision()
 		if err != nil {
 			return fmt.Errorf("failed to get parent revision: %w", err)
 		}
 		continuation = &config.ContinuationState{
 			RebasedBranchBase:     parentRev,
 			BranchesToRestack:     []string{},
-			CurrentBranchOverride: currentBranch,
+			CurrentBranchOverride: currentBranch.Name,
 		}
 	}
 
@@ -75,7 +79,11 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		// Get current branch name for conflict status
 		branchName := result.BranchName
 		if branchName == "" {
-			branchName = eng.CurrentBranch()
+			currentBranch := eng.CurrentBranch()
+			if currentBranch == nil {
+				return fmt.Errorf("not on a branch")
+			}
+			branchName = currentBranch.Name
 		}
 		if err := PrintConflictStatus(ctx.Context, branchName, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)

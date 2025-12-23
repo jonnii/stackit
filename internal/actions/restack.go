@@ -17,11 +17,18 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	splog := ctx.Splog
 
 	// Get branches to restack based on scope
-	branches := eng.GetRelativeStack(opts.BranchName, opts.Scope)
+	branch := eng.GetBranch(opts.BranchName)
+	branches := branch.GetRelativeStack(opts.Scope)
 
 	if len(branches) == 0 {
 		splog.Info("No branches to restack.")
 		return nil
+	}
+
+	// Convert []Branch to []string for RestackBranches
+	branchNames := make([]string, len(branches))
+	for i, branch := range branches {
+		branchNames[i] = branch.Name
 	}
 
 	// Take snapshot before modifying the repository
@@ -35,5 +42,5 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	}
 
 	// Call RestackBranches (from common.go)
-	return RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot)
+	return RestackBranches(ctx.Context, branchNames, eng, splog, ctx.RepoRoot)
 }

@@ -25,15 +25,15 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 	if opts.Parent != "" {
 		parent := opts.Parent
 		// Validate parent exists (refresh branch list if needed)
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 		parentExists := false
-		for _, name := range allBranches {
-			if name == parent {
+		for _, branch := range allBranches {
+			if branch.Name == parent {
 				parentExists = true
 				break
 			}
 		}
-		if !parentExists && parent != eng.Trunk() {
+		if !parentExists && parent != eng.Trunk().Name {
 			// Refresh branches list and check again
 			branches, err := git.GetAllBranchNames()
 			if err == nil {
@@ -51,7 +51,8 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 		}
 
 		// Validate parent is tracked (or is trunk)
-		if !eng.IsTrunk(parent) && !eng.IsBranchTracked(parent) {
+		parentBranch := eng.GetBranch(parent)
+		if !parentBranch.IsTrunk() && !parentBranch.IsTracked() {
 			return fmt.Errorf("parent branch %s must be tracked (or be trunk)", parent)
 		}
 
@@ -108,14 +109,15 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	eng := ctx.Engine
 
 	// Check if branch is already tracked
-	if eng.IsBranchTracked(branchName) {
+	branch := eng.GetBranch(branchName)
+	if branch.IsTracked() {
 		ctx.Splog.Info("%s is already tracked.", tui.ColorBranchName(branchName, false))
 		// Still ask if user wants to track descendants
 	} else {
 		// Try auto-detection (single unambiguous non-trunk tracked ancestor)
 		var parentBranch string
 		ancestors, err := eng.FindMostRecentTrackedAncestors(ctx.Context, branchName)
-		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk() {
+		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().Name {
 			parentBranch = ancestors[0]
 			ctx.Splog.Info("Auto-detected parent %s for %s.", tui.ColorBranchName(parentBranch, false), tui.ColorBranchName(branchName, false))
 		} else {
@@ -135,10 +137,11 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	}
 
 	// Find untracked children and ask to track them
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
 	untrackedChildren := []string{}
 
-	for _, candidate := range allBranches {
+	for _, candidateBranch := range allBranches {
+		candidate := candidateBranch.Name
 		if candidate == branchName {
 			continue
 		}
@@ -155,7 +158,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		}
 
 		// If merge base is the branch we just tracked, candidate is a child
-		if mergeBase == branchRev && !eng.IsBranchTracked(candidate) {
+		if mergeBase == branchRev && !candidateBranch.IsTracked() {
 			untrackedChildren = append(untrackedChildren, candidate)
 		}
 	}
@@ -181,16 +184,30 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 // selectParentBranch interactively selects a parent branch for tracking
 func selectParentBranch(ctx *runtime.Context, branchName string) (string, error) {
 	eng := ctx.Engine
-	trunk := eng.Trunk()
+	trunk := eng.Trunk().Name
 
 	// Render the tree to get visual context for each branch
 	renderer := tui.NewStackTreeRenderer(
 		branchName,
 		trunk,
-		eng.GetChildren,
-		eng.GetParent,
-		eng.IsTrunk,
-		func(b string) bool { return eng.IsBranchUpToDate(b) },
+		func(branchName string) []string {
+			branch := eng.GetBranch(branchName)
+			children := branch.GetChildren()
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			return childNames
+		},
+		func(branchName string) string {
+			parent := eng.GetParent(branchName)
+			if parent == nil {
+				return ""
+			}
+			return parent.Name
+		},
+		func(b string) bool { return eng.GetBranch(b).IsTrunk() },
+		func(b string) bool { return eng.GetBranch(b).IsBranchUpToDate() },
 	)
 
 	// Render the full tree from trunk
@@ -227,13 +244,15 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	})
 
 	// Add all tracked branches
-	allBranches := eng.AllBranchNames()
-	for _, candidate := range allBranches {
+	allBranches := eng.AllBranches()
+	for _, candidateBranch := range allBranches {
+		candidate := candidateBranch.Name
 		if candidate == branchName || candidate == trunk {
 			continue
 		}
 
-		if eng.IsBranchTracked(candidate) {
+		candidateBranch := eng.GetBranch(candidate)
+		if candidateBranch.IsTracked() {
 			display := branchToDisplay[candidate]
 			if display == "" {
 				display = tui.ColorBranchName(candidate, false)

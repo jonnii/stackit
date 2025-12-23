@@ -92,8 +92,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Display the stack tree with PR annotations
-	renderer := getStackTreeRenderer(branches, opts, eng, currentBranch)
-	ui.ShowStack(renderer, eng.Trunk())
+	renderer := getStackTreeRenderer(branches, opts, eng)
+	ui.ShowStack(renderer, eng.Trunk().Name)
 
 	// Restack if requested
 	if opts.Restack {
@@ -116,7 +116,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch, ui)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch.Name, ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -295,9 +295,11 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 		}
 
 		// Get SHAs
-		headSHA, _ := eng.GetRevision(branchName)
-		parentBranchName := eng.GetParentPrecondition(branchName)
-		baseSHA, _ := eng.GetRevision(parentBranchName)
+		branch := eng.GetBranch(branchName)
+		headSHA, _ := branch.GetRevision()
+		parentBranchName := branch.GetParentPrecondition()
+		parentBranch := eng.GetBranch(parentBranchName)
+		baseSHA, _ := parentBranch.GetRevision()
 
 		submissionInfo := Info{
 			BranchName: branchName,
@@ -323,27 +325,37 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	// Get branch scope
 	branchName := opts.Branch
 	if branchName == "" {
-		branchName = eng.CurrentBranch()
-	}
-	if branchName == "" {
-		return nil, fmt.Errorf("not on a branch and no branch specified")
+		currentBranch := eng.CurrentBranch()
+		if currentBranch == nil {
+			return nil, fmt.Errorf("not on a branch and no branch specified")
+		}
+		branchName = currentBranch.Name
 	}
 
 	var allBranches []string
 	if opts.Stack {
 		// Include descendants and ancestors
-		allBranches = eng.GetFullStack(branchName)
+		stackBranches := eng.GetFullStack(branchName)
+		allBranches = make([]string, len(stackBranches))
+		for i, b := range stackBranches {
+			allBranches[i] = b.Name
+		}
 	} else {
 		// Just ancestors (including current branch)
-		allBranches = eng.GetRelativeStackDownstack(branchName)
-		allBranches = append(allBranches, branchName)
+		downstackBranches := eng.GetRelativeStackDownstack(branchName)
+		allBranches = make([]string, len(downstackBranches)+1)
+		for i, b := range downstackBranches {
+			allBranches[i] = b.Name
+		}
+		allBranches[len(downstackBranches)] = branchName
 	}
 
 	// Remove duplicates and trunk
 	branches := []string{}
 	branchSet := make(map[string]bool)
 	for _, b := range allBranches {
-		if !eng.IsTrunk(b) && !branchSet[b] {
+		branchObj := eng.GetBranch(b)
+		if !branchObj.IsTrunk() && !branchSet[b] {
 			branches = append(branches, b)
 			branchSet[b] = true
 		}
@@ -507,16 +519,32 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
-func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, currentBranch string) *tui.StackTreeRenderer {
+func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *tui.StackTreeRenderer {
 	// Create the tree renderer
+	currentBranchObj := eng.CurrentBranch()
+	trunk := eng.Trunk()
 	renderer := tui.NewStackTreeRenderer(
-		currentBranch,
-		eng.Trunk(),
-		eng.GetChildren,
-		eng.GetParent,
-		eng.IsTrunk,
+		currentBranchObj.Name,
+		trunk.Name,
+		func(branchName string) []string {
+			branch := eng.GetBranch(branchName)
+			children := branch.GetChildren()
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			return childNames
+		},
+		func(branchName string) string {
+			parent := eng.GetParent(branchName)
+			if parent == nil {
+				return ""
+			}
+			return parent.Name
+		},
+		func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
-			return eng.IsBranchUpToDate(branchName)
+			return eng.GetBranch(branchName).IsBranchUpToDate()
 		},
 	)
 
@@ -527,14 +555,15 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		branchSet[b] = true
 	}
 
-	for _, branchName := range eng.AllBranchNames() {
+	for _, branch := range eng.AllBranches() {
+		branchName := branch.Name
 		prInfo, _ := eng.GetPrInfo(branchName)
 		if prInfo == nil && !branchSet[branchName] {
 			continue
 		}
 
 		annotation := tui.BranchAnnotation{
-			NeedsRestack: !eng.IsBranchUpToDate(branchName),
+			NeedsRestack: !eng.GetBranch(branchName).IsBranchUpToDate(),
 		}
 
 		const actionUpdate = "update"

@@ -43,12 +43,13 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	}
 
 	// Check if on trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot fold trunk branch")
 	}
 
 	// Check if branch is tracked
-	if !eng.IsBranchTracked(currentBranch) {
+	if !currentBranchObj.IsTracked() {
 		return fmt.Errorf("cannot fold untracked branch %s", currentBranch)
 	}
 
@@ -64,24 +65,29 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 
 	// Get parent branch
 	parent := eng.GetParent(currentBranch)
-	if parent == "" {
-		parent = eng.Trunk()
+	parentName := ""
+	if parent == nil {
+		parentName = eng.Trunk().Name
+	} else {
+		parentName = parent.Name
 	}
+
+	parentBranch := eng.GetBranch(parentName)
 
 	if opts.Keep {
 		// Prevent folding onto trunk with --keep, as that would delete trunk
-		if eng.IsTrunk(parent) {
+		if parentBranch.IsTrunk() {
 			return fmt.Errorf("cannot fold into trunk with --keep because it would delete the trunk branch")
 		}
-		return foldWithKeep(gctx, ctx, currentBranch, parent, eng, splog)
+		return foldWithKeep(gctx, ctx, currentBranch, parentName, eng, splog)
 	}
 
 	// Check if folding into trunk
-	if eng.IsTrunk(parent) && !opts.AllowTrunk {
-		return fmt.Errorf("cannot fold into trunk branch %s without --allow-trunk. Folding into trunk will modify your local main branch directly", parent)
+	if parentBranch.IsTrunk() && !opts.AllowTrunk {
+		return fmt.Errorf("cannot fold into trunk branch %s without --allow-trunk. Folding into trunk will modify your local main branch directly", parentName)
 	}
 
-	return foldNormal(gctx, ctx, currentBranch, parent, eng, splog)
+	return foldNormal(gctx, ctx, currentBranch, parentName, eng, splog)
 }
 
 // foldNormal performs a normal fold: merge current branch into parent, then delete current branch
@@ -92,7 +98,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Rebuild engine so it knows we're on the parent branch
-	if err := eng.Rebuild(eng.Trunk()); err != nil {
+	if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -107,7 +113,8 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Get all descendants of parent before deletion (for restacking)
-	descendants := eng.GetRelativeStack(parent, engine.Scope{
+	parentBranch := eng.GetBranch(parent)
+	descendants := parentBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    false,
 		RecursiveParents:  false,
@@ -125,18 +132,24 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	// Restack all descendants of the parent
 	if len(descendants) > 0 {
 		// Rebuild engine to reflect the deletion
-		if err := eng.Rebuild(eng.Trunk()); err != nil {
+		if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 			return fmt.Errorf("failed to rebuild engine: %w", err)
 		}
 
 		// Get updated descendants list (current branch's children are now children of parent)
-		updatedDescendants := eng.GetRelativeStack(parent, engine.Scope{
+		parentBranch := eng.GetBranch(parent)
+		updatedDescendants := parentBranch.GetRelativeStack(engine.Scope{
 			RecursiveChildren: true,
 			IncludeCurrent:    false,
 			RecursiveParents:  false,
 		})
 
-		if err := RestackBranches(gctx, updatedDescendants, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		updatedDescendantNames := make([]string, len(updatedDescendants))
+		for i, b := range updatedDescendants {
+			updatedDescendantNames[i] = b.Name
+		}
+		if err := RestackBranches(gctx, updatedDescendantNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
@@ -147,13 +160,14 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 // foldWithKeep performs a fold with --keep: merge parent into current branch, then delete parent
 func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog) error {
 	// Get all children of parent (siblings + current branch)
-	allChildren := eng.GetChildren(parent)
+	parentBranch := eng.GetBranch(parent)
+	allChildren := parentBranch.GetChildren()
 
 	// Identify siblings (children of parent excluding current branch)
 	siblings := []string{}
 	for _, child := range allChildren {
-		if child != currentBranch {
-			siblings = append(siblings, child)
+		if child.Name != currentBranch {
+			siblings = append(siblings, child.Name)
 		}
 	}
 
@@ -178,7 +192,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 	}
 
 	// Rebuild engine to reflect the deletion
-	if err := eng.Rebuild(eng.Trunk()); err != nil {
+	if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -195,13 +209,19 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		tui.ColorBranchName(currentBranch, false))
 
 	// Restack current branch and all its descendants
-	branchesToRestack := eng.GetRelativeStack(currentBranch, engine.Scope{
+	currentBranchObj := eng.GetBranch(currentBranch)
+	branchesToRestack := currentBranchObj.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
 	})
 
-	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	// Convert []Branch to []string
+	branchNamesToRestack := make([]string, len(branchesToRestack))
+	for i, b := range branchesToRestack {
+		branchNamesToRestack[i] = b.Name
+	}
+	if err := RestackBranches(gctx, branchNamesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

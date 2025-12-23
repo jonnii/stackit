@@ -26,9 +26,9 @@ func TestTakeSnapshot(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get current branch SHAs
-		mainSHA, err := s.Engine.GetRevision("main")
+		mainSHA, err := s.Engine.Trunk().GetRevision()
 		require.NoError(t, err)
-		featureSHA, err := s.Engine.GetRevision("feature")
+		featureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 
 		// Take snapshot
@@ -184,9 +184,9 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get initial SHAs
-		initialMainSHA, err := s.Engine.GetRevision("main")
+		initialMainSHA, err := s.Engine.Trunk().GetRevision()
 		require.NoError(t, err)
-		initialFeatureSHA, err := s.Engine.GetRevision("feature")
+		initialFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 
 		// Take snapshot
@@ -200,9 +200,9 @@ func TestRestoreSnapshot(t *testing.T) {
 			Commit("feature change 2")
 
 		// Verify SHAs changed
-		newMainSHA, err := s.Engine.GetRevision("main")
+		newMainSHA, err := s.Engine.Trunk().GetRevision()
 		require.NoError(t, err)
-		newFeatureSHA, err := s.Engine.GetRevision("feature")
+		newFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 		require.NotEqual(t, initialMainSHA, newMainSHA)
 		require.NotEqual(t, initialFeatureSHA, newFeatureSHA)
@@ -215,9 +215,9 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Verify SHAs restored
 		s.Rebuild()
-		restoredMainSHA, err := s.Engine.GetRevision("main")
+		restoredMainSHA, err := s.Engine.Trunk().GetRevision()
 		require.NoError(t, err)
-		restoredFeatureSHA, err := s.Engine.GetRevision("feature")
+		restoredFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 		require.Equal(t, initialMainSHA, restoredMainSHA)
 		require.Equal(t, initialFeatureSHA, restoredFeatureSHA)
@@ -241,7 +241,11 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("new-branch", "main")
 
 		// Verify new branch exists
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "new-branch")
 
 		// Restore snapshot
@@ -252,7 +256,11 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Verify new branch was deleted
 		s.Rebuild()
-		branches = s.Engine.AllBranchNames()
+		allBranches2 := s.Engine.AllBranches()
+		branches = make([]string, len(allBranches2))
+		for i, b := range allBranches2 {
+			branches[i] = b.Name
+		}
 		require.NotContains(t, branches, "new-branch")
 	})
 
@@ -344,7 +352,11 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Verify branch was restored
 		s.Rebuild()
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "feature")
 	})
 
@@ -379,7 +391,11 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.Equal(t, "feature", currentBranch)
 
 		// Verify the branch exists
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "feature")
 	})
 }

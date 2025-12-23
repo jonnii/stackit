@@ -27,10 +27,10 @@ func IsInteractive() bool {
 // ValidateOnBranch ensures the user is on a branch
 func ValidateOnBranch(ctx *runtime.Context) (string, error) {
 	currentBranch := ctx.Engine.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch == nil {
 		return "", fmt.Errorf("not on a branch")
 	}
-	return currentBranch, nil
+	return currentBranch.Name, nil
 }
 
 // CheckRebaseInProgress ensures no rebase is currently active

@@ -22,7 +22,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -47,7 +47,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		return fmt.Errorf("failed to squash branch: %w", err)
 	}
 
-	splog.Info("Squashed commits in %s.", tui.ColorBranchName(currentBranch, true))
+	splog.Info("Squashed commits in %s.", tui.ColorBranchName(currentBranch.Name, true))
 
 	// Get upstack branches (recursive children only, excluding current branch)
 	scope := engine.Scope{
@@ -55,11 +55,16 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := eng.GetRelativeStack(currentBranch, scope)
+	upstackBranches := currentBranch.GetRelativeStack(scope)
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

@@ -27,14 +27,18 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 
 	branchName := opts.BranchName
 	if branchName == "" {
-		branchName = eng.CurrentBranch()
-		if branchName == "" {
+		currentBranch := eng.CurrentBranch()
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no branch specified")
 		}
+		branchName = currentBranch.Name
 	}
 
+	// Get branch wrapper
+	branch := eng.GetBranch(branchName)
+
 	// Check if branch exists
-	if !eng.IsBranchTracked(branchName) && !eng.IsTrunk(branchName) {
+	if !branch.IsTracked() && !branch.IsTrunk() {
 		// Check if it's a git branch
 		_, err := git.GetRevision(branchName)
 		if err != nil {
@@ -51,20 +55,21 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	var outputLines []string
 
 	// Get branch info
-	isCurrent := branchName == eng.CurrentBranch()
-	isTrunk := eng.IsTrunk(branchName)
+	currentBranch := eng.CurrentBranch()
+	isCurrent := branchName == currentBranch.Name
+	isTrunk := branch.IsTrunk()
 
 	// Branch name with current indicator
 	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
-	if !isTrunk && !eng.IsBranchUpToDate(branchName) {
+	if !isTrunk && !branch.IsBranchUpToDate() {
 		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
 	// Commit date
-	commitDate, err := eng.GetCommitDate(branchName)
+	commitDate, err := branch.GetCommitDate()
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
 		outputLines = append(outputLines, tui.ColorDim(dateStr))
@@ -87,18 +92,19 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	}
 
 	// Parent branch
-	parentBranchName := eng.GetParent(branchName)
-	if parentBranchName != "" {
+	parentBranch := eng.GetParent(branchName)
+	if parentBranch != nil {
 		outputLines = append(outputLines, "")
-		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranchName))
+		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranch.Name))
 	}
 
 	// Children branches
-	children := eng.GetChildren(branchName)
+	branchObj := eng.GetBranch(branchName)
+	children := branchObj.GetChildren()
 	if len(children) > 0 {
 		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))
 		for _, child := range children {
-			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child))
+			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child.Name))
 		}
 	}
 
@@ -122,7 +128,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 				baseRevision = *meta.ParentBranchRevision
 			}
 		}
-		branchRevision, err := eng.GetRevision(branchName)
+		branchRevision, err := branch.GetRevision()
 		if err == nil {
 			commitsOutput, err := git.ShowCommits(ctx.Context, baseRevision, branchRevision, true, opts.Stat)
 			if err == nil && commitsOutput != "" {
@@ -131,7 +137,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	} else {
 		// Show commit list (readable format)
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
+		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
 				outputLines = append(outputLines, tui.ColorDim(commit))
@@ -144,7 +150,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		outputLines = append(outputLines, "")
 		if isTrunk {
 			// For trunk, show diff from HEAD~1 to HEAD
-			headRevision, err := eng.GetRevision(branchName)
+			headRevision, err := branch.GetRevision()
 			if err == nil {
 				// Get parent commit
 				parentSHA, err := git.GetCommitSHA(branchName, 1)
@@ -159,7 +165,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			// For regular branches, show diff from parent revision
 			meta, err := git.ReadMetadataRef(branchName)
 			if err == nil && meta.ParentBranchRevision != nil {
-				branchRevision, err := eng.GetRevision(branchName)
+				branchRevision, err := branch.GetRevision()
 				if err == nil {
 					diffOutput, err := git.ShowDiff(ctx.Context, *meta.ParentBranchRevision, branchRevision, opts.Stat)
 					if err == nil && diffOutput != "" {

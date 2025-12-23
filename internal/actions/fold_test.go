@@ -62,7 +62,8 @@ func TestFoldAction(t *testing.T) {
 
 		// Verify branch3's parent is now branch1
 		parent := s.Engine.GetParent("branch3")
-		require.Equal(t, "branch1", parent)
+		require.NotNil(t, parent)
+		require.Equal(t, "branch1", parent.Name)
 
 		// Verify branch2 is deleted
 		branches, err := git.GetAllBranchNames()
@@ -96,7 +97,8 @@ func TestFoldAction(t *testing.T) {
 
 		// Verify branch2's parent is now main
 		parent := s.Engine.GetParent("branch2")
-		require.Equal(t, "main", parent)
+		require.NotNil(t, parent)
+		require.Equal(t, "main", parent.Name)
 
 		// Verify branch2 contains both commits by checking log
 		logOutput, err := s.Scene.Repo.RunGitCommandAndGetOutput("log", "--oneline", "main..branch2")
@@ -127,11 +129,13 @@ func TestFoldAction(t *testing.T) {
 
 		// Verify branch3's parent is now branch2
 		parent := s.Engine.GetParent("branch3")
-		require.Equal(t, "branch2", parent)
+		require.NotNil(t, parent)
+		require.Equal(t, "branch2", parent.Name)
 
 		// Verify branch2's parent is now main
-		parent = s.Engine.GetParent("branch2")
-		require.Equal(t, "main", parent)
+		parent2 := s.Engine.GetParent("branch2")
+		require.NotNil(t, parent2)
+		require.Equal(t, "main", parent2.Name)
 	})
 
 	t.Run("fails when trying to fold trunk", func(t *testing.T) {
@@ -229,7 +233,9 @@ func TestFoldAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify branch3's parent is now branch1
-		require.Equal(t, "branch1", s.Engine.GetParent("branch3"))
+		parent3 := s.Engine.GetParent("branch3")
+		require.NotNil(t, parent3)
+		require.Equal(t, "branch1", parent3.Name)
 
 		// Verify branch3 contains all commits (c1, c2, c3)
 		logOutput, err := s.Scene.Repo.RunGitCommandAndGetOutput("log", "--oneline", "main..branch3")

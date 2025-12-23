@@ -308,17 +308,23 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 // detectCycles detects cycles in the branch parent graph using DFS
 func detectCycles(eng engine.Engine) [][]string {
 	var cycles [][]string
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
+	branchNames := make([]string, len(allBranches))
+	for i, b := range allBranches {
+		branchNames[i] = b.Name
+	}
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
 	parentMap := make(map[string]string)
 	trunk := eng.Trunk()
+	trunkName := trunk.Name
 
 	// Build parent map
 	for _, branch := range allBranches {
-		parent := eng.GetParent(branch)
-		if parent != "" && parent != trunk {
-			parentMap[branch] = parent
+		branchName := branch.Name
+		parent := eng.GetParent(branchName)
+		if parent != nil && parent.Name != trunkName {
+			parentMap[branchName] = parent.Name
 		}
 	}
 
@@ -360,9 +366,9 @@ func detectCycles(eng engine.Engine) [][]string {
 	}
 
 	// Run DFS on all branches
-	for _, branch := range allBranches {
-		if branch != trunk && !visited[branch] {
-			dfs(branch, []string{})
+	for _, branchName := range branchNames {
+		if branchName != trunkName && !visited[branchName] {
+			dfs(branchName, []string{})
 		}
 	}
 
@@ -374,18 +380,19 @@ func checkMissingParents(eng engine.Engine, allBranches []string) []string {
 	var missing []string
 	branchSet := make(map[string]bool)
 	trunk := eng.Trunk()
+	trunkName := trunk.Name
 
 	for _, branch := range allBranches {
 		branchSet[branch] = true
 	}
 
 	for _, branch := range allBranches {
-		if branch == trunk {
+		if branch == trunkName {
 			continue
 		}
 		parent := eng.GetParent(branch)
-		if parent != "" && parent != trunk {
-			if !branchSet[parent] {
+		if parent != nil && parent.Name != trunkName {
+			if !branchSet[parent.Name] {
 				missing = append(missing, branch)
 			}
 		}

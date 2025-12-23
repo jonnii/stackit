@@ -34,12 +34,14 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Prevent reordering trunk
-	if eng.IsTrunk(currentBranch) {
+	currentBranchObj := eng.GetBranch(currentBranch)
+	if currentBranchObj.IsTrunk() {
 		return fmt.Errorf("cannot reorder trunk branch")
 	}
 
 	// Collect branches: get ancestors from trunk to current branch
-	stack := eng.GetRelativeStack(currentBranch, engine.Scope{
+	currentBranchBranch := eng.GetBranch(currentBranch)
+	stack := currentBranchBranch.GetRelativeStack(engine.Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    true,
 		RecursiveChildren: false,
@@ -48,8 +50,8 @@ func ReorderAction(ctx *runtime.Context) error {
 	// Filter out trunk and get only tracked branches
 	branches := []string{}
 	for _, branch := range stack {
-		if !eng.IsTrunk(branch) && eng.IsBranchTracked(branch) {
-			branches = append(branches, branch)
+		if !branch.IsTrunk() && branch.IsTracked() {
+			branches = append(branches, branch.Name)
 		}
 	}
 
@@ -103,17 +105,23 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Identify affected branches: find the first branch that moved or changed parent
-	firstAffectedBranch := findFirstAffectedBranch(eng, originalOrder, newOrder)
+	firstAffectedBranchName := findFirstAffectedBranch(eng, originalOrder, newOrder)
+	firstAffectedBranch := eng.GetBranch(firstAffectedBranchName)
 
 	// Get all affected branches (first affected and all its descendants)
-	affectedBranches := eng.GetRelativeStack(firstAffectedBranch, engine.Scope{
+	affectedBranches := firstAffectedBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
 	})
 
 	// Restack all affected branches
-	if err := RestackBranches(gctx, affectedBranches, eng, splog, ctx.RepoRoot); err != nil {
+	// Convert []Branch to []string
+	affectedBranchNames := make([]string, len(affectedBranches))
+	for i, b := range affectedBranches {
+		affectedBranchNames[i] = b.Name
+	}
+	if err := RestackBranches(gctx, affectedBranchNames, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 
@@ -193,8 +201,8 @@ func updateParentRelationships(ctx context.Context, eng engine.Engine, newOrder 
 	// Set parent of first branch to trunk
 	trunk := eng.Trunk()
 	if len(newOrder) > 0 {
-		if err := eng.SetParent(ctx, newOrder[0], trunk); err != nil {
-			return fmt.Errorf("failed to set parent of %s to %s: %w", newOrder[0], trunk, err)
+		if err := eng.SetParent(ctx, newOrder[0], trunk.Name); err != nil {
+			return fmt.Errorf("failed to set parent of %s to %s: %w", newOrder[0], trunk.Name, err)
 		}
 	}
 
@@ -210,7 +218,7 @@ func updateParentRelationships(ctx context.Context, eng engine.Engine, newOrder 
 
 // findFirstAffectedBranch finds the first branch that moved or changed parent
 func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string) string {
-	trunk := eng.Trunk()
+	trunk := eng.Trunk().Name
 	// Create a map of original positions
 	originalPos := make(map[string]int)
 	for i, branch := range originalOrder {
@@ -233,11 +241,14 @@ func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string
 		}
 
 		currentParent := eng.GetParent(branch)
-		if currentParent == "" {
-			currentParent = trunk
+		currentParentName := ""
+		if currentParent == nil {
+			currentParentName = trunk
+		} else {
+			currentParentName = currentParent.Name
 		}
 
-		if currentParent != expectedParent {
+		if currentParentName != expectedParent {
 			return branch
 		}
 	}

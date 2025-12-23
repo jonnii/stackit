@@ -23,6 +23,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	splog := ctx.Splog
 	gctx := ctx.Context
 	trunk := eng.Trunk() // Cache trunk for this function scope
+	trunkName := trunk.Name
 
 	// Handle --all flag (stub for now)
 	if opts.All {
@@ -37,7 +38,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	}
 
 	// Pull trunk
-	splog.Info("Pulling %s from remote...", tui.ColorBranchName(trunk, false))
+	splog.Info("Pulling %s from remote...", tui.ColorBranchName(trunkName, false))
 	pullResult, err := eng.PullTrunk(gctx)
 	if err != nil {
 		return fmt.Errorf("failed to pull trunk: %w", err)
@@ -45,18 +46,19 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	switch pullResult {
 	case engine.PullDone:
-		rev, _ := eng.GetRevision(trunk)
+		trunk := eng.Trunk()
+		rev, _ := trunk.GetRevision()
 		revShort := rev
 		if len(rev) > 7 {
 			revShort = rev[:7]
 		}
 		splog.Info("%s fast-forwarded to %s.",
-			tui.ColorBranchName(trunk, true),
+			tui.ColorBranchName(trunkName, true),
 			tui.ColorDim(revShort))
 	case engine.PullUnneeded:
-		splog.Info("%s is up to date.", tui.ColorBranchName(trunk, true))
+		splog.Info("%s is up to date.", tui.ColorBranchName(trunkName, true))
 	case engine.PullConflict:
-		splog.Warn("%s could not be fast-forwarded.", tui.ColorBranchName(trunk, false))
+		splog.Warn("%s could not be fast-forwarded.", tui.ColorBranchName(trunkName, false))
 
 		// Prompt to overwrite (or use force flag)
 		shouldReset := opts.Force
@@ -70,22 +72,27 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 			if err := eng.ResetTrunkToRemote(gctx); err != nil {
 				return fmt.Errorf("failed to reset trunk: %w", err)
 			}
-			rev, _ := eng.GetRevision(trunk)
+			trunk := eng.Trunk()
+			rev, _ := trunk.GetRevision()
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
 			}
 			splog.Info("%s set to %s.",
-				tui.ColorBranchName(trunk, true),
+				tui.ColorBranchName(trunkName, true),
 				tui.ColorDim(revShort))
 		}
 	}
 
 	// Sync PR info
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
+	branchNames := make([]string, len(allBranches))
+	for i, b := range allBranches {
+		branchNames[i] = b.Name
+	}
 	repoOwner, repoName, _ := utils.GetRepoInfo(gctx)
 	if repoOwner != "" && repoName != "" {
-		if err := github.SyncPrInfo(gctx, allBranches, repoOwner, repoName); err != nil {
+		if err := github.SyncPrInfo(gctx, branchNames, repoOwner, repoName); err != nil {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}
@@ -104,7 +111,9 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	// Add branches with new parents to restack list
 	for _, branchName := range cleanResult.BranchesWithNewParents {
 		upstack := eng.GetRelativeStackUpstack(branchName)
-		branchesToRestack = append(branchesToRestack, upstack...)
+		for _, b := range upstack {
+			branchesToRestack = append(branchesToRestack, b.Name)
+		}
 		branchesToRestack = append(branchesToRestack, branchName)
 	}
 
@@ -116,15 +125,21 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Add current branch stack to restack list
 	currentBranch := eng.CurrentBranch()
-	if currentBranch != "" && eng.IsBranchTracked(currentBranch) {
-		// Get full stack (up to trunk)
-		stack := eng.GetFullStack(currentBranch)
-		// Add branches to restack list
-		branchesToRestack = append(branchesToRestack, stack...)
-	} else if currentBranch != "" && eng.IsTrunk(currentBranch) {
-		// If on trunk, restack all branches
-		stack := eng.GetRelativeStack(currentBranch, engine.Scope{RecursiveChildren: true})
-		branchesToRestack = append(branchesToRestack, stack...)
+	if currentBranch != nil {
+		if currentBranch.IsTracked() {
+			// Get full stack (up to trunk)
+			stack := eng.GetFullStack(currentBranch.Name)
+			// Add branches to restack list
+			for _, b := range stack {
+				branchesToRestack = append(branchesToRestack, b.Name)
+			}
+		} else if currentBranch.IsTrunk() {
+			// If on trunk, restack all branches
+			stack := currentBranch.GetRelativeStack(engine.Scope{RecursiveChildren: true})
+			for _, b := range stack {
+				branchesToRestack = append(branchesToRestack, b.Name)
+			}
+		}
 	}
 
 	// Remove duplicates

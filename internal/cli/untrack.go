@@ -31,10 +31,11 @@ If the branch has children, they will also be untracked.`,
 			if len(args) > 0 {
 				branchName = args[0]
 			} else {
-				branchName = ctx.Engine.CurrentBranch()
-				if branchName == "" {
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
+				branchName = currentBranch.Name
 			}
 
 			// Execute untrack action

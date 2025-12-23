@@ -162,7 +162,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the SHA of branch A
-		aSHA, err := s.Engine.GetRevision("A")
+		aSHA, err := s.Engine.GetBranch("A").GetRevision()
 		require.NoError(t, err)
 
 		// Make branch B point to the same commit as A
@@ -201,7 +201,7 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify that B and A have the same SHA (no commits between them)
-		bSHA, err := s.Engine.GetRevision("B")
+		bSHA, err := s.Engine.GetBranch("B").GetRevision()
 		require.NoError(t, err)
 		require.Equal(t, aSHA, bSHA, "B and A should point to the same commit")
 

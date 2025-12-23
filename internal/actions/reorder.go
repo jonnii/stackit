@@ -49,9 +49,8 @@ func ReorderAction(ctx *runtime.Context) error {
 	// Filter out trunk and get only tracked branches
 	branches := []string{}
 	for _, branch := range stack {
-		branchObj := eng.GetBranch(branch)
-		if !branchObj.IsTrunk() && branchObj.IsTracked() {
-			branches = append(branches, branch)
+		if !branch.IsTrunk() && branch.IsTracked() {
+			branches = append(branches, branch.Name)
 		}
 	}
 
@@ -115,7 +114,12 @@ func ReorderAction(ctx *runtime.Context) error {
 	})
 
 	// Restack all affected branches
-	if err := RestackBranches(gctx, affectedBranches, eng, splog, ctx.RepoRoot); err != nil {
+	// Convert []Branch to []string
+	affectedBranchNames := make([]string, len(affectedBranches))
+	for i, b := range affectedBranches {
+		affectedBranchNames[i] = b.Name
+	}
+	if err := RestackBranches(gctx, affectedBranchNames, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 
@@ -235,11 +239,14 @@ func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string
 		}
 
 		currentParent := eng.GetParent(branch)
-		if currentParent == "" {
-			currentParent = trunk
+		currentParentName := ""
+		if currentParent == nil {
+			currentParentName = trunk
+		} else {
+			currentParentName = currentParent.Name
 		}
 
-		if currentParent != expectedParent {
+		if currentParentName != expectedParent {
 			return branch
 		}
 	}

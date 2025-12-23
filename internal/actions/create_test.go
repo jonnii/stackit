@@ -82,8 +82,12 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		// 4. Verify metadata relationships
 		eng := s.Context.Engine
-		require.Equal(t, "main", eng.GetParent("inserted"))
-		require.Equal(t, "inserted", eng.GetParent("child1"))
+		parentInserted := eng.GetParent("inserted")
+		require.NotNil(t, parentInserted)
+		require.Equal(t, "main", parentInserted.Name)
+		parentChild1 := eng.GetParent("child1")
+		require.NotNil(t, parentChild1)
+		require.Equal(t, "inserted", parentChild1.Name)
 
 		// 5. Verify physical relationship (child1 should have been restacked onto inserted)
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")
@@ -126,8 +130,12 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		// 4. Verify relationships
 		eng := s.Context.Engine
-		require.Equal(t, "child1", eng.GetParent("inserted"))
-		require.Equal(t, "inserted", eng.GetParent("child2"))
+		parentInserted := eng.GetParent("inserted")
+		require.NotNil(t, parentInserted)
+		require.Equal(t, "child1", parentInserted.Name)
+		parentChild2 := eng.GetParent("child2")
+		require.NotNil(t, parentChild2)
+		require.Equal(t, "inserted", parentChild2.Name)
 
 		// 5. Verify physical relationship
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child2")
@@ -170,9 +178,15 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		// 4. Verify relationships
 		eng := s.Context.Engine
-		require.Equal(t, "main", eng.GetParent("inserted"))
-		require.Equal(t, "inserted", eng.GetParent("child1"))
-		require.Equal(t, "inserted", eng.GetParent("child2"))
+		parentInserted := eng.GetParent("inserted")
+		require.NotNil(t, parentInserted)
+		require.Equal(t, "main", parentInserted.Name)
+		parentChild1 := eng.GetParent("child1")
+		require.NotNil(t, parentChild1)
+		require.Equal(t, "inserted", parentChild1.Name)
+		parentChild2 := eng.GetParent("child2")
+		require.NotNil(t, parentChild2)
+		require.Equal(t, "inserted", parentChild2.Name)
 
 		// 5. Verify physical relationships
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")
@@ -219,9 +233,15 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		// 4. Verify relationships
 		eng := s.Context.Engine
-		require.Equal(t, "main", eng.GetParent("inserted"))
-		require.Equal(t, "inserted", eng.GetParent("child1"), "child1 should have been moved to inserted")
-		require.Equal(t, "main", eng.GetParent("child2"), "child2 should have remained a child of main")
+		parentInserted := eng.GetParent("inserted")
+		require.NotNil(t, parentInserted)
+		require.Equal(t, "main", parentInserted.Name)
+		parentChild1 := eng.GetParent("child1")
+		require.NotNil(t, parentChild1)
+		require.Equal(t, "inserted", parentChild1.Name, "child1 should have been moved to inserted")
+		parentChild2 := eng.GetParent("child2")
+		require.NotNil(t, parentChild2)
+		require.Equal(t, "main", parentChild2.Name, "child2 should have remained a child of main")
 
 		// 5. Verify physical relationships
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")

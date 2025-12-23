@@ -101,8 +101,12 @@ func (e *Engine) AllBranches() []engine.Branch {
 }
 
 // CurrentBranch returns the simulated current branch
-func (e *Engine) CurrentBranch() engine.Branch {
-	return engine.Branch{Name: GetDemoCurrentBranch(), Reader: e}
+func (e *Engine) CurrentBranch() *engine.Branch {
+	currentBranchName := GetDemoCurrentBranch()
+	if currentBranchName == "" {
+		return nil
+	}
+	return &engine.Branch{Name: currentBranchName, Reader: e}
 }
 
 // Trunk returns the simulated trunk branch
@@ -111,8 +115,12 @@ func (e *Engine) Trunk() engine.Branch {
 }
 
 // GetParent returns the simulated parent of a branch
-func (e *Engine) GetParent(branchName string) string {
-	return e.parentMap[branchName]
+func (e *Engine) GetParent(branchName string) *engine.Branch {
+	parentName := e.parentMap[branchName]
+	if parentName == "" {
+		return nil
+	}
+	return &engine.Branch{Name: parentName, Reader: e}
 }
 
 // GetParentPrecondition returns the simulated parent, panics if no parent
@@ -124,25 +132,30 @@ func (e *Engine) GetParentPrecondition(branchName string) string {
 	return parent
 }
 
-// GetChildren returns the simulated children of a branch
-func (e *Engine) GetChildren(branchName string) []string {
-	return e.childrenMap[branchName]
+// GetChildrenInternal returns the simulated children of a branch (internal method for Branch type)
+func (e *Engine) GetChildrenInternal(branchName string) []engine.Branch {
+	children := e.childrenMap[branchName]
+	branches := make([]engine.Branch, len(children))
+	for i, name := range children {
+		branches[i] = engine.Branch{Name: name, Reader: e}
+	}
+	return branches
 }
 
 // GetRelativeStack returns branches in stack order
-func (e *Engine) GetRelativeStack(branchName string, scope engine.Scope) []string {
-	var result []string
+func (e *Engine) GetRelativeStack(branchName string, scope engine.Scope) []engine.Branch {
+	var result []engine.Branch
 
 	// Add ancestors if RecursiveParents
 	if scope.RecursiveParents {
-		ancestors := []string{}
+		ancestors := []engine.Branch{}
 		current := branchName
 		for {
 			parent := e.parentMap[current]
 			if parent == "" || parent == GetDemoTrunk() {
 				break
 			}
-			ancestors = append([]string{parent}, ancestors...)
+			ancestors = append([]engine.Branch{{Name: parent, Reader: e}}, ancestors...)
 			current = parent
 		}
 		result = append(result, ancestors...)
@@ -150,12 +163,15 @@ func (e *Engine) GetRelativeStack(branchName string, scope engine.Scope) []strin
 
 	// Add current branch
 	if scope.IncludeCurrent {
-		result = append(result, branchName)
+		result = append(result, engine.Branch{Name: branchName, Reader: e})
 	}
 
 	// Add descendants if RecursiveChildren
 	if scope.RecursiveChildren {
-		result = append(result, e.getDescendants(branchName)...)
+		descendants := e.getDescendants(branchName)
+		for _, name := range descendants {
+			result = append(result, engine.Branch{Name: name, Reader: e})
+		}
 	}
 
 	return result
@@ -214,21 +230,30 @@ func (e *Engine) GetRevision(branchName string) (string, error) {
 // FindBranchForCommit returns the current branch in the demo engine
 func (e *Engine) FindBranchForCommit(_ string) (string, error) {
 	// For demo, just return the current branch
-	return e.CurrentBranch().Name, nil
+	currentBranch := e.CurrentBranch()
+	if currentBranch == nil {
+		return "", fmt.Errorf("not on a branch")
+	}
+	return currentBranch.Name, nil
 }
 
 // GetRelativeStackUpstack returns descendants in the demo engine
-func (e *Engine) GetRelativeStackUpstack(branchName string) []string {
-	return e.getDescendants(branchName)
+func (e *Engine) GetRelativeStackUpstack(branchName string) []engine.Branch {
+	descendants := e.getDescendants(branchName)
+	result := make([]engine.Branch, len(descendants))
+	for i, name := range descendants {
+		result[i] = engine.Branch{Name: name, Reader: e}
+	}
+	return result
 }
 
 // GetRelativeStackDownstack returns ancestors in the demo engine
-func (e *Engine) GetRelativeStackDownstack(branchName string) []string {
+func (e *Engine) GetRelativeStackDownstack(branchName string) []engine.Branch {
 	return e.GetRelativeStack(branchName, engine.Scope{RecursiveParents: true, IncludeCurrent: false, RecursiveChildren: false})
 }
 
 // GetFullStack returns the entire stack in the demo engine
-func (e *Engine) GetFullStack(branchName string) []string {
+func (e *Engine) GetFullStack(branchName string) []engine.Branch {
 	return e.GetRelativeStack(branchName, engine.Scope{RecursiveParents: true, IncludeCurrent: true, RecursiveChildren: true})
 }
 
@@ -269,10 +294,10 @@ func (e *Engine) FindMostRecentTrackedAncestors(_ context.Context, branchName st
 }
 
 // BranchesDepthFirst returns an iterator that yields branches starting from startBranch in depth-first order.
-// Each iteration yields (branchName, depth) where depth is 0 for the start branch.
+// Each iteration yields (branch, depth) where depth is 0 for the start branch.
 // The iterator can be used with range loops and supports early termination with break.
-func (e *Engine) BranchesDepthFirst(startBranch string) iter.Seq2[string, int] {
-	return func(yield func(string, int) bool) {
+func (e *Engine) BranchesDepthFirst(startBranch string) iter.Seq2[engine.Branch, int] {
+	return func(yield func(engine.Branch, int) bool) {
 		visited := make(map[string]bool)
 		var visit func(branch string, depth int) bool
 		visit = func(branch string, depth int) bool {
@@ -281,13 +306,13 @@ func (e *Engine) BranchesDepthFirst(startBranch string) iter.Seq2[string, int] {
 			}
 			visited[branch] = true
 
-			if !yield(branch, depth) {
+			if !yield(engine.Branch{Name: branch, Reader: e}, depth) {
 				return false // iterator wants to stop
 			}
 
-			children := e.GetChildren(branch)
+			children := e.GetChildrenInternal(branch)
 			for _, child := range children {
-				if !visit(child, depth+1) {
+				if !visit(child.Name, depth+1) {
 					return false
 				}
 			}

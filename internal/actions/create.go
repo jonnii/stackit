@@ -187,11 +187,12 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		}
 	} else {
 		// Check if current branch has children and show tip
-		children := eng.GetChildren(currentBranch)
+		currentBranchObj := eng.GetBranch(currentBranch)
+		children := currentBranchObj.GetChildren()
 		siblings := []string{}
 		for _, child := range children {
-			if child != branchName {
-				siblings = append(siblings, child)
+			if child.Name != branchName {
+				siblings = append(siblings, child.Name)
 			}
 		}
 		if len(siblings) > 0 {
@@ -204,11 +205,12 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 
 // handleInsert moves children of the current branch to be children of the new branch
 func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeCtx *runtime.Context, opts CreateOptions) error {
-	children := runtimeCtx.Engine.GetChildren(currentBranch)
+	currentBranchObj := runtimeCtx.Engine.GetBranch(currentBranch)
+	children := currentBranchObj.GetChildren()
 	siblings := []string{}
 	for _, child := range children {
-		if child != newBranch {
-			siblings = append(siblings, child)
+		if child.Name != newBranch {
+			siblings = append(siblings, child.Name)
 		}
 	}
 

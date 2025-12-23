@@ -54,14 +54,15 @@ the --to flag is used to specify a target branch to navigate towards.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch.Name == "" {
+			if currentBranch == nil {
 				return errors.ErrNotOnBranch
 			}
 
 			// Traverse up the specified number of steps
 			targetBranch := currentBranch.Name
 			for i := 0; i < steps; i++ {
-				children := ctx.Engine.GetChildren(targetBranch)
+				targetBranchObj := ctx.Engine.GetBranch(targetBranch)
+				children := targetBranchObj.GetChildren()
 				if len(children) == 0 {
 					if i == 0 {
 						ctx.Splog.Info("Already at the top of the stack.")
@@ -73,15 +74,20 @@ the --to flag is used to specify a target branch to navigate towards.`,
 
 				var nextBranch string
 				if len(children) == 1 {
-					nextBranch = children[0]
+					nextBranch = children[0].Name
 				} else {
 					// Multiple children, decide which way to go
 					if toBranch != "" {
 						// Try to find the child that leads to toBranch
 						var candidates []string
 						for _, child := range children {
-							if child == toBranch || utils.ContainsString(ctx.Engine.GetRelativeStackUpstack(child), toBranch) {
-								candidates = append(candidates, child)
+							upstack := ctx.Engine.GetRelativeStackUpstack(child.Name)
+							upstackNames := make([]string, len(upstack))
+							for i, b := range upstack {
+								upstackNames[i] = b.Name
+							}
+							if child.Name == toBranch || utils.ContainsString(upstackNames, toBranch) {
+								candidates = append(candidates, child.Name)
 							}
 						}
 
@@ -94,13 +100,21 @@ the --to flag is used to specify a target branch to navigate towards.`,
 							fallthrough
 						default:
 							// Still ambiguous even with --to (shouldn't happen in a tree)
-							nextBranch, err = promptForChild(children, targetBranch)
+							childNames := make([]string, len(children))
+							for i, c := range children {
+								childNames[i] = c.Name
+							}
+							nextBranch, err = promptForChild(childNames, targetBranch)
 							if err != nil {
 								return err
 							}
 						}
 					} else {
-						nextBranch, err = promptForChild(children, targetBranch)
+						childNames := make([]string, len(children))
+						for i, c := range children {
+							childNames[i] = c.Name
+						}
+						nextBranch, err = promptForChild(childNames, targetBranch)
 						if err != nil {
 							return err
 						}

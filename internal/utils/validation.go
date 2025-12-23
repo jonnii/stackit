@@ -27,7 +27,7 @@ func IsInteractive() bool {
 // ValidateOnBranch ensures the user is on a branch
 func ValidateOnBranch(ctx *runtime.Context) (string, error) {
 	currentBranch := ctx.Engine.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return "", fmt.Errorf("not on a branch")
 	}
 	return currentBranch.Name, nil

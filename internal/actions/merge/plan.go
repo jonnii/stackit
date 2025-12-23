@@ -108,7 +108,7 @@ type mergePlanEngine interface {
 func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog, githubClient github.Client, opts CreatePlanOptions) (*Plan, *PlanValidation, error) {
 	// 1. Get current branch, validate not on trunk
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return nil, nil, fmt.Errorf("not on a branch")
 	}
 
@@ -128,10 +128,9 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	// Build full list: parent branches + current branch
 	// Filter out trunk (it shouldn't be in the list, but be safe)
 	allBranches := make([]string, 0, len(parentBranches)+1)
-	for _, branchName := range parentBranches {
-		branchObj := eng.GetBranch(branchName)
-		if !branchObj.IsTrunk() {
-			allBranches = append(allBranches, branchName)
+	for _, branch := range parentBranches {
+		if !branch.IsTrunk() {
+			allBranches = append(allBranches, branch.Name)
 		}
 	}
 	allBranches = append(allBranches, currentBranch.Name)
@@ -241,9 +240,9 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		if ancestorBranch.IsTrunk() {
 			continue
 		}
-		children := eng.GetChildren(ancestor)
+		children := ancestorBranch.GetChildren()
 		for _, child := range children {
-			if !mergedSet[child] {
+			if !mergedSet[child.Name] {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Sibling branch %s will be reparented to trunk when %s is merged", child, ancestor))
 			}
 		}
@@ -252,10 +251,9 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}
 	upstack := eng.GetRelativeStackUpstack(currentBranch.Name)
-	for _, branchName := range upstack {
-		branchObj := eng.GetBranch(branchName)
-		if branchObj.IsTracked() {
-			upstackBranches = append(upstackBranches, branchName)
+	for _, branch := range upstack {
+		if branch.IsTracked() {
+			upstackBranches = append(upstackBranches, branch.Name)
 		}
 	}
 

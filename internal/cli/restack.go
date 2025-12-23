@@ -50,7 +50,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			targetBranch := branch
 			if targetBranch == "" {
 				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch.Name == "" {
+				if currentBranch == nil {
 					return fmt.Errorf("not on a branch and --branch not specified")
 				}
 				targetBranch = currentBranch.Name

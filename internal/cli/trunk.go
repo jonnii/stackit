@@ -110,7 +110,7 @@ func handleShowTrunk(ctx *runtime.Context) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		// Not on a branch, just show primary trunk
 		trunk := eng.Trunk()
 		fmt.Println(trunk.Name)
@@ -153,10 +153,10 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 
 		// Get parent
 		parent := eng.GetParent(current)
-		if parent == "" {
+		if parent == nil {
 			break
 		}
-		current = parent
+		current = parent.Name
 	}
 
 	// Default to primary trunk

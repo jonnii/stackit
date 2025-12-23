@@ -28,7 +28,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	branchName := opts.BranchName
 	if branchName == "" {
 		currentBranch := eng.CurrentBranch()
-		if currentBranch.Name == "" {
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no branch specified")
 		}
 		branchName = currentBranch.Name
@@ -92,18 +92,19 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	}
 
 	// Parent branch
-	parentBranchName := eng.GetParent(branchName)
-	if parentBranchName != "" {
+	parentBranch := eng.GetParent(branchName)
+	if parentBranch != nil {
 		outputLines = append(outputLines, "")
-		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranchName))
+		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranch.Name))
 	}
 
 	// Children branches
-	children := eng.GetChildren(branchName)
+	branchObj := eng.GetBranch(branchName)
+	children := branchObj.GetChildren()
 	if len(children) > 0 {
 		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))
 		for _, child := range children {
-			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child))
+			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child.Name))
 		}
 	}
 

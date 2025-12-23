@@ -23,7 +23,7 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	branchName := opts.BranchName
 	if branchName == "" {
 		currentBranch := eng.CurrentBranch()
-		if currentBranch.Name == "" {
+		if currentBranch == nil {
 			return fmt.Errorf("no branch specified and not on a branch")
 		}
 		branchName = currentBranch.Name
@@ -46,11 +46,19 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	toDelete := []string{branchName}
 
 	if opts.Upstack {
-		toDelete = append(toDelete, eng.GetRelativeStackUpstack(branchName)...)
+		upstack := eng.GetRelativeStackUpstack(branchName)
+		for _, b := range upstack {
+			toDelete = append(toDelete, b.Name)
+		}
 	}
 
 	if opts.Downstack {
-		toDelete = append(eng.GetRelativeStackDownstack(branchName), toDelete...)
+		downstack := eng.GetRelativeStackDownstack(branchName)
+		downstackNames := make([]string, len(downstack))
+		for i, b := range downstack {
+			downstackNames[i] = b.Name
+		}
+		toDelete = append(downstackNames, toDelete...)
 	}
 
 	// Confirm if not forced and not merged/closed

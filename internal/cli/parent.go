@@ -29,7 +29,7 @@ and seeing which branch the current branch is based on.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch.Name == "" {
+			if currentBranch == nil {
 				return errors.ErrNotOnBranch
 			}
 
@@ -41,13 +41,13 @@ and seeing which branch the current branch is based on.`,
 
 			// Get parent
 			parent := ctx.Engine.GetParent(currentBranch.Name)
-			if parent == "" {
+			if parent == nil {
 				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
 			}
 
 			// Print parent
-			fmt.Println(parent)
+			fmt.Println(parent.Name)
 			return nil
 		},
 	}

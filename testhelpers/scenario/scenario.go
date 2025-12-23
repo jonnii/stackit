@@ -206,7 +206,11 @@ func (s *Scenario) ExpectStackStructure(expected map[string]string) *Scenario {
 	s.T.Helper()
 	for branch, expectedParent := range expected {
 		actualParent := s.Engine.GetParent(branch)
-		require.Equal(s.T, expectedParent, actualParent, "Parent of %s does not match", branch)
+		if actualParent == nil {
+			s.T.Errorf("Parent of %s is nil, expected %s", branch, expectedParent)
+			continue
+		}
+		require.Equal(s.T, expectedParent, actualParent.Name, "Parent of %s does not match", branch)
 	}
 	return s
 }

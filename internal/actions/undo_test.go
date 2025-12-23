@@ -193,7 +193,8 @@ func TestUndoAfterMove(t *testing.T) {
 
 		// Get initial parent
 		initialParent := s.Engine.GetParent("feature2")
-		require.Equal(t, "feature1", initialParent)
+		require.NotNil(t, initialParent)
+		require.Equal(t, "feature1", initialParent.Name)
 
 		// Take snapshot before move
 		err := s.Engine.TakeSnapshot("move", []string{"feature2", "onto", "main"})
@@ -205,7 +206,8 @@ func TestUndoAfterMove(t *testing.T) {
 
 		// Verify parent changed
 		newParent := s.Engine.GetParent("feature2")
-		require.Equal(t, "main", newParent)
+		require.NotNil(t, newParent)
+		require.Equal(t, "main", newParent.Name)
 
 		// Undo via engine directly (bypasses confirmation)
 		snapshots, err := s.Engine.GetSnapshots()
@@ -216,6 +218,7 @@ func TestUndoAfterMove(t *testing.T) {
 		// Verify parent restored
 		s.Engine.Rebuild(s.Engine.Trunk().Name)
 		restoredParent := s.Engine.GetParent("feature2")
-		require.Equal(t, initialParent, restoredParent)
+		require.NotNil(t, restoredParent)
+		require.Equal(t, initialParent.Name, restoredParent.Name)
 	})
 }

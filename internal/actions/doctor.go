@@ -323,8 +323,8 @@ func detectCycles(eng engine.Engine) [][]string {
 	for _, branch := range allBranches {
 		branchName := branch.Name
 		parent := eng.GetParent(branchName)
-		if parent != "" && parent != trunkName {
-			parentMap[branchName] = parent
+		if parent != nil && parent.Name != trunkName {
+			parentMap[branchName] = parent.Name
 		}
 	}
 
@@ -391,8 +391,8 @@ func checkMissingParents(eng engine.Engine, allBranches []string) []string {
 			continue
 		}
 		parent := eng.GetParent(branch)
-		if parent != "" && parent != trunkName {
-			if !branchSet[parent] {
+		if parent != nil && parent.Name != trunkName {
+			if !branchSet[parent.Name] {
 				missing = append(missing, branch)
 			}
 		}

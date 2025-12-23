@@ -44,7 +44,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -62,11 +62,14 @@ func Action(ctx *runtime.Context, opts Options) error {
 	if !currentBranchObj.IsTracked() {
 		// Auto-track the branch
 		parent := eng.GetParent(currentBranch.Name)
-		if parent == "" {
+		parentName := ""
+		if parent == nil {
 			// Try to find parent from git
-			parent = eng.Trunk().Name
+			parentName = eng.Trunk().Name
+		} else {
+			parentName = parent.Name
 		}
-		if err := eng.TrackBranch(context, currentBranch.Name, parent); err != nil {
+		if err := eng.TrackBranch(context, currentBranch.Name, parentName); err != nil {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 	}
@@ -138,7 +141,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 		upstackBranches := eng.GetRelativeStack(currentBranch.Name, scope)
 		if len(upstackBranches) > 0 {
-			if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			// Convert []Branch to []string
+			upstackNames := make([]string, len(upstackBranches))
+			for i, b := range upstackBranches {
+				upstackNames[i] = b.Name
+			}
+			if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -170,7 +178,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

@@ -174,8 +174,9 @@ func (e *engineImpl) DeleteBranches(ctx context.Context, branchNames []string) (
 	toDeleteSet := make(map[string]bool)
 	for _, b := range branchNames {
 		toDeleteSet[b] = true
-		for _, child := range e.GetChildren(b) {
-			allChildren[child] = true
+		children := e.GetChildrenInternal(b)
+		for _, child := range children {
+			allChildren[child.Name] = true
 		}
 	}
 

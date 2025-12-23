@@ -190,8 +190,22 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	renderer := tui.NewStackTreeRenderer(
 		branchName,
 		trunk,
-		eng.GetChildren,
-		eng.GetParent,
+		func(branchName string) []string {
+			branch := eng.GetBranch(branchName)
+			children := branch.GetChildren()
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			return childNames
+		},
+		func(branchName string) string {
+			parent := eng.GetParent(branchName)
+			if parent == nil {
+				return ""
+			}
+			return parent.Name
+		},
 		func(b string) bool { return eng.GetBranch(b).IsTrunk() },
 		func(b string) bool { return eng.IsBranchUpToDate(b) },
 	)

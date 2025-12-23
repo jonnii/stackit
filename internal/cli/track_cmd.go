@@ -35,7 +35,7 @@ This command can also be used to fix corrupted stackit metadata.`,
 				branchName = args[0]
 			} else {
 				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch.Name == "" {
+				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
 				branchName = currentBranch.Name

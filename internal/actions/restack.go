@@ -24,6 +24,12 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 		return nil
 	}
 
+	// Convert []Branch to []string for RestackBranches
+	branchNames := make([]string, len(branches))
+	for i, branch := range branches {
+		branchNames[i] = branch.Name
+	}
+
 	// Take snapshot before modifying the repository
 	args := []string{}
 	if opts.BranchName != "" {
@@ -35,5 +41,5 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	}
 
 	// Call RestackBranches (from common.go)
-	return RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot)
+	return RestackBranches(ctx.Context, branchNames, eng, splog, ctx.RepoRoot)
 }

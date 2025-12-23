@@ -27,7 +27,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -95,14 +95,14 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	// We need commits from all branches downstack, not just current branch
 	downstackBranches := eng.GetRelativeStackDownstack(currentBranch.Name)
 	// Include current branch
-	downstackBranches = append([]string{currentBranch.Name}, downstackBranches...)
+	downstackBranches = append([]engine.Branch{*currentBranch}, downstackBranches...)
 
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}
-	for _, branchName := range downstackBranches {
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatSHA)
+	for _, branch := range downstackBranches {
+		commits, err := eng.GetAllCommits(branch.Name, engine.CommitFormatSHA)
 		if err != nil {
-			return fmt.Errorf("failed to get commits for branch %s: %w", branchName, err)
+			return fmt.Errorf("failed to get commits for branch %s: %w", branch.Name, err)
 		}
 		// Commits are returned oldest to newest, but we want newest to oldest for search
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -244,7 +244,12 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 		upstackBranches := eng.GetRelativeStackUpstack(oldestModifiedBranch)
 
 		if len(upstackBranches) > 0 {
-			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			// Convert []Branch to []string
+			upstackNames := make([]string, len(upstackBranches))
+			for i, b := range upstackBranches {
+				upstackNames[i] = b.Name
+			}
+			if err := RestackBranches(ctx.Context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}

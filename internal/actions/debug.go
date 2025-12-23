@@ -144,14 +144,19 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 		// Get parent
 		parent := eng.GetParent(branchName)
-		if parent != "" {
-			branchInfo.Parent = parent
+		if parent != nil {
+			branchInfo.Parent = parent.Name
 		}
 
 		// Get children
-		children := eng.GetChildren(branchName)
+		branch := eng.GetBranch(branchName)
+		children := branch.GetChildren()
 		if len(children) > 0 {
-			branchInfo.Children = children
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			branchInfo.Children = childNames
 		}
 
 		// Get metadata
@@ -217,9 +222,14 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		Timestamp:      time.Now(),
 		RecentCommands: recentCommands,
 		StackState: StackStateInfo{
-			Trunk:         trunk.Name,
-			CurrentBranch: currentBranch.Name,
-			Branches:      branchInfos,
+			Trunk: trunk.Name,
+			CurrentBranch: func() string {
+				if currentBranch != nil {
+					return currentBranch.Name
+				}
+				return ""
+			}(),
+			Branches: branchInfos,
 		},
 		ContinuationState: continuationState,
 		RepositoryInfo:    repoInfo,

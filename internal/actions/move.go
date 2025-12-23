@@ -24,7 +24,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	source := opts.Source
 	if source == "" {
 		currentBranch := eng.CurrentBranch()
-		if currentBranch.Name == "" {
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no source branch specified")
 		}
 		source = currentBranch.Name
@@ -89,15 +89,18 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 		RecursiveParents:  false,
 	})
 	for _, d := range descendants {
-		if d == onto {
+		if d.Name == onto {
 			return fmt.Errorf("cannot move %s onto its own descendant %s", source, onto)
 		}
 	}
 
 	// Get current parent for logging
 	oldParent := eng.GetParent(source)
-	if oldParent == "" {
-		oldParent = eng.Trunk().Name
+	oldParentName := ""
+	if oldParent == nil {
+		oldParentName = eng.Trunk().Name
+	} else {
+		oldParentName = oldParent.Name
 	}
 
 	// Update parent in engine
@@ -107,7 +110,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 
 	splog.Info("Moved %s from %s to %s.",
 		tui.ColorBranchName(source, true),
-		tui.ColorBranchName(oldParent, false),
+		tui.ColorBranchName(oldParentName, false),
 		tui.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
@@ -118,7 +121,12 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	})
 
 	// Restack source and all its descendants
-	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	// Convert []Branch to []string
+	branchNamesToRestack := make([]string, len(branchesToRestack))
+	for i, b := range branchesToRestack {
+		branchNamesToRestack[i] = b.Name
+	}
+	if err := RestackBranches(gctx, branchNamesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

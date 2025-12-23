@@ -109,7 +109,9 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	// Add branches with new parents to restack list
 	for _, branchName := range cleanResult.BranchesWithNewParents {
 		upstack := eng.GetRelativeStackUpstack(branchName)
-		branchesToRestack = append(branchesToRestack, upstack...)
+		for _, b := range upstack {
+			branchesToRestack = append(branchesToRestack, b.Name)
+		}
 		branchesToRestack = append(branchesToRestack, branchName)
 	}
 
@@ -121,16 +123,20 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Add current branch stack to restack list
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name != "" {
+	if currentBranch != nil {
 		if currentBranch.IsTracked() {
 			// Get full stack (up to trunk)
 			stack := eng.GetFullStack(currentBranch.Name)
 			// Add branches to restack list
-			branchesToRestack = append(branchesToRestack, stack...)
+			for _, b := range stack {
+				branchesToRestack = append(branchesToRestack, b.Name)
+			}
 		} else if currentBranch.IsTrunk() {
 			// If on trunk, restack all branches
 			stack := eng.GetRelativeStack(currentBranch.Name, engine.Scope{RecursiveChildren: true})
-			branchesToRestack = append(branchesToRestack, stack...)
+			for _, b := range stack {
+				branchesToRestack = append(branchesToRestack, b.Name)
+			}
 		}
 	}
 

@@ -22,7 +22,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -59,7 +59,12 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		if err := RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

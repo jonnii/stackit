@@ -475,10 +475,12 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		// Use NewParent from result if reparented, otherwise get from engine
 		actualParent := result.NewParent
 		if actualParent == "" {
-			actualParent = eng.GetParent(step.BranchName)
-		}
-		if actualParent == "" {
-			actualParent = trunkName
+			parent := eng.GetParent(step.BranchName)
+			if parent == nil {
+				actualParent = trunkName
+			} else {
+				actualParent = parent.Name
+			}
 		}
 
 		switch result.Result {
@@ -498,9 +500,14 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 
 		case engine.RestackConflict:
 			// Save continuation state
+			currentBranch := eng.CurrentBranch()
+			currentBranchName := ""
+			if currentBranch != nil {
+				currentBranchName = currentBranch.Name
+			}
 			continuation := &config.ContinuationState{
 				RebasedBranchBase:     result.RebasedBranchBase,
-				CurrentBranchOverride: eng.CurrentBranch().Name,
+				CurrentBranchOverride: currentBranchName,
 			}
 			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
 				return fmt.Errorf("failed to persist continuation: %w", err)
@@ -554,18 +561,21 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 
 	// Get the parent revision (old base)
 	parent := eng.GetParent(step.BranchName)
-	if parent == "" {
-		parent = trunkName
+	parentName := ""
+	if parent == nil {
+		parentName = trunkName
+	} else {
+		parentName = parent.Name
 	}
 
 	// Get the old parent revision
-	oldParentRev, err := eng.GetRevision(parent)
+	oldParentRev, err := eng.GetRevision(parentName)
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}
 
 	// If parent is already trunk, we might just need to update the PR base
-	if parent == trunkName {
+	if parentName == trunkName {
 		// Just update the PR base branch via GitHub API
 		return updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunkName)
 	}

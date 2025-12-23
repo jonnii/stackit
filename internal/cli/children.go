@@ -29,12 +29,12 @@ branches depend on the current branch.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch.Name == "" {
+			if currentBranch == nil {
 				return errors.ErrNotOnBranch
 			}
 
 			// Get children
-			children := ctx.Engine.GetChildren(currentBranch.Name)
+			children := currentBranch.GetChildren()
 			if len(children) == 0 {
 				ctx.Splog.Info("%s has no children.", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
@@ -42,7 +42,7 @@ branches depend on the current branch.`,
 
 			// Print children
 			for _, child := range children {
-				fmt.Println(child)
+				fmt.Println(child.Name)
 			}
 			return nil
 		},

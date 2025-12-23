@@ -36,7 +36,7 @@ If no branch is passed in, opens an interactive selector to choose the target br
 			sourceBranch := source
 			if sourceBranch == "" {
 				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch.Name == "" {
+				if currentBranch == nil {
 					return fmt.Errorf("not on a branch and no source branch specified")
 				}
 				sourceBranch = currentBranch.Name
@@ -85,7 +85,7 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	})
 	excludedBranches := make(map[string]bool)
 	for _, d := range descendants {
-		excludedBranches[d] = true
+		excludedBranches[d.Name] = true
 	}
 
 	// Get branches in stack order: trunk first, then children recursively
@@ -93,26 +93,26 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	trunkName := trunk.Name
 	choices := make([]tui.BranchChoice, 0)
 
-	for branchName := range eng.BranchesDepthFirst(trunkName) {
+	for branch := range eng.BranchesDepthFirst(trunkName) {
 		// Skip source and its descendants
-		if excludedBranches[branchName] {
+		if excludedBranches[branch.Name] {
 			continue
 		}
 
-		if seenBranches[branchName] {
+		if seenBranches[branch.Name] {
 			continue
 		}
-		seenBranches[branchName] = true
+		seenBranches[branch.Name] = true
 
 		currentBranch := eng.CurrentBranch()
-		isCurrent := branchName == currentBranch.Name
-		display := tui.ColorBranchName(branchName, isCurrent)
+		isCurrent := branch.Name == currentBranch.Name
+		display := tui.ColorBranchName(branch.Name, isCurrent)
 		if isCurrent {
 			initialIndex = len(choices)
 		}
 		choices = append(choices, tui.BranchChoice{
 			Display: display,
-			Value:   branchName,
+			Value:   branch.Name,
 		})
 	}
 

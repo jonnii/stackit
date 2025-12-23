@@ -59,7 +59,7 @@ func executeLog(cmd *cobra.Command, f *logFlags, style string) error {
 	branchName := trunk.Name
 	if f.stack || f.steps > 0 {
 		currentBranch := eng.CurrentBranch()
-		if currentBranch.Name == "" {
+		if currentBranch == nil {
 			return fmt.Errorf("not on a branch")
 		}
 		branchName = currentBranch.Name

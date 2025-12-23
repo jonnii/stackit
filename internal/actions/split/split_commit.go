@@ -38,7 +38,8 @@ func splitByCommit(ctx context.Context, branchToSplit string, eng splitByCommitE
 	}
 
 	parentBranchName := eng.GetParentPrecondition(branchToSplit)
-	numChildren := len(eng.GetChildren(branchToSplit))
+	branchToSplitObj := eng.GetBranch(branchToSplit)
+	numChildren := len(branchToSplitObj.GetChildren())
 
 	// Show instructions
 	splog.Info("Splitting the commits of %s into multiple branches.", tui.ColorBranchName(branchToSplit, true))

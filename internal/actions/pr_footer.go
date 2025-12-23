@@ -17,13 +17,13 @@ func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 	terminalParent := findTerminalParent(branch, eng)
 
 	var tree strings.Builder
-	for branchName, depth := range eng.BranchesDepthFirst(terminalParent) {
+	for branchObj, depth := range eng.BranchesDepthFirst(terminalParent) {
 		// Only include branches related to the PR branch
-		if branchName != branch && !isParentOrChild(eng, branchName, branch) {
+		if branchObj.Name != branch && !isParentOrChild(eng, branchObj.Name, branch) {
 			continue // skip but continue traversal
 		}
 
-		leaf := buildLeaf(eng, branchName, depth, branch)
+		leaf := buildLeaf(eng, branchObj.Name, depth, branch)
 		if leaf != "" {
 			tree.WriteString(leaf)
 		}
@@ -59,17 +59,16 @@ func UpdatePRBodyFooter(existingBody, footer string) string {
 // findTerminalParent finds the terminal parent (parent of trunk) for a branch
 func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 	parent := eng.GetParent(currentBranch)
-	if parent == "" {
+	if parent == nil {
 		// No parent, use trunk
 		return eng.Trunk().Name
 	}
 
-	parentBranch := eng.GetBranch(parent)
-	if parentBranch.IsTrunk() {
+	if parent.IsTrunk() {
 		return currentBranch
 	}
 
-	return findTerminalParent(parent, eng)
+	return findTerminalParent(parent.Name, eng)
 }
 
 // buildLeaf builds a single leaf in the tree
@@ -103,23 +102,24 @@ func isParentOrChildRecursive(eng engine.BranchReader, branch1, branch2 string, 
 	visited[branch1] = true
 
 	// Check if branch1 is parent of branch2
-	children := eng.GetChildren(branch1)
+	branch1Obj := eng.GetBranch(branch1)
+	children := branch1Obj.GetChildren()
 	for _, child := range children {
-		if child == branch2 {
+		if child.Name == branch2 {
 			return true
 		}
-		if isParentOrChildRecursive(eng, child, branch2, visited) {
+		if isParentOrChildRecursive(eng, child.Name, branch2, visited) {
 			return true
 		}
 	}
 
 	// Check if branch1 is child of branch2
 	parent := eng.GetParent(branch1)
-	if parent == branch2 {
-		return true
-	}
-	if parent != "" {
-		return isParentOrChildRecursive(eng, parent, branch2, visited)
+	if parent != nil {
+		if parent.Name == branch2 {
+			return true
+		}
+		return isParentOrChildRecursive(eng, parent.Name, branch2, visited)
 	}
 
 	return false

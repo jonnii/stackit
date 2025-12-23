@@ -124,7 +124,12 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := RestackBranches(gctx, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}
@@ -142,16 +147,19 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 
 	// Get the parent branch to determine rebase base
 	parent := eng.GetParent(currentBranch.Name)
-	if parent == "" {
-		parent = eng.Trunk().Name
+	parentName := ""
+	if parent == nil {
+		parentName = eng.Trunk().Name
+	} else {
+		parentName = parent.Name
 	}
 
 	splog.Info("Starting interactive rebase for %s onto %s...",
 		tui.ColorBranchName(currentBranch.Name, true),
-		tui.ColorBranchName(parent, false))
+		tui.ColorBranchName(parentName, false))
 
 	// Run interactive rebase
-	if err := git.RunGitCommandInteractive("rebase", "-i", parent); err != nil {
+	if err := git.RunGitCommandInteractive("rebase", "-i", parentName); err != nil {
 		// Check if rebase is in progress (conflict or user canceled)
 		if git.IsRebaseInProgress(gctx) {
 			return fmt.Errorf("interactive rebase paused. Resolve conflicts and run 'git rebase --continue' or 'git rebase --abort'")
@@ -167,7 +175,12 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []Branch to []string
+		upstackNames := make([]string, len(upstackBranches))
+		for i, b := range upstackBranches {
+			upstackNames[i] = b.Name
+		}
+		if err := RestackBranches(gctx, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

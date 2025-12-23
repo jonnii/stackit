@@ -32,7 +32,7 @@ If the branch has children, they will also be untracked.`,
 				branchName = args[0]
 			} else {
 				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch.Name == "" {
+				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
 				branchName = currentBranch.Name

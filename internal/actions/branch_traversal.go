@@ -24,7 +24,7 @@ const (
 // SwitchBranchAction switches to a branch based on the given direction
 func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 	currentBranch := ctx.Engine.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return errors.ErrNotOnBranch
 	}
 
@@ -71,24 +71,24 @@ func traverseDownward(currentBranch string, ctx *runtime.Context) string {
 	}
 
 	parent := ctx.Engine.GetParent(currentBranch)
-	if parent == "" {
+	if parent == nil {
 		// No parent, we're at the bottom
 		return currentBranch
 	}
 
 	// If parent is trunk, we're at the first branch from trunk
-	parentBranch := ctx.Engine.GetBranch(parent)
-	if parentBranch.IsTrunk() {
+	if parent.IsTrunk() {
 		return currentBranch
 	}
 
-	ctx.Splog.Info("⮑  %s", parent)
-	return traverseDownward(parent, ctx)
+	ctx.Splog.Info("⮑  %s", parent.Name)
+	return traverseDownward(parent.Name, ctx)
 }
 
 // traverseUpward walks up the children chain to find the tip branch
 func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) {
-	children := ctx.Engine.GetChildren(currentBranch)
+	currentBranchObj := ctx.Engine.GetBranch(currentBranch)
+	children := currentBranchObj.GetChildren()
 	if len(children) == 0 {
 		// No children, we're at the tip
 		return currentBranch, nil
@@ -99,10 +99,14 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 
 	if len(children) == 1 {
 		// Single child, follow it
-		nextBranch = children[0]
+		nextBranch = children[0].Name
 	} else {
 		// Multiple children, prompt user
-		nextBranch, err = handleMultipleChildren(children)
+		childNames := make([]string, len(children))
+		for i, c := range children {
+			childNames[i] = c.Name
+		}
+		nextBranch, err = handleMultipleChildren(childNames)
 		if err != nil {
 			return "", err
 		}

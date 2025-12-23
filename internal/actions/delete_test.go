@@ -26,7 +26,9 @@ func TestDelete(t *testing.T) {
 		// branch1 should be gone, branch2 should be reparented to main
 		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 		require.True(t, s.Engine.GetBranch("branch2").IsTracked())
-		require.Equal(t, "main", s.Engine.GetParent("branch2"))
+		parent2 := s.Engine.GetParent("branch2")
+		require.NotNil(t, parent2)
+		require.Equal(t, "main", parent2.Name)
 	})
 
 	t.Run("deletes upstack", func(t *testing.T) {
@@ -96,7 +98,9 @@ func TestDelete(t *testing.T) {
 			})
 
 		s.Checkout("branch1")
-		require.Equal(t, "branch1", s.Engine.CurrentBranch().Name)
+		currentBranch := s.Engine.CurrentBranch()
+		require.NotNil(t, currentBranch)
+		require.Equal(t, "branch1", currentBranch.Name)
 
 		err := actions.Delete(s.Context, actions.DeleteOptions{
 			BranchName: "branch1",
@@ -104,7 +108,9 @@ func TestDelete(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.Equal(t, "main", s.Engine.CurrentBranch().Name)
+		currentBranch = s.Engine.CurrentBranch()
+		require.NotNil(t, currentBranch)
+		require.Equal(t, "main", currentBranch.Name)
 	})
 
 	t.Run("deletes a branch in a branching stack", func(t *testing.T) {
@@ -127,7 +133,11 @@ func TestDelete(t *testing.T) {
 		// Both children should be reparented to main and still be tracked
 		require.True(t, s.Engine.GetBranch("child1").IsTracked())
 		require.True(t, s.Engine.GetBranch("child2").IsTracked())
-		require.Equal(t, "main", s.Engine.GetParent("child1"))
-		require.Equal(t, "main", s.Engine.GetParent("child2"))
+		parent1 := s.Engine.GetParent("child1")
+		require.NotNil(t, parent1)
+		require.Equal(t, "main", parent1.Name)
+		parent2 := s.Engine.GetParent("child2")
+		require.NotNil(t, parent2)
+		require.Equal(t, "main", parent2.Name)
 	})
 }

@@ -92,7 +92,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	// Get current branch info
 	currentBranch := eng.CurrentBranch()
-	if currentBranch.Name == "" {
+	if currentBranch == nil {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -114,8 +114,22 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		renderer := tui.NewStackTreeRenderer(
 			currentBranch.Name,
 			eng.Trunk().Name,
-			eng.GetChildren,
-			eng.GetParent,
+			func(branchName string) []string {
+				branch := eng.GetBranch(branchName)
+				children := branch.GetChildren()
+				childNames := make([]string, len(children))
+				for i, c := range children {
+					childNames[i] = c.Name
+				}
+				return childNames
+			},
+			func(branchName string) string {
+				parent := eng.GetParent(branchName)
+				if parent == nil {
+					return ""
+				}
+				return parent.Name
+			},
 			func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
 			func(branchName string) bool {
 				return eng.IsBranchUpToDate(branchName)

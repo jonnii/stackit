@@ -25,18 +25,23 @@ func (b Branch) IsTracked() bool {
 	return b.Reader.IsBranchTrackedInternal(b.Name)
 }
 
+// GetChildren returns the children branches
+func (b Branch) GetChildren() []Branch {
+	return b.Reader.GetChildrenInternal(b.Name)
+}
+
 // BranchReader provides read-only access to branch information
 // Thread-safe: All methods are safe for concurrent use
 type BranchReader interface {
 	// State queries
 	AllBranches() []Branch                          // Returns all branches
-	CurrentBranch() Branch                          // Returns current branch (Name is empty if not on a branch)
+	CurrentBranch() *Branch                         // Returns current branch (nil if not on a branch)
 	Trunk() Branch                                  // Returns the trunk branch
 	GetBranch(branchName string) Branch             // Returns a Branch wrapper
-	GetParent(branchName string) string             // Returns empty string if no parent
+	GetParent(branchName string) *Branch            // Returns nil if no parent
 	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)
-	GetChildren(branchName string) []string
-	GetRelativeStack(branchName string, scope Scope) []string
+	GetChildrenInternal(branchName string) []Branch // Internal method for Branch type
+	GetRelativeStack(branchName string, scope Scope) []Branch
 	IsBranchUpToDate(branchName string) bool
 
 	// Internal methods used by Branch type (exported so implementations outside this package can provide them)
@@ -51,9 +56,9 @@ type BranchReader interface {
 	FindBranchForCommit(commitSHA string) (string, error)
 
 	// Stack queries
-	GetRelativeStackUpstack(branchName string) []string
-	GetRelativeStackDownstack(branchName string) []string
-	GetFullStack(branchName string) []string
+	GetRelativeStackUpstack(branchName string) []Branch
+	GetRelativeStackDownstack(branchName string) []Branch
+	GetFullStack(branchName string) []Branch
 	SortBranchesTopologically(branches []string) []string
 	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
@@ -61,7 +66,7 @@ type BranchReader interface {
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 
 	// Traversal
-	BranchesDepthFirst(startBranch string) iter.Seq2[string, int]
+	BranchesDepthFirst(startBranch string) iter.Seq2[Branch, int]
 }
 
 // BranchWriter provides write operations for branch management

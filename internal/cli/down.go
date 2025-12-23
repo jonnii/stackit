@@ -49,25 +49,24 @@ as an argument to move multiple levels at once.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == "" {
+			if currentBranch.Name == "" {
 				return errors.ErrNotOnBranch
 			}
 
 			// Check if on trunk
-			currentBranchObj := ctx.Engine.GetBranch(currentBranch)
-			if currentBranchObj.IsTrunk() {
-				ctx.Splog.Info("Already at trunk (%s).", tui.ColorBranchName(currentBranch, true))
+			if currentBranch.IsTrunk() {
+				ctx.Splog.Info("Already at trunk (%s).", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
 			}
 
 			// Traverse down the specified number of steps
-			targetBranch := currentBranch
+			targetBranch := currentBranch.Name
 			for i := 0; i < steps; i++ {
 				parent := ctx.Engine.GetParent(targetBranch)
 				if parent == "" {
 					// No parent found - branch is untracked or we've gone past trunk
 					if i == 0 {
-						ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch, true))
+						ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch.Name, true))
 						return nil
 					}
 					// We moved some steps but can't go further
@@ -79,7 +78,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Check if we actually moved
-			if targetBranch == currentBranch {
+			if targetBranch == currentBranch.Name {
 				ctx.Splog.Info("Already at the bottom of the stack.")
 				return nil
 			}

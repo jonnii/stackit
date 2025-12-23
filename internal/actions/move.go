@@ -23,10 +23,11 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	// Default source to current branch
 	source := opts.Source
 	if source == "" {
-		source = eng.CurrentBranch()
-		if source == "" {
+		currentBranch := eng.CurrentBranch()
+		if currentBranch.Name == "" {
 			return fmt.Errorf("not on a branch and no source branch specified")
 		}
+		source = currentBranch.Name
 	}
 
 	// Take snapshot before modifying the repository
@@ -63,10 +64,10 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	ontoBranch := eng.GetBranch(onto)
 	if !ontoBranch.IsTrunk() && !ontoBranch.IsTracked() {
 		// Check if it's an untracked branch
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 		found := false
-		for _, b := range allBranches {
-			if b == onto {
+		for _, branch := range allBranches {
+			if branch.Name == onto {
 				found = true
 				break
 			}
@@ -96,7 +97,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	// Get current parent for logging
 	oldParent := eng.GetParent(source)
 	if oldParent == "" {
-		oldParent = eng.Trunk()
+		oldParent = eng.Trunk().Name
 	}
 
 	// Update parent in engine

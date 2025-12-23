@@ -151,9 +151,9 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Check if branch already exists
-	allBranches := eng.AllBranchNames()
-	for _, name := range allBranches {
-		if name == branchName {
+	allBranches := eng.AllBranches()
+	for _, branch := range allBranches {
+		if branch.Name == branchName {
 			return fmt.Errorf("branch %s already exists", branchName)
 		}
 	}

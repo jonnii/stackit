@@ -241,7 +241,11 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("new-branch", "main")
 
 		// Verify new branch exists
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "new-branch")
 
 		// Restore snapshot
@@ -252,7 +256,11 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Verify new branch was deleted
 		s.Rebuild()
-		branches = s.Engine.AllBranchNames()
+		allBranches2 := s.Engine.AllBranches()
+		branches = make([]string, len(allBranches2))
+		for i, b := range allBranches2 {
+			branches[i] = b.Name
+		}
 		require.NotContains(t, branches, "new-branch")
 	})
 
@@ -344,7 +352,11 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Verify branch was restored
 		s.Rebuild()
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "feature")
 	})
 
@@ -379,7 +391,11 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.Equal(t, "feature", currentBranch)
 
 		// Verify the branch exists
-		branches := s.Engine.AllBranchNames()
+		allBranches := s.Engine.AllBranches()
+		branches := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branches[i] = b.Name
+		}
 		require.Contains(t, branches, "feature")
 	})
 }

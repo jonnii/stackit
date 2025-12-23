@@ -29,14 +29,14 @@ branches depend on the current branch.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == "" {
+			if currentBranch.Name == "" {
 				return errors.ErrNotOnBranch
 			}
 
 			// Get children
-			children := ctx.Engine.GetChildren(currentBranch)
+			children := ctx.Engine.GetChildren(currentBranch.Name)
 			if len(children) == 0 {
-				ctx.Splog.Info("%s has no children.", tui.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("%s has no children.", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
 			}
 

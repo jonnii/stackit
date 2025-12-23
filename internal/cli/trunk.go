@@ -110,22 +110,21 @@ func handleShowTrunk(ctx *runtime.Context) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch.Name == "" {
 		// Not on a branch, just show primary trunk
 		trunk := eng.Trunk()
-		fmt.Println(trunk)
+		fmt.Println(trunk.Name)
 		return nil
 	}
 
 	// If current branch is trunk, show it
-	currentBranchObj := eng.GetBranch(currentBranch)
-	if currentBranchObj.IsTrunk() {
-		fmt.Println(currentBranch)
+	if currentBranch.IsTrunk() {
+		fmt.Println(currentBranch.Name)
 		return nil
 	}
 
 	// Find the trunk by walking up the parent chain
-	trunk := findTrunkForBranch(eng, currentBranch, ctx.RepoRoot)
+	trunk := findTrunkForBranch(eng, currentBranch.Name, ctx.RepoRoot)
 	fmt.Println(trunk)
 	return nil
 }
@@ -135,7 +134,7 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	// Get all configured trunks
 	trunks, err := config.GetAllTrunks(repoRoot)
 	if err != nil {
-		return eng.Trunk()
+		return eng.Trunk().Name
 	}
 
 	// Walk up the parent chain
@@ -161,5 +160,5 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	}
 
 	// Default to primary trunk
-	return eng.Trunk()
+	return eng.Trunk().Name
 }

@@ -49,7 +49,7 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	// Get parent branch
 	parent := eng.GetParent(currentBranch)
 	if parent == "" {
-		parent = eng.Trunk()
+		parent = eng.Trunk().Name
 	}
 
 	// Get parent branch revision

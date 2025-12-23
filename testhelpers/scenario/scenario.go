@@ -122,7 +122,7 @@ func (s *Scenario) Rebuild() *Scenario {
 	err := git.InitDefaultRepo()
 	require.NoError(s.T, err)
 	if s.Engine != nil {
-		err = s.Engine.Rebuild(s.Engine.Trunk())
+		err = s.Engine.Rebuild(s.Engine.Trunk().Name)
 		require.NoError(s.T, err)
 	}
 	return s
@@ -159,7 +159,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	s.T.Helper()
 
 	// Ensure we have an initial commit on main if it's the root
-	if s.Engine.Trunk() == "main" {
+	if s.Engine.Trunk().Name == "main" {
 		messages, _ := s.Scene.Repo.ListCurrentBranchCommitMessages()
 		if len(messages) == 0 {
 			s.WithInitialCommit()
@@ -170,7 +170,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	// For simplicity in tests, we'll just keep trying until all are created
 	// or we stop making progress.
 	created := make(map[string]bool)
-	created[s.Engine.Trunk()] = true
+	created[s.Engine.Trunk().Name] = true
 
 	for len(created) < len(structure)+1 {
 		progress := false

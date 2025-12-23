@@ -31,8 +31,9 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 
 		// Log reparenting if it happened
 		if result.Reparented {
+			currentBranch := eng.CurrentBranch()
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
+				tui.ColorBranchName(branchName, branchName == currentBranch.Name),
 				tui.ColorBranchName(result.OldParent, false),
 				tui.ColorBranchName(result.NewParent, false))
 		}
@@ -41,17 +42,18 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 		case engine.RestackDone:
 			parent := eng.GetParent(branchName)
 			if parent == "" {
-				parent = eng.Trunk()
+				parent = eng.Trunk().Name
 			}
+			currentBranch := eng.CurrentBranch()
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
+				tui.ColorBranchName(branchName, branchName == currentBranch.Name),
 				tui.ColorBranchName(parent, false))
 		case engine.RestackConflict:
 			// Persist continuation state with remaining branches
 			continuation := &config.ContinuationState{
 				BranchesToRestack:     branchNames[i+1:], // Remaining branches
 				RebasedBranchBase:     result.RebasedBranchBase,
-				CurrentBranchOverride: eng.CurrentBranch(),
+				CurrentBranchOverride: eng.CurrentBranch().Name,
 			}
 
 			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
@@ -67,10 +69,11 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 		case engine.RestackUnneeded:
 			parent := eng.GetParent(branchName)
 			if parent == "" {
-				parent = eng.Trunk()
+				parent = eng.Trunk().Name
 			}
+			currentBranch := eng.CurrentBranch()
 			splog.Info("%s does not need to be restacked on %s.",
-				tui.ColorBranchName(branchName, branchName == eng.CurrentBranch()),
+				tui.ColorBranchName(branchName, branchName == currentBranch.Name),
 				tui.ColorBranchName(parent, false))
 		}
 	}

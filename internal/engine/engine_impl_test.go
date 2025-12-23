@@ -150,7 +150,12 @@ func TestDeleteBranch(t *testing.T) {
 
 		// Verify branch1 is removed
 		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
-		require.NotContains(t, s.Engine.AllBranchNames(), "branch1")
+		allBranches := s.Engine.AllBranches()
+		branchNames := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branchNames[i] = b.Name
+		}
+		require.NotContains(t, branchNames, "branch1")
 
 		// Verify children now point to main
 		require.Equal(t, "main", s.Engine.GetParent("branch2"))
@@ -371,7 +376,12 @@ func TestRebuild(t *testing.T) {
 			})
 
 		// Verify initial state
-		require.Contains(t, s.Engine.AllBranchNames(), "branch1")
+		allBranches := s.Engine.AllBranches()
+		branchNames := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branchNames[i] = b.Name
+		}
+		require.Contains(t, branchNames, "branch1")
 		require.Equal(t, "main", s.Engine.GetParent("branch1"))
 
 		// Create new branch externally (not tracked)
@@ -384,7 +394,12 @@ func TestRebuild(t *testing.T) {
 		require.NoError(t, err)
 
 		// New branch should be in list
-		require.Contains(t, s.Engine.AllBranchNames(), "branch2")
+		allBranches2 := s.Engine.AllBranches()
+		branchNames2 := make([]string, len(allBranches2))
+		for i, b := range allBranches2 {
+			branchNames2[i] = b.Name
+		}
+		require.Contains(t, branchNames2, "branch2")
 		// But not tracked yet
 		require.False(t, s.Engine.GetBranch("branch2").IsTracked())
 	})
@@ -574,7 +589,12 @@ func TestReset(t *testing.T) {
 		require.NoError(t, err)
 
 		// Branch should still exist but not be tracked
-		require.Contains(t, s.Engine.AllBranchNames(), "branch1")
+		allBranches := s.Engine.AllBranches()
+		branchNames := make([]string, len(allBranches))
+		for i, b := range allBranches {
+			branchNames[i] = b.Name
+		}
+		require.Contains(t, branchNames, "branch1")
 		require.False(t, s.Engine.GetBranch("branch1").IsTracked())
 	})
 }
@@ -593,7 +613,7 @@ func TestConcurrentAccess(t *testing.T) {
 				_ = s.Engine.GetParent("branch1")
 				_ = s.Engine.GetChildren("main")
 				_ = s.Engine.GetBranch("branch1").IsTracked()
-				_ = s.Engine.AllBranchNames()
+				_ = s.Engine.AllBranches()
 				done <- true
 			}()
 		}
@@ -843,7 +863,7 @@ func TestDetachAndResetBranchChanges(t *testing.T) {
 
 		// Verify HEAD is detached
 		currentBranch := s.Engine.CurrentBranch()
-		require.Empty(t, currentBranch, "should be in detached HEAD state")
+		require.Empty(t, currentBranch.Name, "should be in detached HEAD state")
 
 		// Verify we're at the merge base commit
 		headCommit, _ := s.Scene.Repo.GetRevision("HEAD")

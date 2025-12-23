@@ -25,9 +25,11 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	}
 
 	// Create tree renderer
+	currentBranch := ctx.Engine.CurrentBranch()
+	trunk := ctx.Engine.Trunk()
 	renderer := tui.NewStackTreeRenderer(
-		ctx.Engine.CurrentBranch(),
-		ctx.Engine.Trunk(),
+		currentBranch.Name,
+		trunk.Name,
 		ctx.Engine.GetChildren,
 		ctx.Engine.GetParent,
 		func(branchName string) bool { return ctx.Engine.GetBranch(branchName).IsTrunk() },
@@ -62,8 +64,8 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 
 func getUntrackedBranchNames(ctx *runtime.Context) []string {
 	var untracked []string
-	for _, branchName := range ctx.Engine.AllBranchNames() {
-		branch := ctx.Engine.GetBranch(branchName)
+	for _, branch := range ctx.Engine.AllBranches() {
+		branchName := branch.Name
 		if !branch.IsTrunk() && !branch.IsTracked() {
 			untracked = append(untracked, branchName)
 		}

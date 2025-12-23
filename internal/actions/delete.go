@@ -22,7 +22,11 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 
 	branchName := opts.BranchName
 	if branchName == "" {
-		branchName = eng.CurrentBranch()
+		currentBranch := eng.CurrentBranch()
+		if currentBranch.Name == "" {
+			return fmt.Errorf("no branch specified and not on a branch")
+		}
+		branchName = currentBranch.Name
 	}
 
 	if branchName == "" {

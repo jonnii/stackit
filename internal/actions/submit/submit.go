@@ -92,8 +92,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Display the stack tree with PR annotations
-	renderer := getStackTreeRenderer(branches, opts, eng, currentBranch)
-	ui.ShowStack(renderer, eng.Trunk())
+	renderer := getStackTreeRenderer(branches, opts, eng, currentBranch.Name)
+	ui.ShowStack(renderer, eng.Trunk().Name)
 
 	// Restack if requested
 	if opts.Restack {
@@ -116,7 +116,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch, ui)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch.Name, ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -323,10 +323,11 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	// Get branch scope
 	branchName := opts.Branch
 	if branchName == "" {
-		branchName = eng.CurrentBranch()
-	}
-	if branchName == "" {
-		return nil, fmt.Errorf("not on a branch and no branch specified")
+		currentBranch := eng.CurrentBranch()
+		if currentBranch.Name == "" {
+			return nil, fmt.Errorf("not on a branch and no branch specified")
+		}
+		branchName = currentBranch.Name
 	}
 
 	var allBranches []string
@@ -510,9 +511,11 @@ func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Eng
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
 func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, currentBranch string) *tui.StackTreeRenderer {
 	// Create the tree renderer
+	currentBranchObj := eng.CurrentBranch()
+	trunk := eng.Trunk()
 	renderer := tui.NewStackTreeRenderer(
-		currentBranch,
-		eng.Trunk(),
+		currentBranchObj.Name,
+		trunk.Name,
 		eng.GetChildren,
 		eng.GetParent,
 		func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
@@ -528,7 +531,8 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine, cu
 		branchSet[b] = true
 	}
 
-	for _, branchName := range eng.AllBranchNames() {
+	for _, branch := range eng.AllBranches() {
+		branchName := branch.Name
 		prInfo, _ := eng.GetPrInfo(branchName)
 		if prInfo == nil && !branchSet[branchName] {
 			continue

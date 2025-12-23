@@ -87,23 +87,27 @@ func NewDemoEngine() *Engine {
 
 // BranchReader interface implementation
 
-// AllBranchNames returns simulated branch names
-func (e *Engine) AllBranchNames() []string {
+// AllBranches returns simulated branches
+func (e *Engine) AllBranches() []engine.Branch {
 	names := []string{GetDemoTrunk()}
 	for _, b := range GetDemoBranches() {
 		names = append(names, b.Name)
 	}
-	return names
+	branches := make([]engine.Branch, len(names))
+	for i, name := range names {
+		branches[i] = engine.Branch{Name: name, Reader: e}
+	}
+	return branches
 }
 
 // CurrentBranch returns the simulated current branch
-func (e *Engine) CurrentBranch() string {
-	return GetDemoCurrentBranch()
+func (e *Engine) CurrentBranch() engine.Branch {
+	return engine.Branch{Name: GetDemoCurrentBranch(), Reader: e}
 }
 
 // Trunk returns the simulated trunk branch
-func (e *Engine) Trunk() string {
-	return GetDemoTrunk()
+func (e *Engine) Trunk() engine.Branch {
+	return engine.Branch{Name: GetDemoTrunk(), Reader: e}
 }
 
 // GetParent returns the simulated parent of a branch
@@ -210,7 +214,7 @@ func (e *Engine) GetRevision(branchName string) (string, error) {
 // FindBranchForCommit returns the current branch in the demo engine
 func (e *Engine) FindBranchForCommit(_ string) (string, error) {
 	// For demo, just return the current branch
-	return e.CurrentBranch(), nil
+	return e.CurrentBranch().Name, nil
 }
 
 // GetRelativeStackUpstack returns descendants in the demo engine

@@ -25,15 +25,15 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 	if opts.Parent != "" {
 		parent := opts.Parent
 		// Validate parent exists (refresh branch list if needed)
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 		parentExists := false
-		for _, name := range allBranches {
-			if name == parent {
+		for _, branch := range allBranches {
+			if branch.Name == parent {
 				parentExists = true
 				break
 			}
 		}
-		if !parentExists && parent != eng.Trunk() {
+		if !parentExists && parent != eng.Trunk().Name {
 			// Refresh branches list and check again
 			branches, err := git.GetAllBranchNames()
 			if err == nil {
@@ -117,7 +117,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		// Try auto-detection (single unambiguous non-trunk tracked ancestor)
 		var parentBranch string
 		ancestors, err := eng.FindMostRecentTrackedAncestors(ctx.Context, branchName)
-		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk() {
+		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().Name {
 			parentBranch = ancestors[0]
 			ctx.Splog.Info("Auto-detected parent %s for %s.", tui.ColorBranchName(parentBranch, false), tui.ColorBranchName(branchName, false))
 		} else {
@@ -137,10 +137,11 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	}
 
 	// Find untracked children and ask to track them
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
 	untrackedChildren := []string{}
 
-	for _, candidate := range allBranches {
+	for _, candidateBranch := range allBranches {
+		candidate := candidateBranch.Name
 		if candidate == branchName {
 			continue
 		}
@@ -157,7 +158,6 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		}
 
 		// If merge base is the branch we just tracked, candidate is a child
-		candidateBranch := eng.GetBranch(candidate)
 		if mergeBase == branchRev && !candidateBranch.IsTracked() {
 			untrackedChildren = append(untrackedChildren, candidate)
 		}
@@ -184,7 +184,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 // selectParentBranch interactively selects a parent branch for tracking
 func selectParentBranch(ctx *runtime.Context, branchName string) (string, error) {
 	eng := ctx.Engine
-	trunk := eng.Trunk()
+	trunk := eng.Trunk().Name
 
 	// Render the tree to get visual context for each branch
 	renderer := tui.NewStackTreeRenderer(
@@ -230,8 +230,9 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	})
 
 	// Add all tracked branches
-	allBranches := eng.AllBranchNames()
-	for _, candidate := range allBranches {
+	allBranches := eng.AllBranches()
+	for _, candidateBranch := range allBranches {
+		candidate := candidateBranch.Name
 		if candidate == branchName || candidate == trunk {
 			continue
 		}

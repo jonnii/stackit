@@ -27,7 +27,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get current branch
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch.Name == "" {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -93,9 +93,9 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get all commits downstack from current branch
 	// We need commits from all branches downstack, not just current branch
-	downstackBranches := eng.GetRelativeStackDownstack(currentBranch)
+	downstackBranches := eng.GetRelativeStackDownstack(currentBranch.Name)
 	// Include current branch
-	downstackBranches = append([]string{currentBranch}, downstackBranches...)
+	downstackBranches = append([]string{currentBranch.Name}, downstackBranches...)
 
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}

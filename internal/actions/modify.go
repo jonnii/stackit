@@ -141,13 +141,13 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	currentBranch := eng.CurrentBranch()
 
 	// Get the parent branch to determine rebase base
-	parent := eng.GetParent(currentBranch)
+	parent := eng.GetParent(currentBranch.Name)
 	if parent == "" {
-		parent = eng.Trunk()
+		parent = eng.Trunk().Name
 	}
 
 	splog.Info("Starting interactive rebase for %s onto %s...",
-		tui.ColorBranchName(currentBranch, true),
+		tui.ColorBranchName(currentBranch.Name, true),
 		tui.ColorBranchName(parent, false))
 
 	// Run interactive rebase
@@ -163,7 +163,7 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	splog.Info("Interactive rebase completed.")
 
 	// Restack upstack branches
-	upstackBranches := eng.GetRelativeStackUpstack(currentBranch)
+	upstackBranches := eng.GetRelativeStackUpstack(currentBranch.Name)
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))

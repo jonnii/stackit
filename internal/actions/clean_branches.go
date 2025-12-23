@@ -28,7 +28,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	c := ctx.Context
 
 	// Pre-calculate which branches should be deleted in parallel
-	allTrackedBranches := eng.AllBranchNames()
+	allTrackedBranches := eng.AllBranches()
 	type deleteStatus struct {
 		shouldDelete bool
 		reason       string
@@ -37,8 +37,8 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	for _, branchName := range allTrackedBranches {
-		branch := eng.GetBranch(branchName)
+	for _, branch := range allTrackedBranches {
+		branchName := branch.Name
 		if branch.IsTrunk() {
 			continue
 		}
@@ -54,7 +54,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 	wg.Wait()
 
 	// Start from trunk children
-	branchesToProcess := eng.GetChildren(eng.Trunk())
+	branchesToProcess := eng.GetChildren(eng.Trunk().Name)
 	branchesToDelete := make(map[string]map[string]bool) // branch -> set of blocking children
 	branchesWithNewParents := []string{}
 
@@ -89,7 +89,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 			// If its parent IS being deleted, update parent
 			parent := eng.GetParent(branchName)
 			if parent == "" {
-				parent = eng.Trunk()
+				parent = eng.Trunk().Name
 			}
 
 			// Find nearest ancestor that isn't being deleted
@@ -100,7 +100,7 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 				}
 				ancestor := eng.GetParent(newParent)
 				if ancestor == "" {
-					newParent = eng.Trunk()
+					newParent = eng.Trunk().Name
 					break
 				}
 				newParent = ancestor
@@ -140,7 +140,7 @@ func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[s
 			// No blockers, safe to delete
 			parent := eng.GetParent(branchName)
 			if parent == "" {
-				parent = eng.Trunk()
+				parent = eng.Trunk().Name
 			}
 
 			// Delete the branch

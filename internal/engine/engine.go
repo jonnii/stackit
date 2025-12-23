@@ -29,9 +29,9 @@ func (b Branch) IsTracked() bool {
 // Thread-safe: All methods are safe for concurrent use
 type BranchReader interface {
 	// State queries
-	AllBranchNames() []string
-	CurrentBranch() string
-	Trunk() string
+	AllBranches() []Branch                          // Returns all branches
+	CurrentBranch() Branch                          // Returns current branch (Name is empty if not on a branch)
+	Trunk() Branch                                  // Returns the trunk branch
 	GetBranch(branchName string) Branch             // Returns a Branch wrapper
 	GetParent(branchName string) string             // Returns empty string if no parent
 	GetParentPrecondition(branchName string) string // Returns parent, panics if no parent (for submit validation)

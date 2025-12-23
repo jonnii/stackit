@@ -108,23 +108,22 @@ type mergePlanEngine interface {
 func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog, githubClient github.Client, opts CreatePlanOptions) (*Plan, *PlanValidation, error) {
 	// 1. Get current branch, validate not on trunk
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch.Name == "" {
 		return nil, nil, fmt.Errorf("not on a branch")
 	}
 
-	currentBranchObj := eng.GetBranch(currentBranch)
-	if currentBranchObj.IsTrunk() {
+	if currentBranch.IsTrunk() {
 		return nil, nil, fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
 	}
 
 	// Check if current branch is tracked
-	if !currentBranchObj.IsTracked() {
-		return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch)
+	if !currentBranch.IsTracked() {
+		return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch.Name)
 	}
 
 	// 2. Collect branches from trunk to current
 	scope := engine.Scope{RecursiveParents: true}
-	parentBranches := eng.GetRelativeStack(currentBranch, scope)
+	parentBranches := eng.GetRelativeStack(currentBranch.Name, scope)
 
 	// Build full list: parent branches + current branch
 	// Filter out trunk (it shouldn't be in the list, but be safe)
@@ -135,7 +134,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 			allBranches = append(allBranches, branchName)
 		}
 	}
-	allBranches = append(allBranches, currentBranch)
+	allBranches = append(allBranches, currentBranch.Name)
 
 	// 3. For each branch: fetch PR info, check status, CI checks
 	branchesToMerge := []BranchMergeInfo{}
@@ -252,7 +251,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}
-	upstack := eng.GetRelativeStackUpstack(currentBranch)
+	upstack := eng.GetRelativeStackUpstack(currentBranch.Name)
 	for _, branchName := range upstack {
 		branchObj := eng.GetBranch(branchName)
 		if branchObj.IsTracked() {
@@ -263,14 +262,14 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	// 6. Build ordered steps based on strategy
 	var steps []PlanStep
 	if opts.Strategy == StrategyTopDown {
-		steps = buildTopDownSteps(branchesToMerge, currentBranch, upstackBranches)
+		steps = buildTopDownSteps(branchesToMerge, currentBranch.Name, upstackBranches)
 	} else {
 		steps = buildBottomUpSteps(branchesToMerge, upstackBranches)
 	}
 
 	plan := &Plan{
 		Strategy:        opts.Strategy,
-		CurrentBranch:   currentBranch,
+		CurrentBranch:   currentBranch.Name,
 		BranchesToMerge: branchesToMerge,
 		UpstackBranches: upstackBranches,
 		Steps:           steps,

@@ -55,13 +55,14 @@ func executeLog(cmd *cobra.Command, f *logFlags, style string) error {
 	eng := ctx.Engine
 
 	// Determine branch name
-	branchName := eng.Trunk()
+	trunk := eng.Trunk()
+	branchName := trunk.Name
 	if f.stack || f.steps > 0 {
 		currentBranch := eng.CurrentBranch()
-		if currentBranch == "" {
+		if currentBranch.Name == "" {
 			return fmt.Errorf("not on a branch")
 		}
-		branchName = currentBranch
+		branchName = currentBranch.Name
 	}
 
 	// Prepare options

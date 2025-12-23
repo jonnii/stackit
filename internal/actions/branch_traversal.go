@@ -24,20 +24,20 @@ const (
 // SwitchBranchAction switches to a branch based on the given direction
 func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 	currentBranch := ctx.Engine.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch.Name == "" {
 		return errors.ErrNotOnBranch
 	}
 
-	ctx.Splog.Info("%s", currentBranch)
+	ctx.Splog.Info("%s", currentBranch.Name)
 
 	var targetBranch string
 	var err error
 
 	switch direction {
 	case DirectionBottom:
-		targetBranch = traverseDownward(currentBranch, ctx)
+		targetBranch = traverseDownward(currentBranch.Name, ctx)
 	case DirectionTop:
-		targetBranch, err = traverseUpward(currentBranch, ctx)
+		targetBranch, err = traverseUpward(currentBranch.Name, ctx)
 		if err != nil {
 			return err
 		}
@@ -45,7 +45,7 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 		return fmt.Errorf("invalid direction: %s", direction)
 	}
 
-	if targetBranch == currentBranch {
+	if targetBranch == currentBranch.Name {
 		directionText := "bottom most"
 		if direction == DirectionTop {
 			directionText = "top most"

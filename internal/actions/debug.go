@@ -118,7 +118,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	// Collect stack state
 	trunk := eng.Trunk()
 	currentBranch := eng.CurrentBranch()
-	allBranches := eng.AllBranchNames()
+	allBranches := eng.AllBranches()
 
 	// Get all metadata refs
 	metadataRefs, err := git.GetMetadataRefList()
@@ -128,8 +128,8 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
-	for _, branchName := range allBranches {
-		branch := eng.GetBranch(branchName)
+	for _, branch := range allBranches {
+		branchName := branch.Name
 		branchInfo := BranchInfo{
 			Name:      branchName,
 			IsTrunk:   branch.IsTrunk(),
@@ -217,8 +217,8 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		Timestamp:      time.Now(),
 		RecentCommands: recentCommands,
 		StackState: StackStateInfo{
-			Trunk:         trunk,
-			CurrentBranch: currentBranch,
+			Trunk:         trunk.Name,
+			CurrentBranch: currentBranch.Name,
 			Branches:      branchInfos,
 		},
 		ContinuationState: continuationState,

@@ -29,21 +29,20 @@ and seeing which branch the current branch is based on.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == "" {
+			if currentBranch.Name == "" {
 				return errors.ErrNotOnBranch
 			}
 
 			// Check if on trunk
-			currentBranchObj := ctx.Engine.GetBranch(currentBranch)
-			if currentBranchObj.IsTrunk() {
-				ctx.Splog.Info("%s is trunk and has no parent.", tui.ColorBranchName(currentBranch, true))
+			if currentBranch.IsTrunk() {
+				ctx.Splog.Info("%s is trunk and has no parent.", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
 			}
 
 			// Get parent
-			parent := ctx.Engine.GetParent(currentBranch)
+			parent := ctx.Engine.GetParent(currentBranch.Name)
 			if parent == "" {
-				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch, true))
+				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch.Name, true))
 				return nil
 			}
 

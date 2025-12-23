@@ -96,7 +96,7 @@ func TestDelete(t *testing.T) {
 			})
 
 		s.Checkout("branch1")
-		require.Equal(t, "branch1", s.Engine.CurrentBranch())
+		require.Equal(t, "branch1", s.Engine.CurrentBranch().Name)
 
 		err := actions.Delete(s.Context, actions.DeleteOptions{
 			BranchName: "branch1",
@@ -104,7 +104,7 @@ func TestDelete(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.Equal(t, "main", s.Engine.CurrentBranch())
+		require.Equal(t, "main", s.Engine.CurrentBranch().Name)
 	})
 
 	t.Run("deletes a branch in a branching stack", func(t *testing.T) {

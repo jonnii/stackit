@@ -35,12 +35,12 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		// Try to continue the rebase anyway (user might have started it manually)
 		// But we need a rebasedBranchBase - try to get it from current branch's parent
 		currentBranch := eng.CurrentBranch()
-		if currentBranch == "" {
+		if currentBranch.Name == "" {
 			return fmt.Errorf("not on a branch")
 		}
-		parent := eng.GetParent(currentBranch)
+		parent := eng.GetParent(currentBranch.Name)
 		if parent == "" {
-			parent = eng.Trunk()
+			parent = eng.Trunk().Name
 		}
 		parentRev, err := eng.GetRevision(parent)
 		if err != nil {
@@ -49,7 +49,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		continuation = &config.ContinuationState{
 			RebasedBranchBase:     parentRev,
 			BranchesToRestack:     []string{},
-			CurrentBranchOverride: currentBranch,
+			CurrentBranchOverride: currentBranch.Name,
 		}
 	}
 
@@ -75,7 +75,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		// Get current branch name for conflict status
 		branchName := result.BranchName
 		if branchName == "" {
-			branchName = eng.CurrentBranch()
+			branchName = eng.CurrentBranch().Name
 		}
 		if err := PrintConflictStatus(ctx.Context, branchName, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)

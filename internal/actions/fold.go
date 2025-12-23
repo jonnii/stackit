@@ -66,7 +66,7 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	// Get parent branch
 	parent := eng.GetParent(currentBranch)
 	if parent == "" {
-		parent = eng.Trunk()
+		parent = eng.Trunk().Name
 	}
 
 	parentBranch := eng.GetBranch(parent)
@@ -95,7 +95,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Rebuild engine so it knows we're on the parent branch
-	if err := eng.Rebuild(eng.Trunk()); err != nil {
+	if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -128,7 +128,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	// Restack all descendants of the parent
 	if len(descendants) > 0 {
 		// Rebuild engine to reflect the deletion
-		if err := eng.Rebuild(eng.Trunk()); err != nil {
+		if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 			return fmt.Errorf("failed to rebuild engine: %w", err)
 		}
 
@@ -181,7 +181,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 	}
 
 	// Rebuild engine to reflect the deletion
-	if err := eng.Rebuild(eng.Trunk()); err != nil {
+	if err := eng.Rebuild(eng.Trunk().Name); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 

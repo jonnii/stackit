@@ -34,10 +34,11 @@ This command can also be used to fix corrupted stackit metadata.`,
 			if len(args) > 0 {
 				branchName = args[0]
 			} else {
-				branchName = ctx.Engine.CurrentBranch()
-				if branchName == "" {
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch.Name == "" {
 					return errors.ErrNotOnBranch
 				}
+				branchName = currentBranch.Name
 			}
 
 			// Execute track action

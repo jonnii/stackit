@@ -9,15 +9,19 @@ import (
 	"stackit.dev/stackit/internal/git"
 )
 
-// AllBranchNames returns all branch names
-func (e *engineImpl) AllBranchNames() []string {
+// AllBranches returns all branches
+func (e *engineImpl) AllBranches() []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.branches
+	branches := make([]Branch, len(e.branches))
+	for i, name := range e.branches {
+		branches[i] = Branch{Name: name, Reader: e}
+	}
+	return branches
 }
 
-// CurrentBranch returns the current branch name
-func (e *engineImpl) CurrentBranch() string {
+// CurrentBranch returns the current branch (Name is empty if not on a branch)
+func (e *engineImpl) CurrentBranch() Branch {
 	e.mu.Lock()
 	if current, err := git.GetCurrentBranch(); err == nil {
 		e.currentBranch = current
@@ -29,14 +33,14 @@ func (e *engineImpl) CurrentBranch() string {
 
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.currentBranch
+	return Branch{Name: e.currentBranch, Reader: e}
 }
 
-// Trunk returns the trunk branch name
-func (e *engineImpl) Trunk() string {
+// Trunk returns the trunk branch
+func (e *engineImpl) Trunk() Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.trunk
+	return Branch{Name: e.trunk, Reader: e}
 }
 
 // GetBranch returns a Branch wrapper for the given branch name
@@ -176,7 +180,7 @@ func (e *engineImpl) GetRevision(branchName string) (string, error) {
 func (e *engineImpl) GetParentPrecondition(branchName string) string {
 	parent := e.GetParent(branchName)
 	if parent == "" {
-		return e.Trunk()
+		return e.Trunk().Name
 	}
 	return parent
 }
@@ -445,7 +449,7 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 		if prInfo.State == prStateMerged {
 			base := prInfo.Base
 			if base == "" {
-				base = e.Trunk()
+				base = e.Trunk().Name
 			}
 			return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, base)}, nil
 		}
@@ -454,7 +458,7 @@ func (e *engineImpl) GetDeletionStatus(ctx context.Context, branchName string) (
 	// Check if merged into trunk
 	merged, err := e.IsMergedIntoTrunk(ctx, branchName)
 	if err == nil && merged {
-		return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, e.Trunk())}, nil
+		return DeletionStatus{SafeToDelete: true, Reason: fmt.Sprintf("%s is merged into %s", branchName, e.Trunk().Name)}, nil
 	}
 
 	// Check if empty

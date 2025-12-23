@@ -157,7 +157,7 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 
 	worktreeEng, err := engine.NewEngine(engine.Options{
 		RepoRoot:          worktreePath,
-		Trunk:             trunk,
+		Trunk:             trunk.Name,
 		MaxUndoStackDepth: maxUndoDepth,
 	})
 	if err != nil {
@@ -434,6 +434,7 @@ func executeStepWithProgress(ctx context.Context, step PlanStep, stepIndex int, 
 // executeStep executes a single step
 func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, _ ExecuteOptions) error {
 	trunk := eng.Trunk() // Cache trunk for this function scope
+	trunkName := trunk.Name
 	switch step.StepType {
 	case StepMergePR:
 		if githubClient == nil {
@@ -450,7 +451,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(trunk)
+			rev, _ := eng.GetRevision(trunkName)
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -477,7 +478,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			actualParent = eng.GetParent(step.BranchName)
 		}
 		if actualParent == "" {
-			actualParent = trunk
+			actualParent = trunkName
 		}
 
 		switch result.Result {
@@ -499,7 +500,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			// Save continuation state
 			continuation := &config.ContinuationState{
 				RebasedBranchBase:     result.RebasedBranchBase,
-				CurrentBranchOverride: eng.CurrentBranch(),
+				CurrentBranchOverride: eng.CurrentBranch().Name,
 			}
 			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
 				return fmt.Errorf("failed to persist continuation: %w", err)
@@ -549,11 +550,12 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 // This is used in top-down strategy to rebase the current branch onto trunk
 func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClient github.Client, step PlanStep) error {
 	trunk := eng.Trunk()
+	trunkName := trunk.Name
 
 	// Get the parent revision (old base)
 	parent := eng.GetParent(step.BranchName)
 	if parent == "" {
-		parent = trunk
+		parent = trunkName
 	}
 
 	// Get the old parent revision
@@ -563,33 +565,33 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	}
 
 	// If parent is already trunk, we might just need to update the PR base
-	if parent == trunk {
+	if parent == trunkName {
 		// Just update the PR base branch via GitHub API
-		return updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunk)
+		return updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunkName)
 	}
 
 	// Rebase the branch onto trunk
-	gitResult, err := git.Rebase(ctx, step.BranchName, trunk, oldParentRev)
+	gitResult, err := git.Rebase(ctx, step.BranchName, trunkName, oldParentRev)
 	if err != nil {
 		return fmt.Errorf("failed to rebase: %w", err)
 	}
 
 	if gitResult == git.RebaseConflict {
-		return fmt.Errorf("rebase conflict while rebasing %s onto %s", step.BranchName, trunk)
+		return fmt.Errorf("rebase conflict while rebasing %s onto %s", step.BranchName, trunkName)
 	}
 
 	// Update parent to trunk
-	if err := eng.SetParent(ctx, step.BranchName, trunk); err != nil {
+	if err := eng.SetParent(ctx, step.BranchName, trunkName); err != nil {
 		return fmt.Errorf("failed to update parent: %w", err)
 	}
 
 	// Update PR base branch via GitHub API
-	if err := updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunk); err != nil {
+	if err := updatePRBaseBranchFromContext(ctx, githubClient, step.BranchName, trunkName); err != nil {
 		return fmt.Errorf("failed to update PR base: %w", err)
 	}
 
 	// Rebuild engine to reflect changes
-	if err := eng.Rebuild(trunk); err != nil {
+	if err := eng.Rebuild(trunkName); err != nil {
 		return fmt.Errorf("failed to rebuild engine: %w", err)
 	}
 
@@ -728,12 +730,13 @@ func CheckSyncStatus(ctx context.Context, eng engine.Engine, splog *tui.Splog) (
 
 	if pullResult == engine.PullDone {
 		needsSync = true
-		staleBranches = append(staleBranches, eng.Trunk())
+		staleBranches = append(staleBranches, eng.Trunk().Name)
 	}
 
 	// Check all tracked branches
-	allBranches := eng.AllBranchNames()
-	for _, branchName := range allBranches {
+	allBranches := eng.AllBranches()
+	for _, branch := range allBranches {
+		branchName := branch.Name
 		branch := eng.GetBranch(branchName)
 		if branch.IsTrunk() {
 			continue

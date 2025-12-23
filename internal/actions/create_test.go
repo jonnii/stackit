@@ -111,7 +111,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild engine to ensure it knows we're on child1
-		err = s.Context.Engine.Rebuild(s.Context.Engine.Trunk())
+		err = s.Context.Engine.Rebuild(s.Context.Engine.Trunk().Name)
 		require.NoError(t, err)
 
 		// 3. Insert 'inserted' after child1

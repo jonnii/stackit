@@ -34,7 +34,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	// Handle --trunk flag
 	switch {
 	case opts.CheckoutTrunk:
-		branchName = eng.Trunk()
+		branchName = eng.Trunk().Name
 	case opts.BranchName != "":
 		// Direct checkout
 		branchName = opts.BranchName
@@ -44,7 +44,8 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		branchName, err = tui.PromptBranchCheckout(branchNames, eng.CurrentBranch())
+		currentBranch := eng.CurrentBranch()
+		branchName, err = tui.PromptBranchCheckout(branchNames, currentBranch.Name)
 		if err != nil {
 			return err
 		}
@@ -52,7 +53,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 
 	// Check if already on the branch
 	currentBranch := eng.CurrentBranch()
-	if branchName == currentBranch {
+	if branchName == currentBranch.Name {
 		splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
 		return nil
 	}
@@ -71,10 +72,9 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 // getUntrackedBranchNamesForCheckout returns all untracked branch names (excluding trunk)
 func getUntrackedBranchNamesForCheckout(eng engine.BranchReader) []string {
 	var untracked []string
-	for _, branchName := range eng.AllBranchNames() {
-		branch := eng.GetBranch(branchName)
+	for _, branch := range eng.AllBranches() {
 		if !branch.IsTrunk() && !branch.IsTracked() {
-			untracked = append(untracked, branchName)
+			untracked = append(untracked, branch.Name)
 		}
 	}
 	return untracked
@@ -84,13 +84,13 @@ func getUntrackedBranchNamesForCheckout(eng engine.BranchReader) []string {
 func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, error) {
 	eng := ctx.Engine
 	currentBranch := eng.CurrentBranch()
-	trunkName := eng.Trunk() // Cache trunk for this function scope
+	trunkName := eng.Trunk().Name // Cache trunk for this function scope
 	seenBranches := make(map[string]bool)
 	var branchNames []string
 
 	if opts.StackOnly {
 		// Only show current stack (ancestors + descendants)
-		if currentBranch == "" {
+		if currentBranch.Name == "" {
 			return nil, fmt.Errorf("not on a branch; cannot use --stack flag")
 		}
 
@@ -99,7 +99,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := eng.GetRelativeStack(currentBranch, scope)
+		stack := eng.GetRelativeStack(currentBranch.Name, scope)
 
 		// Build branch list from stack
 		for _, branchName := range stack {
@@ -133,7 +133,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 
 	// Fallback: if we still have no choices, get all branches directly from engine
 	if len(branchNames) == 0 {
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 
 		// Ensure trunk is always included
 		if trunkName != "" && !seenBranches[trunkName] {
@@ -142,10 +142,10 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]string, e
 		}
 
 		// Add all other branches
-		for _, branchName := range allBranches {
-			if !seenBranches[branchName] {
-				branchNames = append(branchNames, branchName)
-				seenBranches[branchName] = true
+		for _, branch := range allBranches {
+			if !seenBranches[branch.Name] {
+				branchNames = append(branchNames, branch.Name)
+				seenBranches[branch.Name] = true
 			}
 		}
 

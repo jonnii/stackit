@@ -92,7 +92,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	// Get current branch info
 	currentBranch := eng.CurrentBranch()
-	if currentBranch == "" {
+	if currentBranch.Name == "" {
 		return fmt.Errorf("not on a branch")
 	}
 
@@ -106,14 +106,14 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	}
 
 	// Display current state using stack tree
-	splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch, false))
+	splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch.Name, false))
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {
 		// Create tree renderer
 		renderer := tui.NewStackTreeRenderer(
-			currentBranch,
-			eng.Trunk(),
+			currentBranch.Name,
+			eng.Trunk().Name,
 			eng.GetChildren,
 			eng.GetParent,
 			func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },

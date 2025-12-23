@@ -54,12 +54,12 @@ the --to flag is used to specify a target branch to navigate towards.`,
 
 			// Get current branch
 			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == "" {
+			if currentBranch.Name == "" {
 				return errors.ErrNotOnBranch
 			}
 
 			// Traverse up the specified number of steps
-			targetBranch := currentBranch
+			targetBranch := currentBranch.Name
 			for i := 0; i < steps; i++ {
 				children := ctx.Engine.GetChildren(targetBranch)
 				if len(children) == 0 {
@@ -112,7 +112,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 			}
 
 			// Check if we actually moved
-			if targetBranch == currentBranch {
+			if targetBranch == currentBranch.Name {
 				return nil
 			}
 

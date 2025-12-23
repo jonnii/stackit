@@ -35,10 +35,11 @@ If no branch is passed in, opens an interactive selector to choose the target br
 			// Default source to current branch
 			sourceBranch := source
 			if sourceBranch == "" {
-				sourceBranch = ctx.Engine.CurrentBranch()
-				if sourceBranch == "" {
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch.Name == "" {
 					return fmt.Errorf("not on a branch and no source branch specified")
 				}
+				sourceBranch = currentBranch.Name
 			}
 
 			// Handle interactive selection for onto if not provided
@@ -88,7 +89,8 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	}
 
 	// Get branches in stack order: trunk first, then children recursively
-	trunkName := eng.Trunk()
+	trunk := eng.Trunk()
+	trunkName := trunk.Name
 	choices := make([]tui.BranchChoice, 0)
 
 	for branchName := range eng.BranchesDepthFirst(trunkName) {
@@ -102,7 +104,8 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 		}
 		seenBranches[branchName] = true
 
-		isCurrent := branchName == eng.CurrentBranch()
+		currentBranch := eng.CurrentBranch()
+		isCurrent := branchName == currentBranch.Name
 		display := tui.ColorBranchName(branchName, isCurrent)
 		if isCurrent {
 			initialIndex = len(choices)
@@ -115,12 +118,13 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 
 	// Fallback: if we still have no choices, get all branches directly from engine
 	if len(choices) == 0 {
-		allBranches := eng.AllBranchNames()
+		allBranches := eng.AllBranches()
 
 		// Ensure trunk is always included if not excluded
 		if trunkName != "" && !excludedBranches[trunkName] && !seenBranches[trunkName] {
+			currentBranch := eng.CurrentBranch()
 			var display string
-			if trunkName == eng.CurrentBranch() {
+			if trunkName == currentBranch.Name {
 				display = tui.ColorBranchName(trunkName, true)
 				initialIndex = 0
 			} else {
@@ -134,13 +138,15 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 		}
 
 		// Add all other branches
-		for _, branchName := range allBranches {
+		for _, branch := range allBranches {
+			branchName := branch.Name
 			if excludedBranches[branchName] {
 				continue
 			}
 			if !seenBranches[branchName] {
 				var display string
-				if branchName == eng.CurrentBranch() {
+				currentBranch := eng.CurrentBranch()
+				if branchName == currentBranch.Name {
 					display = tui.ColorBranchName(branchName, true)
 					initialIndex = len(choices)
 				} else {

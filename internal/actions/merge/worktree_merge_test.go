@@ -79,6 +79,6 @@ func TestExecuteInWorktree(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify we are still on branch-a in the main workspace
-		require.Equal(t, "branch-a", s.Engine.CurrentBranch())
+		require.Equal(t, "branch-a", s.Engine.CurrentBranch().Name)
 	})
 }

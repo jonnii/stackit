@@ -35,8 +35,12 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 
 	// Generate new branch name
 	newBranchName := branchToSplit + "_split"
-	allBranches := eng.AllBranchNames()
-	for utils.ContainsString(allBranches, newBranchName) {
+	allBranches := eng.AllBranches()
+	branchNames := make([]string, len(allBranches))
+	for i, b := range allBranches {
+		branchNames[i] = b.Name
+	}
+	for utils.ContainsString(branchNames, newBranchName) {
 		newBranchName += "_split"
 	}
 

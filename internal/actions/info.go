@@ -27,10 +27,11 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 
 	branchName := opts.BranchName
 	if branchName == "" {
-		branchName = eng.CurrentBranch()
-		if branchName == "" {
+		currentBranch := eng.CurrentBranch()
+		if currentBranch.Name == "" {
 			return fmt.Errorf("not on a branch and no branch specified")
 		}
+		branchName = currentBranch.Name
 	}
 
 	// Get branch wrapper
@@ -54,7 +55,8 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	var outputLines []string
 
 	// Get branch info
-	isCurrent := branchName == eng.CurrentBranch()
+	currentBranch := eng.CurrentBranch()
+	isCurrent := branchName == currentBranch.Name
 	isTrunk := branch.IsTrunk()
 
 	// Branch name with current indicator

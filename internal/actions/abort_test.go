@@ -56,7 +56,7 @@ func TestAbortAction(t *testing.T) {
 		require.True(t, os.IsNotExist(err), "continuation state should be gone")
 
 		// Verify state restored
-		s.Engine.Rebuild(s.Engine.Trunk())
+		s.Engine.Rebuild(s.Engine.Trunk().Name)
 		restoredSHA, err := s.Engine.GetRevision("feature")
 		require.NoError(t, err)
 		require.Equal(t, initialSHA, restoredSHA)

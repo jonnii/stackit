@@ -26,7 +26,8 @@ func TestTrackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify parent relationship
-		parent := s.Engine.GetParent("feature")
+		branch := s.Engine.GetBranch("feature")
+		parent := s.Engine.GetParent(branch)
 		require.NotNil(t, parent)
 		require.Equal(t, "main", parent.Name)
 
@@ -59,10 +60,12 @@ func TestTrackBranch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify relationships
-		parent1 := s.Engine.GetParent("branch1")
+		branch1 := s.Engine.GetBranch("branch1")
+		parent1 := s.Engine.GetParent(branch1)
 		require.NotNil(t, parent1)
 		require.Equal(t, "main", parent1.Name)
-		parent2 := s.Engine.GetParent("branch2")
+		branch2 := s.Engine.GetBranch("branch2")
+		parent2 := s.Engine.GetParent(branch2)
 		require.NotNil(t, parent2)
 		require.Equal(t, "branch1", parent2.Name)
 		mainBranch := s.Engine.GetBranch("main")
@@ -127,7 +130,8 @@ func TestSetParent(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify initial state
-		parent2 := s.Engine.GetParent("branch2")
+		branch2 := s.Engine.GetBranch("branch2")
+		parent2 := s.Engine.GetParent(branch2)
 		require.NotNil(t, parent2)
 		require.Equal(t, "branch1", parent2.Name)
 
@@ -136,7 +140,8 @@ func TestSetParent(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify new parent
-		parent2After := s.Engine.GetParent("branch2")
+		branchparent2After := s.Engine.GetBranch("branch2")
+		parent2After := s.Engine.GetParent(branchparent2After)
 		require.NotNil(t, parent2After)
 		require.Equal(t, "main", parent2After.Name)
 		mainBranch := s.Engine.GetBranch("main")
@@ -202,10 +207,12 @@ func TestDeleteBranch(t *testing.T) {
 		require.NotContains(t, branchNames, "branch1")
 
 		// Verify children now point to main
-		parent2 := s.Engine.GetParent("branch2")
+		branchparent2 := s.Engine.GetBranch("branch2")
+		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
 		require.Equal(t, "main", parent2.Name)
-		parent3 := s.Engine.GetParent("branch3")
+		branchparent3 := s.Engine.GetBranch("branch3")
+		parent3 := s.Engine.GetParent(branchparent3)
 		require.NotNil(t, parent3)
 		require.Equal(t, "main", parent3.Name)
 		mainBranch := s.Engine.GetBranch("main")
@@ -230,13 +237,16 @@ func TestDeleteBranch(t *testing.T) {
 			})
 
 		// Verify initial parent of children is P
-		parentC1 := s.Engine.GetParent("C1")
+		branchparentC1 := s.Engine.GetBranch("C1")
+		parentC1 := s.Engine.GetParent(branchparentC1)
 		require.NotNil(t, parentC1)
 		require.Equal(t, "P", parentC1.Name)
-		parentC2 := s.Engine.GetParent("C2")
+		branchparentC2 := s.Engine.GetBranch("C2")
+		parentC2 := s.Engine.GetParent(branchparentC2)
 		require.NotNil(t, parentC2)
 		require.Equal(t, "P", parentC2.Name)
-		parentC3 := s.Engine.GetParent("C3")
+		branchparentC3 := s.Engine.GetBranch("C3")
+		parentC3 := s.Engine.GetParent(branchparentC3)
 		require.NotNil(t, parentC3)
 		require.Equal(t, "P", parentC3.Name)
 
@@ -248,21 +258,26 @@ func TestDeleteBranch(t *testing.T) {
 		require.False(t, s.Engine.GetBranch("P").IsTracked())
 
 		// Verify all direct children of P now point to main
-		parentC1After := s.Engine.GetParent("C1")
+		branchparentC1After := s.Engine.GetBranch("C1")
+		parentC1After := s.Engine.GetParent(branchparentC1After)
 		require.NotNil(t, parentC1After)
 		require.Equal(t, "main", parentC1After.Name)
-		parentC2After := s.Engine.GetParent("C2")
+		branchparentC2After := s.Engine.GetBranch("C2")
+		parentC2After := s.Engine.GetParent(branchparentC2After)
 		require.NotNil(t, parentC2After)
 		require.Equal(t, "main", parentC2After.Name)
-		parentC3After := s.Engine.GetParent("C3")
+		branchparentC3After := s.Engine.GetBranch("C3")
+		parentC3After := s.Engine.GetParent(branchparentC3After)
 		require.NotNil(t, parentC3After)
 		require.Equal(t, "main", parentC3After.Name)
 
 		// Verify grandchildren still point to their parents
-		parentGC1 := s.Engine.GetParent("GC1")
+		branchparentGC1 := s.Engine.GetBranch("GC1")
+		parentGC1 := s.Engine.GetParent(branchparentGC1)
 		require.NotNil(t, parentGC1)
 		require.Equal(t, "C1", parentGC1.Name)
-		parentGC3 := s.Engine.GetParent("GC3")
+		branchparentGC3 := s.Engine.GetBranch("GC3")
+		parentGC3 := s.Engine.GetParent(branchparentGC3)
 		require.NotNil(t, parentGC3)
 		require.Equal(t, "C3", parentGC3.Name)
 
@@ -431,7 +446,8 @@ func TestRestackBranch(t *testing.T) {
 			Commit("main update")
 
 		// Restack branch1 (should rebase onto new main)
-		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
+		branch1 := s.Engine.GetBranch("branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), branch1)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackDone, result.Result)
 
@@ -446,7 +462,8 @@ func TestRestackBranch(t *testing.T) {
 			})
 
 		// Branch is already fixed (no changes to main)
-		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
+		branch1 := s.Engine.GetBranch("branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), branch1)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 	})
@@ -459,13 +476,15 @@ func TestRestackBranch(t *testing.T) {
 		// Don't track the branch explicitly
 		// RestackBranch should auto-discover parent (main) and succeed
 		// In this case, main is still at the fork point, so FindMostRecentTrackedAncestors finds it.
-		result, err := s.Engine.RestackBranch(context.Background(), "branch1")
+		branch1 := s.Engine.GetBranch("branch1")
+		result, err := s.Engine.RestackBranch(context.Background(), branch1)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 
 		// Verify it is now tracked
 		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
-		parent1 := s.Engine.GetParent("branch1")
+		branchparent1 := s.Engine.GetBranch("branch1")
+		parent1 := s.Engine.GetParent(branchparent1)
 		require.NotNil(t, parent1)
 		require.Equal(t, "main", parent1.Name)
 	})
@@ -485,7 +504,8 @@ func TestRebuild(t *testing.T) {
 			branchNames[i] = b.Name
 		}
 		require.Contains(t, branchNames, "branch1")
-		parent1 := s.Engine.GetParent("branch1")
+		branchparent1 := s.Engine.GetBranch("branch1")
+		parent1 := s.Engine.GetParent(branchparent1)
 		require.NotNil(t, parent1)
 		require.Equal(t, "main", parent1.Name)
 
@@ -676,7 +696,8 @@ func TestGetRelativeStackUpstack(t *testing.T) {
 				"branch3": "branch1",
 			})
 
-		upstack := s.Engine.GetRelativeStackUpstack("branch1")
+		branch := s.Engine.GetBranch("branch1")
+		upstack := s.Engine.GetRelativeStackUpstack(branch)
 		upstackNames := make([]string, len(upstack))
 		for i, b := range upstack {
 			upstackNames[i] = b.Name
@@ -721,7 +742,8 @@ func TestConcurrentAccess(t *testing.T) {
 		done := make(chan bool, 10)
 		for i := 0; i < 10; i++ {
 			go func() {
-				_ = s.Engine.GetParent("branch1")
+				branch := s.Engine.GetBranch("branch1")
+				_ = s.Engine.GetParent(branch)
 				_ = s.Engine.GetBranch("main").GetChildren()
 				_ = s.Engine.GetBranch("branch1").IsTracked()
 				_ = s.Engine.AllBranches()
@@ -919,11 +941,12 @@ func TestEdgeCases(t *testing.T) {
 			Checkout("main")
 
 		// Branch exists but not tracked
-		parent := s.Engine.GetParent("branch1")
+		branch := s.Engine.GetBranch("branch1")
+		parent := s.Engine.GetParent(branch)
 		require.Empty(t, parent)
 
 		// GetParentPrecondition should return trunk
-		branch := s.Engine.GetBranch("branch1")
+		// branch already declared above
 		parentName := branch.GetParentPrecondition()
 		require.Equal(t, "main", parentName)
 	})
@@ -1130,7 +1153,8 @@ func TestSetParentScenarios(t *testing.T) {
 
 		// 4. Rebase branch1 onto main (changing its SHA)
 		s.Checkout("branch1")
-		s.Engine.RestackBranch(context.Background(), "branch1")
+		branch1 := s.Engine.GetBranch("branch1")
+		s.Engine.RestackBranch(context.Background(), branch1)
 		branch1NewSHA, _ := s.Engine.GetBranch("branch1").GetRevision()
 		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
 

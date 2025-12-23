@@ -93,7 +93,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Get all commits downstack from current branch
 	// We need commits from all branches downstack, not just current branch
-	downstackBranches := eng.GetRelativeStackDownstack(currentBranch.Name)
+	downstackBranches := eng.GetRelativeStackDownstack(*currentBranch)
 	// Include current branch
 	downstackBranches = append([]engine.Branch{*currentBranch}, downstackBranches...)
 
@@ -241,15 +241,11 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 
 	// Restack all branches above the oldest modified branch
 	if oldestModifiedBranch != "" {
-		upstackBranches := eng.GetRelativeStackUpstack(oldestModifiedBranch)
+		branch := eng.GetBranch(oldestModifiedBranch)
+		upstackBranches := eng.GetRelativeStackUpstack(branch)
 
 		if len(upstackBranches) > 0 {
-			// Convert []Branch to []string
-			upstackNames := make([]string, len(upstackBranches))
-			for i, b := range upstackBranches {
-				upstackNames[i] = b.Name
-			}
-			if err := RestackBranches(ctx.Context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
+			if err := RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}

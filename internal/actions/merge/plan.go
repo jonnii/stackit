@@ -250,7 +250,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}
-	upstack := eng.GetRelativeStackUpstack(currentBranch.Name)
+	upstack := eng.GetRelativeStackUpstack(*currentBranch)
 	for _, branch := range upstack {
 		if branch.IsTracked() {
 			upstackBranches = append(upstackBranches, branch.Name)

@@ -115,8 +115,8 @@ func (e *Engine) Trunk() engine.Branch {
 }
 
 // GetParent returns the simulated parent of a branch
-func (e *Engine) GetParent(branchName string) *engine.Branch {
-	parentName := e.parentMap[branchName]
+func (e *Engine) GetParent(branch engine.Branch) *engine.Branch {
+	parentName := e.parentMap[branch.Name]
 	if parentName == "" {
 		return nil
 	}
@@ -264,8 +264,8 @@ func (e *Engine) FindBranchForCommit(_ string) (string, error) {
 }
 
 // GetRelativeStackUpstack returns descendants in the demo engine
-func (e *Engine) GetRelativeStackUpstack(branchName string) []engine.Branch {
-	descendants := e.getDescendants(branchName)
+func (e *Engine) GetRelativeStackUpstack(branch engine.Branch) []engine.Branch {
+	descendants := e.getDescendants(branch.Name)
 	result := make([]engine.Branch, len(descendants))
 	for i, name := range descendants {
 		result[i] = engine.Branch{Name: name, Reader: e}
@@ -274,19 +274,17 @@ func (e *Engine) GetRelativeStackUpstack(branchName string) []engine.Branch {
 }
 
 // GetRelativeStackDownstack returns ancestors in the demo engine
-func (e *Engine) GetRelativeStackDownstack(branchName string) []engine.Branch {
-	branch := e.GetBranch(branchName)
+func (e *Engine) GetRelativeStackDownstack(branch engine.Branch) []engine.Branch {
 	return e.GetRelativeStack(branch, engine.Scope{RecursiveParents: true, IncludeCurrent: false, RecursiveChildren: false})
 }
 
 // GetFullStack returns the entire stack in the demo engine
-func (e *Engine) GetFullStack(branchName string) []engine.Branch {
-	branch := e.GetBranch(branchName)
+func (e *Engine) GetFullStack(branch engine.Branch) []engine.Branch {
 	return e.GetRelativeStack(branch, engine.Scope{RecursiveParents: true, IncludeCurrent: true, RecursiveChildren: true})
 }
 
 // SortBranchesTopologically simulates topological sort in the demo engine
-func (e *Engine) SortBranchesTopologically(branches []string) []string {
+func (e *Engine) SortBranchesTopologically(branches []engine.Branch) []engine.Branch {
 	// For demo, just return the branches as-is or do a simple sort if needed
 	return branches
 }
@@ -460,7 +458,7 @@ func (e *Engine) ResetTrunkToRemote(_ context.Context) error {
 }
 
 // RestackBranch simulates restack in the demo engine
-func (e *Engine) RestackBranch(_ context.Context, _ string) (engine.RestackBranchResult, error) {
+func (e *Engine) RestackBranch(_ context.Context, _ engine.Branch) (engine.RestackBranchResult, error) {
 	simulateDelay(delayMedium) // Rebase operation takes time
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
@@ -468,11 +466,11 @@ func (e *Engine) RestackBranch(_ context.Context, _ string) (engine.RestackBranc
 }
 
 // RestackBranches simulates batch restack in the demo engine
-func (e *Engine) RestackBranches(ctx context.Context, branchNames []string) (engine.RestackBatchResult, error) {
+func (e *Engine) RestackBranches(ctx context.Context, branches []engine.Branch) (engine.RestackBatchResult, error) {
 	results := make(map[string]engine.RestackBranchResult)
-	for _, b := range branchNames {
+	for _, b := range branches {
 		res, _ := e.RestackBranch(ctx, b)
-		results[b] = res
+		results[b.Name] = res
 	}
 	return engine.RestackBatchResult{Results: results}, nil
 }

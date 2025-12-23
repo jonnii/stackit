@@ -144,7 +144,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get parent
-		parent := eng.GetParent(branchName)
+		parent := eng.GetParent(branch)
 		if parent != nil {
 			branchInfo.Parent = parent.Name
 		}

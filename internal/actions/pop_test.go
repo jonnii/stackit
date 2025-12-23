@@ -58,7 +58,8 @@ func TestPopAction(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify branch2's parent is now main
-		parent := s.Engine.GetParent("branch2")
+		branch := s.Engine.GetBranch("branch2")
+		parent := s.Engine.GetParent(branch)
 		require.NotNil(t, parent)
 		require.Equal(t, "main", parent.Name)
 

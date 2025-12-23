@@ -96,7 +96,8 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Get current parent for logging
-	oldParent := eng.GetParent(source)
+	// sourceBranch already declared above
+	oldParent := eng.GetParent(sourceBranch)
 	oldParentName := ""
 	if oldParent == nil {
 		oldParentName = eng.Trunk().Name
@@ -122,12 +123,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	})
 
 	// Restack source and all its descendants
-	// Convert []Branch to []string
-	branchNamesToRestack := make([]string, len(branchesToRestack))
-	for i, b := range branchesToRestack {
-		branchNamesToRestack[i] = b.Name
-	}
-	if err := RestackBranches(gctx, branchNamesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

@@ -95,7 +95,8 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 		} else {
 			// Branch is not being deleted
 			// If its parent IS being deleted, update parent
-			parent := eng.GetParent(branchName)
+			branch := eng.GetBranch(branchName)
+			parent := eng.GetParent(branch)
 			parentName := ""
 			if parent == nil {
 				parentName = eng.Trunk().Name
@@ -109,7 +110,8 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 				if _, isDeleting := branchesToDelete[newParentName]; !isDeleting {
 					break
 				}
-				ancestor := eng.GetParent(newParentName)
+				newParentBranch := eng.GetBranch(newParentName)
+				ancestor := eng.GetParent(newParentBranch)
 				if ancestor == nil {
 					newParentName = eng.Trunk().Name
 					break
@@ -149,7 +151,8 @@ func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[s
 	for branchName, blockers := range branchesToDelete {
 		if len(blockers) == 0 {
 			// No blockers, safe to delete
-			parent := eng.GetParent(branchName)
+			branch := eng.GetBranch(branchName)
+			parent := eng.GetParent(branch)
 			parentName := ""
 			if parent == nil {
 				parentName = eng.Trunk().Name

@@ -110,7 +110,8 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Add branches with new parents to restack list
 	for _, branchName := range cleanResult.BranchesWithNewParents {
-		upstack := eng.GetRelativeStackUpstack(branchName)
+		branch := eng.GetBranch(branchName)
+		upstack := eng.GetRelativeStackUpstack(branch)
 		for _, b := range upstack {
 			branchesToRestack = append(branchesToRestack, b.Name)
 		}
@@ -128,7 +129,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 	if currentBranch != nil {
 		if currentBranch.IsTracked() {
 			// Get full stack (up to trunk)
-			stack := eng.GetFullStack(currentBranch.Name)
+			stack := eng.GetFullStack(*currentBranch)
 			// Add branches to restack list
 			for _, b := range stack {
 				branchesToRestack = append(branchesToRestack, b.Name)
@@ -144,11 +145,11 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 
 	// Remove duplicates
 	seen := make(map[string]bool)
-	uniqueBranches := []string{}
+	uniqueBranches := []engine.Branch{}
 	for _, branchName := range branchesToRestack {
 		if !seen[branchName] {
 			seen[branchName] = true
-			uniqueBranches = append(uniqueBranches, branchName)
+			uniqueBranches = append(uniqueBranches, eng.GetBranch(branchName))
 		}
 	}
 

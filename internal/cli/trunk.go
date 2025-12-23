@@ -138,25 +138,25 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	}
 
 	// Walk up the parent chain
-	current := branchName
+	currentBranch := eng.GetBranch(branchName)
 	visited := make(map[string]bool)
 
-	for current != "" && !visited[current] {
-		visited[current] = true
+	for currentBranch.Name != "" && !visited[currentBranch.Name] {
+		visited[currentBranch.Name] = true
 
 		// Check if current is a trunk
 		for _, t := range trunks {
-			if current == t {
-				return current
+			if currentBranch.Name == t {
+				return currentBranch.Name
 			}
 		}
 
 		// Get parent
-		parent := eng.GetParent(current)
+		parent := eng.GetParent(currentBranch)
 		if parent == nil {
 			break
 		}
-		current = parent.Name
+		currentBranch = *parent
 	}
 
 	// Default to primary trunk

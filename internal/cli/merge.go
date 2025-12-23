@@ -124,7 +124,8 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 				return childNames
 			},
 			func(branchName string) string {
-				parent := eng.GetParent(branchName)
+				branch := eng.GetBranch(branchName)
+				parent := eng.GetParent(branch)
 				if parent == nil {
 					return ""
 				}

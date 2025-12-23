@@ -116,12 +116,7 @@ func ReorderAction(ctx *runtime.Context) error {
 	})
 
 	// Restack all affected branches
-	// Convert []Branch to []string
-	affectedBranchNames := make([]string, len(affectedBranches))
-	for i, b := range affectedBranches {
-		affectedBranchNames[i] = b.Name
-	}
-	if err := RestackBranches(gctx, affectedBranchNames, eng, splog, ctx.RepoRoot); err != nil {
+	if err := RestackBranches(gctx, affectedBranches, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 
@@ -240,7 +235,8 @@ func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string
 			expectedParent = newOrder[i-1]
 		}
 
-		currentParent := eng.GetParent(branch)
+		branchObj := eng.GetBranch(branch)
+		currentParent := eng.GetParent(branchObj)
 		currentParentName := ""
 		if currentParent == nil {
 			currentParentName = trunk

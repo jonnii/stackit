@@ -81,7 +81,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 						// Try to find the child that leads to toBranch
 						var candidates []string
 						for _, child := range children {
-							upstack := ctx.Engine.GetRelativeStackUpstack(child.Name)
+							upstack := ctx.Engine.GetRelativeStackUpstack(child)
 							upstackNames := make([]string, len(upstack))
 							for i, b := range upstack {
 								upstackNames[i] = b.Name

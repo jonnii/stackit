@@ -85,7 +85,8 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 
 // RestackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
-func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (RestackBranchResult, error) {
+func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackBranchResult, error) {
+	branchName := branch.Name
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
 	e.mu.RUnlock()
@@ -139,7 +140,6 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 	}
 
 	// Check if branch needs restacking
-	branch := e.GetBranch(branchName)
 	if branch.IsBranchUpToDate() {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
@@ -243,26 +243,37 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branchName string) (Rest
 }
 
 // RestackBranches restacks multiple branches in order
-func (e *engineImpl) RestackBranches(ctx context.Context, branchNames []string) (RestackBatchResult, error) {
+func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
 	results := make(map[string]RestackBranchResult)
-	for i, branchName := range branchNames {
-		result, err := e.RestackBranch(ctx, branchName)
+	for i, branch := range branches {
+		branchName := branch.Name
+		result, err := e.RestackBranch(ctx, branch)
 		results[branchName] = result
 
 		if err != nil {
+			// Convert remaining branches to []string for RestackBatchResult
+			remainingBranchNames := make([]string, len(branches[i+1:]))
+			for j, b := range branches[i+1:] {
+				remainingBranchNames[j] = b.Name
+			}
 			return RestackBatchResult{
 				ConflictBranch:    branchName,
 				RebasedBranchBase: result.RebasedBranchBase,
-				RemainingBranches: branchNames[i+1:],
+				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, err
 		}
 
 		if result.Result == RestackConflict {
+			// Convert remaining branches to []string for RestackBatchResult
+			remainingBranchNames := make([]string, len(branches[i+1:]))
+			for j, b := range branches[i+1:] {
+				remainingBranchNames[j] = b.Name
+			}
 			return RestackBatchResult{
 				ConflictBranch:    branchName,
 				RebasedBranchBase: result.RebasedBranchBase,
-				RemainingBranches: branchNames[i+1:],
+				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, nil
 		}

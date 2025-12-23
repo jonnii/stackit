@@ -70,7 +70,7 @@ func traverseDownward(currentBranch string, ctx *runtime.Context) string {
 		return currentBranch
 	}
 
-	parent := ctx.Engine.GetParent(currentBranch)
+	parent := ctx.Engine.GetParent(currentBranchObj)
 	if parent == nil {
 		// No parent, we're at the bottom
 		return currentBranch

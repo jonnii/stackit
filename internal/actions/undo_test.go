@@ -34,7 +34,7 @@ func TestUndoAction(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get initial state
-		initialFeatureSHA, err := s.Engine.GetRevision("feature")
+		initialFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 
 		// Take snapshot
@@ -46,7 +46,7 @@ func TestUndoAction(t *testing.T) {
 			Commit("additional change")
 
 		// Verify SHA changed
-		newFeatureSHA, err := s.Engine.GetRevision("feature")
+		newFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 		require.NotEqual(t, initialFeatureSHA, newFeatureSHA)
 
@@ -60,7 +60,7 @@ func TestUndoAction(t *testing.T) {
 
 		// Verify state restored
 		s.Engine.Rebuild(s.Engine.Trunk().Name)
-		restoredFeatureSHA, err := s.Engine.GetRevision("feature")
+		restoredFeatureSHA, err := s.Engine.GetBranch("feature").GetRevision()
 		require.NoError(t, err)
 		require.Equal(t, initialFeatureSHA, restoredFeatureSHA)
 	})
@@ -89,7 +89,7 @@ func TestUndoAction(t *testing.T) {
 			TrackBranch("feature1", "main")
 
 		// Get initial state BEFORE taking snapshot
-		initialFeature1SHA, err := s.Engine.GetRevision("feature1")
+		initialFeature1SHA, err := s.Engine.GetBranch("feature1").GetRevision()
 		require.NoError(t, err)
 
 		// Take first snapshot (captures initial state)
@@ -101,7 +101,7 @@ func TestUndoAction(t *testing.T) {
 			Commit("feature1 change 2")
 
 		// Get SHA after first change
-		afterFirstChangeSHA, err := s.Engine.GetRevision("feature1")
+		afterFirstChangeSHA, err := s.Engine.GetBranch("feature1").GetRevision()
 		require.NoError(t, err)
 		require.NotEqual(t, initialFeature1SHA, afterFirstChangeSHA)
 
@@ -113,7 +113,7 @@ func TestUndoAction(t *testing.T) {
 		s.Commit("feature1 change 3")
 
 		// Get SHA after second change
-		afterSecondChangeSHA, err := s.Engine.GetRevision("feature1")
+		afterSecondChangeSHA, err := s.Engine.GetBranch("feature1").GetRevision()
 		require.NoError(t, err)
 		require.NotEqual(t, afterFirstChangeSHA, afterSecondChangeSHA)
 
@@ -129,7 +129,7 @@ func TestUndoAction(t *testing.T) {
 
 		// Verify state restored to Snapshot 2 (after first change, not initial)
 		s.Engine.Rebuild(s.Engine.Trunk().Name)
-		restoredFeature1SHA, err := s.Engine.GetRevision("feature1")
+		restoredFeature1SHA, err := s.Engine.GetBranch("feature1").GetRevision()
 		require.NoError(t, err)
 		// Should restore to state after first change
 		require.Equal(t, afterFirstChangeSHA, restoredFeature1SHA)

@@ -55,7 +55,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := eng.GetRelativeStack(currentBranch.Name, scope)
+	upstackBranches := currentBranch.GetRelativeStack(scope)
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {

@@ -31,7 +31,8 @@ type splitByFileEngine interface {
 //  7. Update the original branch's parent to be the new split branch.
 func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, eng splitByFileEngine) (*Result, error) {
 	// Get parent branch
-	parentBranchName := eng.GetParentPrecondition(branchToSplit)
+	branchToSplitObj := eng.GetBranch(branchToSplit)
+	parentBranchName := branchToSplitObj.GetParentPrecondition()
 
 	// Generate new branch name
 	newBranchName := branchToSplit + "_split"
@@ -113,7 +114,8 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 // promptForFiles shows an interactive file selector for split --by-file
 func promptForFiles(ctx context.Context, branchToSplit string, eng engine.BranchReader, splog *tui.Splog) ([]string, error) {
 	// Get the parent branch to compare against
-	parentBranchName := eng.GetParentPrecondition(branchToSplit)
+	branchToSplitObj := eng.GetBranch(branchToSplit)
+	parentBranchName := branchToSplitObj.GetParentPrecondition()
 
 	// Get merge base between branch and parent
 	mergeBase, err := git.GetMergeBase(branchToSplit, parentBranchName)

@@ -44,13 +44,8 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		// Convert []Branch to []string for TUI
-		branchNames := make([]string, len(branches))
-		for i, branch := range branches {
-			branchNames[i] = branch.Name
-		}
 		currentBranch := eng.CurrentBranch()
-		branchName, err = tui.PromptBranchCheckout(branchNames, currentBranch.Name)
+		branchName, err = tui.PromptBranchCheckout(branches, currentBranch)
 		if err != nil {
 			return err
 		}
@@ -69,7 +64,8 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	}
 
 	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
-	printBranchInfo(branchName, ctx)
+	branch := eng.GetBranch(branchName)
+	printBranchInfo(branch, ctx)
 
 	return nil
 }
@@ -104,7 +100,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := eng.GetRelativeStack(currentBranch.Name, scope)
+		stack := currentBranch.GetRelativeStack(scope)
 
 		// Build branch list from stack
 		for _, branch := range stack {
@@ -163,8 +159,7 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 }
 
 // printBranchInfo prints information about the checked out branch
-func printBranchInfo(branchName string, ctx *runtime.Context) {
-	branch := ctx.Engine.GetBranch(branchName)
+func printBranchInfo(branch engine.Branch, ctx *runtime.Context) {
 	if branch.IsTrunk() {
 		return
 	}
@@ -174,8 +169,8 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		return
 	}
 
-	if !ctx.Engine.IsBranchUpToDate(branchName) {
-		parent := ctx.Engine.GetParentPrecondition(branchName)
+	if !branch.IsBranchUpToDate() {
+		parent := branch.GetParentPrecondition()
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
 			tui.ColorBranchName(parent, false),
 			tui.ColorCyan("stackit upstack restack"))
@@ -188,13 +183,13 @@ func printBranchInfo(branchName string, ctx *runtime.Context) {
 		IncludeCurrent:    false,
 		RecursiveChildren: false,
 	}
-	downstack := ctx.Engine.GetRelativeStack(branchName, scope)
+	downstack := branch.GetRelativeStack(scope)
 
 	// Reverse to check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {
 		ancestor := downstack[i]
-		if !ctx.Engine.IsBranchUpToDate(ancestor.Name) {
-			parent := ctx.Engine.GetParentPrecondition(ancestor.Name)
+		if !ancestor.IsBranchUpToDate() {
+			parent := ancestor.GetParentPrecondition()
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
 				tui.ColorBranchName(ancestor.Name, false),
 				tui.ColorBranchName(parent, false),

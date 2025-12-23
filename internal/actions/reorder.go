@@ -40,7 +40,8 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Collect branches: get ancestors from trunk to current branch
-	stack := eng.GetRelativeStack(currentBranch, engine.Scope{
+	currentBranchBranch := eng.GetBranch(currentBranch)
+	stack := currentBranchBranch.GetRelativeStack(engine.Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    true,
 		RecursiveChildren: false,
@@ -104,10 +105,11 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Identify affected branches: find the first branch that moved or changed parent
-	firstAffectedBranch := findFirstAffectedBranch(eng, originalOrder, newOrder)
+	firstAffectedBranchName := findFirstAffectedBranch(eng, originalOrder, newOrder)
+	firstAffectedBranch := eng.GetBranch(firstAffectedBranchName)
 
 	// Get all affected branches (first affected and all its descendants)
-	affectedBranches := eng.GetRelativeStack(firstAffectedBranch, engine.Scope{
+	affectedBranches := firstAffectedBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

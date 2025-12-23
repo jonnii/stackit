@@ -78,7 +78,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	style := opts.Style
 	if style == "" {
 		// Check if there's more than one commit
-		commits, err := eng.GetAllCommits(currentBranch.Name, engine.CommitFormatSHA)
+		commits, err := currentBranch.GetAllCommits(engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits: %w", err)
 		}
@@ -139,7 +139,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 			IncludeCurrent:    false,
 			RecursiveChildren: true,
 		}
-		upstackBranches := eng.GetRelativeStack(currentBranch.Name, scope)
+		upstackBranches := currentBranch.GetRelativeStack(scope)
 		if len(upstackBranches) > 0 {
 			// Convert []Branch to []string
 			upstackNames := make([]string, len(upstackBranches))
@@ -165,7 +165,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		IncludeCurrent:    false,
 		RecursiveChildren: true,
 	}
-	upstackBranches := eng.GetRelativeStack(currentBranch.Name, scope)
+	upstackBranches := currentBranch.GetRelativeStack(scope)
 
 	// Apply the split
 	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{

@@ -39,7 +39,8 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 	branchNames := []string{}
 
 	// Get default commit message
-	commitMessages, err := eng.GetAllCommits(branchToSplit, engine.CommitFormatMessage)
+	branchToSplitObj := eng.GetBranch(branchToSplit)
+	commitMessages, err := branchToSplitObj.GetAllCommits(engine.CommitFormatMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit messages: %w", err)
 	}

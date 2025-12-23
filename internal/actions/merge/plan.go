@@ -123,7 +123,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	// 2. Collect branches from trunk to current
 	scope := engine.Scope{RecursiveParents: true}
-	parentBranches := eng.GetRelativeStack(currentBranch.Name, scope)
+	parentBranches := currentBranch.GetRelativeStack(scope)
 
 	// Build full list: parent branches + current branch
 	// Filter out trunk (it shouldn't be in the list, but be safe)

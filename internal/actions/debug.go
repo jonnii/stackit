@@ -137,7 +137,8 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get SHA
-		sha, err := eng.GetRevision(branchName)
+		branch := eng.GetBranch(branchName)
+		sha, err := branch.GetRevision()
 		if err == nil {
 			branchInfo.SHA = sha
 		}
@@ -149,7 +150,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get children
-		branch := eng.GetBranch(branchName)
+		branch = eng.GetBranch(branchName)
 		children := branch.GetChildren()
 		if len(children) > 0 {
 			childNames := make([]string, len(children))
@@ -188,7 +189,8 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 
 		// Check if branch is up to date with its parent
 		if !branchInfo.IsTrunk {
-			branchInfo.IsFixed = eng.IsBranchUpToDate(branchName)
+			branch := eng.GetBranch(branchName)
+			branchInfo.IsFixed = branch.IsBranchUpToDate()
 		} else {
 			branchInfo.IsFixed = true // Trunk is always up to date
 		}

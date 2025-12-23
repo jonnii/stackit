@@ -45,7 +45,8 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		} else {
 			parentName = parent.Name
 		}
-		parentRev, err := eng.GetRevision(parentName)
+		parentBranch := eng.GetBranch(parentName)
+		parentRev, err := parentBranch.GetRevision()
 		if err != nil {
 			return fmt.Errorf("failed to get parent revision: %w", err)
 		}

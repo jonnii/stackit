@@ -113,7 +113,8 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Get all descendants of parent before deletion (for restacking)
-	descendants := eng.GetRelativeStack(parent, engine.Scope{
+	parentBranch := eng.GetBranch(parent)
+	descendants := parentBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    false,
 		RecursiveParents:  false,
@@ -136,7 +137,8 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 		}
 
 		// Get updated descendants list (current branch's children are now children of parent)
-		updatedDescendants := eng.GetRelativeStack(parent, engine.Scope{
+		parentBranch := eng.GetBranch(parent)
+		updatedDescendants := parentBranch.GetRelativeStack(engine.Scope{
 			RecursiveChildren: true,
 			IncludeCurrent:    false,
 			RecursiveParents:  false,
@@ -207,7 +209,8 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		tui.ColorBranchName(currentBranch, false))
 
 	// Restack current branch and all its descendants
-	branchesToRestack := eng.GetRelativeStack(currentBranch, engine.Scope{
+	currentBranchObj := eng.GetBranch(currentBranch)
+	branchesToRestack := currentBranchObj.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

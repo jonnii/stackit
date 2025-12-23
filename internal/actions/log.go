@@ -52,7 +52,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 		},
 		func(branchName string) bool { return ctx.Engine.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
-			return ctx.Engine.IsBranchUpToDate(branchName)
+			return ctx.Engine.GetBranch(branchName).IsBranchUpToDate()
 		},
 	)
 

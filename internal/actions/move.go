@@ -83,7 +83,8 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Cycle detection: ensure onto is not a descendant of source
-	descendants := eng.GetRelativeStack(source, engine.Scope{
+	sourceBranch = eng.GetBranch(source)
+	descendants := sourceBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,
@@ -114,7 +115,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 		tui.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
-	branchesToRestack := eng.GetRelativeStack(source, engine.Scope{
+	branchesToRestack := sourceBranch.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

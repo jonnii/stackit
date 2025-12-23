@@ -78,7 +78,8 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	seenBranches := make(map[string]bool)
 
 	// Get descendants of source to exclude them
-	descendants := eng.GetRelativeStack(sourceBranch, engine.Scope{
+	sourceBranchObj := eng.GetBranch(sourceBranch)
+	descendants := sourceBranchObj.GetRelativeStack(engine.Scope{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

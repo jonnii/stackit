@@ -207,7 +207,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 			return parent.Name
 		},
 		func(b string) bool { return eng.GetBranch(b).IsTrunk() },
-		func(b string) bool { return eng.IsBranchUpToDate(b) },
+		func(b string) bool { return eng.GetBranch(b).IsBranchUpToDate() },
 	)
 
 	// Render the full tree from trunk

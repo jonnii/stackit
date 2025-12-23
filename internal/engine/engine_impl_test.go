@@ -297,7 +297,8 @@ func TestGetRelativeStack(t *testing.T) {
 
 		// Get downstack from branch2 - should NOT include trunk (main)
 		scope := engine.Scope{RecursiveParents: true}
-		stack := s.Engine.GetRelativeStack("branch2", scope)
+		branch2 := s.Engine.GetBranch("branch2")
+		stack := s.Engine.GetRelativeStack(branch2, scope)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -316,7 +317,8 @@ func TestGetRelativeStack(t *testing.T) {
 
 		// Get upstack from branch1
 		scope := engine.Scope{RecursiveChildren: true}
-		stack := s.Engine.GetRelativeStack("branch1", scope)
+		branch1 := s.Engine.GetBranch("branch1")
+		stack := s.Engine.GetRelativeStack(branch1, scope)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -333,7 +335,8 @@ func TestGetRelativeStack(t *testing.T) {
 			})
 
 		scope := engine.Scope{IncludeCurrent: true}
-		stack := s.Engine.GetRelativeStack("branch1", scope)
+		branch1 := s.Engine.GetBranch("branch1")
+		stack := s.Engine.GetRelativeStack(branch1, scope)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -355,7 +358,8 @@ func TestGetRelativeStack(t *testing.T) {
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := s.Engine.GetRelativeStack("branch2", scope)
+		branch2 := s.Engine.GetBranch("branch2")
+		stack := s.Engine.GetRelativeStack(branch2, scope)
 		stackNames := make([]string, len(stack))
 		for i, b := range stack {
 			stackNames[i] = b.Name
@@ -378,7 +382,8 @@ func TestGetRelativeStack(t *testing.T) {
 
 		// Get all descendants from trunk
 		scope := engine.Scope{RecursiveChildren: true}
-		stack := s.Engine.GetRelativeStack("main", scope)
+		trunk := s.Engine.Trunk()
+		stack := s.Engine.GetRelativeStack(trunk, scope)
 
 		// Should have all 4 branches
 		require.Len(t, stack, 4)
@@ -431,7 +436,7 @@ func TestRestackBranch(t *testing.T) {
 		require.Equal(t, engine.RestackDone, result.Result)
 
 		// Verify branch1 is now fixed
-		require.True(t, s.Engine.IsBranchUpToDate("branch1"))
+		require.True(t, s.Engine.GetBranch("branch1").IsBranchUpToDate())
 	})
 
 	t.Run("returns unneeded when branch is already fixed", func(t *testing.T) {
@@ -546,7 +551,8 @@ func TestGetParentPrecondition(t *testing.T) {
 				"branch1": "main",
 			})
 
-		parent := s.Engine.GetParentPrecondition("branch1")
+		branch := s.Engine.GetBranch("branch1")
+		parent := branch.GetParentPrecondition()
 		require.Equal(t, "main", parent)
 	})
 
@@ -557,7 +563,8 @@ func TestGetParentPrecondition(t *testing.T) {
 			Checkout("main")
 
 		// Don't track branch1
-		parent := s.Engine.GetParentPrecondition("branch1")
+		branch := s.Engine.GetBranch("branch1")
+		parent := branch.GetParentPrecondition()
 		require.Equal(t, "main", parent) // Should return trunk
 	})
 }
@@ -916,7 +923,8 @@ func TestEdgeCases(t *testing.T) {
 		require.Empty(t, parent)
 
 		// GetParentPrecondition should return trunk
-		parentName := s.Engine.GetParentPrecondition("branch1")
+		branch := s.Engine.GetBranch("branch1")
+		parentName := branch.GetParentPrecondition()
 		require.Equal(t, "main", parentName)
 	})
 
@@ -1107,7 +1115,7 @@ func TestSetParentScenarios(t *testing.T) {
 			CommitChange("file1.txt", "feat: branch1").
 			TrackBranch("branch1", "main")
 
-		branch1OriginalSHA, _ := s.Engine.GetRevision("branch1")
+		branch1OriginalSHA, _ := s.Engine.GetBranch("branch1").GetRevision()
 
 		// 2. Create branch2 on top of branch1
 		s.CreateBranch("branch2").
@@ -1123,7 +1131,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 4. Rebase branch1 onto main (changing its SHA)
 		s.Checkout("branch1")
 		s.Engine.RestackBranch(context.Background(), "branch1")
-		branch1NewSHA, _ := s.Engine.GetRevision("branch1")
+		branch1NewSHA, _ := s.Engine.GetBranch("branch1").GetRevision()
 		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
 
 		// 5. Merge branch1 into main
@@ -1165,7 +1173,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// because branch1 was NOT merged into main; it was merged into branch2.
 		// If we kept the old divergence point (before branch1), a restack would
 		// try to re-apply branch1's changes which are already in branch2.
-		mainSHA, _ := s.Engine.GetRevision("main")
+		mainSHA, _ := s.Engine.Trunk().GetRevision()
 		meta, _ := git.ReadMetadataRef("branch2")
 		require.Equal(t, mainSHA, *meta.ParentBranchRevision, "Divergence point should be updated to new parent when folding upward")
 	})
@@ -1183,7 +1191,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 1. Move main forward
 		s.Checkout("main").
 			CommitChange("main.txt", "feat: main")
-		mainNewSHA, _ := s.Engine.GetRevision("main")
+		mainNewSHA, _ := s.Engine.Trunk().GetRevision()
 
 		// 2. Manually rebase branch1 onto main
 		s.Checkout("branch1")

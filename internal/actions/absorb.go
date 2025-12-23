@@ -100,7 +100,7 @@ func AbsorbAction(ctx *runtime.Context, opts AbsorbOptions) error {
 	// Get all commit SHAs from downstack branches (newest to oldest)
 	commitSHAs := []string{}
 	for _, branch := range downstackBranches {
-		commits, err := eng.GetAllCommits(branch.Name, engine.CommitFormatSHA)
+		commits, err := branch.GetAllCommits(engine.CommitFormatSHA)
 		if err != nil {
 			return fmt.Errorf("failed to get commits for branch %s: %w", branch.Name, err)
 		}
@@ -271,7 +271,8 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 		}
 
 		// Get commit message - show first commit message from the branch
-		commits, err := eng.GetAllCommits(branchName, engine.CommitFormatReadable)
+		branch := eng.GetBranch(branchName)
+		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
 			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])

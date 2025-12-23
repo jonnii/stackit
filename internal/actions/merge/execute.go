@@ -451,7 +451,8 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		}
 		switch pullResult {
 		case engine.PullDone:
-			rev, _ := eng.GetRevision(trunkName)
+			trunk := eng.Trunk()
+			rev, _ := trunk.GetRevision()
 			revShort := rev
 			if len(rev) > 7 {
 				revShort = rev[:7]
@@ -569,7 +570,8 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	}
 
 	// Get the old parent revision
-	oldParentRev, err := eng.GetRevision(parentName)
+	parentBranch := eng.GetBranch(parentName)
+	oldParentRev, err := parentBranch.GetRevision()
 	if err != nil {
 		return fmt.Errorf("failed to get parent revision: %w", err)
 	}

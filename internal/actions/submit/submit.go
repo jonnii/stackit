@@ -295,9 +295,11 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 		}
 
 		// Get SHAs
-		headSHA, _ := eng.GetRevision(branchName)
-		parentBranchName := eng.GetParentPrecondition(branchName)
-		baseSHA, _ := eng.GetRevision(parentBranchName)
+		branch := eng.GetBranch(branchName)
+		headSHA, _ := branch.GetRevision()
+		parentBranchName := branch.GetParentPrecondition()
+		parentBranch := eng.GetBranch(parentBranchName)
+		baseSHA, _ := parentBranch.GetRevision()
 
 		submissionInfo := Info{
 			BranchName: branchName,
@@ -542,7 +544,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 		},
 		func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
 		func(branchName string) bool {
-			return eng.IsBranchUpToDate(branchName)
+			return eng.GetBranch(branchName).IsBranchUpToDate()
 		},
 	)
 
@@ -561,7 +563,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 		}
 
 		annotation := tui.BranchAnnotation{
-			NeedsRestack: !eng.IsBranchUpToDate(branchName),
+			NeedsRestack: !eng.GetBranch(branchName).IsBranchUpToDate(),
 		}
 
 		const actionUpdate = "update"

@@ -8,6 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"stackit.dev/stackit/internal/engine"
 )
 
 // ErrInteractiveDisabled is returned when interactive prompts are disabled via STACKIT_TEST_NO_INTERACTIVE
@@ -452,25 +454,25 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 }
 
 // PromptBranchCheckout shows an interactive branch selector for checkout.
-// It takes a list of branch names and the current branch name, formats them,
+// It takes a list of branches and the current branch, formats them,
 // and presents them for selection.
-func PromptBranchCheckout(branchNames []string, currentBranch string) (string, error) {
-	if len(branchNames) == 0 {
+func PromptBranchCheckout(branches []engine.Branch, currentBranch *engine.Branch) (string, error) {
+	if len(branches) == 0 {
 		return "", fmt.Errorf("no branches available to checkout")
 	}
 
-	choices := make([]BranchChoice, 0, len(branchNames))
+	choices := make([]BranchChoice, 0, len(branches))
 	initialIndex := -1
 
-	for _, branchName := range branchNames {
-		isCurrent := branchName == currentBranch
-		display := ColorBranchName(branchName, isCurrent)
+	for _, branch := range branches {
+		isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
+		display := ColorBranchName(branch.Name, isCurrent)
 		if isCurrent {
 			initialIndex = len(choices)
 		}
 		choices = append(choices, BranchChoice{
 			Display: display,
-			Value:   branchName,
+			Value:   branch.Name,
 		})
 	}
 

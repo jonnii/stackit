@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/config"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -38,7 +39,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		if currentBranch == nil {
 			return fmt.Errorf("not on a branch")
 		}
-		parent := eng.GetParent(currentBranch.Name)
+		parent := eng.GetParent(*currentBranch)
 		parentName := ""
 		if parent == nil {
 			parentName = eng.Trunk().Name
@@ -96,7 +97,12 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 
 	// Continue with remaining branches to restack
 	if len(continuation.BranchesToRestack) > 0 {
-		if err := RestackBranches(ctx.Context, continuation.BranchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []string to []Branch for RestackBranches
+		branches := make([]engine.Branch, len(continuation.BranchesToRestack))
+		for i, name := range continuation.BranchesToRestack {
+			branches[i] = eng.GetBranch(name)
+		}
+		if err := RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot); err != nil {
 			return err
 		}
 	}

@@ -200,7 +200,8 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 			return childNames
 		},
 		func(branchName string) string {
-			parent := eng.GetParent(branchName)
+			branch := eng.GetBranch(branchName)
+			parent := eng.GetParent(branch)
 			if parent == nil {
 				return ""
 			}

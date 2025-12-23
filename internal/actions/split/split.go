@@ -61,7 +61,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	currentBranchObj := eng.GetBranch(currentBranch.Name)
 	if !currentBranchObj.IsTracked() {
 		// Auto-track the branch
-		parent := eng.GetParent(currentBranch.Name)
+		parent := eng.GetParent(*currentBranch)
 		parentName := ""
 		if parent == nil {
 			// Try to find parent from git
@@ -141,12 +141,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 		upstackBranches := currentBranch.GetRelativeStack(scope)
 		if len(upstackBranches) > 0 {
-			// Convert []Branch to []string
-			upstackNames := make([]string, len(upstackBranches))
-			for i, b := range upstackBranches {
-				upstackNames[i] = b.Name
-			}
-			if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
+			if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}
@@ -178,12 +173,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Restack upstack branches
 	if len(upstackBranches) > 0 {
-		// Convert []Branch to []string
-		upstackNames := make([]string, len(upstackBranches))
-		for i, b := range upstackBranches {
-			upstackNames[i] = b.Name
-		}
-		if err := actions.RestackBranches(context, upstackNames, eng, splog, ctx.RepoRoot); err != nil {
+		if err := actions.RestackBranches(context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

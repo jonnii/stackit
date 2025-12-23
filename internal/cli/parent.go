@@ -40,7 +40,7 @@ and seeing which branch the current branch is based on.`,
 			}
 
 			// Get parent
-			parent := ctx.Engine.GetParent(currentBranch.Name)
+			parent := ctx.Engine.GetParent(*currentBranch)
 			if parent == nil {
 				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch.Name, true))
 				return nil

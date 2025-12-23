@@ -52,11 +52,11 @@ func (e *engineImpl) GetBranch(branchName string) Branch {
 }
 
 // GetParent returns the parent branch (nil if no parent)
-func (e *engineImpl) GetParent(branchName string) *Branch {
+func (e *engineImpl) GetParent(branch Branch) *Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	if parent, ok := e.parentMap[branchName]; ok {
+	if parent, ok := e.parentMap[branch.Name]; ok {
 		return &Branch{Name: parent, Reader: e}
 	}
 	return nil
@@ -393,76 +393,76 @@ func (e *engineImpl) GetAllCommitsInternal(branchName string, format CommitForma
 }
 
 // GetRelativeStackUpstack returns all branches in the upstack (descendants)
-func (e *engineImpl) GetRelativeStackUpstack(branchName string) []Branch {
+func (e *engineImpl) GetRelativeStackUpstack(branch Branch) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return e.getRelativeStackUpstackInternal(branchName)
+	return e.getRelativeStackUpstackInternal(branch.Name)
 }
 
 // GetRelativeStackDownstack returns all branches in the downstack (ancestors)
-func (e *engineImpl) GetRelativeStackDownstack(branchName string) []Branch {
+func (e *engineImpl) GetRelativeStackDownstack(branch Branch) []Branch {
 	scope := Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    false,
 		RecursiveChildren: false,
 	}
-	return e.GetRelativeStackInternal(branchName, scope)
+	return e.GetRelativeStackInternal(branch.Name, scope)
 }
 
 // GetFullStack returns the entire stack containing the branch
-func (e *engineImpl) GetFullStack(branchName string) []Branch {
+func (e *engineImpl) GetFullStack(branch Branch) []Branch {
 	scope := Scope{
 		RecursiveParents:  true,
 		IncludeCurrent:    true,
 		RecursiveChildren: true,
 	}
-	return e.GetRelativeStackInternal(branchName, scope)
+	return e.GetRelativeStackInternal(branch.Name, scope)
 }
 
 // SortBranchesTopologically sorts branches so parents come before children.
 // This ensures correct restack order (bottom of stack first).
-func (e *engineImpl) SortBranchesTopologically(branches []string) []string {
+func (e *engineImpl) SortBranchesTopologically(branches []Branch) []Branch {
 	if len(branches) == 0 {
 		return branches
 	}
 
 	// Calculate depth for each branch (distance from trunk)
 	depths := make(map[string]int)
-	var getDepth func(branch string) int
-	getDepth = func(branch string) int {
-		if depth, ok := depths[branch]; ok {
+	var getDepth func(branchName string) int
+	getDepth = func(branchName string) int {
+		if depth, ok := depths[branchName]; ok {
 			return depth
 		}
 
 		e.mu.RLock()
-		isTrunk := branch == e.trunk
-		parent := e.parentMap[branch]
+		isTrunk := branchName == e.trunk
+		parent := e.parentMap[branchName]
 		e.mu.RUnlock()
 
 		if isTrunk {
-			depths[branch] = 0
+			depths[branchName] = 0
 			return 0
 		}
 		if parent == "" || e.IsTrunkInternal(parent) {
-			depths[branch] = 1
+			depths[branchName] = 1
 			return 1
 		}
-		depths[branch] = getDepth(parent) + 1
-		return depths[branch]
+		depths[branchName] = getDepth(parent) + 1
+		return depths[branchName]
 	}
 
 	// Calculate depth for all branches
 	for _, branch := range branches {
-		getDepth(branch)
+		getDepth(branch.Name)
 	}
 
 	// Sort by depth (parents first, then children)
-	result := make([]string, len(branches))
+	result := make([]Branch, len(branches))
 	copy(result, branches)
 	for i := 0; i < len(result)-1; i++ {
 		for j := i + 1; j < len(result); j++ {
-			if depths[result[i]] > depths[result[j]] {
+			if depths[result[i].Name] > depths[result[j].Name] {
 				result[i], result[j] = result[j], result[i]
 			}
 		}

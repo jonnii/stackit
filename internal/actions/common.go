@@ -16,32 +16,31 @@ type Restacker interface {
 }
 
 // RestackBranches restacks a list of branches
-func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, splog *tui.Splog, repoRoot string) error {
-	for i, branchName := range branchNames {
-		branch := eng.GetBranch(branchName)
+func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog, repoRoot string) error {
+	for i, branch := range branches {
 		if branch.IsTrunk() {
-			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
+			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branch.Name, false))
 			continue
 		}
 
-		result, err := eng.RestackBranch(ctx, branchName)
+		result, err := eng.RestackBranch(ctx, branch)
 		if err != nil {
-			return fmt.Errorf("failed to restack %s: %w", branchName, err)
+			return fmt.Errorf("failed to restack %s: %w", branch.Name, err)
 		}
 
 		// Log reparenting if it happened
 		if result.Reparented {
 			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branchName == currentBranch.Name
+			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branchName, isCurrent),
+				tui.ColorBranchName(branch.Name, isCurrent),
 				tui.ColorBranchName(result.OldParent, false),
 				tui.ColorBranchName(result.NewParent, false))
 		}
 
 		switch result.Result {
 		case engine.RestackDone:
-			parent := eng.GetParent(branchName)
+			parent := eng.GetParent(branch)
 			parentName := ""
 			if parent == nil {
 				parentName = eng.Trunk().Name
@@ -49,9 +48,9 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 				parentName = parent.Name
 			}
 			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branchName == currentBranch.Name
+			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branchName, isCurrent),
+				tui.ColorBranchName(branch.Name, isCurrent),
 				tui.ColorBranchName(parentName, false))
 		case engine.RestackConflict:
 			// Persist continuation state with remaining branches
@@ -60,8 +59,13 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 			if currentBranch != nil {
 				currentBranchName = currentBranch.Name
 			}
+			// Convert remaining branches to []string for continuation state
+			remainingBranchNames := make([]string, len(branches[i+1:]))
+			for j, b := range branches[i+1:] {
+				remainingBranchNames[j] = b.Name
+			}
 			continuation := &config.ContinuationState{
-				BranchesToRestack:     branchNames[i+1:], // Remaining branches
+				BranchesToRestack:     remainingBranchNames, // Remaining branches
 				RebasedBranchBase:     result.RebasedBranchBase,
 				CurrentBranchOverride: currentBranchName,
 			}
@@ -71,13 +75,13 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 			}
 
 			// Print conflict status
-			if err := PrintConflictStatus(ctx, branchName, splog); err != nil {
+			if err := PrintConflictStatus(ctx, branch.Name, splog); err != nil {
 				return fmt.Errorf("failed to print conflict status: %w", err)
 			}
 
-			return fmt.Errorf("hit conflict restacking %s", branchName)
+			return fmt.Errorf("hit conflict restacking %s", branch.Name)
 		case engine.RestackUnneeded:
-			parent := eng.GetParent(branchName)
+			parent := eng.GetParent(branch)
 			parentName := ""
 			if parent == nil {
 				parentName = eng.Trunk().Name
@@ -85,9 +89,9 @@ func RestackBranches(ctx context.Context, branchNames []string, eng Restacker, s
 				parentName = parent.Name
 			}
 			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branchName == currentBranch.Name
+			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
 			splog.Info("%s does not need to be restacked on %s.",
-				tui.ColorBranchName(branchName, isCurrent),
+				tui.ColorBranchName(branch.Name, isCurrent),
 				tui.ColorBranchName(parentName, false))
 		}
 	}

@@ -59,7 +59,8 @@ func UpdatePRBodyFooter(existingBody, footer string) string {
 
 // findTerminalParent finds the terminal parent (parent of trunk) for a branch
 func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
-	parent := eng.GetParent(currentBranch)
+	branch := eng.GetBranch(currentBranch)
+	parent := eng.GetParent(branch)
 	if parent == nil {
 		// No parent, use trunk
 		return eng.Trunk().Name
@@ -115,7 +116,8 @@ func isParentOrChildRecursive(eng engine.BranchReader, branch1, branch2 string, 
 	}
 
 	// Check if branch1 is child of branch2
-	parent := eng.GetParent(branch1)
+	// branch1Obj already declared above
+	parent := eng.GetParent(branch1Obj)
 	if parent != nil {
 		if parent.Name == branch2 {
 			return true

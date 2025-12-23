@@ -33,7 +33,7 @@ func (b Branch) GetChildren() []Branch {
 // GetParentPrecondition returns the parent branch name, or trunk if no parent
 // This is used for validation where we expect a parent to exist
 func (b Branch) GetParentPrecondition() string {
-	parent := b.Reader.GetParent(b.Name)
+	parent := b.Reader.GetParent(b)
 	if parent == nil {
 		return b.Reader.Trunk().Name
 	}
@@ -75,18 +75,18 @@ func (b Branch) GetAllCommits(format CommitFormat) ([]string, error) {
 // Thread-safe: All methods are safe for concurrent use
 type BranchReader interface {
 	// State queries
-	AllBranches() []Branch                          // Returns all branches
-	CurrentBranch() *Branch                         // Returns current branch (nil if not on a branch)
-	Trunk() Branch                                  // Returns the trunk branch
-	GetBranch(branchName string) Branch             // Returns a Branch wrapper
-	GetParent(branchName string) *Branch            // Returns nil if no parent
-	GetChildrenInternal(branchName string) []Branch // Internal method for Branch type
+	AllBranches() []Branch              // Returns all branches
+	CurrentBranch() *Branch             // Returns current branch (nil if not on a branch)
+	Trunk() Branch                      // Returns the trunk branch
+	GetBranch(branchName string) Branch // Returns a Branch wrapper
+	GetParent(branch Branch) *Branch    // Returns nil if no parent
 	GetRelativeStack(branch Branch, scope Scope) []Branch
 
 	// Internal methods used by Branch type (exported so implementations outside this package can provide them)
 	IsTrunkInternal(branchName string) bool
 	IsBranchTrackedInternal(branchName string) bool
 	IsBranchUpToDateInternal(branchName string) bool                                // Internal method for Branch type
+	GetChildrenInternal(branchName string) []Branch                                 // Internal method for Branch type
 	GetCommitDateInternal(branchName string) (time.Time, error)                     // Internal method for Branch type
 	GetCommitAuthorInternal(branchName string) (string, error)                      // Internal method for Branch type
 	GetRevisionInternal(branchName string) (string, error)                          // Internal method for Branch type
@@ -97,10 +97,10 @@ type BranchReader interface {
 	FindBranchForCommit(commitSHA string) (string, error)
 
 	// Stack queries
-	GetRelativeStackUpstack(branchName string) []Branch
-	GetRelativeStackDownstack(branchName string) []Branch
-	GetFullStack(branchName string) []Branch
-	SortBranchesTopologically(branches []string) []string
+	GetRelativeStackUpstack(branch Branch) []Branch
+	GetRelativeStackDownstack(branch Branch) []Branch
+	GetFullStack(branch Branch) []Branch
+	SortBranchesTopologically(branches []Branch) []Branch
 	IsMergedIntoTrunk(ctx context.Context, branchName string) (bool, error)
 	IsBranchEmpty(ctx context.Context, branchName string) (bool, error)
 	FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error)
@@ -144,8 +144,8 @@ type SyncManager interface {
 	// Sync operations
 	PullTrunk(ctx context.Context) (PullResult, error)
 	ResetTrunkToRemote(ctx context.Context) error
-	RestackBranch(ctx context.Context, branchName string) (RestackBranchResult, error)
-	RestackBranches(ctx context.Context, branchNames []string) (RestackBatchResult, error)
+	RestackBranch(ctx context.Context, branch Branch) (RestackBranchResult, error)
+	RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error)
 	ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error)
 }
 

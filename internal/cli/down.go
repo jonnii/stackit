@@ -60,7 +60,7 @@ as an argument to move multiple levels at once.`,
 			}
 
 			// Traverse down the specified number of steps
-			targetBranch := currentBranch.Name
+			targetBranch := *currentBranch
 			for i := 0; i < steps; i++ {
 				parent := ctx.Engine.GetParent(targetBranch)
 				if parent == nil {
@@ -70,25 +70,25 @@ as an argument to move multiple levels at once.`,
 						return nil
 					}
 					// We moved some steps but can't go further
-					ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", tui.ColorBranchName(targetBranch, false), i)
+					ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", tui.ColorBranchName(targetBranch.Name, false), i)
 					break
 				}
 				ctx.Splog.Info("⮑  %s", parent.Name)
-				targetBranch = parent.Name
+				targetBranch = *parent
 			}
 
 			// Check if we actually moved
-			if targetBranch == currentBranch.Name {
+			if targetBranch.Name == currentBranch.Name {
 				ctx.Splog.Info("Already at the bottom of the stack.")
 				return nil
 			}
 
 			// Checkout the target branch
-			if err := git.CheckoutBranch(ctx.Context, targetBranch); err != nil {
-				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
+			if err := git.CheckoutBranch(ctx.Context, targetBranch.Name); err != nil {
+				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch.Name, err)
 			}
 
-			ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(targetBranch, false))
+			ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(targetBranch.Name, false))
 			return nil
 		},
 	}

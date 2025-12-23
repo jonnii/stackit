@@ -3,6 +3,7 @@ package actions
 import (
 	"fmt"
 
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -46,14 +47,16 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	toDelete := []string{branchName}
 
 	if opts.Upstack {
-		upstack := eng.GetRelativeStackUpstack(branchName)
+		branch := eng.GetBranch(branchName)
+		upstack := eng.GetRelativeStackUpstack(branch)
 		for _, b := range upstack {
 			toDelete = append(toDelete, b.Name)
 		}
 	}
 
 	if opts.Downstack {
-		downstack := eng.GetRelativeStackDownstack(branchName)
+		branch := eng.GetBranch(branchName)
+		downstack := eng.GetRelativeStackDownstack(branch)
 		downstackNames := make([]string, len(downstack))
 		for i, b := range downstack {
 			downstackNames[i] = b.Name
@@ -99,7 +102,12 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	// Restack children if any
 	if len(childrenToRestack) > 0 {
 		splog.Info("Restacking children of deleted %s...", Pluralize("branch", len(toDelete)))
-		if err := RestackBranches(ctx.Context, childrenToRestack, eng, splog, ctx.RepoRoot); err != nil {
+		// Convert []string to []Branch for RestackBranches
+		branches := make([]engine.Branch, len(childrenToRestack))
+		for i, name := range childrenToRestack {
+			branches[i] = eng.GetBranch(name)
+		}
+		if err := RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack children: %w", err)
 		}
 	}

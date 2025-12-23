@@ -44,7 +44,8 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 			return childNames
 		},
 		func(branchName string) string {
-			parent := ctx.Engine.GetParent(branchName)
+			branch := ctx.Engine.GetBranch(branchName)
+			parent := ctx.Engine.GetParent(branch)
 			if parent == nil {
 				return ""
 			}

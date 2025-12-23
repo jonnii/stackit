@@ -102,7 +102,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if repoRoot == "" {
 			repoRoot, _ = git.GetRepoRoot()
 		}
-		if err := actions.RestackBranches(context, branches, eng, splog, repoRoot); err != nil {
+		// Convert []string to []engine.Branch for RestackBranches
+		branchObjects := make([]engine.Branch, len(branches))
+		for i, branchName := range branches {
+			branchObjects[i] = eng.GetBranch(branchName)
+		}
+		if err := actions.RestackBranches(context, branchObjects, eng, splog, repoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 		ui.ShowRestackComplete()
@@ -335,14 +340,16 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 	var allBranches []string
 	if opts.Stack {
 		// Include descendants and ancestors
-		stackBranches := eng.GetFullStack(branchName)
+		branch := eng.GetBranch(branchName)
+		stackBranches := eng.GetFullStack(branch)
 		allBranches = make([]string, len(stackBranches))
 		for i, b := range stackBranches {
 			allBranches[i] = b.Name
 		}
 	} else {
 		// Just ancestors (including current branch)
-		downstackBranches := eng.GetRelativeStackDownstack(branchName)
+		branch := eng.GetBranch(branchName)
+		downstackBranches := eng.GetRelativeStackDownstack(branch)
 		allBranches = make([]string, len(downstackBranches)+1)
 		for i, b := range downstackBranches {
 			allBranches[i] = b.Name
@@ -536,7 +543,8 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 			return childNames
 		},
 		func(branchName string) string {
-			parent := eng.GetParent(branchName)
+			branch := eng.GetBranch(branchName)
+			parent := eng.GetParent(branch)
 			if parent == nil {
 				return ""
 			}

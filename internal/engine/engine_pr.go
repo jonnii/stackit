@@ -70,7 +70,8 @@ func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatu
 		return PRSubmissionStatus{}, err
 	}
 
-	parentBranch := e.GetParent(branchName)
+	branch := e.GetBranch(branchName)
+	parentBranch := e.GetParent(branch)
 	parentBranchName := ""
 	if parentBranch == nil {
 		parentBranchName = e.trunk

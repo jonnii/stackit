@@ -47,7 +47,8 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Get parent branch
-	parent := eng.GetParent(currentBranch)
+	// currentBranchObj already declared above
+	parent := eng.GetParent(currentBranchObj)
 	parentName := ""
 	if parent == nil {
 		parentName = eng.Trunk().Name

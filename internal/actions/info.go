@@ -92,14 +92,15 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	}
 
 	// Parent branch
-	parentBranch := eng.GetParent(branchName)
+	branchObj := eng.GetBranch(branchName)
+	parentBranch := eng.GetParent(branchObj)
 	if parentBranch != nil {
 		outputLines = append(outputLines, "")
 		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranch.Name))
 	}
 
 	// Children branches
-	branchObj := eng.GetBranch(branchName)
+	// branchObj already declared above
 	children := branchObj.GetChildren()
 	if len(children) > 0 {
 		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))

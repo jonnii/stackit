@@ -262,7 +262,8 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 		}
 
 		// Restack the child onto the new branch to physically insert it
-		res, err := runtimeCtx.Engine.RestackBranch(ctx, child)
+		childBranch := runtimeCtx.Engine.GetBranch(child)
+		res, err := runtimeCtx.Engine.RestackBranch(ctx, childBranch)
 		if err != nil {
 			runtimeCtx.Splog.Info("Warning: failed to restack %s onto %s: %v", child, newBranch, err)
 			continue

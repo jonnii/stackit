@@ -64,7 +64,8 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 	}
 
 	// Get parent branch
-	parent := eng.GetParent(currentBranch)
+	// currentBranchObj already declared above
+	parent := eng.GetParent(currentBranchObj)
 	parentName := ""
 	if parent == nil {
 		parentName = eng.Trunk().Name
@@ -144,12 +145,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 			RecursiveParents:  false,
 		})
 
-		// Convert []Branch to []string
-		updatedDescendantNames := make([]string, len(updatedDescendants))
-		for i, b := range updatedDescendants {
-			updatedDescendantNames[i] = b.Name
-		}
-		if err := RestackBranches(gctx, updatedDescendantNames, eng, splog, ctx.RepoRoot); err != nil {
+		if err := RestackBranches(gctx, updatedDescendants, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}
@@ -216,12 +212,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		RecursiveParents:  false,
 	})
 
-	// Convert []Branch to []string
-	branchNamesToRestack := make([]string, len(branchesToRestack))
-	for i, b := range branchesToRestack {
-		branchNamesToRestack[i] = b.Name
-	}
-	if err := RestackBranches(gctx, branchNamesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

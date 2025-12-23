@@ -294,7 +294,8 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	missingParents := checkMissingParents(eng, allBranches)
 	if len(missingParents) > 0 {
 		for _, branch := range missingParents {
-			parent := eng.GetParent(branch)
+			branchObj := eng.GetBranch(branch)
+			parent := eng.GetParent(branchObj)
 			warnings = append(warnings, fmt.Sprintf("branch '%s' has parent '%s' that does not exist", branch, parent))
 		}
 		splog.Warn("  ⚠️  Found %d branch(es) with missing parents", len(missingParents))
@@ -322,7 +323,7 @@ func detectCycles(eng engine.Engine) [][]string {
 	// Build parent map
 	for _, branch := range allBranches {
 		branchName := branch.Name
-		parent := eng.GetParent(branchName)
+		parent := eng.GetParent(branch)
 		if parent != nil && parent.Name != trunkName {
 			parentMap[branchName] = parent.Name
 		}
@@ -390,7 +391,8 @@ func checkMissingParents(eng engine.Engine, allBranches []string) []string {
 		if branch == trunkName {
 			continue
 		}
-		parent := eng.GetParent(branch)
+		branchObj := eng.GetBranch(branch)
+		parent := eng.GetParent(branchObj)
 		if parent != nil && parent.Name != trunkName {
 			if !branchSet[parent.Name] {
 				missing = append(missing, branch)

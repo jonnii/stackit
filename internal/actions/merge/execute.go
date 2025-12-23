@@ -467,7 +467,8 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 	case StepRestack:
 		// Restack the branch - RestackBranch will automatically handle reparenting
 		// if the parent has been merged/deleted
-		result, err := eng.RestackBranch(ctx, step.BranchName)
+		branch := eng.GetBranch(step.BranchName)
+		result, err := eng.RestackBranch(ctx, branch)
 		if err != nil {
 			return fmt.Errorf("failed to restack: %w", err)
 		}
@@ -476,7 +477,8 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		// Use NewParent from result if reparented, otherwise get from engine
 		actualParent := result.NewParent
 		if actualParent == "" {
-			parent := eng.GetParent(step.BranchName)
+			branch := eng.GetBranch(step.BranchName)
+			parent := eng.GetParent(branch)
 			if parent == nil {
 				actualParent = trunkName
 			} else {
@@ -561,7 +563,8 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	trunkName := trunk.Name
 
 	// Get the parent revision (old base)
-	parent := eng.GetParent(step.BranchName)
+	branch := eng.GetBranch(step.BranchName)
+	parent := eng.GetParent(branch)
 	parentName := ""
 	if parent == nil {
 		parentName = trunkName

@@ -6,8 +6,29 @@ import (
 	"strings"
 )
 
+// Branch represents a branch for git operations. This interface allows
+// the git package to work with branches without importing the engine package,
+// avoiding circular dependencies.
+type Branch interface {
+	GetName() string
+}
+
+// branchName is a simple implementation of Branch for use within the git package
+type branchName string
+
+func (b branchName) GetName() string {
+	return string(b)
+}
+
+// NewBranch creates a Branch from a string name. This is useful for converting
+// string branch names to Branch objects within the git package.
+func NewBranch(name string) Branch {
+	return branchName(name)
+}
+
 // CreateAndCheckoutBranch creates and checks out a new branch
-func CreateAndCheckoutBranch(ctx context.Context, branchName string) error {
+func CreateAndCheckoutBranch(ctx context.Context, branch Branch) error {
+	branchName := branch.GetName()
 	_, err := RunGitCommandWithContext(ctx, "checkout", "-b", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to create and checkout branch %s: %w", branchName, err)
@@ -16,7 +37,8 @@ func CreateAndCheckoutBranch(ctx context.Context, branchName string) error {
 }
 
 // CheckoutBranch checks out an existing branch
-func CheckoutBranch(ctx context.Context, branchName string) error {
+func CheckoutBranch(ctx context.Context, branch Branch) error {
+	branchName := branch.GetName()
 	_, err := RunGitCommandWithContext(ctx, "checkout", branchName)
 	if err != nil {
 		// If it's already used by another worktree, try checking out detached
@@ -38,7 +60,8 @@ func CheckoutDetached(ctx context.Context, rev string) error {
 }
 
 // DeleteBranch deletes a branch
-func DeleteBranch(ctx context.Context, branchName string) error {
+func DeleteBranch(ctx context.Context, branch Branch) error {
+	branchName := branch.GetName()
 	_, err := RunGitCommandWithContext(ctx, "branch", "-D", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to delete branch %s: %w", branchName, err)

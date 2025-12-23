@@ -338,16 +338,21 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 	}
 
 	// Delete branches that were created after the snapshot
+	// Get trunk name while holding lock to avoid deadlock
+	trunkName := e.trunk
 	for branchName := range branchesToDelete {
 		// If we're on this branch, switch to trunk first
 		if branchName == e.currentBranch {
-			if err := git.CheckoutBranch(ctx, e.trunk); err != nil {
+			// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
+			trunkBranch := Branch{Name: trunkName, Reader: e}
+			if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
 				return fmt.Errorf("failed to switch to trunk before deleting branch: %w", err)
 			}
-			e.currentBranch = e.trunk
+			e.currentBranch = trunkName
 		}
 		// Delete the branch
-		if err := git.DeleteBranch(ctx, branchName); err != nil {
+		branch := e.GetBranch(branchName)
+		if err := git.DeleteBranch(ctx, branch); err != nil {
 			// Log but continue - branch might not exist or might be protected
 			continue
 		}
@@ -425,7 +430,8 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 		}
 
 		if branchExists {
-			if err := git.CheckoutBranch(ctx, snapshot.CurrentBranch); err != nil {
+			branch := e.GetBranch(snapshot.CurrentBranch)
+			if err := git.CheckoutBranch(ctx, branch); err != nil {
 				// If checkout fails, try to continue - we're still in a valid state
 				_ = err
 			} else {
@@ -433,7 +439,9 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 			}
 		} else {
 			// Branch was deleted, switch to trunk
-			if err := git.CheckoutBranch(ctx, e.trunk); err != nil {
+			// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
+			trunkBranch := Branch{Name: e.trunk, Reader: e}
+			if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
 				return fmt.Errorf("failed to checkout trunk after restore: %w", err)
 			}
 			e.currentBranch = e.trunk

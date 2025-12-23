@@ -70,12 +70,12 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Checkout parent branch
-	if err := git.CheckoutBranch(ctx.Context, parentName); err != nil {
+	if err := git.CheckoutBranch(ctx.Context, parentBranch); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
 	// Delete the old branch (this will also reparent any children)
-	if err := eng.DeleteBranch(ctx.Context, currentBranch); err != nil {
+	if err := eng.DeleteBranch(ctx.Context, currentBranchObj.Name); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 

@@ -59,12 +59,12 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	}
 
 	// Checkout the branch
-	if err := git.CheckoutBranch(context, branchName); err != nil {
+	branch := eng.GetBranch(branchName)
+	if err := git.CheckoutBranch(context, branch); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
 	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
-	branch := eng.GetBranch(branchName)
 	printBranchInfo(ctx, branch)
 
 	return nil

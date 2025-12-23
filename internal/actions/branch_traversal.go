@@ -55,7 +55,8 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 	}
 
 	// Checkout the target branch
-	if err := git.CheckoutBranch(ctx.Context, targetBranch); err != nil {
+	targetBranchObj := ctx.Engine.GetBranch(targetBranch)
+	if err := git.CheckoutBranch(ctx.Context, targetBranchObj); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 	}
 

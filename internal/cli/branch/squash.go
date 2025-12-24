@@ -23,6 +23,7 @@ func NewSquashCmd() *cobra.Command {
 
 This command combines all commits in the current branch into a single commit. After squashing,
 all upstack branches (children) are automatically restacked.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

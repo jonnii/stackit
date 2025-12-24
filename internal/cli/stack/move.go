@@ -27,6 +27,7 @@ func NewMoveCmd() *cobra.Command {
 		Long: `Rebase the current branch onto the target branch and restack all of its descendants.
 
 If no branch is passed in, opens an interactive selector to choose the target branch.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())

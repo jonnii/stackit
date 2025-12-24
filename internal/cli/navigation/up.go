@@ -32,7 +32,8 @@ as an argument to move multiple levels at once.
 
 If multiple children exist, you will be prompted to select one, unless
 the --to flag is used to specify a target branch to navigate towards.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse steps from positional argument if provided
 			if len(args) > 0 {

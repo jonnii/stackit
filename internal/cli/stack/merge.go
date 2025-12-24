@@ -33,6 +33,7 @@ This command merges PRs for all branches in the stack from trunk up to (and incl
 If --scope is specified, all branches with that scope will be merged.
 
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

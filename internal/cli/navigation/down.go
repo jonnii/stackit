@@ -26,7 +26,8 @@ func NewDownCmd() *cobra.Command {
 Navigates down the stack toward trunk by switching to the parent branch.
 By default, moves one level down. Use the --steps flag or pass a number
 as an argument to move multiple levels at once.`,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse steps from positional argument if provided
 			if len(args) > 0 {

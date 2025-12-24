@@ -38,10 +38,11 @@ type mergeExecuteEngine interface {
 
 // ExecuteOptions contains options for executing a merge plan
 type ExecuteOptions struct {
-	Plan           *Plan
-	Force          bool
-	Reporter       ProgressReporter // Optional progress reporter
-	UndoStackDepth int              // Maximum undo stack depth (from config)
+	Plan                    *Plan
+	Force                   bool
+	Reporter                ProgressReporter           // Optional progress reporter
+	UndoStackDepth          int                        // Maximum undo stack depth (from config)
+	ConsolidationResultFunc func(*ConsolidationResult) // Callback for consolidation results
 }
 
 // Execute executes a validated merge plan step by step
@@ -84,6 +85,12 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 		// Update opts to use the reporter
 		opts.Reporter = reporter
 
+		// Set up callback to collect consolidation results
+		var consolidationResult *ConsolidationResult
+		opts.ConsolidationResultFunc = func(result *ConsolidationResult) {
+			consolidationResult = result
+		}
+
 		if initialEstimate > 0 {
 			reporter.SetEstimatedDuration(initialEstimate)
 		}
@@ -102,6 +109,11 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 			if err != nil {
 				splog.Debug("TUI error: %v", err)
 			}
+		}
+
+		// Display consolidation result if available
+		if consolidationResult != nil {
+			splog.Info("✅ Created consolidation PR #%d: %s", consolidationResult.PRNumber, consolidationResult.PRURL)
 		}
 
 		return err
@@ -551,8 +563,13 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 
 	case StepConsolidate:
 		// Execute stack consolidation
-		if err := executeConsolidation(ctx, eng, splog, githubClient, repoRoot, opts); err != nil {
+		result, err := executeConsolidation(ctx, eng, splog, githubClient, repoRoot, opts)
+		if err != nil {
 			return err
+		}
+		// Notify caller of consolidation result
+		if opts.ConsolidationResultFunc != nil {
+			opts.ConsolidationResultFunc(result)
 		}
 
 	case StepWaitCI:
@@ -653,16 +670,19 @@ func updatePRBaseBranchFromContext(ctx context.Context, githubClient github.Clie
 }
 
 // executeConsolidation handles the stack consolidation process
-func executeConsolidation(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
-	// Temporarily un-quiet splog to show consolidation PR link in TUI mode
-	wasQuiet := splog.IsQuiet()
-	if wasQuiet {
-		splog.SetQuiet(false)
-		defer splog.SetQuiet(true) // Restore quiet mode after consolidation
+func executeConsolidation(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) (*ConsolidationResult, error) {
+	consolidator := NewConsolidateMergeExecutor(opts.Plan, githubClient, eng, splog, repoRoot)
+	result, err := consolidator.Execute(ctx, opts)
+	if err != nil {
+		return nil, err
 	}
 
-	consolidator := NewConsolidateMergeExecutor(opts.Plan, githubClient, eng, splog, repoRoot)
-	return consolidator.Execute(ctx, opts)
+	// In non-TUI mode, display the result immediately
+	if opts.Reporter == nil {
+		splog.Info("✅ Created consolidation PR #%d: %s", result.PRNumber, result.PRURL)
+	}
+
+	return result, nil
 }
 
 // executeWaitCIWithProgress waits for CI checks with progress reporting

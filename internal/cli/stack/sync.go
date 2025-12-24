@@ -20,8 +20,9 @@ func NewSyncCmd() *cobra.Command {
 		Use:   "sync",
 		Short: "Sync all branches with remote",
 		Long: `Sync all branches with remote, prompting to delete any branches for PRs that have been merged or closed. 
-Restacks all branches in your repository that can be restacked without conflicts. 
+Restacks all branches in your repository that can be restacked without conflicts.
 If trunk cannot be fast-forwarded to match remote, overwrites trunk with the remote version.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

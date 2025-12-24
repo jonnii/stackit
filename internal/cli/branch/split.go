@@ -29,6 +29,7 @@ split --by-hunk interactively stages changes to create new single-commit branche
 split --by-file <files> extracts specified files into a new parent branch.
 split -F (--by-file-interactive) shows an interactive file selector.
 split without options will prompt for a splitting strategy.`,
+		SilenceUsage: true,
 		// Disable default help flag to allow -h for --by-hunk
 		DisableFlagParsing: false,
 		RunE: func(cmd *cobra.Command, _ []string) error {

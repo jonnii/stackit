@@ -16,6 +16,7 @@ func NewBottomCmd() *cobra.Command {
 
 This command navigates down the parent chain from the current branch until
 it reaches the first branch that has trunk as its parent (or trunk itself).`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

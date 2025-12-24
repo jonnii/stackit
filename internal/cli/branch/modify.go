@@ -37,6 +37,7 @@ Examples:
   stackit modify -p                       # Interactive patch staging then amend
   stackit modify -c -a -m "New commit"    # Create new commit instead of amending
   stackit modify --interactive-rebase     # Interactive rebase on branch commits`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

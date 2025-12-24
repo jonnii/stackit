@@ -1,5 +1,5 @@
-// Package testhelper provides shared test utilities for CLI packages.
-package testhelper
+// Package testhelpers provides shared test utilities for CLI packages.
+package testhelpers
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"testing"
 )
 
 var (
@@ -102,4 +103,73 @@ func findModuleRoot(startDir string) string {
 		dir = parent
 	}
 	return ""
+}
+
+// TestMain provides a shared TestMain function for packages that need
+// the stackit binary to be built once before running tests.
+// Packages can use this by calling testhelpers.TestMain(m) in their own TestMain.
+func TestMain(m *testing.M, cleanup func()) {
+	// Build the binary once before running any tests
+	binaryPath, binaryCleanup, err := buildBinaryOnce()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to build stackit binary: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Set the shared binary path for test packages
+	SetSharedBinaryPath(binaryPath)
+
+	// Run all tests
+	code := m.Run()
+
+	// Cleanup
+	binaryCleanup()
+	if cleanup != nil {
+		cleanup()
+	}
+	os.Exit(code)
+}
+
+// buildBinaryOnce builds the stackit binary once and returns its path and cleanup function.
+func buildBinaryOnce() (string, func(), error) {
+	// Get the module root (go up from current directory to stackit root)
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	moduleRoot := findModuleRoot(wd)
+	if moduleRoot == "" {
+		return "", nil, fmt.Errorf("could not find module root (go.mod) starting from %s", wd)
+	}
+
+	// Create temp directory for binary
+	tmpDir, err := os.MkdirTemp("", "stackit-test-binary-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	binaryPath := filepath.Join(tmpDir, "stackit")
+
+	// Build the binary
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/stackit")
+	cmd.Dir = moduleRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_ = os.RemoveAll(tmpDir) // Ignore cleanup errors
+		return "", nil, fmt.Errorf("failed to build: %s: %w", string(output), err)
+	}
+
+	// Make it executable
+	//nolint:gosec // 0755 is correct for an executable binary
+	if err := os.Chmod(binaryPath, 0755); err != nil {
+		_ = os.RemoveAll(tmpDir) // Ignore cleanup errors
+		return "", nil, fmt.Errorf("failed to chmod: %w", err)
+	}
+
+	cleanup := func() {
+		_ = os.RemoveAll(tmpDir) // Ignore cleanup errors
+	}
+
+	return binaryPath, cleanup, nil
 }

@@ -13,7 +13,13 @@ import (
 
 func TestMoveCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelpers.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelpers.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("moves branch downstack with explicit flags", func(t *testing.T) {
 		t.Parallel()

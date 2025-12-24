@@ -13,7 +13,13 @@ import (
 
 func TestRestackCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelpers.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelpers.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("restack auto-reparents when parent is merged into trunk", func(t *testing.T) {
 		t.Parallel()

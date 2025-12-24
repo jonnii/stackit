@@ -1,80 +1,24 @@
 package cli_test
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 
-	"stackit.dev/stackit/internal/testhelper"
+	"stackit.dev/stackit/testhelpers"
 )
 
 func TestMain(m *testing.M) {
-	// Build the binary once before running any tests
-	binaryPath, cleanup, err := buildBinaryOnce()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to build stackit binary: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Set the shared binary path for test packages
-	testhelper.SetSharedBinaryPath(binaryPath)
-
-	// Run all tests
-	code := m.Run()
-
-	// Cleanup
-	cleanup()
-	os.Exit(code)
-}
-
-func buildBinaryOnce() (string, func(), error) {
-	// Get the module root (go up from internal/cli to stackit root)
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get working directory: %w", err)
-	}
-
-	moduleRoot := filepath.Join(wd, "..", "..")
-
-	// Create temp directory for binary
-	tmpDir, err := os.MkdirTemp("", "stackit-test-binary-*")
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	binaryPath := filepath.Join(tmpDir, "stackit")
-
-	// Build the binary
-	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/stackit")
-	cmd.Dir = moduleRoot
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, fmt.Errorf("failed to build: %s: %w", string(output), err)
-	}
-
-	// Make it executable
-	if err := os.Chmod(binaryPath, 0755); err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, fmt.Errorf("failed to chmod: %w", err)
-	}
-
-	cleanup := func() {
-		os.RemoveAll(tmpDir)
-	}
-
-	return binaryPath, cleanup, nil
+	testhelpers.TestMain(m, nil)
 }
 
 // getStackitBinary returns the path to the pre-built stackit binary.
-// This replaces the old buildStackitBinary function.
 func getStackitBinary(t *testing.T) string {
 	t.Helper()
-	binaryPath := testhelper.GetSharedBinaryPath()
+	binaryPath := testhelpers.GetSharedBinaryPath()
 	if binaryPath == "" {
-		t.Fatal("stackit binary not built - TestMain should have built it")
+		if err := testhelpers.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
 	}
 	return binaryPath
 }

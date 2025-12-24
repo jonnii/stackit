@@ -211,4 +211,47 @@ func TestModifyWorkflow(t *testing.T) {
 
 		sh.Log("✓ Trunk protection works!")
 	})
+
+	t.Run("modify branching stack restacks all parallel children", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShell(t, binaryPath)
+
+		// Create a branching stack:
+		//        main
+		//          |
+		//       branch-a
+		//       /      \
+		//   branch-b  branch-c
+		//               |
+		//            branch-d
+
+		sh.Log("Creating branching stack structure...")
+		sh.Write("a1", "content a1").Run("create branch-a -m 'feat: a1'")
+
+		sh.Write("b1", "content b1").Run("create branch-b -m 'feat: b1'")
+
+		sh.Checkout("branch-a")
+		sh.Write("c1", "content c1").Run("create branch-c -m 'feat: c1'")
+
+		sh.Write("d1", "content d1").Run("create branch-d -m 'feat: d1'")
+
+		// Modify branch-a
+		sh.Log("Modifying branch-a...")
+		sh.Checkout("branch-a")
+		sh.Write("a1_updated", "updated content a1").Run("modify -n")
+
+		// Verify all children were restacked and are still valid
+		sh.Log("Verifying all children were restacked...")
+
+		// Check branch-b
+		sh.Checkout("branch-b").Run("info").OutputContains("branch-b")
+
+		// Check branch-c
+		sh.Checkout("branch-c").Run("info").OutputContains("branch-c")
+
+		// Check branch-d
+		sh.Checkout("branch-d").Run("info").OutputContains("branch-d")
+
+		sh.Log("✓ Branching stack modify complete!")
+	})
 }

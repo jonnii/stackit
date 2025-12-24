@@ -52,6 +52,8 @@ Stackit manages the complexity of this workflow—automatically handling rebases
 brew install jonnii/tap/stackit
 ```
 
+After installation, you can use either `stackit` or `st` (short alias).
+
 ### From Source
 
 Requires Go 1.25+:
@@ -72,6 +74,8 @@ If you have [just](https://github.com/casey/just) installed:
 just build
 just install
 ```
+
+The `just build` command will also create a local `st` symlink for convenience.
 
 ---
 

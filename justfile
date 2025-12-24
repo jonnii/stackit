@@ -135,6 +135,14 @@ check:
 # Build the stackit binary
 build:
 	go build -o stackit ./cmd/stackit
+	@if [ ! -L ./st ] && [ ! -f ./st ]; then \
+		ln -s ./stackit ./st; \
+		echo "Created symlink: st -> stackit"; \
+	elif [ -L ./st ]; then \
+		echo "Symlink st already exists"; \
+	else \
+		echo "Warning: st already exists as a regular file, skipping symlink creation"; \
+	fi
 
 # Install stackit binary (builds and copies to current directory)
 install: build

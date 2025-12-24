@@ -137,14 +137,22 @@ func (c *ConsolidateMergeExecutor) createConsolidationBranch(ctx context.Context
 		return "", fmt.Errorf("failed to reset to trunk: %w", err)
 	}
 
-	// Merge all stack branches in dependency order
+	// Cherry-pick commits from each branch to preserve individual commits
 	for i, branchInfo := range c.plan.BranchesToMerge {
-		c.splog.Info("  Merging %s (%d/%d)...", branchInfo.BranchName, i+1, len(c.plan.BranchesToMerge))
+		c.splog.Info("  Consolidating commits from %s (%d/%d)...", branchInfo.BranchName, i+1, len(c.plan.BranchesToMerge))
 
-		// Use merge --no-ff to preserve branch structure
-		commitMsg := fmt.Sprintf("Consolidate %s: %s", branchInfo.BranchName, c.getBranchTitle(branchInfo))
-		if _, err := git.RunGitCommandWithContext(ctx, "merge", branchInfo.BranchName, "--no-ff", "-m", commitMsg); err != nil {
-			return "", fmt.Errorf("failed to merge %s: %w", branchInfo.BranchName, err)
+		// Get commits unique to this branch (not in trunk or previous branches)
+		commits, err := c.getUniqueCommitsForBranch(branchInfo.BranchName)
+		if err != nil {
+			return "", fmt.Errorf("failed to get unique commits for %s: %w", branchInfo.BranchName, err)
+		}
+
+		// Cherry-pick each commit
+		for j, commit := range commits {
+			c.splog.Debug("    Cherry-picking commit %d/%d from %s: %s", j+1, len(commits), branchInfo.BranchName, commit[:8])
+			if _, err := git.RunGitCommandWithContext(ctx, "cherry-pick", commit); err != nil {
+				return "", fmt.Errorf("failed to cherry-pick %s from %s: %w", commit, branchInfo.BranchName, err)
+			}
 		}
 	}
 
@@ -288,6 +296,58 @@ func (c *ConsolidateMergeExecutor) restackRemainingBranches(ctx context.Context)
 	}
 
 	return nil
+}
+
+// getUniqueCommitsForBranch returns commits that are in the branch but not in trunk
+// and not in any branches that come before it in the merge order
+func (c *ConsolidateMergeExecutor) getUniqueCommitsForBranch(branchName string) ([]string, error) {
+	// Get all commits in this branch
+	branchCommits, err := c.engine.GetAllCommitsInternal(branchName, engine.CommitFormatSHA)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get commits in trunk
+	trunkCommits, err := c.engine.GetAllCommitsInternal(c.engine.Trunk().Name, engine.CommitFormatSHA)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create set of commits to exclude (trunk + all previous branches in merge order)
+	excludeSet := make(map[string]bool)
+	for _, commit := range trunkCommits {
+		excludeSet[commit] = true
+	}
+
+	// Find this branch's position in the merge order
+	branchIndex := -1
+	for i, branchInfo := range c.plan.BranchesToMerge {
+		if branchInfo.BranchName == branchName {
+			branchIndex = i
+			break
+		}
+	}
+
+	// Exclude commits from branches that come before this one in merge order
+	for i := 0; i < branchIndex; i++ {
+		prevBranchCommits, err := c.engine.GetAllCommitsInternal(c.plan.BranchesToMerge[i].BranchName, engine.CommitFormatSHA)
+		if err != nil {
+			return nil, err
+		}
+		for _, commit := range prevBranchCommits {
+			excludeSet[commit] = true
+		}
+	}
+
+	// Filter branch commits to only include unique ones
+	var uniqueCommits []string
+	for _, commit := range branchCommits {
+		if !excludeSet[commit] {
+			uniqueCommits = append(uniqueCommits, commit)
+		}
+	}
+
+	return uniqueCommits, nil
 }
 
 // Helper methods

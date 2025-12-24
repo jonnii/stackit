@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newTrunkCmd creates the trunk command
-func newTrunkCmd() *cobra.Command {
+// NewTrunkCmd creates the trunk command
+func NewTrunkCmd() *cobra.Command {
 	var (
 		add string
 		all bool

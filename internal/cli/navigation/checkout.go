@@ -1,14 +1,15 @@
-package cli
+package navigation
 
 import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newCheckoutCmd creates the checkout command
-func newCheckoutCmd() *cobra.Command {
+// NewCheckoutCmd creates the checkout command
+func NewCheckoutCmd() *cobra.Command {
 	var (
 		all           bool
 		showUntracked bool
@@ -24,7 +25,7 @@ func newCheckoutCmd() *cobra.Command {
 
 The interactive selector allows you to navigate branches using arrow keys and filter
 by typing. Use flags to customize which branches are shown.`,
-		ValidArgsFunction: completeBranches,
+		ValidArgsFunction: helpers.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

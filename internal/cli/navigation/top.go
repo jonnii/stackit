@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +7,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newTopCmd creates the top command
-func newTopCmd() *cobra.Command {
+// NewTopCmd creates the top command
+func NewTopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
 		Short: "Switch to the tip branch of the current stack",

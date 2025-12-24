@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +7,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newBottomCmd creates the bottom command
-func newBottomCmd() *cobra.Command {
+// NewBottomCmd creates the bottom command
+func NewBottomCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bottom",
 		Short: "Switch to the branch closest to trunk in the current stack",

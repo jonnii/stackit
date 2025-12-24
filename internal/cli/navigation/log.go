@@ -1,4 +1,5 @@
-package cli
+// Package navigation provides CLI commands for navigating branches in a stack.
+package navigation
 
 import (
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newLogCmd creates the log command
-func newLogCmd() *cobra.Command {
+// NewLogCmd creates the log command
+func NewLogCmd() *cobra.Command {
 	f := &logFlags{}
 
 	cmd := &cobra.Command{
@@ -109,7 +110,8 @@ func newLogLongCmd() *cobra.Command {
 	return cmd
 }
 
-func newLsCmd() *cobra.Command {
+// NewLsCmd creates the ls alias command
+func NewLsCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
 		Use:    "ls",
@@ -123,7 +125,8 @@ func newLsCmd() *cobra.Command {
 	return cmd
 }
 
-func newLlCmd() *cobra.Command {
+// NewLlCmd creates the ll alias command
+func NewLlCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
 		Use:    "ll",

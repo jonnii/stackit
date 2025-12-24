@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newChildrenCmd creates the children command
-func newChildrenCmd() *cobra.Command {
+// NewChildrenCmd creates the children command
+func NewChildrenCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "children",
 		Short: "Show the children of the current branch",

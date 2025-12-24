@@ -1,4 +1,4 @@
-package cli_test
+package navigation_test
 
 import (
 	"os"
@@ -7,12 +7,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/cli/testhelper"
 	"stackit.dev/stackit/testhelpers"
 )
 
 func TestUpCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelper.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelper.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("up moves to child branch", func(t *testing.T) {
 		t.Parallel()

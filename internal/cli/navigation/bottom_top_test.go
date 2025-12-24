@@ -1,17 +1,24 @@
-package cli_test
+package navigation_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/cli/testhelper"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestBottomCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelper.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelper.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("bottom from middle of stack", func(t *testing.T) {
 		t.Parallel()
@@ -73,7 +80,13 @@ func TestBottomCommand(t *testing.T) {
 
 func TestTopCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelper.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelper.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("top from middle of stack", func(t *testing.T) {
 		t.Parallel()

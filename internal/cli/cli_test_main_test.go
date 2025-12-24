@@ -6,11 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-)
 
-// sharedBinaryPath holds the path to the pre-built stackit binary
-// It's built once in TestMain and reused by all tests
-var sharedBinaryPath string
+	"stackit.dev/stackit/internal/cli/testhelper"
+)
 
 func TestMain(m *testing.M) {
 	// Build the binary once before running any tests
@@ -19,7 +17,9 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "Failed to build stackit binary: %v\n", err)
 		os.Exit(1)
 	}
-	sharedBinaryPath = binaryPath
+
+	// Set the shared binary path for test packages
+	testhelper.SetSharedBinaryPath(binaryPath)
 
 	// Run all tests
 	code := m.Run()
@@ -72,8 +72,9 @@ func buildBinaryOnce() (string, func(), error) {
 // This replaces the old buildStackitBinary function.
 func getStackitBinary(t *testing.T) string {
 	t.Helper()
-	if sharedBinaryPath == "" {
+	binaryPath := testhelper.GetSharedBinaryPath()
+	if binaryPath == "" {
 		t.Fatal("stackit binary not built - TestMain should have built it")
 	}
-	return sharedBinaryPath
+	return binaryPath
 }

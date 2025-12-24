@@ -52,8 +52,10 @@ If no flags are provided, an interactive wizard will guide you through the merge
 					mergeStrategy = merge.StrategyBottomUp
 				case "top-down", "topdown":
 					mergeStrategy = merge.StrategyTopDown
+				case "consolidate":
+					mergeStrategy = merge.StrategyConsolidate
 				default:
-					return fmt.Errorf("invalid strategy: %s (must be 'bottom-up' or 'top-down')", strategy)
+					return fmt.Errorf("invalid strategy: %s (must be 'bottom-up', 'top-down', or 'consolidate')", strategy)
 				}
 			}
 

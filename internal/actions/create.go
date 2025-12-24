@@ -18,13 +18,13 @@ import (
 type CreateOptions struct {
 	BranchName    string
 	Message       string
-	Scope         string // Optional scope for the new branch
+	Scope         string
 	All           bool
 	Insert        bool
 	Patch         bool
 	Update        bool
 	Verbose       int
-	BranchPattern config.BranchPattern // Branch name pattern from config
+	BranchPattern config.BranchPattern
 	// SelectedChildren is used to specify which children to move during insert
 	// in non-interactive mode (mostly for tests)
 	SelectedChildren []string

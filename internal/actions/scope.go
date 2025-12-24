@@ -67,6 +67,11 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 		return fmt.Errorf("no scope name provided")
 	}
 
+	// Cannot set scope on trunk
+	if isOnTrunk {
+		return fmt.Errorf("cannot set scope on trunk")
+	}
+
 	// Update the current branch's scope
 	oldScope := eng.GetScopeInternal(currentBranch)
 	newScope := engine.NewScope(opts.Scope)

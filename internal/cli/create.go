@@ -48,13 +48,13 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			opts := actions.CreateOptions{
 				BranchName:    branchName,
 				Message:       message,
-				Scope:          scope,
-				All:            all,
-				Insert:         insert,
-				Patch:          patch,
-				Update:         update,
-				Verbose:        verbose,
-				BranchPattern:  branchPattern,
+				Scope:         scope,
+				All:           all,
+				Insert:        insert,
+				Patch:         patch,
+				Update:        update,
+				Verbose:       verbose,
+				BranchPattern: branchPattern,
 			}
 
 			// Execute create action

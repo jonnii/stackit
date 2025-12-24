@@ -665,8 +665,10 @@ func TestCreateCommand(t *testing.T) {
 		_, err := cmd.CombinedOutput()
 		require.NoError(t, err)
 
-		// Set scope on main branch
-		cmd = exec.Command(binaryPath, "scope", "PROJ-456")
+		// Create a parent branch with scope
+		err = scene.Repo.CreateChange("parent content", "test", false)
+		require.NoError(t, err)
+		cmd = exec.Command(binaryPath, "create", "parent", "--scope", "PROJ-456", "-m", "Add parent")
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)
@@ -675,7 +677,7 @@ func TestCreateCommand(t *testing.T) {
 		err = scene.Repo.CreateChange("new content", "test", false)
 		require.NoError(t, err)
 
-		// Create a new branch without explicit scope (should inherit)
+		// Create a new branch without explicit scope (should inherit from parent)
 		cmd = exec.Command(binaryPath, "create", "feature", "-m", "Add feature")
 		cmd.Dir = scene.Dir
 		output, err := cmd.CombinedOutput()
@@ -709,8 +711,10 @@ func TestCreateCommand(t *testing.T) {
 		_, err := cmd.CombinedOutput()
 		require.NoError(t, err)
 
-		// Set scope on main branch
-		cmd = exec.Command(binaryPath, "scope", "PROJ-789")
+		// Create a parent branch with scope
+		err = scene.Repo.CreateChange("parent content", "test", false)
+		require.NoError(t, err)
+		cmd = exec.Command(binaryPath, "create", "parent", "--scope", "PROJ-789", "-m", "Add parent")
 		cmd.Dir = scene.Dir
 		_, err = cmd.CombinedOutput()
 		require.NoError(t, err)

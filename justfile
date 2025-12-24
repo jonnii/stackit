@@ -27,18 +27,18 @@ install-tools:
 test:
 	@echo "Running tests..."
 	@if command -v gotestsum >/dev/null 2>&1; then \
-		STACKIT_TEST_NO_INTERACTIVE=1 gotestsum --format pkgname-and-test-fails -- ./...; \
+		STACKIT_TEST_NO_INTERACTIVE=1 STACKIT_NO_LOGGING=1 gotestsum --format pkgname-and-test-fails -- ./...; \
 	else \
-		STACKIT_TEST_NO_INTERACTIVE=1 go test ./...; \
+		STACKIT_TEST_NO_INTERACTIVE=1 STACKIT_NO_LOGGING=1 go test ./...; \
 	fi
 
 # Run all tests without caching (for CI or debugging flaky tests)
 test-fresh:
 	@echo "Running tests (no cache)..."
 	@if command -v gotestsum >/dev/null 2>&1; then \
-		STACKIT_TEST_NO_INTERACTIVE=1 gotestsum --format pkgname-and-test-fails -- ./... -count=1; \
+		STACKIT_TEST_NO_INTERACTIVE=1 STACKIT_NO_LOGGING=1 gotestsum --format pkgname-and-test-fails -- ./... -count=1; \
 	else \
-		STACKIT_TEST_NO_INTERACTIVE=1 go test ./... -count=1; \
+		STACKIT_TEST_NO_INTERACTIVE=1 STACKIT_NO_LOGGING=1 go test ./... -count=1; \
 	fi
 
 # Run tests with verbose output

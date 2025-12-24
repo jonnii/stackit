@@ -55,8 +55,8 @@ func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, opts ExecuteOpti
 
 	c.splog.Info("✅ Created consolidation PR #%d: %s", pr.Number, pr.HTMLURL)
 
-	// Phase 4: Wait for CI and user to merge
-	if err := c.waitForConsolidationMerge(ctx, pr); err != nil {
+	// Phase 4: Wait for CI and auto-merge
+	if err := c.waitForConsolidationMerge(ctx, consolidationBranch, pr); err != nil {
 		return fmt.Errorf("consolidation merge failed: %w", err)
 	}
 
@@ -189,34 +189,73 @@ func (c *ConsolidateMergeExecutor) createConsolidationPR(ctx context.Context, br
 	return pr, nil
 }
 
-// waitForConsolidationMerge waits for the consolidation PR to be merged
-func (c *ConsolidateMergeExecutor) waitForConsolidationMerge(ctx context.Context, pr *github.PullRequestInfo) error {
-	c.splog.Info("⏳ Waiting for consolidation PR #%d to be merged...", pr.Number)
-	c.splog.Info("   PR: %s", pr.HTMLURL)
-	c.splog.Info("   Once CI passes and you merge this PR, the consolidation will complete automatically.")
+// waitForConsolidationCI waits for CI checks to pass on the consolidation PR
+func (c *ConsolidateMergeExecutor) waitForConsolidationCI(ctx context.Context, branchName string, prNumber int) error {
+	if c.githubClient == nil {
+		return fmt.Errorf("GitHub client not available")
+	}
 
-	// Poll for merge status
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	timeout := 10 * time.Minute // Default timeout for consolidation CI
+	pollInterval := 15 * time.Second
+	startTime := time.Now()
+	deadline := startTime.Add(timeout)
+
+	c.splog.Info("   Waiting for CI checks (timeout: %v)...", timeout)
 
 	for {
+		// Check if we've exceeded the timeout
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for CI checks on consolidation PR #%d after %v", prNumber, timeout)
+		}
+
+		// Check CI status
+		status, err := c.githubClient.GetPRChecksStatus(ctx, branchName)
+		if err != nil {
+			c.splog.Debug("Error checking CI status: %v", err)
+			// Continue polling on transient errors
+		} else {
+			if !status.Passing {
+				// CI checks failed
+				return fmt.Errorf("CI checks failed on consolidation PR #%d", prNumber)
+			}
+			if !status.Pending {
+				// All checks passed and none are pending
+				elapsed := time.Since(startTime)
+				c.splog.Info("✅ CI checks passed on consolidation PR #%d after %v", prNumber, elapsed.Round(time.Second))
+				return nil
+			}
+			// Still pending, continue waiting
+		}
+
+		// Wait before next check
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
-			// Check if PR is merged
-			prInfo, err := c.engine.GetPrInfo("") // Get by branch name from PR
-			if err == nil && prInfo != nil && prInfo.State == "MERGED" {
-				c.splog.Info("✅ Consolidation PR #%d has been merged!", pr.Number)
-				return nil
-			}
-
-			// Check if PR was closed without merging
-			if err == nil && prInfo != nil && prInfo.State == "CLOSED" {
-				return fmt.Errorf("consolidation PR #%d was closed without merging", pr.Number)
-			}
+		case <-time.After(pollInterval):
+			// Continue polling
 		}
 	}
+}
+
+// waitForConsolidationMerge waits for CI to pass and auto-merges the consolidation PR
+func (c *ConsolidateMergeExecutor) waitForConsolidationMerge(ctx context.Context, branchName string, pr *github.PullRequestInfo) error {
+	c.splog.Info("⏳ Waiting for CI checks on consolidation PR #%d...", pr.Number)
+	c.splog.Info("   PR: %s", pr.HTMLURL)
+	c.splog.Info("   The PR will be automatically merged once CI passes.")
+
+	// Wait for CI checks to pass
+	if err := c.waitForConsolidationCI(ctx, branchName, pr.Number); err != nil {
+		return fmt.Errorf("CI checks failed for consolidation PR: %w", err)
+	}
+
+	// Auto-merge the PR
+	c.splog.Info("🚀 Auto-merging consolidation PR #%d...", pr.Number)
+	if err := c.githubClient.MergePullRequest(ctx, branchName); err != nil {
+		return fmt.Errorf("failed to auto-merge consolidation PR #%d: %w", pr.Number, err)
+	}
+
+	c.splog.Info("✅ Consolidation PR #%d has been merged automatically!", pr.Number)
+	return nil
 }
 
 // postMergeCleanup handles cleanup and documentation after successful merge

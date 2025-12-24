@@ -2,7 +2,8 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "cp -r website/* . && go build -o server ./cmd/server"
+    "rootDirectory": "website",
+    "buildCommand": "go build -o server ./cmd/server"
   },
   "deploy": {
     "startCommand": "./server",

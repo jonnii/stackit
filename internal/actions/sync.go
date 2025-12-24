@@ -234,16 +234,22 @@ func SyncParentsFromGitHubBase(ctx *runtime.Context) (*SyncParentsResult, error)
 
 		// If GitHub base is different from local parent, and GitHub base is a valid local branch
 		if githubBase != currentParentName && localBranches[githubBase] {
-			// CRITICAL: Before reparenting to match GitHub, check if the GitHub base is an
-			// ancestor of our current local parent. If it is, then our local parent is
-			// "more specific" (closer to the branch in the stack) than GitHub's base.
-			// This often happens in diamond structures if a PR base update failed or is stale.
+			// Before reparenting to match GitHub, check if the GitHub base is an
+			// ancestor of our current local parent.
 			if currentParentName != eng.Trunk().Name {
 				isAncestor, err := git.IsAncestor(githubBase, currentParentName)
 				if err == nil && isAncestor {
-					splog.Debug("GitHub PR for %s has base %s, which is an ancestor of local parent %s. Keeping the more specific local parent.",
-						branch.Name, githubBase, currentParentName)
-					continue
+					// If GitHub base is an ancestor, it's a "downgrade" in specificity.
+					// We only skip reparenting if the branch is EMPTY relative to its current parent.
+					// This handles the "stale PR" bug in diamond structures where 'submit'
+					// skips updating the PR base because the branch is empty.
+					isEmpty, err := eng.IsBranchEmpty(gctx, branch.Name)
+					if err == nil && isEmpty {
+						splog.Debug("GitHub PR for %s has base %s, which is an ancestor of local parent %s. "+
+							"Branch is empty relative to its parent, so keeping the more specific local parent.",
+							branch.Name, githubBase, currentParentName)
+						continue
+					}
 				}
 			}
 

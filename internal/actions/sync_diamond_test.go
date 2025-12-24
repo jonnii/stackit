@@ -51,8 +51,10 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 
 		// Create diamond:
 		// main -> branch-a -> [branch-b, branch-c]
-		// Use CommitChange to create actual file changes (not empty commits)
-		// to avoid branches being detected as "merged into trunk"
+		// branch-a has its own commit.
+		// branch-b has its own commit.
+		// branch-c is EMPTY relative to branch-a (at the same commit).
+		// This is the common case where 'submit' skips the PR base update.
 		s.CreateBranch("branch-a").
 			CommitChange("file-a", "branch-a initial commit").
 			TrackBranch("branch-a", "main")
@@ -63,7 +65,6 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 
 		s.Checkout("branch-a").
 			CreateBranch("branch-c").
-			CommitChange("file-c", "branch-c commit").
 			TrackBranch("branch-c", "branch-a")
 
 		// Verify initial structure
@@ -357,11 +358,12 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		err = s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
-		// VERIFICATION: branch-b should keep branch-a as parent
+		// VERIFICATION: branch-b should now be parented to main because it has its
+		// own commits, so the move to an ancestor on GitHub is treated as intentional.
 		branchB := s.Engine.GetBranch("branch-b")
 		parent := s.Engine.GetParent(branchB)
 		require.NotNil(t, parent)
-		require.Equal(t, "branch-a", parent.Name, "branch-b should keep the more specific branch-a as parent even if GitHub says main")
+		require.Equal(t, "main", parent.Name, "branch-b should be reparented to main because it has its own commits")
 	})
 }
 

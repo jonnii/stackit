@@ -94,7 +94,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 		},
 	}
 
-	cmd.Flags().StringVar(&strategy, "strategy", "", "Merge strategy: 'bottom-up' (merge each PR from bottom) or 'top-down' (squash into one PR). Interactive if not specified.")
+	cmd.Flags().StringVar(&strategy, "strategy", "", "Merge strategy: 'bottom-up' (merge each PR from bottom), 'top-down' (squash into one PR), or 'consolidate' (single atomic merge). Interactive if not specified.")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
 	cmd.Flags().BoolVar(&force, "force", false, "Skip validation checks (draft PRs, failing CI)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show merge plan without executing")
@@ -249,6 +249,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		strategyOptions := []tui.SelectOption{
 			{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
 			{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
+			{Label: "🔀 Consolidate — Create single PR with all stack commits for atomic merge", Value: "consolidate"},
 		}
 
 		selectedStrategy, err := tui.PromptSelect("Select merge strategy:", strategyOptions, 0)
@@ -256,10 +257,13 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			return fmt.Errorf("strategy selection canceled: %w", err)
 		}
 
-		if selectedStrategy == "bottom-up" {
+		switch selectedStrategy {
+		case "bottom-up":
 			mergeStrategy = merge.StrategyBottomUp
-		} else {
+		case "top-down":
 			mergeStrategy = merge.StrategyTopDown
+		case "consolidate":
+			mergeStrategy = merge.StrategyConsolidate
 		}
 
 		splog.Info("✅ Strategy: %s", mergeStrategy)

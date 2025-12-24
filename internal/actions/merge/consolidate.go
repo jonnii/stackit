@@ -41,6 +41,19 @@ func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, opts ExecuteOpti
 		return fmt.Errorf("pre-validation failed: %w", err)
 	}
 
+	// Show what will be consolidated
+	c.splog.Info("Stack to consolidate:")
+	for i, branchInfo := range c.plan.BranchesToMerge {
+		symbol := "  ○"
+		if i == len(c.plan.BranchesToMerge)-1 {
+			symbol = "  ◉"
+		}
+		c.splog.Info("%s %s PR #%d", symbol, branchInfo.BranchName, branchInfo.PRNumber)
+	}
+	c.splog.Info("    ↓")
+	c.splog.Info("  📦 Consolidated PR")
+	c.splog.Newline()
+
 	// Phase 2: Create consolidation branch
 	consolidationBranch, err := c.createConsolidationBranch(ctx)
 	if err != nil {
@@ -53,6 +66,7 @@ func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, opts ExecuteOpti
 		return fmt.Errorf("failed to create consolidation PR: %w", err)
 	}
 
+	c.splog.Info("✅ Created consolidation branch: %s", consolidationBranch)
 	c.splog.Info("✅ Created consolidation PR #%d: %s", pr.Number, pr.HTMLURL)
 
 	// Phase 4: Wait for CI and auto-merge
@@ -239,9 +253,10 @@ func (c *ConsolidateMergeExecutor) waitForConsolidationCI(ctx context.Context, b
 
 // waitForConsolidationMerge waits for CI to pass and auto-merges the consolidation PR
 func (c *ConsolidateMergeExecutor) waitForConsolidationMerge(ctx context.Context, branchName string, pr *github.PullRequestInfo) error {
-	c.splog.Info("⏳ Waiting for CI checks on consolidation PR #%d...", pr.Number)
-	c.splog.Info("   PR: %s", pr.HTMLURL)
-	c.splog.Info("   The PR will be automatically merged once CI passes.")
+	c.splog.Info("Consolidation PR:")
+	c.splog.Info("  ◉ %s PR #%d ⏳", branchName, pr.Number)
+	c.splog.Info("     %s", pr.HTMLURL)
+	c.splog.Info("     Waiting for CI checks to pass...")
 
 	// Wait for CI checks to pass
 	if err := c.waitForConsolidationCI(ctx, branchName, pr.Number); err != nil {
@@ -249,12 +264,20 @@ func (c *ConsolidateMergeExecutor) waitForConsolidationMerge(ctx context.Context
 	}
 
 	// Auto-merge the PR
-	c.splog.Info("🚀 Auto-merging consolidation PR #%d...", pr.Number)
+	c.splog.Info("Consolidation PR:")
+	c.splog.Info("  ◉ %s PR #%d ✓", branchName, pr.Number)
+	c.splog.Info("     Auto-merging...")
+
 	if err := c.githubClient.MergePullRequest(ctx, branchName); err != nil {
 		return fmt.Errorf("failed to auto-merge consolidation PR #%d: %w", pr.Number, err)
 	}
 
 	c.splog.Info("✅ Consolidation PR #%d has been merged automatically!", pr.Number)
+
+	// Show final state
+	c.splog.Info("Consolidation complete:")
+	c.splog.Info("  ✓ %s (merged)", branchName)
+
 	return nil
 }
 

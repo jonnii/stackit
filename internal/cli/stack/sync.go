@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newSyncCmd creates the sync command
-func newSyncCmd() *cobra.Command {
+// NewSyncCmd creates the sync command
+func NewSyncCmd() *cobra.Command {
 	var (
 		all     bool
 		force   bool

@@ -1,4 +1,4 @@
-package cli_test
+package branch_test
 
 import (
 	"os"

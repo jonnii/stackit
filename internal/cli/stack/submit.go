@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"github.com/spf13/cobra"
@@ -110,8 +111,8 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 	return submit.Action(ctx, opts)
 }
 
-// newSubmitCmd creates the submit command
-func newSubmitCmd() *cobra.Command {
+// NewSubmitCmd creates the submit command
+func NewSubmitCmd() *cobra.Command {
 	f := &submitFlags{}
 
 	cmd := &cobra.Command{
@@ -131,8 +132,8 @@ you last submitted or got them. Opens an interactive prompt that allows you to i
 	return cmd
 }
 
-// newSsCmd creates the ss command, which is an alias for submit --stack
-func newSsCmd() *cobra.Command {
+// NewSsCmd creates the ss command, which is an alias for submit --stack
+func NewSsCmd() *cobra.Command {
 	f := &submitFlags{}
 
 	cmd := &cobra.Command{

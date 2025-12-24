@@ -5,7 +5,9 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/branch"
 	"stackit.dev/stackit/internal/cli/navigation"
+	"stackit.dev/stackit/internal/cli/stack"
 )
 
 // NewRootCmd creates the root cobra command
@@ -25,33 +27,33 @@ Date:    ` + date,
 
 	// Add subcommands
 	rootCmd.AddCommand(newAbortCmd())
-	rootCmd.AddCommand(newAbsorbCmd())
+	rootCmd.AddCommand(branch.NewAbsorbCmd())
 	rootCmd.AddCommand(newAgentCmd())
 	rootCmd.AddCommand(navigation.NewBottomCmd())
 	rootCmd.AddCommand(navigation.NewCheckoutCmd())
 	rootCmd.AddCommand(navigation.NewChildrenCmd())
 	rootCmd.AddCommand(newContinueCmd())
-	rootCmd.AddCommand(newCreateCmd())
+	rootCmd.AddCommand(branch.NewCreateCmd())
 	rootCmd.AddCommand(newDebugCmd())
-	rootCmd.AddCommand(newDeleteCmd())
+	rootCmd.AddCommand(branch.NewDeleteCmd())
 	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(navigation.NewDownCmd())
-	rootCmd.AddCommand(newFoldCmd())
+	rootCmd.AddCommand(branch.NewFoldCmd())
 	rootCmd.AddCommand(newInfoCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(navigation.NewLogCmd())
-	rootCmd.AddCommand(newMergeCmd())
-	rootCmd.AddCommand(newModifyCmd())
-	rootCmd.AddCommand(newMoveCmd())
+	rootCmd.AddCommand(stack.NewMergeCmd())
+	rootCmd.AddCommand(branch.NewModifyCmd())
+	rootCmd.AddCommand(stack.NewMoveCmd())
 	rootCmd.AddCommand(navigation.NewParentCmd())
-	rootCmd.AddCommand(newPopCmd())
-	rootCmd.AddCommand(newReorderCmd())
-	rootCmd.AddCommand(newRestackCmd())
-	rootCmd.AddCommand(newSplitCmd())
-	rootCmd.AddCommand(newSquashCmd())
+	rootCmd.AddCommand(branch.NewPopCmd())
+	rootCmd.AddCommand(stack.NewReorderCmd())
+	rootCmd.AddCommand(stack.NewRestackCmd())
+	rootCmd.AddCommand(branch.NewSplitCmd())
+	rootCmd.AddCommand(branch.NewSquashCmd())
 	rootCmd.AddCommand(newScopeCmd())
-	rootCmd.AddCommand(newSubmitCmd())
-	rootCmd.AddCommand(newSyncCmd())
+	rootCmd.AddCommand(stack.NewSubmitCmd())
+	rootCmd.AddCommand(stack.NewSyncCmd())
 	rootCmd.AddCommand(navigation.NewTopCmd())
 	rootCmd.AddCommand(newTrackCmd())
 	rootCmd.AddCommand(newUntrackCmd())
@@ -63,7 +65,7 @@ Date:    ` + date,
 	// Add aliases
 	rootCmd.AddCommand(navigation.NewLsCmd())
 	rootCmd.AddCommand(navigation.NewLlCmd())
-	rootCmd.AddCommand(newSsCmd())
+	rootCmd.AddCommand(stack.NewSsCmd())
 
 	return rootCmd
 }

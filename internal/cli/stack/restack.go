@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"fmt"
@@ -10,8 +11,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newRestackCmd creates the restack command
-func newRestackCmd() *cobra.Command {
+// NewRestackCmd creates the restack command
+func NewRestackCmd() *cobra.Command {
 	var (
 		branch    string
 		downstack bool

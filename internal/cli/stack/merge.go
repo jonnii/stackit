@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"fmt"
@@ -12,8 +13,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newMergeCmd creates the merge command
-func newMergeCmd() *cobra.Command {
+// NewMergeCmd creates the merge command
+func NewMergeCmd() *cobra.Command {
 	var (
 		dryRun   bool
 		yes      bool

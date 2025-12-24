@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -8,8 +9,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newDeleteCmd creates the delete command
-func newDeleteCmd() *cobra.Command {
+// NewDeleteCmd creates the delete command
+func NewDeleteCmd() *cobra.Command {
 	var (
 		downstack bool
 		force     bool

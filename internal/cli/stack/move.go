@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"fmt"
@@ -12,8 +13,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newMoveCmd creates the move command
-func newMoveCmd() *cobra.Command {
+// NewMoveCmd creates the move command
+func NewMoveCmd() *cobra.Command {
 	var (
 		all    bool
 		onto   string

@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -8,8 +9,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newPopCmd creates the pop command
-func newPopCmd() *cobra.Command {
+// NewPopCmd creates the pop command
+func NewPopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pop",
 		Short: "Delete the current branch but retain the state of files in the working tree",

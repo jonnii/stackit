@@ -614,4 +614,166 @@ func TestCreateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "feature", currentBranch)
 	})
+
+	t.Run("create with --scope sets explicit scope on new branch", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch with scope
+		cmd = exec.Command(binaryPath, "create", "feature", "--scope", "PROJ-123", "-m", "Add feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create with scope failed: %s", string(output))
+
+		// Verify branch was created
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "feature", currentBranch)
+
+		// Verify scope was set
+		cmd = exec.Command(binaryPath, "scope", "--show")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "scope show failed: %s", string(output))
+		require.Contains(t, string(output), "PROJ-123")
+	})
+
+	t.Run("create with --scope inherits scope when not provided", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Set scope on main branch
+		cmd = exec.Command(binaryPath, "scope", "PROJ-456")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch without explicit scope (should inherit)
+		cmd = exec.Command(binaryPath, "create", "feature", "-m", "Add feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create without scope failed: %s", string(output))
+
+		// Verify branch was created
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "feature", currentBranch)
+
+		// Verify scope was inherited
+		cmd = exec.Command(binaryPath, "scope", "--show")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "scope show failed: %s", string(output))
+		require.Contains(t, string(output), "PROJ-456")
+		require.Contains(t, string(output), "inherits scope")
+	})
+
+	t.Run("create with --scope overrides inherited scope", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Set scope on main branch
+		cmd = exec.Command(binaryPath, "scope", "PROJ-789")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch with different scope (should override inheritance)
+		cmd = exec.Command(binaryPath, "create", "feature", "--scope", "PROJ-999", "-m", "Add feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create with scope override failed: %s", string(output))
+
+		// Verify branch was created
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Equal(t, "feature", currentBranch)
+
+		// Verify explicit scope was set (not inherited)
+		cmd = exec.Command(binaryPath, "scope", "--show")
+		cmd.Dir = scene.Dir
+		output, err = cmd.CombinedOutput()
+		require.NoError(t, err, "scope show failed: %s", string(output))
+		require.Contains(t, string(output), "PROJ-999")
+		require.Contains(t, string(output), "explicit scope")
+	})
+
+	t.Run("create with --scope uses scope in branch name pattern", func(t *testing.T) {
+		t.Parallel()
+		scene := testhelpers.NewSceneParallel(t, func(s *testhelpers.Scene) error {
+			// Create initial commit
+			return s.Repo.CreateChangeAndCommit("initial", "init")
+		})
+
+		// Initialize stackit
+		cmd := exec.Command(binaryPath, "init")
+		cmd.Dir = scene.Dir
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Set branch pattern to include scope
+		cmd = exec.Command(binaryPath, "config", "set", "branch.pattern", "{scope}/{message}")
+		cmd.Dir = scene.Dir
+		_, err = cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		// Create a change and stage it
+		err = scene.Repo.CreateChange("new content", "test", false)
+		require.NoError(t, err)
+
+		// Create a new branch with scope (name should include scope)
+		cmd = exec.Command(binaryPath, "create", "--scope", "PROJ-111", "-m", "Add feature")
+		cmd.Dir = scene.Dir
+		output, err := cmd.CombinedOutput()
+
+		require.NoError(t, err, "create with scope in pattern failed: %s", string(output))
+
+		// Verify branch was created with scope in name
+		currentBranch, err := scene.Repo.CurrentBranchName()
+		require.NoError(t, err)
+		require.Contains(t, currentBranch, "PROJ-111")
+		require.Contains(t, currentBranch, "Add-feature")
+	})
 }

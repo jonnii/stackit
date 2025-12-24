@@ -18,6 +18,7 @@ import (
 type CreateOptions struct {
 	BranchName    string
 	Message       string
+	Scope         string // Optional scope for the new branch
 	All           bool
 	Insert        bool
 	Patch         bool
@@ -44,6 +45,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	snapshotOpts := NewSnapshot("create",
 		WithArg(opts.BranchName),
 		WithFlagValue("-m", opts.Message),
+		WithFlagValue("--scope", opts.Scope),
 		WithFlag(opts.All, "--all"),
 		WithFlag(opts.Insert, "--insert"),
 		WithFlag(opts.Patch, "--patch"),
@@ -104,8 +106,15 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Determine branch
-	parentScope := eng.GetScopeInternal(currentBranch)
-	branch, err := determineBranch(ctx, opts, commitMessage, parentScope.String())
+	// Use provided scope if given, otherwise inherit from parent
+	var scopeToUse string
+	if opts.Scope != "" {
+		scopeToUse = opts.Scope
+	} else {
+		parentScope := eng.GetScopeInternal(currentBranch)
+		scopeToUse = parentScope.String()
+	}
+	branch, err := determineBranch(ctx, opts, commitMessage, scopeToUse)
 	if err != nil {
 		return err
 	}
@@ -141,12 +150,15 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 		splog.Info("Warning: failed to track branch: %v", err)
 	}
 
-	// Propagate parent's scope if it exists
-	if !parentScope.IsEmpty() {
-		if err := eng.SetScope(branch, parentScope); err != nil {
-			splog.Info("Warning: failed to set scope from parent: %v", err)
+	// Set scope: use provided scope if given, otherwise let it inherit from parent naturally
+	if opts.Scope != "" {
+		// Set explicit scope if provided
+		newScope := engine.NewScope(opts.Scope)
+		if err := eng.SetScope(branch, newScope); err != nil {
+			splog.Info("Warning: failed to set scope: %v", err)
 		}
 	}
+	// If no scope provided, don't set anything - it will inherit from parent automatically
 
 	// Handle insert logic
 	if opts.Insert {

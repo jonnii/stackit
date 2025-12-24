@@ -293,9 +293,6 @@ func (c *ConsolidateMergeExecutor) postMergeCleanup(ctx context.Context) error {
 	// Update individual PR descriptions
 	c.updateIndividualPRs(ctx)
 
-	// Delete consolidated branches
-	c.deleteMergedBranches(ctx)
-
 	// Restack remaining branches
 	if err := c.restackRemainingBranches(ctx); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
@@ -326,20 +323,6 @@ func (c *ConsolidateMergeExecutor) updateIndividualPRs(ctx context.Context) {
 			c.splog.Warn("Failed to update PR #%d: %v", *prInfo.Number, err)
 		} else {
 			c.splog.Debug("✅ Updated documentation for PR #%d", *prInfo.Number)
-		}
-	}
-}
-
-// deleteMergedBranches removes the consolidated branches
-func (c *ConsolidateMergeExecutor) deleteMergedBranches(ctx context.Context) {
-	for _, branchInfo := range c.plan.BranchesToMerge {
-		branch := c.engine.GetBranch(branchInfo.BranchName)
-		if branch.IsTracked() {
-			if err := c.engine.DeleteBranch(ctx, branchInfo.BranchName); err != nil {
-				c.splog.Warn("Failed to delete branch %s: %v", branchInfo.BranchName, err)
-			} else {
-				c.splog.Debug("✅ Deleted branch %s", branchInfo.BranchName)
-			}
 		}
 	}
 }

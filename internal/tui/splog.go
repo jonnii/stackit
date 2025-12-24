@@ -100,6 +100,19 @@ func (s *Splog) Warn(format string, args ...interface{}) {
 	s.logMessage(slog.LevelWarn, msg)
 }
 
+// Error writes an error message
+// The format parameter may be a variable string, which is safe as we use fmt.Sprintf internally
+// nolint // format string validation is handled internally via fmt.Sprintf
+func (s *Splog) Error(format string, args ...interface{}) {
+	var msg string
+	if len(args) == 0 {
+		msg = "❌ " + format
+	} else {
+		msg = fmt.Sprintf("❌ "+format, args...)
+	}
+	s.logMessage(slog.LevelError, msg)
+}
+
 // Debug writes a debug message
 // The format parameter may be a variable string, which is safe as we use fmt.Sprintf internally
 // nolint // format string validation is handled internally via fmt.Sprintf

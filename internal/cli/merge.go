@@ -215,7 +215,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	if len(validation.Warnings) > 0 {
 		splog.Warn("Warnings:")
 		for _, warn := range validation.Warnings {
-			splog.Warn("  ⚠ %s", warn)
+			splog.Warn("  %s", warn)
 		}
 		splog.Newline()
 		if !forceFlag {
@@ -223,6 +223,15 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 			return fmt.Errorf("merge blocked due to warnings (use --force to override)")
 		}
 		splog.Info("Proceeding despite warnings (--force enabled)")
+	}
+
+	// Show informational messages if any
+	if len(validation.Infos) > 0 {
+		splog.Info("Information:")
+		for _, info := range validation.Infos {
+			splog.Info("  • %s", info)
+		}
+		splog.Newline()
 	}
 
 	// Prompt for strategy using interactive selector

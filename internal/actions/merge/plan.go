@@ -81,6 +81,7 @@ type Plan struct {
 	UpstackBranches []string          // Branches above current that will be restacked
 	Steps           []PlanStep        // Ordered steps to execute
 	Warnings        []string          // Non-blocking warnings
+	Infos           []string          // Informational messages
 	CreatedAt       time.Time
 }
 
@@ -89,6 +90,7 @@ type PlanValidation struct {
 	Valid    bool
 	Errors   []string // Blocking errors
 	Warnings []string // Non-blocking warnings
+	Infos    []string // Informational messages
 }
 
 // CreatePlanOptions contains options for creating a merge plan
@@ -270,7 +272,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		children := ancestorBranch.GetChildren()
 		for _, child := range children {
 			if !mergedSet[child.Name] {
-				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Sibling branch %s will be reparented to trunk when %s is merged", child, ancestor))
+				validation.Infos = append(validation.Infos, fmt.Sprintf("Branch %s is not part of this merge and will be moved to %s", child.Name, eng.Trunk().Name))
 			}
 		}
 	}
@@ -327,6 +329,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		UpstackBranches: upstackBranches,
 		Steps:           steps,
 		Warnings:        validation.Warnings,
+		Infos:           validation.Infos,
 		CreatedAt:       time.Now(),
 	}
 
@@ -485,6 +488,14 @@ func FormatMergePlan(plan *Plan, validation *PlanValidation) string {
 		result.WriteString("Warnings:\n")
 		for _, warn := range validation.Warnings {
 			result.WriteString(fmt.Sprintf("  ⚠ %s\n", warn))
+		}
+		result.WriteString("\n")
+	}
+
+	if len(validation.Infos) > 0 {
+		result.WriteString("Information:\n")
+		for _, info := range validation.Infos {
+			result.WriteString(fmt.Sprintf("  • %s\n", info))
 		}
 		result.WriteString("\n")
 	}

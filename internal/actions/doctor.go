@@ -57,10 +57,10 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 	case len(errors) > 0:
 		splog.Warn("Doctor found %d error(s) and %d warning(s).", len(errors), len(warnings))
 		for _, err := range errors {
-			splog.Warn("  ❌ %s", err)
+			splog.Error("  %s", err)
 		}
 		for _, warn := range warnings {
-			splog.Warn("  ⚠️  %s", warn)
+			splog.Warn("  %s", warn)
 		}
 		return fmt.Errorf("doctor found %d error(s)", len(errors))
 	case len(warnings) > 0:
@@ -70,7 +70,7 @@ func DoctorAction(ctx *runtime.Context, opts DoctorOptions) error {
 			splog.Info("Doctor found %d warning(s). Your stackit setup is mostly healthy.", len(warnings))
 		}
 		for _, warn := range warnings {
-			splog.Warn("  ⚠️  %s", warn)
+			splog.Warn("  %s", warn)
 		}
 	default:
 		splog.Info("✅ All checks passed. Your stackit setup is healthy.")
@@ -85,7 +85,7 @@ func checkEnvironment(splog *tui.Splog, warnings []string, errors []string) ([]s
 	gitVersion, err := exec.Command("git", "version").Output()
 	if err != nil {
 		errors = append(errors, "git is not installed or not in PATH")
-		splog.Warn("  ❌ git is not installed or not in PATH")
+		splog.Error("  git is not installed or not in PATH")
 	} else {
 		version := strings.TrimSpace(string(gitVersion))
 		splog.Info("  ✅ %s", version)
@@ -95,7 +95,7 @@ func checkEnvironment(splog *tui.Splog, warnings []string, errors []string) ([]s
 	ghVersion, err := exec.Command("gh", "version").Output()
 	if err != nil {
 		warnings = append(warnings, "GitHub CLI (gh) is not installed or not in PATH")
-		splog.Warn("  ⚠️  GitHub CLI (gh) is not installed or not in PATH")
+		splog.Warn("  GitHub CLI (gh) is not installed or not in PATH")
 	} else {
 		version := strings.TrimSpace(string(ghVersion))
 		// Extract just the version number
@@ -111,18 +111,18 @@ func checkEnvironment(splog *tui.Splog, warnings []string, errors []string) ([]s
 	token, err := getGitHubToken()
 	if err != nil {
 		warnings = append(warnings, "GitHub authentication not configured (GITHUB_TOKEN env var or gh auth token)")
-		splog.Warn("  ⚠️  GitHub authentication not configured")
+		splog.Warn("  GitHub authentication not configured")
 	} else {
 		if token == "" {
 			warnings = append(warnings, "GitHub token is empty")
-			splog.Warn("  ⚠️  GitHub token is empty")
+			splog.Warn("  GitHub token is empty")
 		} else {
 			// Try to create a GitHub client to verify connectivity
 			ghCtx := context.Background()
 			client, err := github.NewRealGitHubClient(ghCtx)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("GitHub authentication failed: %v", err))
-				splog.Warn("  ⚠️  GitHub authentication failed: %v", err)
+				splog.Warn("  GitHub authentication failed: %v", err)
 			} else {
 				owner, repo := client.GetOwnerRepo()
 				if owner != "" && repo != "" {
@@ -143,12 +143,12 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 	if ctx.RepoRoot == "" {
 		if err := git.InitDefaultRepo(); err != nil {
 			errors = append(errors, "not in a git repository")
-			splog.Warn("  ❌ not in a git repository")
+			splog.Error("  not in a git repository")
 			return warnings, errors
 		}
 		if _, err := git.GetRepoRoot(); err != nil {
 			errors = append(errors, fmt.Sprintf("failed to get repo root: %v", err))
-			splog.Warn("  ❌ failed to get repo root: %v", err)
+			splog.Error("  failed to get repo root: %v", err)
 			return warnings, errors
 		}
 	}
@@ -158,13 +158,13 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 	remoteURL, err := git.RunGitCommandWithContext(ctx.Context, "config", "--get", "remote.origin.url")
 	if err != nil {
 		warnings = append(warnings, "remote 'origin' is not configured")
-		splog.Warn("  ⚠️  remote 'origin' is not configured")
+		splog.Warn("  remote 'origin' is not configured")
 	} else {
 		// Check if it's a GitHub remote
 		repoInfo, err := github.ParseGitHubRemoteURL(remoteURL)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("remote 'origin' is not a GitHub repository: %s", remoteURL))
-			splog.Warn("  ⚠️  remote 'origin' is not a GitHub repository")
+			splog.Warn("  remote 'origin' is not a GitHub repository")
 		} else {
 			splog.Info("  ✅ Remote 'origin' is configured to GitHub (%s/%s)", repoInfo.Owner, repoInfo.Repo)
 		}
@@ -173,13 +173,13 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 	// Check trunk branch
 	if trunk == "" {
 		errors = append(errors, "trunk branch not configured")
-		splog.Warn("  ❌ trunk branch not configured")
+		splog.Error("  trunk branch not configured")
 	} else {
 		// Check if trunk branch exists
 		_, err := git.GetRevision(trunk)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("trunk branch '%s' does not exist", trunk))
-			splog.Warn("  ❌ trunk branch '%s' does not exist", trunk)
+			splog.Error("  trunk branch '%s' does not exist", trunk)
 		} else {
 			splog.Info("  ✅ Trunk branch '%s' exists", trunk)
 		}
@@ -188,7 +188,7 @@ func checkRepository(ctx *runtime.Context, splog *tui.Splog, warnings []string, 
 	// Check if stackit is initialized (if trunk is set, it's initialized)
 	if trunk == "" {
 		errors = append(errors, "stackit is not initialized (run 'stackit init')")
-		splog.Warn("  ❌ stackit is not initialized")
+		splog.Error("  stackit is not initialized")
 	} else {
 		splog.Info("  ✅ stackit is initialized")
 	}
@@ -202,7 +202,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	allBranches, err := git.GetAllBranchNames()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("failed to get branch names: %v", err))
-		splog.Warn("  ❌ failed to get branch names: %v", err)
+		splog.Error("  failed to get branch names: %v", err)
 		return warnings, errors
 	}
 
@@ -210,7 +210,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	metadataRefs, err := git.GetMetadataRefList()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("failed to get metadata refs: %v", err))
-		splog.Warn("  ❌ failed to get metadata refs: %v", err)
+		splog.Error("  failed to get metadata refs: %v", err)
 		return warnings, errors
 	}
 
@@ -227,7 +227,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 			orphanedCount++
 			if fix {
 				if err := git.DeleteMetadataRef(branchName); err != nil {
-					splog.Warn("  ❌ Failed to prune orphaned metadata for %s: %v", branchName, err)
+					splog.Error("  Failed to prune orphaned metadata for %s: %v", branchName, err)
 					warnings = append(warnings, fmt.Sprintf("orphaned metadata found for deleted branch '%s' (fix failed)", branchName))
 				} else {
 					splog.Info("  ✅ Pruned orphaned metadata for deleted branch %s", tui.ColorBranchName(branchName, false))
@@ -244,10 +244,10 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 			if prunedCount == orphanedCount {
 				splog.Info("  ✅ All %d orphaned metadata ref(s) pruned", prunedCount)
 			} else {
-				splog.Warn("  ⚠️  Found %d orphaned metadata ref(s), pruned %d", orphanedCount, prunedCount)
+				splog.Warn("  Found %d orphaned metadata ref(s), pruned %d", orphanedCount, prunedCount)
 			}
 		} else {
-			splog.Warn("  ⚠️  Found %d orphaned metadata ref(s) (run 'stackit doctor --fix' to prune)", orphanedCount)
+			splog.Warn("  Found %d orphaned metadata ref(s) (run 'stackit doctor --fix' to prune)", orphanedCount)
 		}
 	} else {
 		splog.Info("  ✅ No orphaned metadata found")
@@ -270,7 +270,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	}
 
 	if corruptedCount > 0 {
-		splog.Warn("  ❌ Found %d corrupted metadata ref(s)", corruptedCount)
+		splog.Error("  Found %d corrupted metadata ref(s)", corruptedCount)
 	} else {
 		splog.Info("  ✅ Metadata integrity check passed")
 	}
@@ -281,7 +281,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 		for _, cycle := range cycles {
 			errors = append(errors, fmt.Sprintf("cycle detected in stack graph: %s", strings.Join(cycle, " -> ")))
 		}
-		splog.Warn("  ❌ Found %d cycle(s) in stack graph", len(cycles))
+		splog.Error("  Found %d cycle(s) in stack graph", len(cycles))
 	} else {
 		splog.Info("  ✅ No cycles detected in stack graph")
 	}
@@ -292,9 +292,13 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 		for _, branch := range missingParents {
 			branchObj := eng.GetBranch(branch)
 			parent := eng.GetParent(branchObj)
-			warnings = append(warnings, fmt.Sprintf("branch '%s' has parent '%s' that does not exist", branch, parent))
+			parentName := "unknown"
+			if parent != nil {
+				parentName = parent.Name
+			}
+			warnings = append(warnings, fmt.Sprintf("branch '%s' has parent '%s' that does not exist", branch, parentName))
 		}
-		splog.Warn("  ⚠️  Found %d branch(es) with missing parents", len(missingParents))
+		splog.Warn("  Found %d branch(es) with missing parents", len(missingParents))
 	} else {
 		splog.Info("  ✅ All parent branches exist")
 	}

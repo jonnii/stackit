@@ -344,6 +344,8 @@ func (m MergeTUIModel) View() string {
 					desc = "deleting"
 				case strings.HasPrefix(desc, "Restack"):
 					desc = "restacking"
+				case strings.HasPrefix(desc, "Consolidate"):
+					desc = "consolidating"
 				}
 				line.WriteString(m.styles.spinnerStyle.Render("[" + desc + "]"))
 			}

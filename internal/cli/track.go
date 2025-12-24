@@ -23,6 +23,7 @@ func newTrackCmd() *cobra.Command {
 Can recursively track a stack of branches by specifying each branch's parent interactively.
 This command can also be used to fix corrupted stackit metadata.`,
 		ValidArgsFunction: helpers.CompleteBranches,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

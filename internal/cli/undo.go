@@ -22,6 +22,7 @@ represents the state of the repository before a modifying Stackit command (like
 
 If you specify a snapshot ID with --snapshot, it will restore to that specific
 state without prompting.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())

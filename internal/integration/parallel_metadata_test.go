@@ -21,7 +21,7 @@ func TestParallelMetadataRead(t *testing.T) {
 	for i := 0; i < numBranches; i++ {
 		branchName := fmt.Sprintf("branch-%d", i)
 		sh.Run(fmt.Sprintf("create %s -m 'feat: %d'", branchName, i))
-		sh.Checkout("main")
+		sh.Checkout(mainBranchName)
 	}
 
 	// 2. Initialize repo in test process
@@ -51,7 +51,7 @@ func TestParallelMetadataRead(t *testing.T) {
 					errors <- fmt.Errorf("branch %s: metadata lost! ParentBranchName is nil", branchName)
 					return
 				}
-				if *meta.ParentBranchName != "main" {
+				if *meta.ParentBranchName != mainBranchName {
 					errors <- fmt.Errorf("branch %s: incorrect parent: %s", branchName, *meta.ParentBranchName)
 				}
 			}(j)

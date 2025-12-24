@@ -10,6 +10,11 @@ import (
 	"stackit.dev/stackit/testhelpers"
 )
 
+const (
+	// mainBranchName is the name of the main/default trunk branch used in tests
+	mainBranchName = "main"
+)
+
 // =============================================================================
 // Test Shell - A helper to make integration tests read like terminal sessions
 // =============================================================================

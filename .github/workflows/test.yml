@@ -45,13 +45,6 @@ jobs:
           STACKIT_NO_LOGGING: "1"
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          fail_ci_if_error: false
 
   lint:
     name: Lint

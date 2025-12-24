@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"stackit.dev/stackit/internal/cli/testhelper"
+	"stackit.dev/stackit/internal/testhelper"
 )
 
 func TestMain(m *testing.M) {

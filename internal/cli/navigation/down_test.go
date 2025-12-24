@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/cli/testhelper"
+	"stackit.dev/stackit/internal/testhelper"
 	"stackit.dev/stackit/testhelpers"
 )
 

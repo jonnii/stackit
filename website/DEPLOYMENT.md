@@ -17,11 +17,11 @@
    - Choose your Stackit repository
 
 2. **Configure Service**
-   - Railway will auto-detect the configuration from `railway.json`
-   - The build will automatically:
-     - Install Go 1.23
-     - Build the server from `website/cmd/server`
-     - Start serving on the assigned PORT
+   - Railway will auto-detect the configuration from `railway.json` at the repository root
+   - The build will:
+     - Change to the `website/cmd/server` directory
+     - Build the Go server and place the binary at the repository root
+     - Start serving from the `website/` directory
 
 3. **Environment Variables**
    - Railway automatically sets `PORT`
@@ -66,11 +66,10 @@ railway up
 
 ### Build Configuration
 
-The deployment uses three configuration files:
+The deployment uses two configuration files:
 
-1. **`railway.json`** - Railway-specific build and deploy settings
-2. **`nixpacks.toml`** - Build environment (Go version)
-3. **`Procfile`** - Process definition (web server)
+1. **`railway.json`** - Railway-specific build and deploy settings (uses Railpack)
+2. **`Procfile`** - Process definition (web server)
 
 ### Monitoring
 
@@ -192,7 +191,7 @@ CMD ["./server"]
 
 ### Build Fails
 
-- Check Go version in `nixpacks.toml` matches available version
+- Railpack automatically detects the Go version from `website/go.mod`
 - Verify all files are committed and pushed
 - Check Railway build logs for specific errors
 

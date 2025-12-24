@@ -16,9 +16,10 @@ website/
 │   ├── robots.txt       # Search engine directives
 │   └── sitemap.xml      # Site map for SEO
 ├── go.mod               # Go module definition
-├── Procfile             # Railway process file
-├── railway.json         # Railway configuration
-└── nixpacks.toml        # Nixpacks build configuration
+└── Procfile             # Railway process file
+
+Root level:
+└── railway.json         # Railway configuration (uses Railpack)
 ```
 
 ## Local Development
@@ -61,10 +62,10 @@ This site is configured for automatic deployment on Railway. Simply:
 
 ### Build Process
 
-Railway uses the configuration in `railway.json` and `nixpacks.toml` to:
-1. Install Go 1.25
-2. Build the server binary
-3. Start the web server serving static files from `public/`
+Railway uses Railpack with the configuration in `railway.json` to:
+1. Change to the `website/cmd/server` directory
+2. Build the Go server binary
+3. Start the web server serving static files from `website/public/`
 
 ## Features
 

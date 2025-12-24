@@ -28,9 +28,7 @@ func TestWorktree(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a temporary directory for the worktree
-		tmpDir, err := os.MkdirTemp("", "stackit-worktree-test-*")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		// Normalize worktree path (on macOS /var is symlinked to /private/var)
 		worktreePath, err := filepath.EvalSymlinks(tmpDir)
@@ -71,9 +69,7 @@ func TestWorktree(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a temporary directory for the worktree
-		tmpDir, err := os.MkdirTemp("", "stackit-worktree-test-*")
-		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 
 		worktreePath := filepath.Join(tmpDir, "worktree-detached")
 

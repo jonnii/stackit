@@ -42,8 +42,10 @@ func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 			return nil, fmt.Errorf("failed to clone repo: %w", err)
 		}
 	} else {
-		// Initialize new repository
-		cmd := exec.Command("git", "init", dir, "-b", "main")
+		// Initialize new repository with optimized config
+		// Use git -c flags to avoid reading global config and set local configs
+		cmd := exec.Command("git", "-c", "init.defaultBranch=main", "-c", "core.autocrlf=false", "-c", "core.fileMode=false", "init", dir, "-b", "main")
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("failed to init repo: %w", err)
 		}
@@ -84,9 +86,12 @@ func WithRepoURL(url string) GitRepoOption {
 }
 
 // runGitCommand executes a git command in the repository directory.
+// Uses GIT_CONFIG_GLOBAL=/dev/null to avoid reading global config for faster operations.
 func (r *GitRepo) runGitCommand(args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.Dir
+	// Set environment to avoid reading global git config for faster operations in tests
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 	if os.Getenv("DEBUG") == "" {
 		cmd.Stdout = nil
 		cmd.Stderr = nil
@@ -100,9 +105,12 @@ func (r *GitRepo) RunGitCommand(args ...string) error {
 }
 
 // runGitCommandAndGetOutput executes a git command and returns its output.
+// Uses GIT_CONFIG_GLOBAL=/dev/null to avoid reading global config for faster operations.
 func (r *GitRepo) runGitCommandAndGetOutput(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.Dir
+	// Set environment to avoid reading global git config for faster operations in tests
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git command failed: %w", err)
@@ -327,6 +335,8 @@ func (r *GitRepo) CreateBareRemote(name string) (string, error) {
 	bareDir := r.Dir + "-" + name + ".git"
 
 	cmd := exec.Command("git", "init", "--bare", bareDir)
+	// Set environment to avoid reading global git config for faster operations in tests
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to create bare repo: %w", err)
 	}
@@ -343,6 +353,8 @@ func (r *GitRepo) CreateBareRemote(name string) (string, error) {
 func (r *GitRepo) PushBranch(remote, branch string) error {
 	cmd := exec.Command("git", "push", "-u", remote, branch)
 	cmd.Dir = r.Dir
+	// Set environment to avoid reading global git config for faster operations in tests
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("push failed: %w, output: %s", err, string(output))

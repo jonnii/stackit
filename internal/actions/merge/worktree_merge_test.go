@@ -1,7 +1,6 @@
 package merge_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -44,9 +43,7 @@ func TestExecuteInWorktree(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a remote
-		remoteDir, err := os.MkdirTemp("", "stackit-test-remote-*")
-		require.NoError(t, err)
-		defer os.RemoveAll(remoteDir)
+		remoteDir := t.TempDir()
 		s.RunGit("init", "--bare", remoteDir)
 		s.RunGit("remote", "add", "origin", remoteDir).
 			RunGit("push", "-u", "origin", "main").

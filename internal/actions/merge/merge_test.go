@@ -1,7 +1,6 @@
 package merge_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -208,9 +207,7 @@ func TestAction(t *testing.T) {
 		require.Contains(t, plan.UpstackBranches, "branch-c")
 
 		// Set up a remote so PullTrunk can work
-		remoteDir, err := os.MkdirTemp("", "stackit-test-remote-*")
-		require.NoError(t, err)
-		defer os.RemoveAll(remoteDir)
+		remoteDir := t.TempDir()
 
 		s.RunGit("init", "--bare", remoteDir)
 

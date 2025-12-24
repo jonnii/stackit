@@ -654,6 +654,13 @@ func updatePRBaseBranchFromContext(ctx context.Context, githubClient github.Clie
 
 // executeConsolidation handles the stack consolidation process
 func executeConsolidation(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
+	// Temporarily un-quiet splog to show consolidation PR link in TUI mode
+	wasQuiet := splog.IsQuiet()
+	if wasQuiet {
+		splog.SetQuiet(false)
+		defer splog.SetQuiet(true) // Restore quiet mode after consolidation
+	}
+
 	consolidator := NewConsolidateMergeExecutor(opts.Plan, githubClient, eng, splog, repoRoot)
 	return consolidator.Execute(ctx, opts)
 }

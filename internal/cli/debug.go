@@ -27,7 +27,8 @@ The output includes:
   - Repository information
 
 Output is formatted as pretty-printed JSON for easy reading and parsing.`,
-		Args: cobra.NoArgs,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

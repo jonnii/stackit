@@ -196,6 +196,11 @@ func (s *Splog) SetQuiet(quiet bool) {
 	s.quiet = quiet
 }
 
+// IsQuiet returns whether the logger is in quiet mode.
+func (s *Splog) IsQuiet() bool {
+	return s.quiet
+}
+
 // logMessage is a helper to log a message using slog without format string validation
 func (s *Splog) logMessage(level slog.Level, msg string) {
 	s.logger.Log(context.Background(), level, msg)

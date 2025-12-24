@@ -19,6 +19,7 @@ func newAgentCmd() *cobra.Command {
 
 This command generates configuration files that enable AI agents (like Cursor and Claude Code)
 to understand how to use stackit commands for managing stacked branches.`,
+		SilenceUsage: true,
 	}
 
 	cmd.AddCommand(newAgentInitCmd())
@@ -39,6 +40,7 @@ This will create:
 
 These files contain instructions for AI agents on how to use stackit commands
 to manage stacked branches, create commits, submit PRs, and more.`,
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Get repo root
 			if err := git.InitDefaultRepo(); err != nil {

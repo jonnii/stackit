@@ -29,6 +29,7 @@ func NewCreateCmd() *cobra.Command {
 If no branch name is specified, generate a branch name from the commit message.
 If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

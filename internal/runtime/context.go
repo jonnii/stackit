@@ -25,19 +25,49 @@ type Context struct {
 
 // NewContext creates a new context with the given engine
 func NewContext(eng engine.Engine) *Context {
+	var splog *tui.Splog
+	var err error
+
+	// Skip file logging when STACKIT_NO_LOGGING is set (e.g., during tests or CI)
+	if os.Getenv("STACKIT_NO_LOGGING") != "" {
+		splog = tui.NewSplog() // Console-only logging
+	} else {
+		logPath := tui.GetLogFilePath()
+		splog, err = tui.NewSplogWithConfig(logPath, "")
+		if err != nil {
+			// If file logging fails, fall back to console-only
+			splog, _ = tui.NewSplogWithConfig("", "")
+		}
+	}
+
 	return &Context{
 		Context: context.Background(),
 		Engine:  eng,
-		Splog:   tui.NewSplog(),
+		Splog:   splog,
 	}
 }
 
 // NewContextWithRepoRoot creates a new context with the given engine and repo root
 func NewContextWithRepoRoot(eng engine.Engine, repoRoot string) *Context {
+	var splog *tui.Splog
+	var err error
+
+	// Skip file logging when STACKIT_NO_LOGGING is set (e.g., during tests or CI)
+	if os.Getenv("STACKIT_NO_LOGGING") != "" {
+		splog = tui.NewSplog() // Console-only logging
+	} else {
+		logPath := tui.GetLogFilePath()
+		splog, err = tui.NewSplogWithConfig(logPath, "")
+		if err != nil {
+			// If file logging fails, fall back to console-only
+			splog, _ = tui.NewSplogWithConfig("", "")
+		}
+	}
+
 	return &Context{
 		Context:  context.Background(),
 		Engine:   eng,
-		Splog:    tui.NewSplog(),
+		Splog:    splog,
 		RepoRoot: repoRoot,
 	}
 }

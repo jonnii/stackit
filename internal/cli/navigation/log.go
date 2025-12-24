@@ -15,9 +15,10 @@ func NewLogCmd() *cobra.Command {
 	f := &logFlags{}
 
 	cmd := &cobra.Command{
-		Use:     "log",
-		Short:   "Log all branches tracked by Stackit, showing dependencies and info for each",
-		Aliases: []string{"l"},
+		Use:          "log",
+		Short:        "Log all branches tracked by Stackit, showing dependencies and info for each",
+		Aliases:      []string{"l"},
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},
@@ -85,9 +86,10 @@ func executeLog(cmd *cobra.Command, f *logFlags, style string) error {
 func newLogShortCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
-		Use:     "short",
-		Short:   "Log branches in a compact format",
-		Aliases: []string{"ls"},
+		Use:          "short",
+		Short:        "Log branches in a compact format",
+		Aliases:      []string{"ls"},
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "SHORT")
 		},
@@ -99,9 +101,10 @@ func newLogShortCmd() *cobra.Command {
 func newLogLongCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
-		Use:     "long",
-		Short:   "Log branches with full details",
-		Aliases: []string{"ll"},
+		Use:          "long",
+		Short:        "Log branches with full details",
+		Aliases:      []string{"ll"},
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},
@@ -114,9 +117,10 @@ func newLogLongCmd() *cobra.Command {
 func NewLsCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
-		Use:    "ls",
-		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
-		Short:  "Alias for log short",
+		Use:          "ls",
+		Hidden:       true, // Hide from main help to avoid clutter, but keep as alias
+		Short:        "Alias for log short",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "SHORT")
 		},
@@ -129,9 +133,10 @@ func NewLsCmd() *cobra.Command {
 func NewLlCmd() *cobra.Command {
 	f := &logFlags{}
 	cmd := &cobra.Command{
-		Use:    "ll",
-		Hidden: true, // Hide from main help to avoid clutter, but keep as alias
-		Short:  "Alias for log long",
+		Use:          "ll",
+		Hidden:       true, // Hide from main help to avoid clutter, but keep as alias
+		Short:        "Alias for log long",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeLog(cmd, f, "FULL")
 		},

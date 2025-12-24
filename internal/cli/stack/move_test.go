@@ -1,4 +1,4 @@
-package cli_test
+package stack_test
 
 import (
 	"os"

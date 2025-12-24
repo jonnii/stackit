@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -8,8 +9,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newFoldCmd creates the fold command
-func newFoldCmd() *cobra.Command {
+// NewFoldCmd creates the fold command
+func NewFoldCmd() *cobra.Command {
 	var (
 		keep       bool
 		allowTrunk bool

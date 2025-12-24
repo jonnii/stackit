@@ -1,4 +1,5 @@
-package cli
+// Package stack provides CLI commands for operating on entire stacks.
+package stack
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newReorderCmd creates the reorder command
-func newReorderCmd() *cobra.Command {
+// NewReorderCmd creates the reorder command
+func NewReorderCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reorder",
 		Short: "Reorder branches between trunk and the current branch",

@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newModifyCmd creates the modify command
-func newModifyCmd() *cobra.Command {
+// NewModifyCmd creates the modify command
+func NewModifyCmd() *cobra.Command {
 	var (
 		all               bool
 		commit            bool

@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newAbsorbCmd creates the absorb command
-func newAbsorbCmd() *cobra.Command {
+// NewAbsorbCmd creates the absorb command
+func NewAbsorbCmd() *cobra.Command {
 	var (
 		all    bool
 		dryRun bool

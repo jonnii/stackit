@@ -1,4 +1,5 @@
-package cli
+// Package branch provides CLI commands for managing branches in a stack.
+package branch
 
 import (
 	"github.com/spf13/cobra"
@@ -7,8 +8,8 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 )
 
-// newSplitCmd creates the split command
-func newSplitCmd() *cobra.Command {
+// NewSplitCmd creates the split command
+func NewSplitCmd() *cobra.Command {
 	var (
 		byCommit          bool
 		byHunk            bool

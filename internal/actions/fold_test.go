@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
@@ -358,5 +359,29 @@ func TestFoldAction(t *testing.T) {
 		// Verify main contains branch1's commit
 		logOutput, _ := s.Scene.Repo.RunGitCommandAndGetOutput("log", "--oneline", "-n", "1")
 		require.Contains(t, logOutput, "change on branch1")
+	})
+
+	t.Run("fails when folding branches with different scopes", func(t *testing.T) {
+		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
+			WithStack(map[string]string{
+				"branch1": "main",
+				"branch2": "branch1",
+			})
+
+		// Set different scopes on the branches
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.SetScope(branch1, engine.NewScope("PROJ-123"))
+		require.NoError(t, err)
+		err = s.Engine.SetScope(branch2, engine.NewScope("PROJ-456"))
+		require.NoError(t, err)
+
+		// Switch to branch2 and try to fold
+		s.Checkout("branch2")
+		err = actions.FoldAction(s.Context, actions.FoldOptions{Keep: false})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cannot fold branches with different scopes")
+		require.Contains(t, err.Error(), "[PROJ-456]")
+		require.Contains(t, err.Error(), "[PROJ-123]")
 	})
 }

@@ -433,7 +433,7 @@ func executeStepWithProgress(ctx context.Context, step PlanStep, stepIndex int, 
 }
 
 // executeStep executes a single step
-func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, _ ExecuteOptions) error {
+func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	trunk := eng.Trunk() // Cache trunk for this function scope
 	trunkName := trunk.Name
 	switch step.StepType {
@@ -545,6 +545,12 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			return err
 		}
 
+	case StepConsolidate:
+		// Execute stack consolidation
+		if err := executeConsolidation(ctx, eng, splog, githubClient, repoRoot, opts); err != nil {
+			return err
+		}
+
 	case StepWaitCI:
 		// StepWaitCI should be handled by executeStepWithProgress, not executeStep
 		// This case should never be reached, but if it is, return an error
@@ -640,6 +646,12 @@ func updatePRBaseBranchFromContext(ctx context.Context, githubClient github.Clie
 	}
 
 	return nil
+}
+
+// executeConsolidation handles the stack consolidation process
+func executeConsolidation(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
+	consolidator := NewConsolidateMergeExecutor(opts.Plan, githubClient, eng, splog, repoRoot)
+	return consolidator.Execute(ctx, opts)
 }
 
 // executeWaitCIWithProgress waits for CI checks with progress reporting

@@ -268,14 +268,21 @@ func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
 		return false, nil
 	}
 
-	// Get remote SHA from cache
+	// First try to get remote SHA from cache (populated by PopulateRemoteShas)
 	remoteSha, exists := e.remoteShas[branchName]
-	if !exists {
-		// No remote branch exists - branch doesn't match remote
+	if exists {
+		return localSha == remoteSha, nil
+	}
+
+	// Fall back to checking local remote tracking branch (like getBranchRemoteDifference does)
+	// This handles cases where remote fetching failed but we have local remote tracking
+	remoteTrackingSha, err := git.GetRemoteRevision(branchName)
+	if err != nil {
+		// No remote tracking branch exists
 		return false, nil
 	}
 
-	return localSha == remoteSha, nil
+	return localSha == remoteTrackingSha, nil
 }
 
 // IsMergedIntoTrunk checks if a branch is merged into trunk

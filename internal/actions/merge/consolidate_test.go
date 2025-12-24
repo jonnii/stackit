@@ -44,7 +44,7 @@ func TestConsolidateMergeExecutor(t *testing.T) {
 		executor := merge.NewConsolidateMergeExecutor(plan, s.Context.GitHubClient, s.Engine, s.Context.Splog, s.Scene.Dir)
 
 		// This should fail pre-validation because branches aren't pushed to remote
-		err = executor.Execute(s.Context.Context, merge.ExecuteOptions{
+		_, err = executor.Execute(s.Context.Context, merge.ExecuteOptions{
 			Plan:  plan,
 			Force: false,
 		})

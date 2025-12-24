@@ -292,7 +292,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 		for _, branch := range missingParents {
 			branchObj := eng.GetBranch(branch)
 			parent := eng.GetParent(branchObj)
-			parentName := "unknown"
+			parentName := unknown
 			if parent != nil {
 				parentName = parent.Name
 			}

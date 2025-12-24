@@ -269,7 +269,7 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 	for commitSHA, hunks := range hunksByCommit {
 		branchName, err := eng.FindBranchForCommit(commitSHA)
 		if err != nil {
-			branchName = "unknown"
+			branchName = unknown
 		}
 
 		// Get commit message - show first commit message from the branch
@@ -304,7 +304,7 @@ func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.
 	for commitSHA, hunks := range hunksByCommit {
 		branchName, err := eng.FindBranchForCommit(commitSHA)
 		if err != nil {
-			branchName = "unknown"
+			branchName = unknown
 		}
 
 		splog.Info("  Commit %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))

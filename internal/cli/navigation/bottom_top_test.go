@@ -5,16 +5,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/testhelper"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
 
 func TestBottomCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := testhelper.GetSharedBinaryPath()
+	binaryPath := testhelpers.GetSharedBinaryPath()
 	if binaryPath == "" {
-		if err := testhelper.GetBinaryError(); err != nil {
+		if err := testhelpers.GetBinaryError(); err != nil {
 			t.Fatalf("failed to build stackit binary: %v", err)
 		}
 		t.Fatal("stackit binary not built")
@@ -80,9 +79,9 @@ func TestBottomCommand(t *testing.T) {
 
 func TestTopCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := testhelper.GetSharedBinaryPath()
+	binaryPath := testhelpers.GetSharedBinaryPath()
 	if binaryPath == "" {
-		if err := testhelper.GetBinaryError(); err != nil {
+		if err := testhelpers.GetBinaryError(); err != nil {
 			t.Fatalf("failed to build stackit binary: %v", err)
 		}
 		t.Fatal("stackit binary not built")

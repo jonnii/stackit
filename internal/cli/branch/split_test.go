@@ -12,7 +12,13 @@ import (
 
 func TestSplitCommand(t *testing.T) {
 	t.Parallel()
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelpers.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelpers.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("split --by-file extracts files to new parent branch", func(t *testing.T) {
 		t.Parallel()

@@ -12,7 +12,13 @@ import (
 func TestCreateCommand(t *testing.T) {
 	t.Parallel()
 	// Build the stackit binary first
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelpers.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelpers.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("create branch with name", func(t *testing.T) {
 		t.Parallel()

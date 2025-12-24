@@ -1,11 +1,10 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "cd website && go build -o server ./cmd/server"
+    "builder": "RAILPACK"
   },
   "deploy": {
-    "startCommand": "cd website && ./server",
+    "startCommand": "./server",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

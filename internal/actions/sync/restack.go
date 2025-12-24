@@ -33,13 +33,17 @@ func restackBranches(ctx *runtime.Context, branchesToRestack []string) error {
 		}
 	}
 
-	// Remove duplicates
+	// Remove duplicates and filter out non-existent/untracked branches
 	seen := make(map[string]bool)
 	uniqueBranches := []engine.Branch{}
 	for _, branchName := range branchesToRestack {
 		if !seen[branchName] {
 			seen[branchName] = true
-			uniqueBranches = append(uniqueBranches, eng.GetBranch(branchName))
+			branch := eng.GetBranch(branchName)
+			// Only include branches that exist and are tracked
+			if branch.IsTracked() {
+				uniqueBranches = append(uniqueBranches, branch)
+			}
 		}
 	}
 

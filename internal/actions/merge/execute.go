@@ -67,6 +67,10 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 			stepDescriptions[i] = step.Description
 		}
 
+		// Suppress splog output during TUI execution to prevent console interference
+		splog.SetQuiet(true)
+		defer splog.SetQuiet(false) // Ensure we restore logging even if there's an error
+
 		// Start TUI in a goroutine
 		done := make(chan bool, 1)
 		tuiErr := make(chan error, 1)

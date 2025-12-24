@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -13,8 +14,8 @@ import (
 	"stackit.dev/stackit/internal/utils"
 )
 
-// newUpCmd creates the up command
-func newUpCmd() *cobra.Command {
+// NewUpCmd creates the up command
+func NewUpCmd() *cobra.Command {
 	var (
 		steps    int
 		toBranch string
@@ -145,7 +146,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 	cmd.Flags().IntVarP(&steps, "steps", "n", 1, "The number of levels to traverse upstack.")
 	cmd.Flags().StringVar(&toBranch, "to", "", "Target branch to navigate towards. When multiple children exist, selects the path leading to this branch.")
 
-	_ = cmd.RegisterFlagCompletionFunc("to", completeBranches)
+	_ = cmd.RegisterFlagCompletionFunc("to", helpers.CompleteBranches)
 
 	return cmd
 }

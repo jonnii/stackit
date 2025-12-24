@@ -4,6 +4,8 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
+
+	"stackit.dev/stackit/internal/cli/navigation"
 )
 
 // NewRootCmd creates the root cobra command
@@ -25,23 +27,23 @@ Date:    ` + date,
 	rootCmd.AddCommand(newAbortCmd())
 	rootCmd.AddCommand(newAbsorbCmd())
 	rootCmd.AddCommand(newAgentCmd())
-	rootCmd.AddCommand(newBottomCmd())
-	rootCmd.AddCommand(newCheckoutCmd())
-	rootCmd.AddCommand(newChildrenCmd())
+	rootCmd.AddCommand(navigation.NewBottomCmd())
+	rootCmd.AddCommand(navigation.NewCheckoutCmd())
+	rootCmd.AddCommand(navigation.NewChildrenCmd())
 	rootCmd.AddCommand(newContinueCmd())
 	rootCmd.AddCommand(newCreateCmd())
 	rootCmd.AddCommand(newDebugCmd())
 	rootCmd.AddCommand(newDeleteCmd())
 	rootCmd.AddCommand(newDoctorCmd())
-	rootCmd.AddCommand(newDownCmd())
+	rootCmd.AddCommand(navigation.NewDownCmd())
 	rootCmd.AddCommand(newFoldCmd())
 	rootCmd.AddCommand(newInfoCmd())
 	rootCmd.AddCommand(newInitCmd())
-	rootCmd.AddCommand(newLogCmd())
+	rootCmd.AddCommand(navigation.NewLogCmd())
 	rootCmd.AddCommand(newMergeCmd())
 	rootCmd.AddCommand(newModifyCmd())
 	rootCmd.AddCommand(newMoveCmd())
-	rootCmd.AddCommand(newParentCmd())
+	rootCmd.AddCommand(navigation.NewParentCmd())
 	rootCmd.AddCommand(newPopCmd())
 	rootCmd.AddCommand(newReorderCmd())
 	rootCmd.AddCommand(newRestackCmd())
@@ -50,17 +52,17 @@ Date:    ` + date,
 	rootCmd.AddCommand(newScopeCmd())
 	rootCmd.AddCommand(newSubmitCmd())
 	rootCmd.AddCommand(newSyncCmd())
-	rootCmd.AddCommand(newTopCmd())
+	rootCmd.AddCommand(navigation.NewTopCmd())
 	rootCmd.AddCommand(newTrackCmd())
 	rootCmd.AddCommand(newUntrackCmd())
-	rootCmd.AddCommand(newTrunkCmd())
+	rootCmd.AddCommand(navigation.NewTrunkCmd())
 	rootCmd.AddCommand(newUndoCmd())
-	rootCmd.AddCommand(newUpCmd())
+	rootCmd.AddCommand(navigation.NewUpCmd())
 	rootCmd.AddCommand(newConfigCmd())
 
 	// Add aliases
-	rootCmd.AddCommand(newLsCmd())
-	rootCmd.AddCommand(newLlCmd())
+	rootCmd.AddCommand(navigation.NewLsCmd())
+	rootCmd.AddCommand(navigation.NewLlCmd())
 	rootCmd.AddCommand(newSsCmd())
 
 	return rootCmd

@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -25,7 +26,7 @@ PR status, and optionally diffs or patches.
 
 If no branch is specified, displays information about the current branch.`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: completeBranches,
+		ValidArgsFunction: helpers.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

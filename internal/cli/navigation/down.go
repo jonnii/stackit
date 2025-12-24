@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newDownCmd creates the down command
-func newDownCmd() *cobra.Command {
+// NewDownCmd creates the down command
+func NewDownCmd() *cobra.Command {
 	var (
 		steps int
 	)

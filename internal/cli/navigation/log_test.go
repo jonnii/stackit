@@ -1,4 +1,4 @@
-package cli_test
+package navigation_test
 
 import (
 	"strings"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/cli/testhelper"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -13,7 +14,13 @@ import (
 func TestLogCommand(t *testing.T) {
 	t.Parallel()
 	// Build the stackit binary first
-	binaryPath := getStackitBinary(t)
+	binaryPath := testhelper.GetSharedBinaryPath()
+	if binaryPath == "" {
+		if err := testhelper.GetBinaryError(); err != nil {
+			t.Fatalf("failed to build stackit binary: %v", err)
+		}
+		t.Fatal("stackit binary not built")
+	}
 
 	t.Run("log in empty repo", func(t *testing.T) {
 		t.Parallel()

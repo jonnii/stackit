@@ -1,4 +1,4 @@
-package cli
+package navigation
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// newParentCmd creates the parent command
-func newParentCmd() *cobra.Command {
+// NewParentCmd creates the parent command
+func NewParentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "parent",
 		Short: "Show the parent of the current branch",

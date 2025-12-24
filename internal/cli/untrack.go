@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -18,7 +19,7 @@ func newUntrackCmd() *cobra.Command {
 		Long: `Stop tracking the current (or provided) branch with stackit.
 If the branch has children, they will also be untracked.`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: completeBranches,
+		ValidArgsFunction: helpers.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())

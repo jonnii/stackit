@@ -179,6 +179,11 @@ func (r *GitRepo) CreateChange(textValue string, prefix string, unstaged bool) e
 	}
 	filePath := filepath.Join(r.Dir, fileName)
 
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filePath), 0750); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	if err := os.WriteFile(filePath, []byte(textValue), 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}

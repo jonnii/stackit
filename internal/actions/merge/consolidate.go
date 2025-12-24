@@ -33,11 +33,11 @@ func NewConsolidateMergeExecutor(plan *Plan, githubClient github.Client, engine 
 }
 
 // Execute performs stack consolidation merging
-func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, _ ExecuteOptions) error {
+func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, opts ExecuteOptions) error {
 	c.splog.Info("🔀 Starting stack consolidation merge...")
 
 	// Phase 1: Pre-validate the stack
-	if err := c.preValidateStack(ctx); err != nil {
+	if err := c.preValidateStack(ctx, opts.Force); err != nil {
 		return fmt.Errorf("pre-validation failed: %w", err)
 	}
 
@@ -71,7 +71,7 @@ func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, _ ExecuteOptions
 }
 
 // preValidateStack ensures all PRs are ready for consolidation
-func (c *ConsolidateMergeExecutor) preValidateStack(ctx context.Context) error {
+func (c *ConsolidateMergeExecutor) preValidateStack(ctx context.Context, force bool) error {
 	for _, branchInfo := range c.plan.BranchesToMerge {
 		// Check PR exists and is open
 		prInfo, err := c.engine.GetPrInfo(branchInfo.BranchName)
@@ -82,15 +82,25 @@ func (c *ConsolidateMergeExecutor) preValidateStack(ctx context.Context) error {
 			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, branchInfo.BranchName, prInfo.State)
 		}
 
-		// For consolidation, we don't require branches to match remote since
-		// we're creating a new consolidated branch that will be properly pushed
-		// But we still check that remote tracking exists
+		// Check if local matches remote for consolidation validation
 		matchesRemote, err := c.engine.BranchMatchesRemote(branchInfo.BranchName)
 		if err != nil {
 			return fmt.Errorf("failed to check remote tracking for %s: %w", branchInfo.BranchName, err)
 		}
 		if !matchesRemote {
-			c.splog.Warn("Branch %s differs from remote, but proceeding with consolidation", branchInfo.BranchName)
+			// Get detailed difference information like the planning phase does
+			diffInfo := getBranchRemoteDifference(branchInfo.BranchName, c.splog)
+			if diffInfo != "" {
+				if !force {
+					return fmt.Errorf("branch %s differs from remote: %s, use --force to proceed", branchInfo.BranchName, diffInfo)
+				}
+				c.splog.Warn("Branch %s differs from remote: %s, but proceeding with consolidation", branchInfo.BranchName, diffInfo)
+			} else {
+				if !force {
+					return fmt.Errorf("branch %s differs from remote, use --force to proceed", branchInfo.BranchName)
+				}
+				c.splog.Warn("Branch %s differs from remote, but proceeding with consolidation", branchInfo.BranchName)
+			}
 		}
 
 		c.splog.Debug("✅ Branch %s is ready for consolidation", branchInfo.BranchName)

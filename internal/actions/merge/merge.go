@@ -72,12 +72,21 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if len(validation.Warnings) > 0 {
 			splog.Warn("Warnings:")
 			for _, warn := range validation.Warnings {
-				splog.Warn("  ⚠ %s", warn)
+				splog.Warn("  %s", warn)
 			}
 			splog.Newline()
 			if !opts.DryRun && !opts.Force {
 				return fmt.Errorf("merge blocked due to warnings (use --force to override)")
 			}
+		}
+
+		// Show informational messages if any
+		if len(validation.Infos) > 0 {
+			splog.Info("Information:")
+			for _, info := range validation.Infos {
+				splog.Info("  • %s", info)
+			}
+			splog.Newline()
 		}
 
 		// 6. Display plan (dry-run or preview)

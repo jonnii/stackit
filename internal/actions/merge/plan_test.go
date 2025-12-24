@@ -149,14 +149,14 @@ func TestCreateMergePlan(t *testing.T) {
 		// Check if C2 is in UpstackBranches.
 		require.NotContains(t, plan.UpstackBranches, "C2", "Sibling C2 should not be in upstack of C1")
 
-		// Verify warning for sibling C2
-		foundWarning := false
-		for _, warn := range plan.Warnings {
-			if strings.Contains(warn, "C2") && strings.Contains(warn, "reparented") {
-				foundWarning = true
+		// Verify info for sibling C2
+		foundInfo := false
+		for _, info := range plan.Infos {
+			if strings.Contains(info, "C2") && strings.Contains(info, "moved to") {
+				foundInfo = true
 				break
 			}
 		}
-		require.True(t, foundWarning, "Should have a warning about sibling C2 being reparented")
+		require.True(t, foundInfo, "Should have an info message about sibling C2 being moved")
 	})
 }

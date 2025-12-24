@@ -1,4 +1,4 @@
-package actions_test
+package undo
 
 import (
 	"os"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
@@ -22,7 +21,7 @@ func TestUndoAction(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 		s.WithInitialCommit()
 
-		err := actions.UndoAction(s.Context, actions.UndoOptions{})
+		err := Action(s.Context, Options{})
 		require.NoError(t, err) // Should not error, just show message
 	})
 
@@ -77,7 +76,7 @@ func TestUndoAction(t *testing.T) {
 		err := s.Engine.TakeSnapshot(engine.SnapshotOptions{Command: "test"})
 		require.NoError(t, err)
 
-		err = actions.UndoAction(s.Context, actions.UndoOptions{
+		err = Action(s.Context, Options{
 			SnapshotID: "nonexistent-snapshot",
 		})
 		require.Error(t, err)

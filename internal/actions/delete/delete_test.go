@@ -1,11 +1,10 @@
-package actions_test
+package delete
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
 
@@ -17,7 +16,7 @@ func TestDelete(t *testing.T) {
 				"branch2": "branch1",
 			})
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "branch1",
 			Force:      true,
 		})
@@ -40,7 +39,7 @@ func TestDelete(t *testing.T) {
 				"branch3": "branch2",
 			})
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "branch1",
 			Upstack:    true,
 			Force:      true,
@@ -61,7 +60,7 @@ func TestDelete(t *testing.T) {
 				"branch3": "branch2",
 			})
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "branch3",
 			Downstack:  true,
 			Force:      true,
@@ -84,7 +83,7 @@ func TestDelete(t *testing.T) {
 		s.Checkout("branch1").Commit("some change")
 		s.Engine.Rebuild("main")
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "branch1",
 			Force:      false,
 		})
@@ -103,7 +102,7 @@ func TestDelete(t *testing.T) {
 		require.NotNil(t, currentBranch)
 		require.Equal(t, "branch1", currentBranch.Name)
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "branch1",
 			Force:      true,
 		})
@@ -122,7 +121,7 @@ func TestDelete(t *testing.T) {
 				"child2": "parent",
 			})
 
-		err := actions.Delete(s.Context, actions.DeleteOptions{
+		err := Action(s.Context, Options{
 			BranchName: "parent",
 			Force:      true,
 		})

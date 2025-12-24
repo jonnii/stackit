@@ -1,11 +1,10 @@
-package actions_test
+package sync
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -14,7 +13,7 @@ func TestSyncAction(t *testing.T) {
 	t.Run("syncs when trunk is up to date", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		err := actions.SyncAction(s.Context, actions.SyncOptions{
+		err := Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: false,
@@ -26,7 +25,7 @@ func TestSyncAction(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
 			WithUncommittedChange("unstaged")
 
-		err := actions.SyncAction(s.Context, actions.SyncOptions{
+		err := Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: false,
@@ -41,7 +40,7 @@ func TestSyncAction(t *testing.T) {
 				"branch1": "main",
 			})
 
-		err := actions.SyncAction(s.Context, actions.SyncOptions{
+		err := Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: true,
@@ -58,7 +57,7 @@ func TestSyncAction(t *testing.T) {
 				"branch3": "branch2",
 			})
 
-		err := actions.SyncAction(s.Context, actions.SyncOptions{
+		err := Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: true,
@@ -77,7 +76,7 @@ func TestSyncAction(t *testing.T) {
 				"stackB-child1": "stackB",
 			})
 
-		err := actions.SyncAction(s.Context, actions.SyncOptions{
+		err := Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: true,
@@ -113,7 +112,7 @@ func TestSyncAction(t *testing.T) {
 		err := s.Engine.Rebuild("main")
 		require.NoError(t, err)
 
-		err = actions.SyncAction(s.Context, actions.SyncOptions{
+		err = Action(s.Context, Options{
 			All:     true,
 			Restack: true,
 		})
@@ -158,7 +157,7 @@ func TestSyncAction(t *testing.T) {
 
 		s.Checkout("P")
 
-		err = actions.SyncAction(s.Context, actions.SyncOptions{
+		err = Action(s.Context, Options{
 			All:     true,
 			Restack: true,
 		})

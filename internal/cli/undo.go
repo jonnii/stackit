@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/undo"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -30,7 +30,7 @@ state without prompting.`,
 			}
 
 			// Run undo action
-			return actions.UndoAction(ctx, actions.UndoOptions{
+			return undo.Action(ctx, undo.Options{
 				SnapshotID: snapshotID,
 			})
 		},

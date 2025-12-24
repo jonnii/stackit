@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/move"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -53,7 +53,7 @@ If no branch is passed in, opens an interactive selector to choose the target br
 			}
 
 			// Run move action
-			return actions.MoveAction(ctx, actions.MoveOptions{
+			return move.Action(ctx, move.Options{
 				Source: sourceBranch,
 				Onto:   ontoBranch,
 			})

@@ -21,6 +21,7 @@ func newAbortCmd() *cobra.Command {
 This command cancels any in-progress operation (such as restack, sync, or merge)
 that has been paused due to a rebase conflict. Any changes made during the
 operation will be rolled back.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())

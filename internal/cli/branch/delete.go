@@ -28,6 +28,7 @@ or closed, prompts for confirmation.
 This command does not perform any action on GitHub or the remote repository.
 If you delete a branch with an open pull request, you will need to manually
 close the pull request.`,
+		SilenceUsage: true,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: helpers.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {

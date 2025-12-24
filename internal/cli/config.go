@@ -31,6 +31,7 @@ Examples:
   stackit config set branch.pattern "{username}/{date}/{message}"
   stackit config get submit.footer
   stackit config set submit.footer false`,
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Get repo root
 			if err := git.InitDefaultRepo(); err != nil {
@@ -66,6 +67,7 @@ func newConfigGetCmd() *cobra.Command {
 		Use:   "get <key>",
 		Short: "Get a configuration value",
 		Args:  cobra.ExactArgs(1),
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			// Get repo root
 			if err := git.InitDefaultRepo(); err != nil {
@@ -108,6 +110,7 @@ func newConfigSetCmd() *cobra.Command {
 		Use:   "set <key> <value>",
 		Short: "Set a configuration value",
 		Args:  cobra.ExactArgs(2),
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			// Get repo root
 			if err := git.InitDefaultRepo(); err != nil {

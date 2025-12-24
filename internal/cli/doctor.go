@@ -22,6 +22,7 @@ The doctor command checks:
   - Repository: Git repository status, remote configuration, and trunk branch
   - Stack State: Metadata integrity, cycle detection, and missing parent branches`,
 		Args: cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

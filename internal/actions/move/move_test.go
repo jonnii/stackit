@@ -1,4 +1,4 @@
-package actions_test
+package move
 
 import (
 	"strings"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -31,7 +30,7 @@ func TestMoveAction(t *testing.T) {
 		require.Equal(t, "branch2", parent3Initial.Name)
 
 		// Move branch2 from branch1 to main (downstack)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch2",
 			Onto:   "main",
 		})
@@ -73,7 +72,7 @@ func TestMoveAction(t *testing.T) {
 			})
 
 		// Move branchA from main to branchB (upstack - moving to a sibling branch)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branchA",
 			Onto:   "branchB",
 		})
@@ -116,7 +115,7 @@ func TestMoveAction(t *testing.T) {
 			})
 
 		// Move branchA2 from branchA1 to branchB1 (across stacks)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branchA2",
 			Onto:   "branchB1",
 		})
@@ -154,7 +153,7 @@ func TestMoveAction(t *testing.T) {
 		s.Checkout("branch2")
 
 		// Move without specifying source (should use current branch)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "", // Empty means use current branch
 			Onto:   "main",
 		})
@@ -170,7 +169,7 @@ func TestMoveAction(t *testing.T) {
 	t.Run("prevents moving trunk branch", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup)
 
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "main",
 			Onto:   "main", // Even if onto is same, should fail earlier
 		})
@@ -184,7 +183,7 @@ func TestMoveAction(t *testing.T) {
 				"branch1": "main",
 			})
 
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "branch1",
 		})
@@ -201,7 +200,7 @@ func TestMoveAction(t *testing.T) {
 			})
 
 		// Try to move branch1 onto branch3 (which is a descendant of branch1)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "branch3",
 		})
@@ -215,7 +214,7 @@ func TestMoveAction(t *testing.T) {
 			CreateBranch("untracked").
 			Checkout("main")
 
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "untracked",
 			Onto:   "main",
 		})
@@ -229,7 +228,7 @@ func TestMoveAction(t *testing.T) {
 				"branch1": "main",
 			})
 
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "nonexistent",
 		})
@@ -244,7 +243,7 @@ func TestMoveAction(t *testing.T) {
 		s.RunGit("checkout", "HEAD~0").Rebuild()
 
 		// Try to move without specifying source - should fail because we're in detached HEAD
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "",
 			Onto:   "main",
 		})
@@ -265,7 +264,7 @@ func TestMoveAction(t *testing.T) {
 			Checkout("main")
 
 		// Move branch1 onto untracked branch (should work)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "untracked",
 		})
@@ -296,7 +295,7 @@ func TestMoveAction(t *testing.T) {
 			Commit("new main change")
 
 		// Move branch1 to main (which now has new commits)
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "main",
 		})
@@ -324,7 +323,7 @@ func TestMoveAction(t *testing.T) {
 				"branch1": "main",
 			})
 
-		err := actions.MoveAction(s.Context, actions.MoveOptions{
+		err := Action(s.Context, Options{
 			Source: "branch1",
 			Onto:   "", // Empty onto
 		})

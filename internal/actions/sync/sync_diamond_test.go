@@ -1,4 +1,4 @@
-package actions_test
+package sync
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
@@ -133,7 +132,7 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 
 		// Now call SyncParentsFromGitHubBase directly to test if it incorrectly reparents
 		// based on the stale PR info we stored
-		syncResult, err := actions.SyncParentsFromGitHubBase(s.Context)
+		syncResult, err := ParentsFromGitHubBase(s.Context)
 		require.NoError(t, err)
 
 		// Rebuild engine to pick up any changes
@@ -265,7 +264,7 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		s.Checkout("branch-a")
 
 		// Sync
-		err = actions.SyncAction(s.Context, actions.SyncOptions{
+		err = Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: true, // Include restack this time
@@ -347,7 +346,7 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		})
 
 		// Sync - should PRESERVE branch-a as parent because main is its ancestor
-		err = actions.SyncAction(s.Context, actions.SyncOptions{
+		err = Action(s.Context, Options{
 			All:     false,
 			Force:   false,
 			Restack: false,

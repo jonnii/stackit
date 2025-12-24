@@ -1,5 +1,5 @@
-// Package actions provides undo functionality
-package actions
+// Package undo provides functionality for undoing stackit operations using snapshots.
+package undo
 
 import (
 	"fmt"
@@ -11,13 +11,13 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
-// UndoOptions contains options for the undo command
-type UndoOptions struct {
+// Options contains options for the undo command
+type Options struct {
 	SnapshotID string // Optional: specific snapshot to restore (skips interactive selection)
 }
 
-// UndoAction performs the undo operation
-func UndoAction(ctx *runtime.Context, opts UndoOptions) error {
+// Action performs the undo operation
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 

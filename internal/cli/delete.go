@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/delete"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -39,7 +39,7 @@ close the pull request.`,
 				branchName = args[0]
 			}
 
-			return actions.Delete(ctx, actions.DeleteOptions{
+			return delete.Action(ctx, delete.Options{
 				BranchName: branchName,
 				Downstack:  downstack,
 				Force:      force,

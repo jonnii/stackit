@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/sync"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -29,7 +29,7 @@ If trunk cannot be fast-forwarded to match remote, overwrites trunk with the rem
 			}
 
 			// Run sync action
-			return actions.SyncAction(ctx, actions.SyncOptions{
+			return sync.Action(ctx, sync.Options{
 				All:     all,
 				Force:   force,
 				Restack: restack,

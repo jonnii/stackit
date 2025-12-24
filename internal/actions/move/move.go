@@ -1,23 +1,24 @@
-package actions
+package move
 
 import (
 	"fmt"
 	"strings"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
 )
 
-// MoveOptions contains options for the move command
-type MoveOptions struct {
+// Options contains options for the move command
+type Options struct {
 	Source string // Branch to move (defaults to current branch)
 	Onto   string // Branch to move onto
 }
 
-// MoveAction performs the move operation
-func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
+// Action performs the move operation
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 	gctx := ctx.Context
@@ -33,9 +34,9 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	}
 
 	// Take snapshot before modifying the repository
-	snapshotOpts := NewSnapshot("move",
-		WithFlagValue("--source", opts.Source),
-		WithFlagValue("--onto", opts.Onto),
+	snapshotOpts := actions.NewSnapshot("move",
+		actions.WithFlagValue("--source", opts.Source),
+		actions.WithFlagValue("--onto", opts.Onto),
 	)
 	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
 		// Log but don't fail - snapshot is best effort
@@ -141,7 +142,7 @@ func MoveAction(ctx *runtime.Context, opts MoveOptions) error {
 	})
 
 	// Restack source and all its descendants
-	if err := RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
+	if err := actions.RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

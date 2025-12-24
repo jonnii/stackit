@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/create"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -45,7 +45,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			branchPattern, _ := config.GetBranchPattern(ctx.RepoRoot)
 
 			// Prepare options
-			opts := actions.CreateOptions{
+			opts := create.Options{
 				BranchName:    branchName,
 				Message:       message,
 				Scope:         scope,
@@ -58,7 +58,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			}
 
 			// Execute create action
-			return actions.CreateAction(ctx, opts)
+			return create.Action(ctx, opts)
 		},
 	}
 

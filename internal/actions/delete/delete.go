@@ -1,23 +1,25 @@
-package actions
+// Package delete provides functionality for deleting branches and their metadata.
+package delete
 
 import (
 	"fmt"
 
+	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 )
 
-// DeleteOptions contains options for deleting branches
-type DeleteOptions struct {
+// Options contains options for deleting branches
+type Options struct {
 	BranchName string
 	Downstack  bool
 	Force      bool
 	Upstack    bool
 }
 
-// Delete deletes a branch and its metadata
-func Delete(ctx *runtime.Context, opts DeleteOptions) error {
+// Action deletes a branch and its metadata
+func Action(ctx *runtime.Context, opts Options) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
@@ -67,7 +69,7 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 	// Confirm if not forced and not merged/closed
 	if !opts.Force {
 		for _, b := range toDelete {
-			shouldDelete, reason := ShouldDeleteBranch(ctx.Context, b, eng, false)
+			shouldDelete, reason := actions.ShouldDeleteBranch(ctx.Context, b, eng, false)
 			if !shouldDelete {
 				// For now, if any branch in the list shouldn't be deleted and we're not forced,
 				// we might want to prompt. But since we don't have interactive prompting yet,
@@ -101,13 +103,13 @@ func Delete(ctx *runtime.Context, opts DeleteOptions) error {
 
 	// Restack children if any
 	if len(childrenToRestack) > 0 {
-		splog.Info("Restacking children of deleted %s...", Pluralize("branch", len(toDelete)))
+		splog.Info("Restacking children of deleted %s...", actions.Pluralize("branch", len(toDelete)))
 		// Convert []string to []Branch for RestackBranches
 		branches := make([]engine.Branch, len(childrenToRestack))
 		for i, name := range childrenToRestack {
 			branches[i] = eng.GetBranch(name)
 		}
-		if err := RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := actions.RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack children: %w", err)
 		}
 	}

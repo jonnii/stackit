@@ -1,4 +1,4 @@
-package actions_test
+package create
 
 import (
 	"os"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -34,8 +33,8 @@ func TestCreateAction_Stdin(t *testing.T) {
 
 		// Scenario already sets STACKIT_NON_INTERACTIVE=true
 
-		opts := actions.CreateOptions{}
-		err = actions.CreateAction(s.Context, opts)
+		opts := Options{}
+		err = Action(s.Context, opts)
 		require.NoError(t, err)
 
 		// Verify branch was created with name generated from stdin message
@@ -58,11 +57,11 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 1. Create child1 on main
 		err := s.Scene.Repo.CreateChange("child1 content", "file1", false)
 		require.NoError(t, err)
-		opts1 := actions.CreateOptions{
+		opts1 := Options{
 			BranchName: "child1",
 			Message:    "Add child1",
 		}
-		err = actions.CreateAction(s.Context, opts1)
+		err = Action(s.Context, opts1)
 		require.NoError(t, err)
 
 		// 2. Go back to main
@@ -72,12 +71,12 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 3. Create 'inserted' branch with --insert
 		err = s.Scene.Repo.CreateChange("inserted content", "file2", false)
 		require.NoError(t, err)
-		opts2 := actions.CreateOptions{
+		opts2 := Options{
 			BranchName: "inserted",
 			Message:    "Add inserted",
 			Insert:     true,
 		}
-		err = actions.CreateAction(s.Context, opts2)
+		err = Action(s.Context, opts2)
 		require.NoError(t, err)
 
 		// 4. Verify metadata relationships
@@ -104,12 +103,12 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 1. Create stack: main -> child1 -> child2
 		err := s.Scene.Repo.CreateChange("child1 content", "file1", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child1", Message: "Add child1"})
+		err = Action(s.Context, Options{BranchName: "child1", Message: "Add child1"})
 		require.NoError(t, err)
 
 		err = s.Scene.Repo.CreateChange("child2 content", "file2", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child2", Message: "Add child2"})
+		err = Action(s.Context, Options{BranchName: "child2", Message: "Add child2"})
 		require.NoError(t, err)
 
 		// 2. Go to child1
@@ -123,7 +122,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 3. Insert 'inserted' after child1
 		err = s.Scene.Repo.CreateChange("inserted content", "file3", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{
+		err = Action(s.Context, Options{
 			BranchName: "inserted",
 			Message:    "Add inserted",
 			Insert:     true,
@@ -154,7 +153,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 1. Create two children from main: main -> child1, main -> child2
 		err := s.Scene.Repo.CreateChange("child1 content", "file1", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child1", Message: "Add child1"})
+		err = Action(s.Context, Options{BranchName: "child1", Message: "Add child1"})
 		require.NoError(t, err)
 
 		err = s.Scene.Repo.CheckoutBranch("main")
@@ -162,7 +161,7 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		err = s.Scene.Repo.CreateChange("child2 content", "file2", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child2", Message: "Add child2"})
+		err = Action(s.Context, Options{BranchName: "child2", Message: "Add child2"})
 		require.NoError(t, err)
 
 		// 2. Go back to main
@@ -173,7 +172,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		err = s.Scene.Repo.CreateChange("inserted content", "file3", false)
 		require.NoError(t, err)
 		// Non-interactive mode should move all children by default
-		err = actions.CreateAction(s.Context, actions.CreateOptions{
+		err = Action(s.Context, Options{
 			BranchName: "inserted",
 			Message:    "Add inserted",
 			Insert:     true,
@@ -212,7 +211,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 1. Create two children from main: main -> child1, main -> child2
 		err := s.Scene.Repo.CreateChange("child1 content", "file1", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child1", Message: "Add child1"})
+		err = Action(s.Context, Options{BranchName: "child1", Message: "Add child1"})
 		require.NoError(t, err)
 
 		err = s.Scene.Repo.CheckoutBranch("main")
@@ -220,7 +219,7 @@ func TestCreateAction_Insert(t *testing.T) {
 
 		err = s.Scene.Repo.CreateChange("child2 content", "file2", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{BranchName: "child2", Message: "Add child2"})
+		err = Action(s.Context, Options{BranchName: "child2", Message: "Add child2"})
 		require.NoError(t, err)
 
 		// 2. Go back to main
@@ -230,7 +229,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		// 3. Insert 'inserted' after main, but only move 'child1'
 		err = s.Scene.Repo.CreateChange("inserted content", "file3", false)
 		require.NoError(t, err)
-		err = actions.CreateAction(s.Context, actions.CreateOptions{
+		err = Action(s.Context, Options{
 			BranchName:       "inserted",
 			Message:          "Add inserted",
 			Insert:           true,

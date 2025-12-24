@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/absorb"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -34,7 +34,7 @@ Prompts for confirmation before amending the commits, and restacks the branches 
 			}
 
 			// Run absorb action
-			return actions.AbsorbAction(ctx, actions.AbsorbOptions{
+			return absorb.Action(ctx, absorb.Options{
 				All:    all,
 				DryRun: dryRun,
 				Force:  force,

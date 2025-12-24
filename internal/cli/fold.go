@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/fold"
 	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -38,7 +38,7 @@ close the pull request.`,
 			}
 
 			// Run fold action
-			return actions.FoldAction(ctx, actions.FoldOptions{
+			return fold.Action(ctx, fold.Options{
 				Keep:       keep,
 				AllowTrunk: allowTrunk,
 			})

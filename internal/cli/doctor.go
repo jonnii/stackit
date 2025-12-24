@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/actions/doctor"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -33,7 +33,7 @@ The doctor command checks:
 			trunk, _ := config.GetTrunk(ctx.RepoRoot)
 
 			// Run doctor action
-			return actions.DoctorAction(ctx, actions.DoctorOptions{
+			return doctor.Action(ctx, doctor.Options{
 				Fix:   fix,
 				Trunk: trunk,
 			})

@@ -442,7 +442,9 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 
 	// Before updating the base, check if there are commits between the new base and head
 	// GitHub will reject the update if there are no commits between them
+	baseToStore := submissionInfo.Base
 	if baseChanged {
+		baseUpdated := false
 		// Only update base if there are commits between base and head
 		if submissionInfo.BaseSHA != submissionInfo.HeadSHA {
 			// Check if there are actually commits between base and head
@@ -450,10 +452,17 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 			if err == nil && len(commits) > 0 {
 				// There are commits, safe to update base
 				updateOpts.Base = &submissionInfo.Base
+				baseUpdated = true
 			}
 			// If no commits or error, skip base update to avoid GitHub 422 error
 		}
 		// If base SHA equals head SHA, skip base update (no commits between them)
+
+		if !baseUpdated && prInfo != nil {
+			// If we skipped the update, keep the existing base in our local cache
+			// so it reflects what is actually on GitHub.
+			baseToStore = prInfo.Base
+		}
 	}
 
 	if err := githubClient.UpdatePullRequest(ctx, repoOwner, repoName, *submissionInfo.PRNumber, updateOpts); err != nil {
@@ -479,7 +488,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		Body:    submissionInfo.Metadata.Body,
 		IsDraft: submissionInfo.Metadata.IsDraft,
 		State:   "OPEN",
-		Base:    submissionInfo.Base,
+		Base:    baseToStore,
 		URL:     prURL,
 	})
 

@@ -3,10 +3,7 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
-
-	"github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -35,42 +32,28 @@ type PrInfo struct {
 
 // ReadMetadataRef reads metadata for a branch from Git refs
 func ReadMetadataRef(branchName string) (*Meta, error) {
-	repo, err := GetDefaultRepo()
-	if err != nil {
-		return &Meta{}, nil //nolint:nilerr
-	}
-
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 
-	// Get the SHA of the ref
-	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	// Get the content of the ref using git cat-file
+	// This is more reliable than go-git for parallel reads and "read-your-own-writes"
+	content, err := RunGitCommand("cat-file", "-p", refName)
 	if err != nil {
-		// Ref doesn't exist - return empty meta
-		return &Meta{}, nil //nolint:nilerr
+		// If the ref doesn't exist, return empty meta
+		// We check for "exists" specifically to distinguish from other errors
+		_, existsErr := RunGitCommand("rev-parse", "--verify", refName)
+		if existsErr != nil {
+			return &Meta{}, nil //nolint:nilerr
+		}
+		return nil, fmt.Errorf("failed to read metadata ref %s: %w", refName, err)
 	}
 
-	// Get the content of the blob
-	blob, err := repo.BlobObject(ref.Hash())
-	if err != nil {
-		return &Meta{}, nil //nolint:nilerr
-	}
-
-	reader, err := blob.Reader()
-	if err != nil {
-		return &Meta{}, nil //nolint:nilerr
-	}
-	defer func() {
-		_ = reader.Close()
-	}()
-
-	content, err := io.ReadAll(reader)
-	if err != nil {
-		return &Meta{}, nil //nolint:nilerr
+	if content == "" {
+		return &Meta{}, nil
 	}
 
 	var meta Meta
-	if err := json.Unmarshal(content, &meta); err != nil {
-		return &Meta{}, nil //nolint:nilerr
+	if err := json.Unmarshal([]byte(content), &meta); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metadata for %s: %w", branchName, err)
 	}
 
 	return &meta, nil

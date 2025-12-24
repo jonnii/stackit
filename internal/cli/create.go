@@ -15,6 +15,7 @@ func newCreateCmd() *cobra.Command {
 		insert  bool
 		message string
 		patch   bool
+		scope   string
 		update  bool
 		verbose int
 	)
@@ -47,6 +48,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			opts := actions.CreateOptions{
 				BranchName:    branchName,
 				Message:       message,
+				Scope:         scope,
 				All:           all,
 				Insert:        insert,
 				Patch:         patch,
@@ -65,6 +67,7 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 	cmd.Flags().BoolVarP(&insert, "insert", "i", false, "Insert this branch between the current branch and its child. If there are multiple children, prompts you to select which should be moved onto the new branch")
 	cmd.Flags().StringVarP(&message, "message", "m", "", "Specify a commit message")
 	cmd.Flags().BoolVarP(&patch, "patch", "p", false, "Pick hunks to stage before committing")
+	cmd.Flags().StringVar(&scope, "scope", "", "Set a scope (e.g., Jira ticket ID, Linear ID) for the new branch. If not provided, inherits from parent branch")
 	cmd.Flags().BoolVarP(&update, "update", "u", false, "Stage all updates to tracked files before creating the branch")
 	cmd.Flags().CountVarP(&verbose, "verbose", "v", "Show unified diff between the HEAD commit and what would be committed at the bottom of the commit message template. If specified twice, show in addition the unified diff between what would be committed and the worktree files")
 

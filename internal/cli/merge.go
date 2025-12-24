@@ -234,26 +234,34 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		splog.Newline()
 	}
 
-	// Prompt for strategy using interactive selector
-	strategyOptions := []tui.SelectOption{
-		{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
-		{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
-	}
-
-	selectedStrategy, err := tui.PromptSelect("Select merge strategy:", strategyOptions, 0)
-	if err != nil {
-		return fmt.Errorf("strategy selection canceled: %w", err)
-	}
-
+	// Determine merge strategy
 	var mergeStrategy merge.Strategy
-	if selectedStrategy == "bottom-up" {
-		mergeStrategy = merge.StrategyBottomUp
-	} else {
+	// If only a single PR, automatically use top-down strategy
+	if len(plan.BranchesToMerge) == 1 {
 		mergeStrategy = merge.StrategyTopDown
-	}
+		splog.Info("✅ Strategy: %s (auto-selected for single PR)", mergeStrategy)
+		splog.Newline()
+	} else {
+		// Prompt for strategy using interactive selector
+		strategyOptions := []tui.SelectOption{
+			{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
+			{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
+		}
 
-	splog.Info("✅ Strategy: %s", mergeStrategy)
-	splog.Newline()
+		selectedStrategy, err := tui.PromptSelect("Select merge strategy:", strategyOptions, 0)
+		if err != nil {
+			return fmt.Errorf("strategy selection canceled: %w", err)
+		}
+
+		if selectedStrategy == "bottom-up" {
+			mergeStrategy = merge.StrategyBottomUp
+		} else {
+			mergeStrategy = merge.StrategyTopDown
+		}
+
+		splog.Info("✅ Strategy: %s", mergeStrategy)
+		splog.Newline()
+	}
 
 	// Recreate plan with selected strategy
 	plan, validation, err = merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{

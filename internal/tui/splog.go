@@ -13,6 +13,7 @@ import (
 type simpleHandler struct {
 	writer    io.Writer
 	debugMode bool
+	quiet     *bool // Pointer to quiet flag so it can be changed dynamically
 }
 
 func (h *simpleHandler) Enabled(_ context.Context, level slog.Level) bool {
@@ -25,6 +26,9 @@ func (h *simpleHandler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 func (h *simpleHandler) Handle(_ context.Context, record slog.Record) error {
+	if *h.quiet {
+		return nil // Suppress output when in quiet mode
+	}
 	_, err := fmt.Fprintln(h.writer, record.Message)
 	return err
 }
@@ -41,6 +45,7 @@ func (h *simpleHandler) WithGroup(_ string) slog.Handler {
 type Splog struct {
 	logger *slog.Logger
 	writer *os.File
+	quiet  bool // When true, suppresses all output (used during TUI mode)
 }
 
 // NewSplog creates a new splog instance
@@ -48,15 +53,24 @@ type Splog struct {
 func NewSplog() *Splog {
 	writer := os.Stdout
 	debugMode := os.Getenv("DEBUG") != ""
+	splog := &Splog{
+		writer: writer,
+		quiet:  false,
+	}
 	handler := &simpleHandler{
 		writer:    writer,
 		debugMode: debugMode,
+		quiet:     &splog.quiet,
 	}
 	logger := slog.New(handler)
-	return &Splog{
-		logger: logger,
-		writer: writer,
-	}
+	splog.logger = logger
+	return splog
+}
+
+// SetQuiet sets the quiet mode for the logger.
+// When quiet is true, all output is suppressed (used during TUI mode).
+func (s *Splog) SetQuiet(quiet bool) {
+	s.quiet = quiet
 }
 
 // logMessage is a helper to log a message using slog without format string validation

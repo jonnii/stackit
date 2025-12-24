@@ -25,6 +25,7 @@ func NewRestackCmd() *cobra.Command {
 		Short: "Ensure each branch in the current stack has its parent in its Git commit history, rebasing if necessary",
 		Long: `Ensure each branch in the current stack has its parent in its Git commit history, rebasing if necessary.
 If conflicts are encountered, you will be prompted to resolve them via an interactive Git rebase.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validation: only one scope flag at a time
 			scopeFlags := 0

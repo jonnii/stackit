@@ -31,6 +31,7 @@ the --allow-trunk flag, as this will modify your local trunk branch directly.
 This command does not perform any action on GitHub or the remote repository.
 If you fold a branch with an open pull request, you will need to manually
 close the pull request.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

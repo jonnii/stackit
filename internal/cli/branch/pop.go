@@ -19,6 +19,7 @@ func NewPopCmd() *cobra.Command {
 This is useful when you want to remove a branch from the stack but keep
 your uncommitted changes. The working tree will remain unchanged after
 the branch is deleted.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

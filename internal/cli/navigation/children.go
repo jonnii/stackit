@@ -20,6 +20,7 @@ func NewChildrenCmd() *cobra.Command {
 Lists all branches that have the current branch as their parent in the stack.
 This is useful for understanding the structure of your stack and seeing which
 branches depend on the current branch.`,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())

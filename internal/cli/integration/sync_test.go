@@ -1,12 +1,14 @@
 package integration
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 )
 
@@ -162,5 +164,49 @@ func TestSyncWorkflow(t *testing.T) {
 		require.Equal(t, mainSHA, mergeBase, "branch-b should be rebased directly onto main")
 
 		sh.Log("✓ Sync with restack workflow complete!")
+	})
+
+	t.Run("sync reparents from GitHub base branch", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShellWithRemote(t, binaryPath)
+
+		// 1. Create a stack: main -> feature-a -> feature-b
+		sh.Log("Creating stack: main -> feature-a -> feature-b...")
+		sh.Write("a", "a").Run("create feature-a -m 'feat: a'")
+		sh.Write("b", "b").Run("create feature-b -m 'feat: b'")
+
+		// Initialize git package in test process
+		err := os.Chdir(sh.Dir())
+		require.NoError(t, err)
+		git.ResetDefaultRepo()
+		err = git.InitDefaultRepo()
+		require.NoError(t, err)
+
+		// 2. Simulate GitHub PR metadata for feature-b pointing to main instead of feature-a
+		sh.Log("Simulating changed PR base on GitHub...")
+		meta, err := git.ReadMetadataRef("feature-b")
+		require.NoError(t, err)
+
+		if meta.PrInfo == nil {
+			meta.PrInfo = &git.PrInfo{}
+		}
+		newBase := "main"
+		meta.PrInfo.Base = &newBase
+
+		err = git.WriteMetadataRef("feature-b", meta)
+		require.NoError(t, err)
+
+		// Verify current local parent is still feature-a
+		sh.Checkout("feature-b").Run("info").OutputContains("feature-a")
+
+		// 3. Run stackit sync
+		sh.Log("Running sync...")
+		sh.Run("sync")
+
+		// 4. Verify local parent is now main
+		sh.Log("Verifying new parent...")
+		sh.Run("info").OutputContains("main").OutputNotContains("feature-a")
+
+		sh.Log("✓ Sync reparenting complete!")
 	})
 }

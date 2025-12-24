@@ -221,7 +221,7 @@ func (e *engineImpl) SetScope(branch Branch, scope Scope) error {
 	// Read existing metadata
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
-		meta = &git.Meta{}
+		return fmt.Errorf("failed to read metadata: %w", err)
 	}
 
 	// Update scope
@@ -282,7 +282,7 @@ func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, p
 	// Read existing metadata
 	meta, err := git.ReadMetadataRef(branchName)
 	if err != nil {
-		meta = &git.Meta{}
+		return fmt.Errorf("failed to read metadata: %w", err)
 	}
 
 	// Update parent

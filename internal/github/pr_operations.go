@@ -278,10 +278,12 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 		},
 	})
 
-	var checks []CheckDetail
+	// Use a map to deduplicate checks by name, preferring check runs over status checks
+	checkMap := make(map[string]CheckDetail)
 	hasPending := false
 	hasFailing := false
 
+	// First, get check runs (more detailed information)
 	if err == nil && checkRuns != nil {
 		for _, run := range checkRuns.CheckRuns {
 			detail := CheckDetail{
@@ -297,7 +299,7 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 			if run.CompletedAt != nil {
 				detail.FinishedAt = run.CompletedAt.Time
 			}
-			checks = append(checks, detail)
+			checkMap[detail.Name] = detail
 
 			if detail.Status == "QUEUED" || detail.Status == "IN_PROGRESS" {
 				hasPending = true
@@ -308,12 +310,18 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 		}
 	}
 
-	// Also get combined status
+	// Also get combined status, but only add if we don't already have this check from check runs
 	combinedStatus, _, err := client.Repositories.GetCombinedStatus(ctx, owner, repo, headSHA, nil)
 	if err == nil && combinedStatus != nil {
 		for _, status := range combinedStatus.Statuses {
+			name := status.GetContext()
+			// Skip if we already have this check from check runs
+			if _, exists := checkMap[name]; exists {
+				continue
+			}
+
 			detail := CheckDetail{
-				Name:   status.GetContext(),
+				Name:   name,
 				Status: "COMPLETED",
 			}
 			state := strings.ToUpper(status.GetState())
@@ -328,11 +336,11 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 				detail.Conclusion = "SUCCESS"
 			}
 			// Combined status doesn't give us precise times usually in this struct
-			checks = append(checks, detail)
+			checkMap[name] = detail
 		}
 
-		// If no check runs but combined status shows something, use it
-		if len(checks) == 0 && combinedStatus.State != nil {
+		// If no checks at all but combined status shows something, use it for overall status
+		if len(checkMap) == 0 && combinedStatus.State != nil {
 			state := strings.ToUpper(*combinedStatus.State)
 			if state == checkStatePending {
 				hasPending = true
@@ -340,6 +348,12 @@ func GetPRChecksStatus(ctx context.Context, client *github.Client, owner, repo, 
 				hasFailing = true
 			}
 		}
+	}
+
+	// Convert map to slice
+	checks := make([]CheckDetail, 0, len(checkMap))
+	for _, check := range checkMap {
+		checks = append(checks, check)
 	}
 
 	return &CheckStatus{

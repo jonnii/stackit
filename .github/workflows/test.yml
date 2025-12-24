@@ -42,6 +42,7 @@ jobs:
       - name: Run tests
         env:
           STACKIT_TEST_NO_INTERACTIVE: "1"
+          STACKIT_NO_LOGGING: "1"
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage to Codecov

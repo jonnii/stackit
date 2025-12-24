@@ -8,7 +8,7 @@ import (
 // RestackOptions contains options for the restack command
 type RestackOptions struct {
 	BranchName string
-	Scope      engine.Scope
+	Scope      engine.StackRange
 }
 
 // RestackAction performs the restack operation

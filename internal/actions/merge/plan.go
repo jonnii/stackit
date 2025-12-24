@@ -95,6 +95,7 @@ type PlanValidation struct {
 type CreatePlanOptions struct {
 	Strategy Strategy
 	Force    bool
+	Scope    string
 }
 
 // mergePlanEngine is a minimal interface needed for creating a merge plan
@@ -112,28 +113,54 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		return nil, nil, fmt.Errorf("not on a branch")
 	}
 
-	if currentBranch.IsTrunk() {
-		return nil, nil, fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
-	}
+	var allBranches []string
+	var planCurrentBranch string
 
-	// Check if current branch is tracked
-	if !currentBranch.IsTracked() {
-		return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch.Name)
-	}
-
-	// 2. Collect branches from trunk to current
-	scope := engine.Scope{RecursiveParents: true}
-	parentBranches := currentBranch.GetRelativeStack(scope)
-
-	// Build full list: parent branches + current branch
-	// Filter out trunk (it shouldn't be in the list, but be safe)
-	allBranches := make([]string, 0, len(parentBranches)+1)
-	for _, branch := range parentBranches {
-		if !branch.IsTrunk() {
-			allBranches = append(allBranches, branch.Name)
+	if opts.Scope != "" {
+		// Collect all branches with the specified scope
+		scopeBranches := []engine.Branch{}
+		for _, b := range eng.AllBranches() {
+			if !b.IsTrunk() && eng.GetScopeInternal(b.Name).String() == opts.Scope {
+				scopeBranches = append(scopeBranches, b)
+			}
 		}
+		if len(scopeBranches) == 0 {
+			return nil, nil, fmt.Errorf("no branches found with scope %s", opts.Scope)
+		}
+
+		// Sort branches topologically so we merge in correct order (bottom to top)
+		scopeBranches = eng.SortBranchesTopologically(scopeBranches)
+		allBranches = make([]string, len(scopeBranches))
+		for i, b := range scopeBranches {
+			allBranches[i] = b.Name
+		}
+		// In scope mode, the "current branch" for the plan is the top-most branch in the scope
+		planCurrentBranch = allBranches[len(allBranches)-1]
+	} else {
+		if currentBranch.IsTrunk() {
+			return nil, nil, fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
+		}
+
+		// Check if current branch is tracked
+		if !currentBranch.IsTracked() {
+			return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch.Name)
+		}
+
+		// 2. Collect branches from trunk to current
+		rng := engine.StackRange{RecursiveParents: true}
+		parentBranches := currentBranch.GetRelativeStack(rng)
+
+		// Build full list: parent branches + current branch
+		// Filter out trunk (it shouldn't be in the list, but be safe)
+		allBranches = make([]string, 0, len(parentBranches)+1)
+		for _, branch := range parentBranches {
+			if !branch.IsTrunk() {
+				allBranches = append(allBranches, branch.Name)
+			}
+		}
+		allBranches = append(allBranches, currentBranch.Name)
+		planCurrentBranch = currentBranch.Name
 	}
-	allBranches = append(allBranches, currentBranch.Name)
 
 	// 3. For each branch: fetch PR info, check status, CI checks
 	branchesToMerge := []BranchMergeInfo{}
@@ -250,24 +277,52 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	// 5. Identify upstack branches that need restacking
 	upstackBranches := []string{}
-	upstack := eng.GetRelativeStackUpstack(*currentBranch)
-	for _, branch := range upstack {
-		if branch.IsTracked() {
-			upstackBranches = append(upstackBranches, branch.Name)
+	if opts.Scope != "" {
+		// In scope mode, find all tracked branches with the scope that are not being merged
+		for _, branch := range eng.AllBranches() {
+			if branch.IsTracked() && eng.GetScopeInternal(branch.Name).String() == opts.Scope {
+				// Check if this branch is not already being merged
+				isBeingMerged := false
+				for _, merged := range allBranches {
+					if branch.Name == merged {
+						isBeingMerged = true
+						break
+					}
+				}
+				if !isBeingMerged {
+					upstackBranches = append(upstackBranches, branch.Name)
+				}
+			}
+		}
+	} else {
+		// For upstack branches, we want branches that are descendants of the current branch,
+		// but NOT in the list of branches we're merging.
+		mergedMap := make(map[string]bool)
+		for _, b := range allBranches {
+			mergedMap[b] = true
+		}
+
+		// Only get upstack of the current branch (the top of the stack being merged)
+		currentBranchObj := eng.GetBranch(planCurrentBranch)
+		upstack := eng.GetRelativeStackUpstack(currentBranchObj)
+		for _, ub := range upstack {
+			if ub.IsTracked() && !mergedMap[ub.Name] {
+				upstackBranches = append(upstackBranches, ub.Name)
+			}
 		}
 	}
 
 	// 6. Build ordered steps based on strategy
 	var steps []PlanStep
 	if opts.Strategy == StrategyTopDown {
-		steps = buildTopDownSteps(branchesToMerge, currentBranch.Name, upstackBranches)
+		steps = buildTopDownSteps(branchesToMerge, planCurrentBranch, upstackBranches)
 	} else {
 		steps = buildBottomUpSteps(branchesToMerge, upstackBranches)
 	}
 
 	plan := &Plan{
 		Strategy:        opts.Strategy,
-		CurrentBranch:   currentBranch.Name,
+		CurrentBranch:   planCurrentBranch,
 		BranchesToMerge: branchesToMerge,
 		UpstackBranches: upstackBranches,
 		Steps:           steps,

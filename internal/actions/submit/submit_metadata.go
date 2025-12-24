@@ -3,6 +3,7 @@ package submit
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"stackit.dev/stackit/internal/engine"
@@ -12,8 +13,10 @@ import (
 	"stackit.dev/stackit/internal/tui"
 )
 
+var scopeRegex = regexp.MustCompile(`^\[[^\]]+\]\s*`)
+
 // GetPRTitle gets the PR title, prompting if needed
-func GetPRTitle(branchName string, editInline bool, existingTitle string) (string, error) {
+func GetPRTitle(branchName string, editInline bool, existingTitle string, scope string) (string, error) {
 	// First check if we have a saved title
 	title := existingTitle
 	if title == "" {
@@ -24,6 +27,19 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string) (strin
 			title = branchName
 		} else {
 			title = subject
+		}
+	}
+
+	// Prefix scope if present and not already in title
+	if scope != "" {
+		if scopeRegex.MatchString(title) {
+			// Replace existing scope prefix if it's different
+			if !strings.HasPrefix(strings.ToUpper(title), "["+strings.ToUpper(scope)+"]") {
+				title = scopeRegex.ReplaceAllString(title, "["+scope+"] ")
+			}
+		} else {
+			// No scope prefix, add it
+			title = fmt.Sprintf("[%s] %s", scope, title)
 		}
 	}
 
@@ -120,8 +136,10 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	shouldEditTitle := opts.EditTitle || (opts.Edit && !opts.NoEditTitle)
 	shouldEditBody := opts.EditDescription || (opts.Edit && !opts.NoEditDescription)
 
+	scope := eng.GetScopeInternal(branchName)
+
 	if shouldEditTitle || (prInfo == nil || prInfo.Title == "") {
-		title, err := GetPRTitle(branchName, shouldEditTitle, metadata.Title)
+		title, err := GetPRTitle(branchName, shouldEditTitle, metadata.Title, scope.String())
 		if err != nil {
 			return nil, err
 		}

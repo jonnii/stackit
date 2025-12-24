@@ -53,6 +53,7 @@ func NewDemoContext() (*runtime.Context, bool) {
 type Engine struct {
 	parentMap   map[string]string
 	childrenMap map[string][]string
+	scopeMap    map[string]string
 	prInfoMap   map[string]*engine.PrInfo
 }
 
@@ -61,6 +62,7 @@ func NewDemoEngine() *Engine {
 	e := &Engine{
 		parentMap:   make(map[string]string),
 		childrenMap: make(map[string][]string),
+		scopeMap:    make(map[string]string),
 		prInfoMap:   make(map[string]*engine.PrInfo),
 	}
 
@@ -134,11 +136,11 @@ func (e *Engine) GetChildrenInternal(branchName string) []engine.Branch {
 }
 
 // GetRelativeStack returns branches in stack order
-func (e *Engine) GetRelativeStack(branch engine.Branch, scope engine.Scope) []engine.Branch {
+func (e *Engine) GetRelativeStack(branch engine.Branch, rng engine.StackRange) []engine.Branch {
 	var result []engine.Branch
 
 	// Add ancestors if RecursiveParents
-	if scope.RecursiveParents {
+	if rng.RecursiveParents {
 		ancestors := []engine.Branch{}
 		current := branch.Name
 		for {
@@ -153,12 +155,12 @@ func (e *Engine) GetRelativeStack(branch engine.Branch, scope engine.Scope) []en
 	}
 
 	// Add current branch
-	if scope.IncludeCurrent {
+	if rng.IncludeCurrent {
 		result = append(result, branch)
 	}
 
 	// Add descendants if RecursiveChildren
-	if scope.RecursiveChildren {
+	if rng.RecursiveChildren {
 		descendants := e.getDescendants(branch.Name)
 		for _, name := range descendants {
 			result = append(result, engine.Branch{Name: name, Reader: e})
@@ -169,11 +171,11 @@ func (e *Engine) GetRelativeStack(branch engine.Branch, scope engine.Scope) []en
 }
 
 // GetRelativeStackInternal returns branches in stack order (internal method used by Branch type)
-func (e *Engine) GetRelativeStackInternal(branchName string, scope engine.Scope) []engine.Branch {
+func (e *Engine) GetRelativeStackInternal(branchName string, rng engine.StackRange) []engine.Branch {
 	var result []engine.Branch
 
 	// Add ancestors if RecursiveParents
-	if scope.RecursiveParents {
+	if rng.RecursiveParents {
 		ancestors := []engine.Branch{}
 		current := branchName
 		for {
@@ -188,12 +190,12 @@ func (e *Engine) GetRelativeStackInternal(branchName string, scope engine.Scope)
 	}
 
 	// Add current branch
-	if scope.IncludeCurrent {
+	if rng.IncludeCurrent {
 		result = append(result, engine.Branch{Name: branchName, Reader: e})
 	}
 
 	// Add descendants if RecursiveChildren
-	if scope.RecursiveChildren {
+	if rng.RecursiveChildren {
 		descendants := e.getDescendants(branchName)
 		for _, name := range descendants {
 			result = append(result, engine.Branch{Name: name, Reader: e})
@@ -237,6 +239,35 @@ func (e *Engine) IsBranchUpToDateInternal(_ string) bool {
 	return true // All demo branches are "fixed" (not needing restack)
 }
 
+// GetScopeInternal returns the simulated scope for a branch, inheriting from parent if not set
+func (e *Engine) GetScopeInternal(branchName string) engine.Scope {
+	current := branchName
+	for {
+		if scopeStr, ok := e.scopeMap[current]; ok && scopeStr != "" {
+			scope := engine.NewScope(scopeStr)
+			if scope.IsNone() {
+				return engine.Empty()
+			}
+			return scope
+		}
+		parent := e.parentMap[current]
+		if parent == "" || parent == GetDemoTrunk() {
+			break
+		}
+		current = parent
+	}
+	return engine.Empty()
+}
+
+// GetExplicitScopeInternal returns the explicit scope set for a branch in the demo engine
+func (e *Engine) GetExplicitScopeInternal(branchName string) engine.Scope {
+	scopeStr := e.scopeMap[branchName]
+	if scopeStr == "" {
+		return engine.Empty()
+	}
+	return engine.NewScope(scopeStr)
+}
+
 // GetCommitDateInternal returns a fake commit date in the demo engine
 func (e *Engine) GetCommitDateInternal(_ string) (time.Time, error) {
 	return time.Now().Add(-24 * time.Hour), nil
@@ -275,12 +306,12 @@ func (e *Engine) GetRelativeStackUpstack(branch engine.Branch) []engine.Branch {
 
 // GetRelativeStackDownstack returns ancestors in the demo engine
 func (e *Engine) GetRelativeStackDownstack(branch engine.Branch) []engine.Branch {
-	return e.GetRelativeStack(branch, engine.Scope{RecursiveParents: true, IncludeCurrent: false, RecursiveChildren: false})
+	return e.GetRelativeStack(branch, engine.StackRange{RecursiveParents: true, IncludeCurrent: false, RecursiveChildren: false})
 }
 
 // GetFullStack returns the entire stack in the demo engine
 func (e *Engine) GetFullStack(branch engine.Branch) []engine.Branch {
-	return e.GetRelativeStack(branch, engine.Scope{RecursiveParents: true, IncludeCurrent: true, RecursiveChildren: true})
+	return e.GetRelativeStack(branch, engine.StackRange{RecursiveParents: true, IncludeCurrent: true, RecursiveChildren: true})
 }
 
 // SortBranchesTopologically simulates topological sort in the demo engine
@@ -376,10 +407,65 @@ func (e *Engine) SetParent(_ context.Context, branchName string, parentBranchNam
 	return nil
 }
 
+// SetScope sets the scope of a branch in the demo engine
+func (e *Engine) SetScope(branch engine.Branch, scope engine.Scope) error {
+	branchName := branch.Name
+	if scope.IsEmpty() {
+		delete(e.scopeMap, branchName)
+	} else {
+		e.scopeMap[branchName] = scope.String()
+	}
+	return nil
+}
+
+// RenameBranch renames a branch in the demo engine
+func (e *Engine) RenameBranch(_ context.Context, oldBranch, newBranch engine.Branch) error {
+	oldName := oldBranch.Name
+	newName := newBranch.Name
+
+	if parent, ok := e.parentMap[oldName]; ok {
+		e.parentMap[newName] = parent
+		delete(e.parentMap, oldName)
+
+		// Update children of parent
+		children := e.childrenMap[parent]
+		for i, c := range children {
+			if c == oldName {
+				e.childrenMap[parent][i] = newName
+				break
+			}
+		}
+	}
+
+	// Update children of renamed branch
+	if children, ok := e.childrenMap[oldName]; ok {
+		e.childrenMap[newName] = children
+		delete(e.childrenMap, oldName)
+		for _, child := range children {
+			e.parentMap[child] = newName
+		}
+	}
+
+	// Update scope
+	if scope, ok := e.scopeMap[oldName]; ok {
+		e.scopeMap[newName] = scope
+		delete(e.scopeMap, oldName)
+	}
+
+	// Update PR info
+	if pr, ok := e.prInfoMap[oldName]; ok {
+		e.prInfoMap[newName] = pr
+		delete(e.prInfoMap, oldName)
+	}
+
+	return nil
+}
+
 // DeleteBranch deletes a branch in the demo engine
 func (e *Engine) DeleteBranch(_ context.Context, branchName string) error {
 	delete(e.parentMap, branchName)
 	delete(e.prInfoMap, branchName)
+	delete(e.scopeMap, branchName)
 	return nil
 }
 

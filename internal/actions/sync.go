@@ -96,6 +96,11 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}
+
+		// Update PR body footers if needed
+		if ctx.GitHubClient != nil {
+			UpdateStackPRMetadata(gctx, branchNames, eng, ctx.GitHubClient, repoOwner, repoName)
+		}
 	}
 
 	// Clean branches (delete merged/closed)
@@ -136,7 +141,7 @@ func SyncAction(ctx *runtime.Context, opts SyncOptions) error {
 			}
 		} else if currentBranch.IsTrunk() {
 			// If on trunk, restack all branches
-			stack := currentBranch.GetRelativeStack(engine.Scope{RecursiveChildren: true})
+			stack := currentBranch.GetRelativeStack(engine.StackRange{RecursiveChildren: true})
 			for _, b := range stack {
 				branchesToRestack = append(branchesToRestack, b.Name)
 			}

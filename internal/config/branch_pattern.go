@@ -53,9 +53,9 @@ func (p BranchPattern) WithDefault() BranchPattern {
 	return p
 }
 
-// GetBranchName generates a branch name from the pattern using the provided commit message.
+// GetBranchName generates a branch name from the pattern using the provided commit message and optional scope.
 // It fetches the username and current date internally only if needed by the pattern.
-func (p BranchPattern) GetBranchName(ctx context.Context, commitMessage string) (string, error) {
+func (p BranchPattern) GetBranchName(ctx context.Context, commitMessage string, scope string) (string, error) {
 	pattern := p.String()
 	if pattern == "" {
 		// If pattern is empty, just use the message (backward compatibility)
@@ -79,6 +79,9 @@ func (p BranchPattern) GetBranchName(ctx context.Context, commitMessage string) 
 		"{date}": git.GetCurrentDate,
 		"{message}": func() string {
 			return p.generateBranchNameFromMessage(commitMessage)
+		},
+		"{scope}": func() string {
+			return p.sanitizeBranchName(scope)
 		},
 	}
 

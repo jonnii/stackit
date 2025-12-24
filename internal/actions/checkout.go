@@ -60,7 +60,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 
 	// Checkout the branch
 	branch := eng.GetBranch(branchName)
-	if err := git.CheckoutBranch(context, branch); err != nil {
+	if err := git.CheckoutBranch(context, branch.Name); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
@@ -95,12 +95,12 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 			return nil, fmt.Errorf("not on a branch; cannot use --stack flag")
 		}
 
-		scope := engine.Scope{
+		rng := engine.StackRange{
 			RecursiveParents:  true,
 			IncludeCurrent:    true,
 			RecursiveChildren: true,
 		}
-		stack := currentBranch.GetRelativeStack(scope)
+		stack := currentBranch.GetRelativeStack(rng)
 
 		// Build branch list from stack
 		for _, branch := range stack {
@@ -178,12 +178,12 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	}
 
 	// Check if any downstack branch needs restack
-	scope := engine.Scope{
+	rng := engine.StackRange{
 		RecursiveParents:  true,
 		IncludeCurrent:    false,
 		RecursiveChildren: false,
 	}
-	downstack := branch.GetRelativeStack(scope)
+	downstack := branch.GetRelativeStack(rng)
 
 	// Reverse to check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {

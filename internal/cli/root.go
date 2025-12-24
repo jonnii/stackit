@@ -47,6 +47,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(newRestackCmd())
 	rootCmd.AddCommand(newSplitCmd())
 	rootCmd.AddCommand(newSquashCmd())
+	rootCmd.AddCommand(newScopeCmd())
 	rootCmd.AddCommand(newSubmitCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newTopCmd())

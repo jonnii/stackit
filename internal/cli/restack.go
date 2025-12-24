@@ -57,7 +57,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			}
 
 			// Determine scope based on flags
-			scope := engine.Scope{
+			rng := engine.StackRange{
 				RecursiveParents:  !only && !upstack,   // Default or downstack
 				IncludeCurrent:    true,                // Always include current
 				RecursiveChildren: !only && !downstack, // Default or upstack
@@ -66,7 +66,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 			// Run restack action
 			return actions.RestackAction(ctx, actions.RestackOptions{
 				BranchName: targetBranch,
-				Scope:      scope,
+				Scope:      rng,
 			})
 		},
 	}

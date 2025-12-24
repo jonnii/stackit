@@ -70,7 +70,7 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Checkout parent branch
-	if err := git.CheckoutBranch(ctx.Context, parentBranch); err != nil {
+	if err := git.CheckoutBranch(ctx.Context, parentBranch.Name); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 

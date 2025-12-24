@@ -122,7 +122,7 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	if branchName == e.currentBranch {
 		// Access trunk directly while holding the lock (avoid deadlock from e.Trunk() trying to acquire RLock)
 		trunkBranch := Branch{Name: e.trunk, Reader: e}
-		if err := git.CheckoutBranch(ctx, trunkBranch); err != nil {
+		if err := git.CheckoutBranch(ctx, trunkBranch.Name); err != nil {
 			return fmt.Errorf("failed to switch to trunk before deleting current branch: %w", err)
 		}
 		e.currentBranch = e.trunk
@@ -130,7 +130,7 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 
 	// Delete git branch
 	branch := e.GetBranch(branchName)
-	if err := git.DeleteBranch(ctx, branch); err != nil {
+	if err := git.DeleteBranch(ctx, branch.Name); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 
@@ -209,6 +209,66 @@ func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBra
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.setParentInternal(ctx, branchName, parentBranchName)
+}
+
+// SetScope updates a branch's scope
+func (e *engineImpl) SetScope(branch Branch, scope Scope) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	branchName := branch.Name
+
+	// Read existing metadata
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		meta = &git.Meta{}
+	}
+
+	// Update scope
+	if scope.IsEmpty() {
+		meta.Scope = nil
+	} else {
+		scopeStr := scope.String()
+		meta.Scope = &scopeStr
+	}
+
+	// Write metadata
+	if err := git.WriteMetadataRef(branchName, meta); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	// Update in-memory map
+	if scope.IsEmpty() {
+		delete(e.scopeMap, branchName)
+	} else {
+		e.scopeMap[branchName] = scope.String()
+	}
+
+	return nil
+}
+
+// RenameBranch renames a branch and its metadata
+func (e *engineImpl) RenameBranch(ctx context.Context, oldBranch, newBranch Branch) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	oldName := oldBranch.Name
+	newName := newBranch.Name
+
+	// Rename git branch
+	if err := git.RenameBranch(ctx, oldName, newName); err != nil {
+		return err
+	}
+
+	// Rename metadata ref
+	if err := git.RenameMetadataRef(oldName, newName); err != nil {
+		// Attempt to undo git rename
+		_ = git.RenameBranch(ctx, newName, oldName)
+		return err
+	}
+
+	// Rebuild in-memory state to be safe
+	return e.rebuildInternal(true)
 }
 
 // setParentInternal updates parent without locking (caller must hold lock)

@@ -79,14 +79,14 @@ func (e *engineImpl) GetChildrenInternal(branchName string) []Branch {
 
 // GetRelativeStack returns the stack relative to a branch
 // Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
-func (e *engineImpl) GetRelativeStack(branch Branch, scope Scope) []Branch {
+func (e *engineImpl) GetRelativeStack(branch Branch, rng StackRange) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	result := []Branch{}
 
 	// Add ancestors if RecursiveParents is true (excluding trunk)
-	if scope.RecursiveParents {
+	if rng.RecursiveParents {
 		current := branch.Name
 		ancestors := []Branch{}
 		for {
@@ -104,12 +104,12 @@ func (e *engineImpl) GetRelativeStack(branch Branch, scope Scope) []Branch {
 	}
 
 	// Add current branch if IncludeCurrent is true
-	if scope.IncludeCurrent {
+	if rng.IncludeCurrent {
 		result = append(result, branch)
 	}
 
 	// Add descendants if RecursiveChildren is true
-	if scope.RecursiveChildren {
+	if rng.RecursiveChildren {
 		descendants := e.getRelativeStackUpstackInternal(branch.Name)
 		result = append(result, descendants...)
 	}
@@ -119,14 +119,14 @@ func (e *engineImpl) GetRelativeStack(branch Branch, scope Scope) []Branch {
 
 // GetRelativeStackInternal returns the stack relative to a branch (internal method used by Branch type)
 // Returns branches in order: ancestors (if RecursiveParents), current (if IncludeCurrent), descendants (if RecursiveChildren)
-func (e *engineImpl) GetRelativeStackInternal(branchName string, scope Scope) []Branch {
+func (e *engineImpl) GetRelativeStackInternal(branchName string, rng StackRange) []Branch {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	result := []Branch{}
 
 	// Add ancestors if RecursiveParents is true (excluding trunk)
-	if scope.RecursiveParents {
+	if rng.RecursiveParents {
 		current := branchName
 		ancestors := []Branch{}
 		for {
@@ -144,12 +144,12 @@ func (e *engineImpl) GetRelativeStackInternal(branchName string, scope Scope) []
 	}
 
 	// Add current branch if IncludeCurrent is true
-	if scope.IncludeCurrent {
+	if rng.IncludeCurrent {
 		result = append(result, Branch{Name: branchName, Reader: e})
 	}
 
 	// Add descendants if RecursiveChildren is true
-	if scope.RecursiveChildren {
+	if rng.RecursiveChildren {
 		descendants := e.getRelativeStackUpstackInternal(branchName)
 		result = append(result, descendants...)
 	}
@@ -170,6 +170,41 @@ func (e *engineImpl) IsBranchTrackedInternal(branchName string) bool {
 	defer e.mu.RUnlock()
 	_, ok := e.parentMap[branchName]
 	return ok
+}
+
+// GetScopeInternal returns the scope for a branch, inheriting from parent if not set (internal method used by Branch type)
+func (e *engineImpl) GetScopeInternal(branchName string) Scope {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	current := branchName
+	for {
+		if scopeStr, ok := e.scopeMap[current]; ok && scopeStr != "" {
+			scope := NewScope(scopeStr)
+			if scope.IsNone() {
+				return Empty()
+			}
+			return scope
+		}
+		parent, ok := e.parentMap[current]
+		if !ok || parent == e.trunk {
+			break
+		}
+		current = parent
+	}
+	return Empty()
+}
+
+// GetExplicitScopeInternal returns the explicit scope set for a branch (no inheritance)
+func (e *engineImpl) GetExplicitScopeInternal(branchName string) Scope {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	scopeStr := e.scopeMap[branchName]
+	if scopeStr == "" {
+		return Empty()
+	}
+	return NewScope(scopeStr)
 }
 
 // IsBranchUpToDateInternal checks if a branch is up to date with its parent
@@ -402,22 +437,22 @@ func (e *engineImpl) GetRelativeStackUpstack(branch Branch) []Branch {
 
 // GetRelativeStackDownstack returns all branches in the downstack (ancestors)
 func (e *engineImpl) GetRelativeStackDownstack(branch Branch) []Branch {
-	scope := Scope{
+	rng := StackRange{
 		RecursiveParents:  true,
 		IncludeCurrent:    false,
 		RecursiveChildren: false,
 	}
-	return e.GetRelativeStackInternal(branch.Name, scope)
+	return e.GetRelativeStackInternal(branch.Name, rng)
 }
 
 // GetFullStack returns the entire stack containing the branch
 func (e *engineImpl) GetFullStack(branch Branch) []Branch {
-	scope := Scope{
+	rng := StackRange{
 		RecursiveParents:  true,
 		IncludeCurrent:    true,
 		RecursiveChildren: true,
 	}
-	return e.GetRelativeStackInternal(branch.Name, scope)
+	return e.GetRelativeStackInternal(branch.Name, rng)
 }
 
 // SortBranchesTopologically sorts branches so parents come before children.

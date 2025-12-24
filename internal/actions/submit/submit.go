@@ -221,7 +221,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Update PR body footers silently
 	if opts.SubmitFooter {
-		updatePRFootersQuiet(context, branches, eng, githubClient, repoOwner, repoName)
+		actions.UpdateStackPRMetadata(context, branches, eng, githubClient, repoOwner, repoName)
 	}
 
 	return nil
@@ -484,34 +484,6 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 	})
 
 	return prURL, nil
-}
-
-// updatePRFootersQuiet updates PR body footers silently (no logging)
-func updatePRFootersQuiet(ctx context.Context, branches []string, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) {
-	var wg sync.WaitGroup
-	for _, branchName := range branches {
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-			prInfo, err := eng.GetPrInfo(name)
-			if err != nil || prInfo == nil || prInfo.Number == nil {
-				return
-			}
-
-			footer := actions.CreatePRBodyFooter(name, eng)
-			updatedBody := actions.UpdatePRBodyFooter(prInfo.Body, footer)
-
-			if updatedBody != prInfo.Body {
-				updateOpts := github.UpdatePROptions{
-					Body: &updatedBody,
-				}
-				if err := githubClient.UpdatePullRequest(ctx, repoOwner, repoName, *prInfo.Number, updateOpts); err != nil {
-					return
-				}
-			}
-		}(branchName)
-	}
-	wg.Wait()
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations

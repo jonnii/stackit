@@ -72,6 +72,15 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 
 	parentBranch := eng.GetBranch(parentName)
 
+	// Prohibit folding branches with different scopes
+	if !parentBranch.IsTrunk() {
+		currentScope := currentBranchObj.GetScope()
+		parentScope := parentBranch.GetScope()
+		if !currentScope.Equal(parentScope) {
+			return fmt.Errorf("cannot fold branches with different scopes (current: [%s], parent: [%s])", currentScope.String(), parentScope.String())
+		}
+	}
+
 	if opts.Keep {
 		// Prevent folding onto trunk with --keep, as that would delete trunk
 		if parentBranch.IsTrunk() {
@@ -92,7 +101,7 @@ func FoldAction(ctx *runtime.Context, opts FoldOptions) error {
 func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog) error {
 	// Checkout parent branch
 	parentBranch := eng.GetBranch(parent)
-	if err := git.CheckoutBranch(gctx, parentBranch); err != nil {
+	if err := git.CheckoutBranch(gctx, parentBranch.Name); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
@@ -112,7 +121,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	// Get all descendants of parent before deletion (for restacking)
-	descendants := parentBranch.GetRelativeStack(engine.Scope{
+	descendants := parentBranch.GetRelativeStack(engine.StackRange{
 		RecursiveChildren: true,
 		IncludeCurrent:    false,
 		RecursiveParents:  false,
@@ -136,7 +145,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 
 		// Get updated descendants list (current branch's children are now children of parent)
 		parentBranch := eng.GetBranch(parent)
-		updatedDescendants := parentBranch.GetRelativeStack(engine.Scope{
+		updatedDescendants := parentBranch.GetRelativeStack(engine.StackRange{
 			RecursiveChildren: true,
 			IncludeCurrent:    false,
 			RecursiveParents:  false,
@@ -166,7 +175,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 
 	// Ensure we're on the current branch
 	currentBranchObj := eng.GetBranch(currentBranch)
-	if err := git.CheckoutBranch(gctx, currentBranchObj); err != nil {
+	if err := git.CheckoutBranch(gctx, currentBranchObj.Name); err != nil {
 		return fmt.Errorf("failed to checkout current branch: %w", err)
 	}
 
@@ -203,7 +212,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		tui.ColorBranchName(currentBranch, false))
 
 	// Restack current branch and all its descendants
-	branchesToRestack := currentBranchObj.GetRelativeStack(engine.Scope{
+	branchesToRestack := currentBranchObj.GetRelativeStack(engine.StackRange{
 		RecursiveChildren: true,
 		IncludeCurrent:    true,
 		RecursiveParents:  false,

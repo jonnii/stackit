@@ -353,7 +353,7 @@ func ApplyHunksToCommit(ctx context.Context, hunks []Hunk, commitSHA string, bra
 	if err := CheckoutDetached(ctx, parentSHA); err != nil {
 		// Restore branch
 		if currentBranch != "" {
-			_ = CheckoutBranch(ctx, NewBranch(currentBranch))
+			_ = CheckoutBranch(ctx, currentBranch)
 		}
 		return fmt.Errorf("failed to checkout parent: %w", err)
 	}
@@ -367,7 +367,7 @@ func ApplyHunksToCommit(ctx context.Context, hunks []Hunk, commitSHA string, bra
 		if nowBranch != currentBranch && currentBranch != "" {
 			// Clean up index/working tree if needed before checkout
 			_, _ = RunGitCommandWithContext(ctx, "reset", "--hard", "HEAD")
-			_ = CheckoutBranch(ctx, NewBranch(currentBranch))
+			_ = CheckoutBranch(ctx, currentBranch)
 		}
 	}()
 

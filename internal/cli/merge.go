@@ -20,6 +20,7 @@ func newMergeCmd() *cobra.Command {
 		force    bool
 		strategy string
 		worktree bool
+		scope    string
 	)
 
 	cmd := &cobra.Command{
@@ -27,6 +28,8 @@ func newMergeCmd() *cobra.Command {
 		Short: "Merge the pull requests associated with all branches from trunk to the current branch via Stackit",
 		Long: `Merge the pull requests associated with all branches from trunk to the current branch via Stackit.
 This command merges PRs for all branches in the stack from trunk up to (and including) the current branch.
+
+If --scope is specified, all branches with that scope will be merged.
 
 If no flags are provided, an interactive wizard will guide you through the merge process.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -37,7 +40,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 			}
 
 			// Determine if we should run in interactive mode
-			// Interactive if no flags are provided (except dry-run which is always allowed)
+			// Interactive if no flags are provided (except dry-run and scope which are always allowed)
 			interactive := strategy == "" && !yes && !force
 
 			// Parse strategy
@@ -55,11 +58,25 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 			// Run interactive wizard if needed
 			if interactive {
-				return runInteractiveMergeWizard(ctx, dryRun, force)
+				return runInteractiveMergeWizard(ctx, dryRun, force, scope)
 			}
 
 			// Get config values
 			undoStackDepth, _ := config.GetUndoStackDepth(ctx.RepoRoot)
+
+			// Create plan if scope is specified
+			var plan *merge.Plan
+			if scope != "" {
+				p, _, err := merge.CreateMergePlan(ctx.Context, ctx.Engine, ctx.Splog, ctx.GitHubClient, merge.CreatePlanOptions{
+					Strategy: mergeStrategy,
+					Force:    force,
+					Scope:    scope,
+				})
+				if err != nil {
+					return err
+				}
+				plan = p
+			}
 
 			// Run merge action
 			return merge.Action(ctx, merge.Options{
@@ -68,6 +85,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 				Strategy:       mergeStrategy,
 				Force:          force,
 				UseWorktree:    worktree,
+				Plan:           plan,
 				UndoStackDepth: undoStackDepth,
 			})
 		},
@@ -78,12 +96,13 @@ If no flags are provided, an interactive wizard will guide you through the merge
 	cmd.Flags().BoolVar(&force, "force", false, "Skip validation checks (draft PRs, failing CI)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show merge plan without executing")
 	cmd.Flags().BoolVar(&worktree, "worktree", false, "Execute the merge and restack in a temporary worktree to avoid interfering with current branch")
+	cmd.Flags().StringVar(&scope, "scope", "", "Bulk-merge all branches within the specified scope")
 
 	return cmd
 }
 
 // runInteractiveMergeWizard runs the interactive merge wizard
-func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool) error {
+func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool, scope string) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
@@ -105,13 +124,18 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	plan, validation, err := merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
 		Strategy: merge.StrategyBottomUp,
 		Force:    forceFlag,
+		Scope:    scope,
 	})
 	if err != nil {
 		return err
 	}
 
 	// Display current state using stack tree
-	splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch.Name, false))
+	if scope != "" {
+		splog.Info("Merging scope: [%s]", scope)
+	} else {
+		splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch.Name, false))
+	}
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {

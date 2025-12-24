@@ -104,7 +104,8 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Determine branch
-	branch, err := determineBranch(ctx, opts, commitMessage)
+	parentScope := eng.GetScopeInternal(currentBranch)
+	branch, err := determineBranch(ctx, opts, commitMessage, parentScope.String())
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	}
 
 	// Create and checkout new branch
-	if err := git.CreateAndCheckoutBranch(ctx.Context, branch); err != nil {
+	if err := git.CreateAndCheckoutBranch(ctx.Context, branch.Name); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
@@ -127,7 +128,7 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	if hasStaged {
 		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
-			_ = git.DeleteBranch(ctx.Context, branch)
+			_ = git.DeleteBranch(ctx.Context, branch.Name)
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
@@ -138,6 +139,13 @@ func CreateAction(ctx *runtime.Context, opts CreateOptions) error {
 	if err := eng.TrackBranch(ctx.Context, branchName, currentBranch); err != nil {
 		// Log error but don't fail - branch is created, just not tracked
 		splog.Info("Warning: failed to track branch: %v", err)
+	}
+
+	// Propagate parent's scope if it exists
+	if !parentScope.IsEmpty() {
+		if err := eng.SetScope(branch, parentScope); err != nil {
+			splog.Info("Warning: failed to set scope from parent: %v", err)
+		}
 	}
 
 	// Handle insert logic
@@ -283,7 +291,7 @@ func getCommitMessageForBranch(ctx *runtime.Context, opts CreateOptions, commitM
 
 // determineBranch determines the branch name and returns a Branch object.
 // It expects a clean commit message to be provided if branch name is not specified.
-func determineBranch(ctx *runtime.Context, opts CreateOptions, commitMessage string) (engine.Branch, error) {
+func determineBranch(ctx *runtime.Context, opts CreateOptions, commitMessage string, scope string) (engine.Branch, error) {
 	branchName := opts.BranchName
 	if branchName == "" {
 		// Get pattern from options (always valid, default applied in GetBranchPattern)
@@ -291,7 +299,7 @@ func determineBranch(ctx *runtime.Context, opts CreateOptions, commitMessage str
 
 		// Generate branch name from pattern
 		var err error
-		branchName, err = pattern.GetBranchName(ctx.Context, commitMessage)
+		branchName, err = pattern.GetBranchName(ctx.Context, commitMessage, scope)
 		if err != nil {
 			return engine.Branch{}, err
 		}

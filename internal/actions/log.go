@@ -58,6 +58,18 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	)
 
 	// Render the stack
+	// First, collect annotations for all branches in the stack
+	annotations := make(map[string]tui.BranchAnnotation)
+	for _, branch := range ctx.Engine.AllBranches() {
+		scope := ctx.Engine.GetScopeInternal(branch.Name)
+		if !scope.IsEmpty() {
+			annotations[branch.Name] = tui.BranchAnnotation{
+				Scope: scope.String(),
+			}
+		}
+	}
+	renderer.SetAnnotations(annotations)
+
 	stackLines := renderer.RenderStack(opts.BranchName, tui.TreeRenderOptions{
 		Short:   opts.Style == "SHORT",
 		Reverse: opts.Reverse,

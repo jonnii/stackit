@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -32,15 +33,31 @@ type PrInfo struct {
 
 // ReadMetadataRef reads metadata for a branch from Git refs
 func ReadMetadataRef(branchName string) (*Meta, error) {
+	return ReadMetadataRefInDir("", branchName)
+}
+
+// ReadMetadataRefInDir reads metadata for a branch from Git refs in a specific directory
+func ReadMetadataRefInDir(dir, branchName string) (*Meta, error) {
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
 
 	// Get the content of the ref using git cat-file
 	// This is more reliable than go-git for parallel reads and "read-your-own-writes"
-	content, err := RunGitCommand("cat-file", "-p", refName)
+	var content string
+	var err error
+	if dir == "" {
+		content, err = RunGitCommand("cat-file", "-p", refName)
+	} else {
+		content, err = RunGitCommandInDir(dir, "cat-file", "-p", refName)
+	}
 	if err != nil {
 		// If the ref doesn't exist, return empty meta
 		// We check for "exists" specifically to distinguish from other errors
-		_, existsErr := RunGitCommand("rev-parse", "--verify", refName)
+		var existsErr error
+		if dir == "" {
+			_, existsErr = RunGitCommand("rev-parse", "--verify", refName)
+		} else {
+			_, existsErr = RunGitCommandInDir(dir, "rev-parse", "--verify", refName)
+		}
 		if existsErr != nil {
 			return &Meta{}, nil //nolint:nilerr
 		}
@@ -90,14 +107,29 @@ func GetMetadataRefList() (map[string]string, error) {
 
 // DeleteMetadataRef deletes a metadata ref for a branch
 func DeleteMetadataRef(branchName string) error {
+	return DeleteMetadataRefInDir("", branchName)
+}
+
+// DeleteMetadataRefInDir deletes a metadata ref for a branch in a specific directory
+func DeleteMetadataRefInDir(dir, branchName string) error {
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
-	_, err := RunGitCommand("update-ref", "-d", refName)
+	var err error
+	if dir == "" {
+		_, err = RunGitCommand("update-ref", "-d", refName)
+	} else {
+		_, err = RunGitCommandInDir(dir, "update-ref", "-d", refName)
+	}
 
 	return err
 }
 
 // WriteMetadataRef writes metadata for a branch to Git refs
 func WriteMetadataRef(branchName string, meta *Meta) error {
+	return WriteMetadataRefInDir("", branchName, meta)
+}
+
+// WriteMetadataRefInDir writes metadata for a branch to Git refs in a specific directory
+func WriteMetadataRefInDir(dir, branchName string, meta *Meta) error {
 	// Marshal metadata to JSON
 	jsonData, err := json.Marshal(meta)
 	if err != nil {
@@ -105,14 +137,25 @@ func WriteMetadataRef(branchName string, meta *Meta) error {
 	}
 
 	// Create blob using git hash-object
-	sha, err := RunGitCommandWithInput(string(jsonData), "hash-object", "-w", "--stdin")
+	var sha string
+	if dir == "" {
+		sha, err = RunGitCommandWithInput(string(jsonData), "hash-object", "-w", "--stdin")
+	} else {
+		// For hash-object with input, we need to use the runner approach
+		runner := NewRunner(dir)
+		sha, err = runner.runInternal(context.Background(), string(jsonData), true, "hash-object", "-w", "--stdin")
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create metadata blob: %w", err)
 	}
 
 	// Create or update the ref using git update-ref
 	refName := fmt.Sprintf("%s%s", MetadataRefPrefix, branchName)
-	_, err = RunGitCommand("update-ref", refName, sha)
+	if dir == "" {
+		_, err = RunGitCommand("update-ref", refName, sha)
+	} else {
+		_, err = RunGitCommandInDir(dir, "update-ref", refName, sha)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write metadata ref: %w", err)
 	}

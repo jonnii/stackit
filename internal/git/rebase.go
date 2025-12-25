@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/go-git/go-git/v5/plumbing"
 )
@@ -83,21 +84,22 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 }
 
 // IsRebaseInProgress checks if a rebase is currently in progress
-func IsRebaseInProgress(ctx context.Context) bool {
+func IsRebaseInProgress(_ context.Context) bool {
 	// Check for .git/rebase-merge or .git/rebase-apply directories
-	// This is more reliable than checking REBASE_HEAD which can persist after rebase
-	output, err := RunGitCommandWithContext(ctx, "rev-parse", "--git-dir")
-	if err != nil {
+	// Use the working directory to construct paths
+	workingDir := GetWorkingDir()
+	if workingDir == "" {
 		return false
 	}
 
-	gitDir := output
+	gitDir := filepath.Join(workingDir, ".git")
+
 	// Check for interactive rebase
-	if _, err := os.Stat(gitDir + "/rebase-merge"); err == nil {
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-merge")); err == nil {
 		return true
 	}
 	// Check for non-interactive rebase
-	if _, err := os.Stat(gitDir + "/rebase-apply"); err == nil {
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-apply")); err == nil {
 		return true
 	}
 	return false

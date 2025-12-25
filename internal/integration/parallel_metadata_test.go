@@ -2,11 +2,8 @@ package integration
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -24,14 +21,7 @@ func TestParallelMetadataRead(t *testing.T) {
 		sh.Checkout(mainBranchName)
 	}
 
-	// 2. Initialize repo in test process
-	err := os.Chdir(sh.Dir())
-	require.NoError(t, err)
-	git.ResetDefaultRepo()
-	err = git.InitDefaultRepo()
-	require.NoError(t, err)
-
-	// 3. Read metadata in parallel many times
+	// 2. Read metadata in parallel many times
 	var wg sync.WaitGroup
 	numIterations := 50
 	errors := make(chan error, numBranches*numIterations)
@@ -42,7 +32,7 @@ func TestParallelMetadataRead(t *testing.T) {
 			go func(idx int) {
 				defer wg.Done()
 				branchName := fmt.Sprintf("branch-%d", idx)
-				meta, err := git.ReadMetadataRef(branchName)
+				meta, err := git.ReadMetadataRefInDir(sh.Dir(), branchName)
 				if err != nil {
 					errors <- fmt.Errorf("branch %s: unexpected error: %w", branchName, err)
 					return

@@ -8,8 +8,6 @@ import (
 )
 
 func TestReadFromStdin(t *testing.T) {
-	t.Setenv("STACKIT_TEST_NO_INTERACTIVE", "1")
-
 	oldStdin := os.Stdin
 	defer func() { os.Stdin = oldStdin }()
 

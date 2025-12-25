@@ -21,8 +21,8 @@ type SceneSetup func(*Scene) error
 
 // NewScene creates a new test scene with a temporary directory and Git repository.
 // It automatically handles cleanup using t.Cleanup().
-// NOTE: This function uses os.Chdir() and is NOT safe for parallel tests.
-// Use NewSceneParallel for tests that can run in parallel.
+// This function is safe for parallel tests as it does NOT change the process working directory,
+// but it does set the git package's working directory for proper operation.
 func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Reset the default git repository to ensure this test gets a fresh one.
 	// This is necessary because the git package uses a package-level global
@@ -35,7 +35,7 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Save current directory
+	// Save current directory for compatibility (though we don't chdir anymore)
 	oldDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current directory: %v", err)
@@ -54,23 +54,19 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 		oldDir: oldDir,
 	}
 
-	// Change to temp directory
-	if err := os.Chdir(tmpDir); err != nil {
-		_ = os.RemoveAll(tmpDir)
-		t.Fatalf("Failed to change directory: %v", err)
-	}
-
 	// Write default config files
 	if err := scene.writeDefaultConfigs(); err != nil {
-		_ = os.Chdir(oldDir)
 		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
+	// Set the git working directory for this test
+	git.SetWorkingDir(tmpDir)
+
 	// Run custom setup if provided
 	if setup != nil {
 		if err := setup(scene); err != nil {
-			_ = os.Chdir(oldDir)
+			git.SetWorkingDir("") // Reset on failure
 			_ = os.RemoveAll(tmpDir)
 			t.Fatalf("Setup failed: %v", err)
 		}
@@ -78,7 +74,7 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 
 	// Register cleanup
 	t.Cleanup(func() {
-		_ = os.Chdir(oldDir)
+		git.SetWorkingDir("") // Reset working directory
 		if os.Getenv("DEBUG") == "" {
 			_ = os.RemoveAll(tmpDir)
 		}
@@ -118,9 +114,13 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
+	// Set the git working directory for this test
+	git.SetWorkingDir(tmpDir)
+
 	// Run custom setup if provided
 	if setup != nil {
 		if err := setup(scene); err != nil {
+			git.SetWorkingDir("") // Reset on failure
 			_ = os.RemoveAll(tmpDir)
 			t.Fatalf("Setup failed: %v", err)
 		}
@@ -128,6 +128,7 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 
 	// Register cleanup
 	t.Cleanup(func() {
+		git.SetWorkingDir("") // Reset working directory
 		if os.Getenv("DEBUG") == "" {
 			_ = os.RemoveAll(tmpDir)
 		}

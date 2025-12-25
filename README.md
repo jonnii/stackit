@@ -40,8 +40,10 @@ Stackit manages the complexity of this workflow—automatically handling rebases
 - 🔧 **Absorb changes** — Automatically amend changes to the right commit in your stack
 - 🧭 **Easy navigation** — Move `up`, `down`, `top`, or `bottom` of your stack
 - 🧹 **Auto cleanup** — Detect and delete merged branches during `sync`
-- 🤖 **AI-Assisted** — `stackit analyze` uses AI to suggest how to split your changes into a stack
-
+- 🎯 **Smart scoping** — Associate branches with Jira tickets, Linear IDs, or other logical scopes
+- 🔍 **Branch inspection** — Easily see parent/child relationships with `children` and `parent` commands
+- ⚙️ **Advanced configuration** — Customize branch naming patterns and submit behavior
+- 🤖 **AI assistant integration** — Generate integration files for Cursor and Claude Code
 ---
 
 ## Installation
@@ -53,29 +55,6 @@ brew install jonnii/tap/stackit
 ```
 
 After installation, you can use either `stackit` or `st` (short alias).
-
-### From Source
-
-Requires Go 1.25+:
-
-```bash
-git clone https://github.com/jonnii/stackit
-cd stackit
-go build -o stackit ./cmd/stackit
-# Move to your PATH
-mv stackit /usr/local/bin/
-```
-
-### Using Just
-
-If you have [just](https://github.com/casey/just) installed:
-
-```bash
-just build
-just install
-```
-
-The `just build` command will also create a local `st` symlink for convenience.
 
 ---
 
@@ -122,6 +101,13 @@ stackit submit
 ```
 This pushes both branches and creates two PRs on GitHub, with `add-logic` correctly pointing its base to `add-api`.
 
+### 6. Merge your stack
+Once your PRs are approved, merge the entire stack:
+```bash
+stackit merge
+```
+This merges all approved PRs in your stack, bottom-up, and cleans up the merged branches.
+
 ---
 
 ## Command Reference
@@ -134,6 +120,8 @@ This pushes both branches and creates two PRs on GitHub, with `add-logic` correc
 | `stackit up` / `down` | Move to the child or parent branch |
 | `stackit top` / `bottom` | Move to the top or bottom of the stack |
 | `stackit trunk` | Return to the main/trunk branch |
+| `stackit children` | Show the children of the current branch |
+| `stackit parent` | Show the parent of the current branch |
 
 ### Branch Management
 | Command | Description |
@@ -146,21 +134,21 @@ This pushes both branches and creates two PRs on GitHub, with `add-logic` correc
 | `stackit fold` | Merge the current branch into its parent |
 | `stackit pop` | Delete current branch but keep its changes in working tree |
 | `stackit delete` | Delete the current branch and its metadata |
+| `stackit scope [name]` | Manage logical scope (Jira ticket, Linear ID) for current branch |
 
 ### Stack Operations
 | Command | Description |
 |:---|:---|
 | `stackit restack` | Rebase all branches in the stack to ensure proper ancestry |
-| `stackit submit` | Push branches and create/update GitHub PRs |
+| `stackit submit` | Push branches and create/update GitHub PRs (alias: `ss` for `--stack`) |
 | `stackit sync` | Pull trunk, delete merged branches, and restack |
-| `stackit merge` | Merge PRs in the stack (bottom-up or top-down) |
+| `stackit merge` | Merge approved PRs and clean up merged branches |
 | `stackit reorder` | Interactively reorder branches in your stack |
 | `stackit move` | Rebase a branch (and its children) onto a new parent |
 
 ### AI & Automation
 | Command | Description |
 |:---|:---|
-| `stackit analyze` | AI analyzes staged changes and suggests a stack structure |
 | `stackit agent init` | Setup integration files for Cursor and Claude Code |
 
 ### Utilities & System
@@ -171,6 +159,7 @@ This pushes both branches and creates two PRs on GitHub, with `add-logic` correc
 | `stackit info` | Show detailed info about the current branch |
 | `stackit track` / `untrack` | Manually start/stop tracking a branch with stackit |
 | `stackit config` | Manage stackit configuration |
+| `stackit debug` | Dump debugging information about recent commands and stack state |
 | `stackit continue` / `abort` | Continue or abort an interrupted operation (like a rebase) |
 
 ---
@@ -193,6 +182,29 @@ To keep your stack up-to-date with `main`:
 stackit sync
 ```
 This pulls the latest changes from `main`, deletes branches that have already been merged, and restacks your remaining branches on top of the new `main`.
+
+---
+
+## Configuration
+
+Stackit supports several configuration options that can be managed via `stackit config`:
+
+| Option | Description | Example |
+|:---|:---|:---|
+| `branch.pattern` | Customize how branch names are generated when not explicitly specified | `stackit config set branch.pattern "{username}/{date}/{message}"` |
+| `submit.footer` | Control whether PRs include a footer linking back to the stack | `stackit config set submit.footer true` |
+
+### Interactive Configuration
+Use the interactive TUI to manage all settings:
+```bash
+stackit config
+```
+
+### List Current Configuration
+View all current configuration values:
+```bash
+stackit config --list
+```
 
 ---
 
@@ -222,3 +234,40 @@ just build
 ## License
 
 MIT
+
+---
+
+## Hack on Stackit
+
+### Building from Source
+
+Requires Go 1.25+:
+
+```bash
+git clone https://github.com/jonnii/stackit
+cd stackit
+go build -o stackit ./cmd/stackit
+# Move to your PATH
+mv stackit /usr/local/bin/
+```
+
+### Using Just
+
+If you have [just](https://github.com/casey/just) installed:
+
+```bash
+just build
+just install
+```
+
+The `just build` command will also create a local `st` symlink for convenience.
+
+### Development
+
+```bash
+# Run tests and linter
+just check
+
+# Build locally
+just build
+```

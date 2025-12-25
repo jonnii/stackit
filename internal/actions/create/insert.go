@@ -62,22 +62,32 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	}
 
 	// Update parent for each child to move
+	branchesToRestack := make([]engine.Branch, 0, len(toMove))
 	for _, child := range toMove {
 		if err := runtimeCtx.Engine.TrackBranch(ctx, child, newBranch); err != nil {
 			return fmt.Errorf("failed to update parent for %s: %w", child, err)
 		}
+		branchesToRestack = append(branchesToRestack, runtimeCtx.Engine.GetBranch(child))
+	}
 
-		// Restack the child onto the new branch to physically insert it
-		childBranch := runtimeCtx.Engine.GetBranch(child)
-		res, err := runtimeCtx.Engine.RestackBranch(ctx, childBranch, true)
+	// Restack children onto the new branch to physically insert it
+	if len(branchesToRestack) > 0 {
+		batchRes, err := runtimeCtx.Engine.RestackBranches(ctx, branchesToRestack)
 		if err != nil {
-			runtimeCtx.Splog.Info("Warning: failed to restack %s onto %s: %v", child, newBranch, err)
-			continue
+			runtimeCtx.Splog.Info("Warning: failed to restack branches onto %s: %v", newBranch, err)
 		}
-		if res.Result == engine.RestackConflict {
-			runtimeCtx.Splog.Info("Conflict restacking %s onto %s. Please resolve manually or run 'stackit sync --restack'.", child, newBranch)
-		} else if res.Result == engine.RestackDone {
-			runtimeCtx.Splog.Info("Restacked %s onto %s.", child, newBranch)
+
+		for _, child := range toMove {
+			res, ok := batchRes.Results[child]
+			if !ok {
+				continue
+			}
+
+			if res.Result == engine.RestackConflict {
+				runtimeCtx.Splog.Info("Conflict restacking %s onto %s. Please resolve manually or run 'stackit sync --restack'.", child, newBranch)
+			} else if res.Result == engine.RestackDone {
+				runtimeCtx.Splog.Info("Restacked %s onto %s.", child, newBranch)
+			}
 		}
 	}
 

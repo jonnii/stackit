@@ -213,9 +213,9 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		// Manually restack children (simulating what modify would do)
 		branchB := s.Engine.GetBranch("branch-b")
 		branchC := s.Engine.GetBranch("branch-c")
-		_, err = s.Engine.RestackBranch(context.Background(), branchB, true)
+		_, err = s.Engine.RestackBranches(context.Background(), []engine.Branch{branchB})
 		require.NoError(t, err)
-		_, err = s.Engine.RestackBranch(context.Background(), branchC, true)
+		_, err = s.Engine.RestackBranches(context.Background(), []engine.Branch{branchC})
 		require.NoError(t, err)
 
 		// Now setup mock GitHub with potentially stale info

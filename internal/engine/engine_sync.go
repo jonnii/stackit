@@ -86,13 +86,9 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	return nil
 }
 
-// RestackBranch rebases a branch onto its parent
+// restackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
-func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAfterRestack bool) (RestackBranchResult, error) {
-	return e.restackBranchInternal(ctx, branch, nil, nil, rebuildAfterRestack)
-}
-
-func (e *engineImpl) restackBranchInternal(
+func (e *engineImpl) restackBranch(
 	ctx context.Context,
 	branch Branch,
 	metaMap map[string]*git.Meta,
@@ -143,6 +139,14 @@ func (e *engineImpl) restackBranchInternal(
 		}
 		parent = newParent
 		reparented = true
+
+		// Update the cached metadata if we're using a metaMap, otherwise the subsequent
+		// write will overwrite the parent change.
+		if metaMap != nil {
+			if updatedMeta, err := git.ReadMetadataRef(branchName); err == nil {
+				metaMap[branchName] = updatedMeta
+			}
+		}
 	}
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
@@ -275,7 +279,7 @@ func (e *engineImpl) restackBranchInternal(
 
 // RestackBranches implements a hybrid batch approach for performance:
 // 1. Collect all data required for the restack (in bulk)
-// 2. Process branches using individual RestackBranch calls with deferred rebuilds
+// 2. Process branches using individual restackBranch calls with deferred rebuilds
 // 3. Final cache rebuild
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
 	// 1. Collect all the data required for the restack (in bulk)
@@ -312,7 +316,7 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 
 	for i, branch := range branches {
 		branchName := branch.Name
-		result, err := e.restackBranchInternal(ctx, branch, allMeta, allRevisions, false) // Don't rebuild after each branch
+		result, err := e.restackBranch(ctx, branch, allMeta, allRevisions, false) // Don't rebuild after each branch
 		results[branchName] = result
 
 		if err == nil && (result.Result == RestackDone || result.Result == RestackUnneeded) {

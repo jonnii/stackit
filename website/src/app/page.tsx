@@ -6,18 +6,21 @@ import Commands from '@/components/Commands'
 import Features from '@/components/Features'
 import Documentation from '@/components/Documentation'
 import Footer from '@/components/Footer'
+import { Main } from '@/components/elements/main'
 
 export default function Home() {
   return (
-    <main>
+    <>
       <Header />
-      <Hero />
-      <Installation />
-      <QuickStart />
-      <Commands />
-      <Features />
-      <Documentation />
+      <Main>
+        <Hero />
+        <Installation />
+        <QuickStart />
+        <Commands />
+        <Features />
+        <Documentation />
+      </Main>
       <Footer />
-    </main>
+    </>
   )
 }

@@ -10,9 +10,13 @@
     "lint": "echo 'Linting temporarily disabled'"
   },
   "dependencies": {
-    "next": "16.1.1",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindplus/elements": "^1.0.21",
+    "clsx": "^2.1.1",
+    "next": "^16.1.1",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@types/node": "^25",

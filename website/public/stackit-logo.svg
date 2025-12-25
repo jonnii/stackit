@@ -1,0 +1,6 @@
+<svg width="120" height="32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="4" width="24" height="24" rx="4" fill="#3B82F6"/>
+  <rect x="6" y="10" width="12" height="4" fill="white"/>
+  <rect x="6" y="16" width="8" height="4" fill="white"/>
+  <text x="32" y="22" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#1F2937">Stackit</text>
+</svg>

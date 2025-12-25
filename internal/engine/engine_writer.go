@@ -250,6 +250,10 @@ func (e *engineImpl) RenameBranch(ctx context.Context, oldBranch, newBranch Bran
 	oldName := oldBranch.Name
 	newName := newBranch.Name
 
+	// Get children before renaming anything
+	children := make([]string, len(e.childrenMap[oldName]))
+	copy(children, e.childrenMap[oldName])
+
 	// Rename git branch
 	if err := git.RenameBranch(ctx, oldName, newName); err != nil {
 		return err
@@ -260,6 +264,18 @@ func (e *engineImpl) RenameBranch(ctx context.Context, oldBranch, newBranch Bran
 		// Attempt to undo git rename
 		_ = git.RenameBranch(ctx, newName, oldName)
 		return err
+	}
+
+	// Update children to point to the new branch name
+	for _, child := range children {
+		childMeta, err := git.ReadMetadataRef(child)
+		if err != nil {
+			continue
+		}
+		childMeta.ParentBranchName = &newName
+		if err := git.WriteMetadataRef(child, childMeta); err != nil {
+			continue
+		}
 	}
 
 	// Rebuild in-memory state to be safe

@@ -47,6 +47,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(stack.NewMoveCmd())
 	rootCmd.AddCommand(navigation.NewParentCmd())
 	rootCmd.AddCommand(branch.NewPopCmd())
+	rootCmd.AddCommand(branch.NewRenameCmd())
 	rootCmd.AddCommand(stack.NewReorderCmd())
 	rootCmd.AddCommand(stack.NewRestackCmd())
 	rootCmd.AddCommand(branch.NewSplitCmd())

@@ -134,6 +134,7 @@ This merges all approved PRs in your stack, bottom-up, and cleans up the merged 
 | `stackit fold` | Merge the current branch into its parent |
 | `stackit pop` | Delete current branch but keep its changes in working tree |
 | `stackit delete` | Delete the current branch and its metadata |
+| `stackit rename [name]` | Rename the current branch and update metadata |
 | `stackit scope [name]` | Manage logical scope (Jira ticket, Linear ID) for current branch |
 
 ### Stack Operations

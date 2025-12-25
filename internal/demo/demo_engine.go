@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"os"
 	"time"
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // Delay constants for simulating real operations
@@ -26,11 +26,6 @@ func simulateDelay(base time.Duration) {
 	time.Sleep(base + jitter)
 }
 
-// IsDemoMode returns true if STACKIT_DEMO environment variable is set
-func IsDemoMode() bool {
-	return os.Getenv("STACKIT_DEMO") != ""
-}
-
 func init() {
 	// Register the demo engine factory with runtime package
 	runtime.DemoEngineFactory = func() engine.Engine {
@@ -42,7 +37,7 @@ func init() {
 // Returns (context, true) if in demo mode, (nil, false) otherwise.
 // Deprecated: Use runtime.NewContextAuto instead.
 func NewDemoContext() (*runtime.Context, bool) {
-	if !IsDemoMode() {
+	if !utils.IsDemoMode() {
 		return nil, false
 	}
 	eng := NewDemoEngine()

@@ -12,6 +12,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // Context provides access to engine and output for commands
@@ -72,11 +73,6 @@ func NewContextWithRepoRoot(eng engine.Engine, repoRoot string) *Context {
 	}
 }
 
-// IsDemoMode returns true if STACKIT_DEMO environment variable is set
-func IsDemoMode() bool {
-	return os.Getenv("STACKIT_DEMO") != ""
-}
-
 // DemoEngineFactory is a function that creates a demo engine.
 // This is set by the demo package to avoid circular imports.
 var DemoEngineFactory func() engine.Engine
@@ -89,7 +85,7 @@ var DemoGitHubClientFactory func() github.Client
 // In demo mode, it creates a demo engine. Otherwise, it creates a real engine
 // using the provided repoRoot.
 func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
-	if IsDemoMode() && DemoEngineFactory != nil {
+	if utils.IsDemoMode() && DemoEngineFactory != nil {
 		eng := DemoEngineFactory()
 		runtimeCtx := NewContext(eng)
 		runtimeCtx.Context = ctx
@@ -133,7 +129,7 @@ func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
 // This handles git initialization and config checks for real mode.
 func GetContext(ctx context.Context) (*Context, error) {
 	// Check for demo mode first
-	if IsDemoMode() {
+	if utils.IsDemoMode() {
 		return NewContextAuto(ctx, "")
 	}
 

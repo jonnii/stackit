@@ -34,7 +34,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	splog := ctx.Splog
 
 	// Get current branch
-	currentBranch, err := utils.ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}

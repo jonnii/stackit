@@ -21,7 +21,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	gctx := ctx.Context
 
 	// Validate we're on a branch
-	currentBranch, err := utils.ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}

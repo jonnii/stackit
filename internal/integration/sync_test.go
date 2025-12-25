@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -254,10 +253,8 @@ func TestSyncWorkflow(t *testing.T) {
 
 		// Mark individual PRs as merged (like consolidation does)
 		sh.Log("Marking individual PRs as merged...")
-		err := os.Chdir(sh.Dir())
-		require.NoError(t, err)
 		git.ResetDefaultRepo()
-		err = git.InitDefaultRepo()
+		err := git.InitDefaultRepoInDir(sh.Dir())
 		require.NoError(t, err)
 
 		// Batch read metadata for all individual branches at once
@@ -282,7 +279,7 @@ func TestSyncWorkflow(t *testing.T) {
 			meta.PrInfo.Number = &prNum
 			meta.PrInfo.State = &state
 			meta.PrInfo.Base = &base
-			err = git.WriteMetadataRef(branch, meta)
+			err = git.WriteMetadataRefInDir(sh.Dir(), branch, meta)
 			require.NoError(t, err)
 		}
 
@@ -290,7 +287,7 @@ func TestSyncWorkflow(t *testing.T) {
 		// but for the test to work with current clean_branches logic, we need to track it)
 		// TODO: Fix clean_branches to handle untracked branches that should be deleted
 		parentName := mainBranchName
-		err = git.WriteMetadataRef(consolidationBranch, &git.Meta{
+		err = git.WriteMetadataRefInDir(sh.Dir(), consolidationBranch, &git.Meta{
 			ParentBranchName: &parentName,
 		})
 		require.NoError(t, err)

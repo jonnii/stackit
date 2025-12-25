@@ -17,18 +17,33 @@ type GitRepo struct {
 	UserConfigPath string
 }
 
-// NewGitRepo creates a new Git repository in the specified directory.
-// If opts.ExistingRepo is true, it assumes the repo already exists.
-// If opts.RepoURL is provided, it clones the repository instead of initializing.
-func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
+// NewGitRepo initializes a new Git repository in the specified directory using 'git init'.
+func NewGitRepo(dir string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{})
+}
+
+// NewGitRepoFromTemplate clones a repository from a local template using 'git clone --local'.
+func NewGitRepoFromTemplate(dir string, templatePath string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{templatePath: templatePath})
+}
+
+// NewGitRepoFromURL clones a repository from a remote URL.
+func NewGitRepoFromURL(dir string, repoURL string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{repoURL: repoURL})
+}
+
+// gitRepoOptions holds options for creating a GitRepo.
+type gitRepoOptions struct {
+	existingRepo bool
+	repoURL      string
+	templatePath string
+}
+
+// newGitRepoInternal is the internal implementation for creating a GitRepo.
+func newGitRepoInternal(dir string, options *gitRepoOptions) (*GitRepo, error) {
 	repo := &GitRepo{
 		Dir:            dir,
 		UserConfigPath: filepath.Join(dir, ".git", ".stackit_user_config"),
-	}
-
-	options := &gitRepoOptions{}
-	for _, opt := range opts {
-		opt(options)
 	}
 
 	if options.existingRepo {
@@ -73,37 +88,6 @@ func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 	}
 
 	return repo, nil
-}
-
-// gitRepoOptions holds options for creating a GitRepo.
-type gitRepoOptions struct {
-	existingRepo bool
-	repoURL      string
-	templatePath string
-}
-
-// GitRepoOption is a function that configures GitRepo creation.
-type GitRepoOption func(*gitRepoOptions)
-
-// WithExistingRepo indicates the repository already exists.
-func WithExistingRepo() GitRepoOption {
-	return func(opts *gitRepoOptions) {
-		opts.existingRepo = true
-	}
-}
-
-// WithRepoURL specifies a URL to clone from.
-func WithRepoURL(url string) GitRepoOption {
-	return func(opts *gitRepoOptions) {
-		opts.repoURL = url
-	}
-}
-
-// WithTemplate specifies a local path to clone from using --local.
-func WithTemplate(path string) GitRepoOption {
-	return func(opts *gitRepoOptions) {
-		opts.templatePath = path
-	}
 }
 
 // runGitCommand executes a git command in the repository directory.

@@ -44,8 +44,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		if err != nil {
 			return err
 		}
-		currentBranch := eng.CurrentBranch()
-		branchName, err = tui.PromptBranchCheckout(branches, currentBranch)
+		branchName, err = tui.PromptBranchCheckout(branches, eng)
 		if err != nil {
 			return err
 		}

@@ -164,6 +164,17 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 		oldParentRev = *meta.ParentBranchRevision
 	}
 
+	// If parent hasn't changed, no need to restack (early exit before expensive operations)
+	if parentRev == oldParentRev {
+		return RestackBranchResult{
+			Result:            RestackUnneeded,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, nil
+	}
+
 	// RESILIENCY: If oldParentRev is no longer an ancestor of branchName,
 	// or if it's empty, find the actual merge base. This handles cases where
 	// the parent was amended or rebased outside of stackit.
@@ -180,7 +191,7 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 		}
 	}
 
-	// If parent hasn't changed, no need to restack
+	// Check again after resiliency logic - parent might still be unchanged
 	if parentRev == oldParentRev {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,

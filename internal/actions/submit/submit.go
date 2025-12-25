@@ -98,21 +98,27 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Restack if requested
 	if opts.Restack {
 		ui.ShowRestackStart()
+		ui.Pause()
 		// Convert []string to []engine.Branch for RestackBranches
 		branchObjects := make([]engine.Branch, len(branches))
 		for i, branchName := range branches {
 			branchObjects[i] = eng.GetBranch(branchName)
 		}
 		if err := actions.RestackBranches(context, branchObjects, eng, splog, ctx.RepoRoot); err != nil {
+			ui.Resume()
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
+		ui.Resume()
 		ui.ShowRestackComplete()
 	}
 
 	// Validate and prepare branches
 	ui.ShowPreparing()
 
-	if err := ValidateBranchesToSubmit(context, branches, eng, ctx); err != nil {
+	ui.Pause()
+	err = ValidateBranchesToSubmit(context, branches, eng, ctx)
+	ui.Resume()
+	if err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -279,7 +285,9 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 			ReviewersPrompt:   opts.Reviewers == "" && opts.Edit,
 		}
 
+		ui.Pause()
 		metadata, err := PreparePRMetadata(branchName, metadataOpts, eng, runtimeCtx)
+		ui.Resume()
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare metadata for %s: %w", branchName, err)
 		}

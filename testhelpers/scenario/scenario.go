@@ -180,13 +180,15 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 				continue
 			}
 			if created[parent] {
-				// Create branch
-				s.Checkout(parent)
-				s.CreateBranch(branch)
-				err := s.Scene.Repo.CreateChangeAndCommit("change on "+branch, branch)
+				// Create branch directly using Repo to avoid engine rebuilds
+				err := s.Scene.Repo.CheckoutBranch(parent)
+				require.NoError(s.T, err)
+				err = s.Scene.Repo.CreateAndCheckoutBranch(branch)
+				require.NoError(s.T, err)
+				err = s.Scene.Repo.CreateChangeAndCommit("change on "+branch, branch)
 				require.NoError(s.T, err)
 
-				// Track it
+				// Track it directly using the engine (doesn't trigger full rebuild)
 				err = s.Engine.TrackBranch(context.Background(), branch, parent)
 				require.NoError(s.T, err)
 
@@ -199,7 +201,8 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 		}
 	}
 
-	return s
+	// Rebuild once at the end to ensure engine state is fully consistent
+	return s.Rebuild()
 }
 
 // ExpectStackStructure asserts that the engine's parent-child relationships match the expected map.

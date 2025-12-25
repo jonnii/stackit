@@ -1,12 +1,80 @@
 package testhelpers
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"stackit.dev/stackit/internal/git"
 )
+
+var (
+	minimalTemplateDir string
+	minimalTemplateErr error
+	minimalTemplateOnce sync.Once
+
+	basicTemplateDir string
+	basicTemplateErr error
+	basicTemplateOnce sync.Once
+)
+
+func getMinimalTemplate(t *testing.T) string {
+	minimalTemplateOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "stackit-test-minimal-template-*")
+		if err != nil {
+			minimalTemplateErr = fmt.Errorf("failed to create minimal template dir: %w", err)
+			return
+		}
+		minimalTemplateDir = dir
+
+		// Initialize the minimal repo
+		_, err = NewGitRepo(minimalTemplateDir)
+		if err != nil {
+			minimalTemplateErr = fmt.Errorf("failed to init minimal template repo: %w", err)
+			return
+		}
+	})
+
+	if minimalTemplateErr != nil {
+		t.Fatalf("Minimal template initialization failed: %v", minimalTemplateErr)
+	}
+
+	return minimalTemplateDir
+}
+
+func getBasicTemplate(t *testing.T) string {
+	basicTemplateOnce.Do(func() {
+		minimalDir := getMinimalTemplate(t)
+		
+		dir, err := os.MkdirTemp("", "stackit-test-basic-template-*")
+		if err != nil {
+			basicTemplateErr = fmt.Errorf("failed to create basic template dir: %w", err)
+			return
+		}
+		basicTemplateDir = dir
+
+		// Clone from minimal
+		repo, err := NewGitRepo(basicTemplateDir, WithTemplate(minimalDir))
+		if err != nil {
+			basicTemplateErr = fmt.Errorf("failed to init basic template repo: %w", err)
+			return
+		}
+
+		// Apply BasicSceneSetup
+		if err := BasicSceneSetup(&Scene{Repo: repo, Dir: basicTemplateDir}); err != nil {
+			basicTemplateErr = fmt.Errorf("failed to run basic setup on template: %w", err)
+			return
+		}
+	})
+
+	if basicTemplateErr != nil {
+		t.Fatalf("Basic template initialization failed: %v", basicTemplateErr)
+	}
+
+	return basicTemplateDir
+}
 
 // Scene represents a test scene with a temporary directory and Git repository.
 // This is the Go equivalent of the TypeScript AbstractScene.
@@ -25,8 +93,6 @@ type SceneSetup func(*Scene) error
 // Use NewSceneParallel for tests that can run in parallel.
 func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Reset the default git repository to ensure this test gets a fresh one.
-	// This is necessary because the git package uses a package-level global
-	// for the repository, which would otherwise persist across tests.
 	git.ResetDefaultRepo()
 
 	// Create temporary directory
@@ -42,7 +108,20 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	}
 
 	// Initialize Git repository
-	repo, err := NewGitRepo(tmpDir)
+	var repo *GitRepo
+	isBasicSetup := false
+	
+	// Determine which template to use
+	if setup != nil && fmt.Sprintf("%p", setup) == fmt.Sprintf("%p", BasicSceneSetup) {
+		templateDir := getBasicTemplate(t)
+		repo, err = NewGitRepo(tmpDir, WithTemplate(templateDir))
+		isBasicSetup = true
+	} else {
+		// All other cases (nil or custom setup) start with a minimal repo
+		templateDir := getMinimalTemplate(t)
+		repo, err = NewGitRepo(tmpDir, WithTemplate(templateDir))
+	}
+
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create Git repo: %v", err)
@@ -67,8 +146,8 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
-	// Run custom setup if provided
-	if setup != nil {
+	// Run custom setup if provided and not already covered by template
+	if setup != nil && !isBasicSetup {
 		if err := setup(scene); err != nil {
 			_ = os.Chdir(oldDir)
 			_ = os.RemoveAll(tmpDir)
@@ -101,7 +180,19 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 	}
 
 	// Initialize Git repository
-	repo, err := NewGitRepo(tmpDir)
+	var repo *GitRepo
+	isBasicSetup := false
+
+	if setup != nil && fmt.Sprintf("%p", setup) == fmt.Sprintf("%p", BasicSceneSetup) {
+		templateDir := getBasicTemplate(t)
+		repo, err = NewGitRepo(tmpDir, WithTemplate(templateDir))
+		isBasicSetup = true
+	} else {
+		// All other cases (nil or custom setup) start with a minimal repo
+		templateDir := getMinimalTemplate(t)
+		repo, err = NewGitRepo(tmpDir, WithTemplate(templateDir))
+	}
+
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create Git repo: %v", err)
@@ -118,8 +209,8 @@ func NewSceneParallel(t *testing.T, setup SceneSetup) *Scene {
 		t.Fatalf("Failed to write config files: %v", err)
 	}
 
-	// Run custom setup if provided
-	if setup != nil {
+	// Run custom setup if provided and not already covered by template
+	if setup != nil && !isBasicSetup {
 		if err := setup(scene); err != nil {
 			_ = os.RemoveAll(tmpDir)
 			t.Fatalf("Setup failed: %v", err)

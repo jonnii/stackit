@@ -11,16 +11,16 @@ import (
 	"stackit.dev/stackit/testhelpers"
 )
 
-func TestGetSubmitFooter(t *testing.T) {
+func TestConfigSubmitFooter(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns true when config does not exist", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, nil)
 
-		enabled, err := GetSubmitFooter(scene.Dir)
+		cfg, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.True(t, enabled)
+		require.True(t, cfg.SubmitFooter())
 	})
 
 	t.Run("returns true when config exists but submit.footer is not set", func(t *testing.T) {
@@ -37,9 +37,9 @@ func TestGetSubmitFooter(t *testing.T) {
 		err = os.WriteFile(configPath, configJSON, 0600)
 		require.NoError(t, err)
 
-		enabled, err := GetSubmitFooter(scene.Dir)
+		cfg, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.True(t, enabled)
+		require.True(t, cfg.SubmitFooter())
 	})
 
 	t.Run("returns true when config has submit.footer set to true", func(t *testing.T) {
@@ -58,9 +58,9 @@ func TestGetSubmitFooter(t *testing.T) {
 		err = os.WriteFile(configPath, configJSON, 0600)
 		require.NoError(t, err)
 
-		result, err := GetSubmitFooter(scene.Dir)
+		cfg, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.True(t, result)
+		require.True(t, cfg.SubmitFooter())
 	})
 
 	t.Run("returns false when config has submit.footer set to false", func(t *testing.T) {
@@ -79,20 +79,23 @@ func TestGetSubmitFooter(t *testing.T) {
 		err = os.WriteFile(configPath, configJSON, 0600)
 		require.NoError(t, err)
 
-		result, err := GetSubmitFooter(scene.Dir)
+		cfg, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.False(t, result)
+		require.False(t, cfg.SubmitFooter())
 	})
 }
 
-func TestSetSubmitFooter(t *testing.T) {
+func TestConfigSetSubmitFooter(t *testing.T) {
 	t.Parallel()
 
 	t.Run("sets submit.footer to true", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, nil)
 
-		err := SetSubmitFooter(scene.Dir, true)
+		cfg, err := LoadConfig(scene.Dir)
+		require.NoError(t, err)
+		cfg.SetSubmitFooter(true)
+		err = cfg.Save()
 		require.NoError(t, err)
 
 		// Verify config was written
@@ -101,17 +104,20 @@ func TestSetSubmitFooter(t *testing.T) {
 		require.NotNil(t, config.SubmitFooter)
 		require.True(t, *config.SubmitFooter)
 
-		// Verify GetSubmitFooter returns true
-		enabled, err := GetSubmitFooter(scene.Dir)
+		// Verify Config.SubmitFooter returns true
+		cfg2, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.True(t, enabled)
+		require.True(t, cfg2.SubmitFooter())
 	})
 
 	t.Run("sets submit.footer to false", func(t *testing.T) {
 		t.Parallel()
 		scene := testhelpers.NewSceneParallel(t, nil)
 
-		err := SetSubmitFooter(scene.Dir, false)
+		cfg, err := LoadConfig(scene.Dir)
+		require.NoError(t, err)
+		cfg.SetSubmitFooter(false)
+		err = cfg.Save()
 		require.NoError(t, err)
 
 		// Verify config was written
@@ -120,10 +126,10 @@ func TestSetSubmitFooter(t *testing.T) {
 		require.NotNil(t, config.SubmitFooter)
 		require.False(t, *config.SubmitFooter)
 
-		// Verify GetSubmitFooter returns false
-		enabled, err := GetSubmitFooter(scene.Dir)
+		// Verify Config.SubmitFooter returns false
+		cfg2, err := LoadConfig(scene.Dir)
 		require.NoError(t, err)
-		require.False(t, enabled)
+		require.False(t, cfg2.SubmitFooter())
 	})
 
 	t.Run("updates existing config without overwriting other fields", func(t *testing.T) {
@@ -141,7 +147,10 @@ func TestSetSubmitFooter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set submit.footer
-		err = SetSubmitFooter(scene.Dir, false)
+		cfg, err := LoadConfig(scene.Dir)
+		require.NoError(t, err)
+		cfg.SetSubmitFooter(false)
+		err = cfg.Save()
 		require.NoError(t, err)
 
 		// Verify both fields are present
@@ -151,15 +160,6 @@ func TestSetSubmitFooter(t *testing.T) {
 		require.Equal(t, "main", *config.Trunk)
 		require.NotNil(t, config.SubmitFooter)
 		require.False(t, *config.SubmitFooter)
-	})
-
-	t.Run("fails when repo root does not exist", func(t *testing.T) {
-		t.Parallel()
-		nonExistentDir := "/non/existent/directory"
-
-		err := SetSubmitFooter(nonExistentDir, true)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "repository root does not exist")
 	})
 }
 

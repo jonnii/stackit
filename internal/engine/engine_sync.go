@@ -250,52 +250,282 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 	}, nil
 }
 
-// RestackBranches restacks multiple branches by delegating to individual RestackBranch calls
-// but batches the final cache rebuild for performance
+// RestackBranches restacks multiple branches using batch I/O operations for performance
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
 	results := make(map[string]RestackBranchResult)
-	needsRebuild := false
 
-	for i, branch := range branches {
+	// Filter out trunk branches
+	var branchesToRestack []Branch
+	for _, branch := range branches {
+		if !branch.IsTrunk() {
+			branchesToRestack = append(branchesToRestack, branch)
+		} else {
+			results[branch.Name] = RestackBranchResult{Result: RestackUnneeded}
+		}
+	}
+
+	if len(branchesToRestack) == 0 {
+		return RestackBatchResult{Results: results}, nil
+	}
+
+	// Batch preparation phase - collect all data upfront for performance
+
+	// 1. Collect branch names for batch operations
+	branchNames := make([]string, len(branchesToRestack))
+	for i, branch := range branchesToRestack {
+		branchNames[i] = branch.Name
+	}
+
+	// 2. Batch read all metadata using the new batch method
+	metadataMap, err := git.BatchReadMetadataRefs(branchNames)
+	if err != nil {
+		return RestackBatchResult{}, fmt.Errorf("failed to batch read metadata: %w", err)
+	}
+
+	// 3. Collect unique parent branches for batch operations
+	parentSet := make(map[string]bool)
+	for _, branch := range branchesToRestack {
+		e.mu.RLock()
+		if parent, ok := e.parentMap[branch.Name]; ok {
+			parentSet[parent] = true
+		}
+		e.mu.RUnlock()
+	}
+	uniqueParents := make([]string, 0, len(parentSet))
+	for parent := range parentSet {
+		uniqueParents = append(uniqueParents, parent)
+	}
+
+	// 4. Batch get parent revisions using the new batch method
+	parentRevisions, _ := git.BatchGetRevisions(uniqueParents)
+
+	// Processing phase - restack each branch using pre-fetched data
+	needsCacheRebuild := false
+
+	for i, branch := range branchesToRestack {
 		branchName := branch.Name
-		result, err := e.RestackBranch(ctx, branch, false) // Don't rebuild after each branch
-		results[branchName] = result
 
+		// Get pre-fetched metadata instead of reading from disk
+		meta := metadataMap[branchName]
+		if meta == nil {
+			meta = &git.Meta{} // Empty meta if not found
+		}
+
+		// Get cached parent info
+		e.mu.RLock()
+		parent, parentExists := e.parentMap[branchName]
+		e.mu.RUnlock()
+
+		if !parentExists {
+			// Try auto-discovery like individual RestackBranch does
+			ancestors, err := e.FindMostRecentTrackedAncestors(ctx, branchName)
+			if err == nil && len(ancestors) > 0 {
+				parent = ancestors[0]
+				// Auto-track the branch
+				if err := e.TrackBranch(ctx, branchName, parent); err == nil {
+					parentExists = true
+					// Add to unique parents if not already there
+					if _, exists := parentSet[parent]; !exists {
+						uniqueParents = append(uniqueParents, parent)
+						parentSet[parent] = true
+						// Get revision for new parent
+						if rev, err := git.GetRevision(parent); err == nil {
+							parentRevisions[parent] = rev
+						}
+					}
+				}
+			}
+		}
+
+		if !parentExists {
+			results[branchName] = RestackBranchResult{Result: RestackUnneeded}
+			continue
+		}
+
+		// Check if parent needs reparenting (do this per-branch to detect merges during batch)
+		var reparented bool
+		var oldParent string
+		e.mu.RLock()
+		needsReparent := e.shouldReparentBranch(ctx, parent)
+		e.mu.RUnlock()
+		if needsReparent {
+			oldParent = parent
+			reparented = true
+
+			// Find nearest valid ancestor
+			e.mu.RLock()
+			newParent := e.findNearestValidAncestor(ctx, branchName)
+			e.mu.RUnlock()
+
+			// Ensure we have the revision for the new parent
+			if _, hasRev := parentRevisions[newParent]; !hasRev {
+				if rev, err := git.GetRevision(newParent); err == nil {
+					parentRevisions[newParent] = rev
+				}
+			}
+
+			// Reparent to the nearest valid ancestor
+			if err := e.SetParent(ctx, branchName, newParent); err != nil {
+				// Convert remaining branches to []string for RestackBatchResult
+				remainingBranchNames := make([]string, len(branchesToRestack[i+1:]))
+				for j, b := range branchesToRestack[i+1:] {
+					remainingBranchNames[j] = b.Name
+				}
+				return RestackBatchResult{
+					ConflictBranch:    branchName,
+					RebasedBranchBase: parentRevisions[newParent],
+					RemainingBranches: remainingBranchNames,
+					Results:           results,
+				}, fmt.Errorf("failed to reparent %s to %s: %w", branchName, newParent, err)
+			}
+			parent = newParent
+		}
+
+		// Get parent revision from pre-fetched cache instead of individual lookup
+		parentRev, hasParentRev := parentRevisions[parent]
+		if !hasParentRev {
+			// Fallback to individual lookup if batch failed
+			var err error
+			parentRev, err = git.GetRevision(parent)
+			if err != nil {
+				results[branchName] = RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}
+				// Convert remaining branches to []string for RestackBatchResult
+				remainingBranchNames := make([]string, len(branchesToRestack[i+1:]))
+				for j, b := range branchesToRestack[i+1:] {
+					remainingBranchNames[j] = b.Name
+				}
+				return RestackBatchResult{
+					ConflictBranch:    branchName,
+					RebasedBranchBase: parentRev,
+					RemainingBranches: remainingBranchNames,
+					Results:           results,
+				}, fmt.Errorf("failed to get parent revision for %s: %w", parent, err)
+			}
+		}
+
+		// Check if branch needs restacking using pre-fetched metadata
+		oldParentRev := parentRev
+		if meta.ParentBranchRevision != nil {
+			oldParentRev = *meta.ParentBranchRevision
+		}
+
+		// Early exit if parent hasn't changed
+		if parentRev == oldParentRev {
+			results[branchName] = RestackBranchResult{
+				Result:            RestackUnneeded,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}
+			continue
+		}
+
+		// Perform resiliency checks (IsAncestor, GetMergeBase) only when needed
+		if oldParentRev != "" {
+			if isAncestor, _ := git.IsAncestor(oldParentRev, branchName); !isAncestor {
+				if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
+					oldParentRev = mergeBase
+				}
+			}
+		} else {
+			// No old parent revision in metadata, try to find merge base
+			if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
+				oldParentRev = mergeBase
+			}
+		}
+
+		// Final check after resiliency logic
+		if parentRev == oldParentRev {
+			results[branchName] = RestackBranchResult{
+				Result:            RestackUnneeded,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}
+			continue
+		}
+
+		// Perform rebase
+		gitResult, err := git.Rebase(ctx, branchName, parent, oldParentRev)
 		if err != nil {
+			results[branchName] = RestackBranchResult{
+				Result:            RestackConflict,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}
 			// Convert remaining branches to []string for RestackBatchResult
-			remainingBranchNames := make([]string, len(branches[i+1:]))
-			for j, b := range branches[i+1:] {
+			remainingBranchNames := make([]string, len(branchesToRestack[i+1:]))
+			for j, b := range branchesToRestack[i+1:] {
 				remainingBranchNames[j] = b.Name
 			}
 			return RestackBatchResult{
 				ConflictBranch:    branchName,
-				RebasedBranchBase: result.RebasedBranchBase,
+				RebasedBranchBase: parentRev,
 				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, err
 		}
 
-		if result.Result == RestackConflict {
+		if gitResult == git.RebaseConflict {
+			results[branchName] = RestackBranchResult{
+				Result:            RestackConflict,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}
 			// Convert remaining branches to []string for RestackBatchResult
-			remainingBranchNames := make([]string, len(branches[i+1:]))
-			for j, b := range branches[i+1:] {
+			remainingBranchNames := make([]string, len(branchesToRestack[i+1:]))
+			for j, b := range branchesToRestack[i+1:] {
 				remainingBranchNames[j] = b.Name
 			}
 			return RestackBatchResult{
 				ConflictBranch:    branchName,
-				RebasedBranchBase: result.RebasedBranchBase,
+				RebasedBranchBase: parentRev,
 				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, nil
 		}
 
-		if result.Result == RestackDone {
-			needsRebuild = true
+		// Update metadata (SetParent already updated parent name, just need to update revision)
+		meta.ParentBranchRevision = &parentRev
+		if err := git.WriteMetadataRef(branchName, meta); err != nil {
+			results[branchName] = RestackBranchResult{
+				Result:            RestackDone,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}
+			// Convert remaining branches to []string for RestackBatchResult
+			remainingBranchNames := make([]string, len(branchesToRestack[i+1:]))
+			for j, b := range branchesToRestack[i+1:] {
+				remainingBranchNames[j] = b.Name
+			}
+			return RestackBatchResult{
+				ConflictBranch:    branchName,
+				RebasedBranchBase: parentRev,
+				RemainingBranches: remainingBranchNames,
+				Results:           results,
+			}, fmt.Errorf("failed to write metadata for %s: %w", branchName, err)
 		}
+
+		results[branchName] = RestackBranchResult{
+			Result:            RestackDone,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}
+		needsCacheRebuild = true
 	}
 
-	// Single rebuild at the end if any branches were restacked
-	if needsRebuild {
+	// Single cache rebuild at the end
+	if needsCacheRebuild {
 		if err := e.rebuild(); err != nil {
 			return RestackBatchResult{
 				Results: results,

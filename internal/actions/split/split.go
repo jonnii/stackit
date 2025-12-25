@@ -127,6 +127,15 @@ func Action(ctx *runtime.Context, opts Options) error {
 				return fmt.Errorf("no files selected")
 			}
 		}
+		// Take snapshot before modifying the repository
+		snapshotOpts := actions.NewSnapshot("split",
+			actions.WithFlag(true, "--by-file"),
+			actions.WithArgs(pathspecs...),
+		)
+		if err := eng.TakeSnapshot(snapshotOpts); err != nil {
+			// Log but don't fail - snapshot is best effort
+			splog.Debug("Failed to take snapshot: %v", err)
+		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
 		_, err = splitByFile(context, currentBranch.Name, pathspecs, eng)
@@ -161,6 +170,19 @@ func Action(ctx *runtime.Context, opts Options) error {
 		RecursiveChildren: true,
 	}
 	upstackBranches := currentBranch.GetRelativeStack(rng)
+
+	// Take snapshot before modifying the repository
+	var snapshotArgs []string
+	if style == StyleCommit {
+		snapshotArgs = append(snapshotArgs, "--by-commit")
+	} else if style == StyleHunk {
+		snapshotArgs = append(snapshotArgs, "--by-hunk")
+	}
+	snapshotOpts := actions.NewSnapshot("split", actions.WithArgs(snapshotArgs...))
+	if err := eng.TakeSnapshot(snapshotOpts); err != nil {
+		// Log but don't fail - snapshot is best effort
+		splog.Debug("Failed to take snapshot: %v", err)
+	}
 
 	// Apply the split
 	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{

@@ -1,114 +1,81 @@
 # Stackit Website
 
-Official website for Stackit, deployed on Railway.
+A modern React Next.js website for the Stackit CLI tool.
 
-## Structure
-
-```
-website/
-├── cmd/
-│   └── server/          # Go web server
-│       └── main.go
-├── public/              # Static assets
-│   ├── index.html       # Main homepage
-│   ├── 404.html         # Custom 404 page
-│   ├── favicon.svg      # Site favicon
-│   ├── robots.txt       # Search engine directives
-│   └── sitemap.xml      # Site map for SEO
-├── go.mod               # Go module definition
-└── Procfile             # Railway process file
-
-Root level:
-└── railway.json         # Railway configuration (uses Railpack)
-```
-
-## Local Development
+## Getting Started
 
 ### Prerequisites
 
-- Go 1.25+
-- Make (optional)
+- Node.js 18+
+- npm or yarn
 
-### Running Locally
+### Installation
 
 ```bash
-cd website
-
-# Build the server
-go build -o server ./cmd/server
-
-# Run the server
-./server
-
-# Or run directly
-go run ./cmd/server/main.go
+npm install
 ```
 
-The server will start on `http://localhost:8080` (or the port specified by the `PORT` environment variable).
+### Development
+
+```bash
+# Start development server with hot reload
+npm run dev
+# or
+make dev
+```
+
+### Build
+
+```bash
+# Build for production
+npm run build
+# or
+make build
+```
+
+### Production
+
+```bash
+# Start production server
+npm start
+# or
+make run
+```
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx       # Root layout with metadata
+│   ├── page.tsx         # Home page
+│   ├── not-found.tsx    # 404 page
+│   └── globals.css      # Global styles
+└── components/          # React components
+    ├── Header.tsx
+    ├── Hero.tsx
+    ├── Installation.tsx
+    ├── QuickStart.tsx
+    ├── Commands.tsx
+    ├── Features.tsx
+    ├── Documentation.tsx
+    └── Footer.tsx
+```
 
 ## Deployment
 
-### Railway
+This is a static Next.js site configured for static export. Build with:
 
-This site is configured for automatic deployment on Railway. Simply:
+```bash
+npm run build
+```
 
-1. Connect your GitHub repository to Railway
-2. Railway will automatically detect the configuration
-3. The site will build and deploy
-
-### Environment Variables
-
-- `PORT` - Server port (Railway sets this automatically)
-
-### Build Process
-
-Railway uses Railpack with the configuration in `railway.json` to:
-1. Change to the `website/cmd/server` directory
-2. Build the Go server binary
-3. Start the web server serving static files from `website/public/`
+The static files will be in the `out/` directory, ready for deployment to any static hosting service.
 
 ## Features
 
-- ✅ Custom Go web server (no external dependencies)
-- ✅ Security headers (CSP, X-Frame-Options, etc.)
-- ✅ Custom 404 page
-- ✅ SEO optimization (meta tags, sitemap, robots.txt)
-- ✅ Social sharing (Open Graph, Twitter Cards)
-- ✅ Request logging
-- ✅ Static asset caching
-- ✅ Mobile responsive design
-
-## Making Changes
-
-### Updating Content
-
-Edit files in the `public/` directory. The server serves these files directly.
-
-### Updating the Server
-
-Edit `cmd/server/main.go` to modify server behavior, add routes, or adjust middleware.
-
-### SEO
-
-- Update `public/sitemap.xml` when adding new pages
-- Update meta tags in HTML files for better social sharing
-- Keep `public/robots.txt` updated with crawl directives
-
-## Performance
-
-- Static assets cached for 1 year (HTML cached for 1 hour)
-- Gzip compression (handled by Railway/CDN)
-- Minimal dependencies for fast cold starts
-
-## Security
-
-The server includes security headers:
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `X-XSS-Protection: 1; mode=block`
-- `Content-Security-Policy`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-
-## Support
-
-For issues with the website, please open an issue on the main [Stackit repository](https://github.com/jonnii/stackit).
+- ⚡ Next.js 14 with App Router
+- 🎨 GitHub Dark Theme styling
+- 📱 Responsive design
+- 🔍 SEO optimized
+- 🚀 Static site generation

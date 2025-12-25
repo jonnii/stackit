@@ -250,8 +250,10 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 	}, nil
 }
 
-// RestackBranches restacks multiple branches by delegating to individual RestackBranch calls
-// but batches the final cache rebuild for performance
+// RestackBranches implements a hybrid batch approach for performance:
+// 1. Collect data in bulk (metadata, parent revisions)
+// 2. Process branches using individual RestackBranch calls with deferred rebuilds
+// 3. Final cache rebuild
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
 	results := make(map[string]RestackBranchResult)
 	needsRebuild := false

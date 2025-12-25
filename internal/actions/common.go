@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -15,28 +14,30 @@ type Restacker interface {
 	engine.SyncManager
 }
 
-// RestackBranches restacks a list of branches
-func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog, repoRoot string) error {
-	for i, branch := range branches {
-		if branch.IsTrunk() {
-			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branch.Name, false))
-			continue
+// RestackBranches restacks a list of branches using the engine's batch restack method
+func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog) error {
+	// Use the engine's optimized batch restack method
+	batchResult, err := eng.RestackBranches(ctx, branches)
+	if err != nil {
+		return fmt.Errorf("batch restack failed: %w", err)
+	}
+
+	// Process results and provide user feedback
+	currentBranch := eng.CurrentBranch()
+	currentBranchName := ""
+	if currentBranch != nil {
+		currentBranchName = currentBranch.Name
+	}
+
+	for _, branch := range branches {
+		branchName := branch.Name
+		result, exists := batchResult.Results[branchName]
+		if !exists {
+			continue // Skip branches not processed (e.g., trunk)
 		}
 
-		result, err := eng.RestackBranch(ctx, branch, true)
-		if err != nil {
-			return fmt.Errorf("failed to restack %s: %w", branch.Name, err)
-		}
-
-		// Log reparenting if it happened
-		if result.Reparented {
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
-			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branch.Name, isCurrent),
-				tui.ColorBranchName(result.OldParent, false),
-				tui.ColorBranchName(result.NewParent, false))
-		}
+		// Log reparenting if it happened (batch version doesn't track this, so we skip for now)
+		// TODO: Consider adding reparenting info to RestackBatchResult if needed
 
 		switch result.Result {
 		case engine.RestackDone:
@@ -47,52 +48,30 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			} else {
 				parentName = parent.Name
 			}
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
+			isCurrent := branchName == currentBranchName
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branch.Name, isCurrent),
+				tui.ColorBranchName(branchName, isCurrent),
 				tui.ColorBranchName(parentName, false))
 		case engine.RestackConflict:
-			// Persist continuation state with remaining branches
-			currentBranch := eng.CurrentBranch()
-			currentBranchName := ""
-			if currentBranch != nil {
-				currentBranchName = currentBranch.Name
-			}
-			// Convert remaining branches to []string for continuation state
-			remainingBranchNames := make([]string, len(branches[i+1:]))
-			for j, b := range branches[i+1:] {
-				remainingBranchNames[j] = b.Name
-			}
-			continuation := &config.ContinuationState{
-				BranchesToRestack:     remainingBranchNames, // Remaining branches
-				RebasedBranchBase:     result.RebasedBranchBase,
-				CurrentBranchOverride: currentBranchName,
-			}
-
-			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
-				return fmt.Errorf("failed to persist continuation: %w", err)
-			}
-
-			// Print conflict status
-			if err := PrintConflictStatus(ctx, branch.Name, splog); err != nil {
-				return fmt.Errorf("failed to print conflict status: %w", err)
-			}
-
-			return fmt.Errorf("hit conflict restacking %s", branch.Name)
+			// This should have been handled by the batch method returning an error
+			// If we get here, it means there was a conflict but batch processing continued
+			return fmt.Errorf("unexpected conflict state for branch %s", branchName)
 		case engine.RestackUnneeded:
-			parent := eng.GetParent(branch)
-			parentName := ""
-			if parent == nil {
-				parentName = eng.Trunk().Name
+			if branch.IsTrunk() {
+				splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
 			} else {
-				parentName = parent.Name
+				parent := eng.GetParent(branch)
+				parentName := ""
+				if parent == nil {
+					parentName = eng.Trunk().Name
+				} else {
+					parentName = parent.Name
+				}
+				isCurrent := branchName == currentBranchName
+				splog.Info("%s does not need to be restacked on %s.",
+					tui.ColorBranchName(branchName, isCurrent),
+					tui.ColorBranchName(parentName, false))
 			}
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
-			splog.Info("%s does not need to be restacked on %s.",
-				tui.ColorBranchName(branch.Name, isCurrent),
-				tui.ColorBranchName(parentName, false))
 		}
 	}
 

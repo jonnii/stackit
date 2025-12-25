@@ -253,7 +253,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		upstackBranches := eng.GetRelativeStackUpstack(branch)
 
 		if len(upstackBranches) > 0 {
-			if err := actions.RestackBranches(ctx.Context, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
+			if err := actions.RestackBranches(ctx.Context, upstackBranches, eng, splog); err != nil {
 				return fmt.Errorf("failed to restack upstack branches: %w", err)
 			}
 		}

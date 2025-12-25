@@ -98,16 +98,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Restack if requested
 	if opts.Restack {
 		ui.ShowRestackStart()
-		repoRoot := ctx.RepoRoot
-		if repoRoot == "" {
-			repoRoot, _ = git.GetRepoRoot()
-		}
 		// Convert []string to []engine.Branch for RestackBranches
 		branchObjects := make([]engine.Branch, len(branches))
 		for i, branchName := range branches {
 			branchObjects[i] = eng.GetBranch(branchName)
 		}
-		if err := actions.RestackBranches(context, branchObjects, eng, splog, repoRoot); err != nil {
+		if err := actions.RestackBranches(context, branchObjects, eng, splog); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 		ui.ShowRestackComplete()

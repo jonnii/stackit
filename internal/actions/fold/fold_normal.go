@@ -64,7 +64,7 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 			RecursiveParents:  false,
 		})
 
-		if err := actions.RestackBranches(gctx, updatedDescendants, eng, splog, ctx.RepoRoot); err != nil {
+		if err := actions.RestackBranches(gctx, updatedDescendants, eng, splog); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}

@@ -35,5 +35,5 @@ func RestackAction(ctx *runtime.Context, opts RestackOptions) error {
 	}
 
 	// Call RestackBranches (from common.go)
-	return RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot)
+	return RestackBranches(ctx.Context, branches, eng, splog)
 }

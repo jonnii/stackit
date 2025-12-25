@@ -52,7 +52,7 @@ func restackBranches(ctx *runtime.Context, branchesToRestack []string) error {
 
 	// Restack branches
 	if len(sortedBranches) > 0 {
-		if err := actions.RestackBranches(gctx, sortedBranches, eng, splog, ctx.RepoRoot); err != nil {
+		if err := actions.RestackBranches(gctx, sortedBranches, eng, splog); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 	}

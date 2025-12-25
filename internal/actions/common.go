@@ -46,6 +46,32 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 		return fmt.Errorf("batch restack failed: %w", err)
 	}
 
+	// Check if there was a conflict (even if no error was returned)
+	if batchResult.ConflictBranch != "" {
+		// Persist continuation state
+		currentBranch := eng.CurrentBranch()
+		currentBranchName := ""
+		if currentBranch != nil {
+			currentBranchName = currentBranch.Name
+		}
+		continuation := &config.ContinuationState{
+			BranchesToRestack:     batchResult.RemainingBranches,
+			RebasedBranchBase:     batchResult.RebasedBranchBase,
+			CurrentBranchOverride: currentBranchName,
+		}
+
+		if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
+			return fmt.Errorf("failed to persist continuation: %w", err)
+		}
+
+		// Print conflict status
+		if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
+			return fmt.Errorf("failed to print conflict status: %w", err)
+		}
+
+		return fmt.Errorf("restack stopped due to conflict on %s", batchResult.ConflictBranch)
+	}
+
 	// Process results and provide user feedback
 	currentBranch := eng.CurrentBranch()
 	currentBranchName := ""

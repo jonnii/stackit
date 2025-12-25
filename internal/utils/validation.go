@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
-	"stackit.dev/stackit/internal/runtime"
 )
 
 // IsInteractive checks if we're in an interactive terminal
@@ -25,8 +25,8 @@ func IsInteractive() bool {
 }
 
 // ValidateOnBranch ensures the user is on a branch
-func ValidateOnBranch(ctx *runtime.Context) (string, error) {
-	currentBranch := ctx.Engine.CurrentBranch()
+func ValidateOnBranch(engine engine.Engine) (string, error) {
+	currentBranch := engine.CurrentBranch()
 	if currentBranch == nil {
 		return "", fmt.Errorf("not on a branch")
 	}
@@ -49,4 +49,9 @@ func HasUncommittedChanges(ctx context.Context) bool {
 		return false
 	}
 	return output != ""
+}
+
+// IsDemoMode returns true if STACKIT_DEMO environment variable is set
+func IsDemoMode() bool {
+	return os.Getenv("STACKIT_DEMO") != ""
 }

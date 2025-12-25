@@ -20,7 +20,7 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	splog := ctx.Splog
 
 	// Validate we're on a branch
-	currentBranch, err := utils.ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}

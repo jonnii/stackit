@@ -18,7 +18,7 @@ func ReorderAction(ctx *runtime.Context) error {
 	gctx := ctx.Context
 
 	// Pre-checks: validate on branch
-	currentBranch, err := utils.ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,11 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 
+export const metadata = {
+  title: '404 - Page Not Found | Stackit',
+  description: 'The page you\'re looking for doesn\'t exist.',
+}
+
 export default function NotFound() {
   return (
     <>

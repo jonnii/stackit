@@ -88,7 +88,7 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 
 // RestackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
-func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackBranchResult, error) {
+func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAfterRestack bool) (RestackBranchResult, error) {
 	branchName := branch.Name
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
@@ -225,15 +225,17 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 		}, fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Rebuild to refresh cache
-	if err := e.rebuild(); err != nil {
-		return RestackBranchResult{
-			Result:            RestackDone,
-			RebasedBranchBase: parentRev,
-			Reparented:        reparented,
-			OldParent:         oldParent,
-			NewParent:         parent,
-		}, fmt.Errorf("failed to rebuild after restack: %w", err)
+	// Rebuild to refresh cache if requested
+	if rebuildAfterRestack {
+		if err := e.rebuild(); err != nil {
+			return RestackBranchResult{
+				Result:            RestackDone,
+				RebasedBranchBase: parentRev,
+				Reparented:        reparented,
+				OldParent:         oldParent,
+				NewParent:         parent,
+			}, fmt.Errorf("failed to rebuild after restack: %w", err)
+		}
 	}
 
 	return RestackBranchResult{
@@ -248,9 +250,11 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 // RestackBranches restacks multiple branches in order
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
 	results := make(map[string]RestackBranchResult)
+	needsRebuild := false
+
 	for i, branch := range branches {
 		branchName := branch.Name
-		result, err := e.RestackBranch(ctx, branch)
+		result, err := e.RestackBranch(ctx, branch, false) // Don't rebuild after each branch
 		results[branchName] = result
 
 		if err != nil {
@@ -279,6 +283,19 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, nil
+		}
+
+		if result.Result == RestackDone {
+			needsRebuild = true
+		}
+	}
+
+	// Single rebuild at the end if any branches were restacked
+	if needsRebuild {
+		if err := e.rebuild(); err != nil {
+			return RestackBatchResult{
+				Results: results,
+			}, fmt.Errorf("failed to rebuild after batch restack: %w", err)
 		}
 	}
 

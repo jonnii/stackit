@@ -447,7 +447,7 @@ func TestRestackBranch(t *testing.T) {
 
 		// Restack branch1 (should rebase onto new main)
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		result, err := s.Engine.RestackBranch(context.Background(), branch1, true)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackDone, result.Result)
 
@@ -463,7 +463,7 @@ func TestRestackBranch(t *testing.T) {
 
 		// Branch is already fixed (no changes to main)
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		result, err := s.Engine.RestackBranch(context.Background(), branch1, true)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 	})
@@ -477,7 +477,7 @@ func TestRestackBranch(t *testing.T) {
 		// RestackBranch should auto-discover parent (main) and succeed
 		// In this case, main is still at the fork point, so FindMostRecentTrackedAncestors finds it.
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		result, err := s.Engine.RestackBranch(context.Background(), branch1, true)
 		require.NoError(t, err)
 		require.Equal(t, engine.RestackUnneeded, result.Result)
 
@@ -1154,7 +1154,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 4. Rebase branch1 onto main (changing its SHA)
 		s.Checkout("branch1")
 		branch1 := s.Engine.GetBranch("branch1")
-		s.Engine.RestackBranch(context.Background(), branch1)
+		s.Engine.RestackBranch(context.Background(), branch1, true)
 		branch1NewSHA, _ := s.Engine.GetBranch("branch1").GetRevision()
 		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
 

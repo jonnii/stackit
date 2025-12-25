@@ -23,7 +23,7 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			continue
 		}
 
-		result, err := eng.RestackBranch(ctx, branch)
+		result, err := eng.RestackBranch(ctx, branch, true)
 		if err != nil {
 			return fmt.Errorf("failed to restack %s: %w", branch.Name, err)
 		}

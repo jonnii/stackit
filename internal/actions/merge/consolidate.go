@@ -336,7 +336,7 @@ func (c *ConsolidateMergeExecutor) restackRemainingBranches(ctx context.Context)
 
 	for _, upstackBranch := range c.plan.UpstackBranches {
 		branch := c.engine.GetBranch(upstackBranch)
-		if result, err := c.engine.RestackBranch(ctx, branch); err != nil {
+		if result, err := c.engine.RestackBranch(ctx, branch, true); err != nil {
 			if result.Result == engine.RestackConflict {
 				c.splog.Warn("Conflict restacking %s - manual resolution needed", upstackBranch)
 			} else {

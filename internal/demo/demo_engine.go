@@ -539,7 +539,7 @@ func (e *Engine) ResetTrunkToRemote(_ context.Context) error {
 }
 
 // RestackBranch simulates restack in the demo engine
-func (e *Engine) RestackBranch(_ context.Context, _ engine.Branch) (engine.RestackBranchResult, error) {
+func (e *Engine) RestackBranch(_ context.Context, _ engine.Branch, _ bool) (engine.RestackBranchResult, error) {
 	simulateDelay(delayMedium) // Rebase operation takes time
 	return engine.RestackBranchResult{
 		Result: engine.RestackUnneeded,
@@ -550,7 +550,7 @@ func (e *Engine) RestackBranch(_ context.Context, _ engine.Branch) (engine.Resta
 func (e *Engine) RestackBranches(ctx context.Context, branches []engine.Branch) (engine.RestackBatchResult, error) {
 	results := make(map[string]engine.RestackBranchResult)
 	for _, b := range branches {
-		res, _ := e.RestackBranch(ctx, b)
+		res, _ := e.RestackBranch(ctx, b, true)
 		results[b.Name] = res
 	}
 	return engine.RestackBatchResult{Results: results}, nil

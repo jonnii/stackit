@@ -4,6 +4,13 @@ import (
 	"strings"
 )
 
+const (
+	// CurrentBranchSymbol is the symbol used for the current branch in tree views
+	CurrentBranchSymbol = "◉"
+	// BranchSymbol is the symbol used for regular branches in tree views
+	BranchSymbol = "◯"
+)
+
 // BranchAnnotation holds per-branch display metadata
 type BranchAnnotation struct {
 	PRNumber     *int
@@ -271,9 +278,9 @@ func (r *StackTreeRenderer) getBranchLines(args treeRenderArgs) []string {
 		// Add circle and branch name
 		isCurrent := args.branchName == r.currentBranch
 		if isCurrent && !args.noStyleBranchName {
-			line += "◉"
+			line += CurrentBranchSymbol
 		} else {
-			line += "◯"
+			line += BranchSymbol
 		}
 		line += "▸" + args.branchName
 
@@ -356,9 +363,9 @@ func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 
 	var symbol string
 	if isCurrent {
-		symbol = "◉"
+		symbol = CurrentBranchSymbol
 	} else {
-		symbol = "◯"
+		symbol = BranchSymbol
 	}
 
 	result = append(result, prefix+symbol+" "+coloredBranchName)
@@ -469,11 +476,11 @@ func (r *StackTreeRenderer) formatShortLines(lines []string, args treeRenderArgs
 	var result []string
 
 	for _, line := range lines {
-		circleIndex := strings.Index(line, "◯")
+		circleIndex := strings.Index(line, BranchSymbol)
 		arrowIndex := strings.Index(line, "▸")
 
 		if circleIndex == -1 {
-			circleIndex = strings.Index(line, "◉")
+			circleIndex = strings.Index(line, CurrentBranchSymbol)
 		}
 
 		if circleIndex != -1 && arrowIndex != -1 {
@@ -507,9 +514,9 @@ func (r *StackTreeRenderer) RenderBranchList(branches []string) []string {
 
 		line := "  "
 		if isCurrent {
-			line += "◉ "
+			line += CurrentBranchSymbol + " "
 		} else {
-			line += "◯ "
+			line += BranchSymbol + " "
 		}
 
 		line += ColorBranchName(branchName, isCurrent)

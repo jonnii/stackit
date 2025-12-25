@@ -454,22 +454,109 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 }
 
 // PromptBranchCheckout shows an interactive branch selector for checkout.
-// It takes a list of branches and the current branch, formats them,
+// It takes a list of branches and the engine context, formats them using tree rendering,
 // and presents them for selection.
-func PromptBranchCheckout(branches []engine.Branch, currentBranch *engine.Branch) (string, error) {
+func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (string, error) {
 	if len(branches) == 0 {
 		return "", fmt.Errorf("no branches available to checkout")
 	}
 
+	// Create tree renderer
+	currentBranch := eng.CurrentBranch()
+	currentBranchName := ""
+	if currentBranch != nil {
+		currentBranchName = currentBranch.Name
+	}
+	trunk := eng.Trunk()
+	renderer := NewStackTreeRenderer(
+		currentBranchName,
+		trunk.Name,
+		func(branchName string) []string {
+			branch := eng.GetBranch(branchName)
+			children := branch.GetChildren()
+			childNames := make([]string, len(children))
+			for i, c := range children {
+				childNames[i] = c.Name
+			}
+			return childNames
+		},
+		func(branchName string) string {
+			branch := eng.GetBranch(branchName)
+			parent := eng.GetParent(branch)
+			if parent == nil {
+				return ""
+			}
+			return parent.Name
+		},
+		func(branchName string) bool { return eng.IsTrunkInternal(branchName) },
+		func(branchName string) bool {
+			return eng.IsBranchUpToDateInternal(branchName)
+		},
+	)
+
+	// Add annotations for all branches
+	annotations := make(map[string]BranchAnnotation)
+	for _, branch := range branches {
+		scope := eng.GetScopeInternal(branch.Name)
+		if !scope.IsEmpty() {
+			annotations[branch.Name] = BranchAnnotation{
+				Scope: scope.String(),
+			}
+		}
+	}
+	renderer.SetAnnotations(annotations)
+
+	// Calculate depth for each branch to create proper tree indentation
+	branchDepth := make(map[string]int)
+	branchDepth[trunk.Name] = 0
+
+	// Build depth map by traversing from trunk
+	var calculateDepth func(branchName string, depth int)
+	calculateDepth = func(branchName string, depth int) {
+		branch := eng.GetBranch(branchName)
+		children := branch.GetChildren()
+		for _, child := range children {
+			branchDepth[child.Name] = depth + 1
+			calculateDepth(child.Name, depth+1)
+		}
+	}
+	calculateDepth(trunk.Name, 0)
+
 	choices := make([]BranchChoice, 0, len(branches))
 	initialIndex := -1
 
-	for _, branch := range branches {
+	for i, branch := range branches {
 		isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
-		display := ColorBranchName(branch.Name, isCurrent)
 		if isCurrent {
-			initialIndex = len(choices)
+			initialIndex = i
 		}
+
+		// Get depth for indentation
+		depth := branchDepth[branch.Name]
+
+		// Create tree line with proper indentation
+		indent := strings.Repeat("  ", depth)
+		var symbol string
+		if isCurrent {
+			symbol = CurrentBranchSymbol
+		} else {
+			symbol = BranchSymbol
+		}
+
+		// Get colored branch name
+		coloredBranchName := ColorBranchName(branch.Name, isCurrent)
+
+		// Add annotation
+		annotation := annotations[branch.Name]
+		coloredBranchName += renderer.formatAnnotationColored(annotation)
+
+		// Add restack indicator if needed
+		if !eng.IsBranchUpToDateInternal(branch.Name) {
+			coloredBranchName += " " + ColorNeedsRestack("(needs restack)")
+		}
+
+		display := indent + symbol + " " + coloredBranchName
+
 		choices = append(choices, BranchChoice{
 			Display: display,
 			Value:   branch.Name,

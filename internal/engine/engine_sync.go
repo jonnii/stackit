@@ -236,17 +236,9 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 		}, fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Rebuild to refresh cache if requested
+	// Update cache incrementally if requested (much faster than full rebuild)
 	if rebuildAfterRestack {
-		if err := e.rebuild(); err != nil {
-			return RestackBranchResult{
-				Result:            RestackDone,
-				RebasedBranchBase: parentRev,
-				Reparented:        reparented,
-				OldParent:         oldParent,
-				NewParent:         parent,
-			}, fmt.Errorf("failed to rebuild after restack: %w", err)
-		}
+		e.updateBranchInCache(branchName)
 	}
 
 	return RestackBranchResult{

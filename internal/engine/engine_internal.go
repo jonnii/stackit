@@ -81,6 +81,78 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	return nil
 }
 
+// updateBranchInCache updates the cache for a specific branch after restack/metadata changes
+func (e *engineImpl) updateBranchInCache(branchName string) {
+	// Read metadata for this branch
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		// If metadata doesn't exist, remove branch from all maps
+		if oldParent, exists := e.parentMap[branchName]; exists {
+			delete(e.parentMap, branchName)
+			// Remove from old parent's children list
+			if children, ok := e.childrenMap[oldParent]; ok {
+				for i, child := range children {
+					if child == branchName {
+						e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
+						break
+					}
+				}
+				// Remove empty children lists
+				if len(e.childrenMap[oldParent]) == 0 {
+					delete(e.childrenMap, oldParent)
+				}
+			}
+		}
+		delete(e.scopeMap, branchName)
+	}
+
+	// Get the old parent before updating
+	oldParent := e.parentMap[branchName]
+
+	// Update parent map
+	if meta.ParentBranchName != nil {
+		e.parentMap[branchName] = *meta.ParentBranchName
+	} else {
+		delete(e.parentMap, branchName)
+	}
+
+	// Update scope map
+	if meta.Scope != nil {
+		e.scopeMap[branchName] = *meta.Scope
+	} else {
+		delete(e.scopeMap, branchName)
+	}
+
+	// Update children map - remove from old parent, add to new parent
+	newParent := ""
+	if meta.ParentBranchName != nil {
+		newParent = *meta.ParentBranchName
+	}
+
+	// Remove from old parent's children if parent changed
+	if oldParent != "" && oldParent != newParent {
+		if children, ok := e.childrenMap[oldParent]; ok {
+			for i, child := range children {
+				if child == branchName {
+					e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
+					break
+				}
+			}
+			// Remove empty children lists
+			if len(e.childrenMap[oldParent]) == 0 {
+				delete(e.childrenMap, oldParent)
+			}
+		}
+	}
+
+	// Add to new parent's children if it has a parent
+	if newParent != "" {
+		e.childrenMap[newParent] = append(e.childrenMap[newParent], branchName)
+		// Sort for deterministic traversal
+		sort.Strings(e.childrenMap[newParent])
+	}
+}
+
 // rebuild loads all branches and their metadata from Git
 func (e *engineImpl) rebuild() error {
 	e.mu.Lock()

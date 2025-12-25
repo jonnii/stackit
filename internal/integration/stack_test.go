@@ -227,6 +227,7 @@ func TestStackWorkflow(t *testing.T) {
 
 		// Verify scopes are correctly set
 		sh.Log("Verifying scopes in mixed repository...")
+		// Batch scope checks by staying on each branch and checking multiple things
 		sh.Checkout("proj111-base").
 			Run("scope --show").
 			OutputContains("explicit scope: PROJ-111")

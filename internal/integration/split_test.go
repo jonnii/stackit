@@ -70,25 +70,23 @@ func TestSplitWorkflow(t *testing.T) {
 		// Verify the new split branch exists
 		sh.HasBranches("main", "feature-a", "feature-a_split", "child-1", "child-2")
 
-		// Verify feature-a_split has the extracted files
+		// Verify feature-a_split has the extracted files (batch check)
 		sh.Checkout("feature-a_split")
-		verifyFileExists(t, sh, "config_test.txt")
-		verifyFileExists(t, sh, "api_test.txt")
-		verifyFileNotExists(t, sh, "utils_test.txt")
+		verifyFilesExist(t, sh, []string{"config_test.txt", "api_test.txt"})
+		verifyFilesNotExist(t, sh, []string{"utils_test.txt"})
 
-		// Verify feature-a now only has utils (config and api were removed)
+		// Verify feature-a now only has utils (config and api were removed) (batch check)
 		sh.Checkout("feature-a")
-		verifyFileNotExists(t, sh, "config_test.txt")
-		verifyFileNotExists(t, sh, "api_test.txt")
-		verifyFileExists(t, sh, "utils_test.txt")
+		verifyFilesNotExist(t, sh, []string{"config_test.txt", "api_test.txt"})
+		verifyFilesExist(t, sh, []string{"utils_test.txt"})
 
 		// Verify child-1 still has its changes
 		sh.Checkout("child-1")
-		verifyFileExists(t, sh, "child1_test.txt")
+		verifyFilesExist(t, sh, []string{"child1_test.txt"})
 
 		// Verify child-2 still has its changes
 		sh.Checkout("child-2")
-		verifyFileExists(t, sh, "child2_test.txt")
+		verifyFilesExist(t, sh, []string{"child2_test.txt"})
 
 		// Verify parent relationships using stackit info
 		sh.Checkout("feature-a").Run("info")
@@ -141,25 +139,23 @@ func TestSplitWorkflow(t *testing.T) {
 		// Verify the new split branch exists
 		sh.HasBranches("main", "feature-a", "feature-a_split", "feature-b", "feature-c")
 
-		// Verify feature-a_split has file1 (extracted)
+		// Verify feature-a_split has file1 (extracted) (batch check)
 		sh.Checkout("feature-a_split")
-		verifyFileExists(t, sh, "file1_test.txt")
-		verifyFileNotExists(t, sh, "file2_test.txt")
+		verifyFilesExist(t, sh, []string{"file1_test.txt"})
+		verifyFilesNotExist(t, sh, []string{"file2_test.txt"})
 
-		// Verify feature-a now only has file2 (file1 was extracted)
+		// Verify feature-a now only has file2 (file1 was extracted) (batch check)
 		sh.Checkout("feature-a")
-		verifyFileNotExists(t, sh, "file1_test.txt")
-		verifyFileExists(t, sh, "file2_test.txt")
+		verifyFilesNotExist(t, sh, []string{"file1_test.txt"})
+		verifyFilesExist(t, sh, []string{"file2_test.txt"})
 
-		// Verify feature-b still has its changes (was restacked)
+		// Verify feature-b still has its changes (was restacked) (batch check)
 		sh.Checkout("feature-b")
-		verifyFileExists(t, sh, "fileb_test.txt")
-		verifyFileExists(t, sh, "file2_test.txt") // inherited from feature-a
+		verifyFilesExist(t, sh, []string{"fileb_test.txt", "file2_test.txt"})
 
-		// Verify feature-c still has its changes (was restacked)
+		// Verify feature-c still has its changes (was restacked) (batch check)
 		sh.Checkout("feature-c")
-		verifyFileExists(t, sh, "filec_test.txt")
-		verifyFileExists(t, sh, "file2_test.txt") // inherited from feature-a
+		verifyFilesExist(t, sh, []string{"filec_test.txt", "file2_test.txt"})
 	})
 
 	t.Run("split preserves commit history correctly", func(t *testing.T) {
@@ -247,23 +243,40 @@ func TestSplitWorkflow(t *testing.T) {
 }
 
 // Helper functions for file verification
+// Batch file verification functions to reduce git process spawns
 
-func verifyFileExists(t *testing.T, sh *TestShell, filename string) {
+func verifyFilesExist(t *testing.T, sh *TestShell, filenames []string) {
 	t.Helper()
-	cmd := exec.Command("git", "ls-files", filename)
+	if len(filenames) == 0 {
+		return
+	}
+	// Use git ls-files to check all files at once
+	cmd := exec.Command("git", "ls-files", "--")
 	cmd.Dir = sh.Dir()
+	cmd.Args = append(cmd.Args, filenames...)
 	output, err := cmd.Output()
 	require.NoError(t, err)
-	require.True(t, strings.Contains(string(output), filename),
-		"expected file %s to exist on current branch", filename)
+	outputStr := string(output)
+	for _, filename := range filenames {
+		require.True(t, strings.Contains(outputStr, filename),
+			"expected file %s to exist on current branch", filename)
+	}
 }
 
-func verifyFileNotExists(t *testing.T, sh *TestShell, filename string) {
+func verifyFilesNotExist(t *testing.T, sh *TestShell, filenames []string) {
 	t.Helper()
-	cmd := exec.Command("git", "ls-files", filename)
+	if len(filenames) == 0 {
+		return
+	}
+	// Use git ls-files to check all files at once
+	cmd := exec.Command("git", "ls-files", "--")
 	cmd.Dir = sh.Dir()
+	cmd.Args = append(cmd.Args, filenames...)
 	output, err := cmd.Output()
 	require.NoError(t, err)
-	require.False(t, strings.Contains(string(output), filename),
-		"expected file %s to NOT exist on current branch", filename)
+	outputStr := string(output)
+	for _, filename := range filenames {
+		require.False(t, strings.Contains(outputStr, filename),
+			"expected file %s to NOT exist on current branch", filename)
+	}
 }

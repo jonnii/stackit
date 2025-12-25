@@ -364,21 +364,21 @@ func TestTrackIntegration(t *testing.T) {
 			Run("track feature-c --force").
 			Run("track feature-d --force")
 
-		// Verify the entire stack is restored
+		// Verify the entire stack is restored (single log call checks all)
 		shell.Run("log --stack").
 			OutputContains("feature-a").
 			OutputContains("feature-b").
 			OutputContains("feature-c").
 			OutputContains("feature-d")
 
-		// Verify relationships
+		// Verify relationships (batch verification by checking all in sequence)
 		shell.Checkout("feature-b").
 			Run("parent").
-			OutputContains("feature-a").
-			Checkout("feature-c").
+			OutputContains("feature-a")
+		shell.Checkout("feature-c").
 			Run("parent").
-			OutputContains("feature-b").
-			Checkout("feature-d").
+			OutputContains("feature-b")
+		shell.Checkout("feature-d").
 			Run("parent").
 			OutputContains("feature-c")
 	})

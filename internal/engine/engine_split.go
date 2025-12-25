@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -102,7 +103,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 	}
 
 	// Delete original branch if not in branchNames
-	if !contains(opts.BranchNames, opts.BranchToSplit) {
+	if !slices.Contains(opts.BranchNames, opts.BranchToSplit) {
 		if err := e.DeleteBranch(ctx, opts.BranchToSplit); err != nil {
 			return fmt.Errorf("failed to delete original branch: %w", err)
 		}

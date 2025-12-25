@@ -4,7 +4,7 @@ package testhelpers
 
 import (
 	"os/exec"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,8 +44,8 @@ func ExpectBranches(t *testing.T, repo *GitRepo, expected []string) {
 	}
 
 	// Sort both slices for comparison
-	sort.Strings(filtered)
-	sort.Strings(expected)
+	slices.Sort(filtered)
+	slices.Sort(expected)
 
 	require.Equal(t, expected, filtered, "Branches do not match")
 }
@@ -72,7 +72,7 @@ func ExpectBranchesString(t *testing.T, repo *GitRepo, expected string) {
 	}
 
 	// Sort and join
-	sort.Strings(filtered)
+	slices.Sort(filtered)
 	actual := strings.Join(filtered, ", ")
 
 	require.Equal(t, expected, actual, "Branches do not match")

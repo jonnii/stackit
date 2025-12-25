@@ -2,6 +2,7 @@ package navigation
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -88,7 +89,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 							for i, b := range upstack {
 								upstackNames[i] = b.Name
 							}
-							if child.Name == toBranch || utils.ContainsString(upstackNames, toBranch) {
+							if child.Name == toBranch || slices.Contains(upstackNames, toBranch) {
 								candidates = append(candidates, child.Name)
 							}
 						}

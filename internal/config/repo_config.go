@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"stackit.dev/stackit/internal/utils"
+	"slices"
 )
 
 // Config represents a repository configuration with getters and setters
@@ -68,7 +67,7 @@ func (c *Config) AllTrunks() []string {
 
 	// Add additional trunks (avoiding duplicates)
 	for _, t := range c.data.Trunks {
-		if !utils.ContainsString(trunks, t) {
+		if !slices.Contains(trunks, t) {
 			trunks = append(trunks, t)
 		}
 	}
@@ -84,7 +83,7 @@ func (c *Config) AllTrunks() []string {
 // IsTrunk checks if a branch is configured as a trunk
 func (c *Config) IsTrunk(branchName string) bool {
 	trunks := c.AllTrunks()
-	return utils.ContainsString(trunks, branchName)
+	return slices.Contains(trunks, branchName)
 }
 
 // AddTrunk adds an additional trunk branch to the config
@@ -93,7 +92,7 @@ func (c *Config) AddTrunk(trunkName string) error {
 	if c.data.Trunk != nil && *c.data.Trunk == trunkName {
 		return fmt.Errorf("'%s' is already the primary trunk", trunkName)
 	}
-	if utils.ContainsString(c.data.Trunks, trunkName) {
+	if slices.Contains(c.data.Trunks, trunkName) {
 		return fmt.Errorf("'%s' is already configured as a trunk", trunkName)
 	}
 

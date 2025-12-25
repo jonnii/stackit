@@ -3,6 +3,7 @@ package split
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -10,7 +11,6 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
-	"stackit.dev/stackit/internal/utils"
 )
 
 // splitByFileEngine is a minimal interface needed for splitting by file
@@ -41,7 +41,7 @@ func splitByFile(ctx context.Context, branchToSplit string, pathspecs []string, 
 	for i, b := range allBranches {
 		branchNames[i] = b.Name
 	}
-	for utils.ContainsString(branchNames, newBranchName) {
+	for slices.Contains(branchNames, newBranchName) {
 		newBranchName += "_split"
 	}
 

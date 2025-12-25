@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -147,11 +148,8 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	// Remove from parent's children list
 	if parent != "" {
 		parentChildren := e.childrenMap[parent]
-		for i, c := range parentChildren {
-			if c == branchName {
-				e.childrenMap[parent] = append(parentChildren[:i], parentChildren[i+1:]...)
-				break
-			}
+		if i := slices.Index(parentChildren, branchName); i >= 0 {
+			e.childrenMap[parent] = slices.Delete(parentChildren, i, i+1)
 		}
 	}
 
@@ -160,11 +158,8 @@ func (e *engineImpl) DeleteBranch(ctx context.Context, branchName string) error 
 	delete(e.childrenMap, branchName)
 
 	// Remove from branches list
-	for i, b := range e.branches {
-		if b == branchName {
-			e.branches = append(e.branches[:i], e.branches[i+1:]...)
-			break
-		}
+	if i := slices.Index(e.branches, branchName); i >= 0 {
+		e.branches = slices.Delete(e.branches, i, i+1)
 	}
 
 	return nil
@@ -320,11 +315,8 @@ func (e *engineImpl) setParentInternal(ctx context.Context, branchName string, p
 	if oldParent != "" {
 		// Remove from old parent's children
 		oldChildren := e.childrenMap[oldParent]
-		for i, c := range oldChildren {
-			if c == branchName {
-				e.childrenMap[oldParent] = append(oldChildren[:i], oldChildren[i+1:]...)
-				break
-			}
+		if i := slices.Index(oldChildren, branchName); i >= 0 {
+			e.childrenMap[oldParent] = slices.Delete(oldChildren, i, i+1)
 		}
 	}
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -196,8 +196,14 @@ func (e *engineImpl) enforceMaxStackDepth() error {
 	}
 
 	// Sort by filename (which includes timestamp, so chronological)
-	sort.Slice(snapshots, func(i, j int) bool {
-		return snapshots[i].Name() < snapshots[j].Name()
+	slices.SortFunc(snapshots, func(a, b os.DirEntry) int {
+		if a.Name() < b.Name() {
+			return -1
+		}
+		if a.Name() > b.Name() {
+			return 1
+		}
+		return 0
 	})
 
 	// Delete oldest snapshots
@@ -262,12 +268,21 @@ func (e *engineImpl) GetSnapshots() ([]SnapshotInfo, error) {
 	}
 
 	// Sort by timestamp (newest first)
-	sort.Slice(snapshots, func(i, j int) bool {
-		if !snapshots[i].Timestamp.Equal(snapshots[j].Timestamp) {
-			return snapshots[i].Timestamp.After(snapshots[j].Timestamp)
+	slices.SortFunc(snapshots, func(a, b SnapshotInfo) int {
+		if !a.Timestamp.Equal(b.Timestamp) {
+			if a.Timestamp.After(b.Timestamp) {
+				return -1 // a is newer, should come first
+			}
+			return 1 // b is newer
 		}
 		// Tie-breaker: use ID (filename) descending
-		return snapshots[i].ID > snapshots[j].ID
+		if a.ID > b.ID {
+			return -1
+		}
+		if a.ID < b.ID {
+			return 1
+		}
+		return 0
 	})
 
 	return snapshots, nil

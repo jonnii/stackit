@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,8 +42,8 @@ func TestApplySplitToCommits(t *testing.T) {
 // Test helper functions
 
 func TestContains(t *testing.T) {
-	// Test the contains helper function used in ApplySplitToCommits
-	require.True(t, contains([]string{"a", "b", "c"}, "b"))
-	require.False(t, contains([]string{"a", "b", "c"}, "d"))
-	require.False(t, contains([]string{}, "a"))
+	// Test slices.Contains used in ApplySplitToCommits
+	require.True(t, slices.Contains([]string{"a", "b", "c"}, "b"))
+	require.False(t, slices.Contains([]string{"a", "b", "c"}, "d"))
+	require.False(t, slices.Contains([]string{}, "a"))
 }

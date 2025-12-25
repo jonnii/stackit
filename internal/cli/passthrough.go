@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 )
 
 var gitCommandAllowlist = []string{
@@ -56,7 +57,7 @@ func HandlePassthrough(args []string) bool {
 	}
 
 	command := args[1]
-	if !contains(gitCommandAllowlist, command) {
+	if !slices.Contains(gitCommandAllowlist, command) {
 		return false
 	}
 
@@ -82,15 +83,6 @@ func HandlePassthrough(args []string) bool {
 	}
 	os.Exit(0)
 	return true
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 func joinArgs(args []string) string {

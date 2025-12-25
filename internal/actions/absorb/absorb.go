@@ -3,7 +3,7 @@ package absorb
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"stackit.dev/stackit/internal/actions"
@@ -186,19 +186,26 @@ func Action(ctx *runtime.Context, opts Options) error {
 	for commitSHA := range hunksByCommit {
 		commitList = append(commitList, commitSHA)
 	}
-	sort.Slice(commitList, func(i, j int) bool {
+	slices.SortFunc(commitList, func(a, b string) int {
 		// Sort by commit index (oldest first)
-		idxI := -1
-		idxJ := -1
+		idxA := -1
+		idxB := -1
 		for _, target := range hunkTargets {
-			if target.CommitSHA == commitList[i] {
-				idxI = target.CommitIndex
+			if target.CommitSHA == a {
+				idxA = target.CommitIndex
 			}
-			if target.CommitSHA == commitList[j] {
-				idxJ = target.CommitIndex
+			if target.CommitSHA == b {
+				idxB = target.CommitIndex
 			}
 		}
-		return idxI > idxJ // Higher index = older commit search position
+		// Higher index = older commit search position
+		if idxA > idxB {
+			return -1
+		}
+		if idxA < idxB {
+			return 1
+		}
+		return 0
 	})
 
 	// Track the oldest modified branch to know where to start restacking from

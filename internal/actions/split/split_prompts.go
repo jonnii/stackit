@@ -2,18 +2,18 @@ package split
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/AlecAivazis/survey/v2"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/utils"
 )
 
 func promptBranchName(existingNames []string, originalBranchName string, branchNum int, eng engine.BranchReader) (string, error) {
 	defaultName := originalBranchName
-	if utils.ContainsString(existingNames, defaultName) {
+	if slices.Contains(existingNames, defaultName) {
 		defaultName = originalBranchName + "_split"
-		for utils.ContainsString(existingNames, defaultName) {
+		for slices.Contains(existingNames, defaultName) {
 			defaultName += "_split"
 		}
 	}
@@ -28,7 +28,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 	}
 
 	// Validate name - don't allow names already picked in this split session
-	if utils.ContainsString(existingNames, branchName) {
+	if slices.Contains(existingNames, branchName) {
 		return "", fmt.Errorf("branch name %s is already used by another branch in this split", branchName)
 	}
 
@@ -40,7 +40,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 		for i, b := range allBranches {
 			branchNames[i] = b.Name
 		}
-		if utils.ContainsString(branchNames, branchName) {
+		if slices.Contains(branchNames, branchName) {
 			return "", fmt.Errorf("branch name %s is already in use", branchName)
 		}
 	}

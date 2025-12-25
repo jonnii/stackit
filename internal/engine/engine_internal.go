@@ -3,7 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -51,7 +51,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 
 	// Sort children by name for deterministic traversal
 	for _, children := range e.childrenMap {
-		sort.Strings(children)
+		slices.Sort(children)
 	}
 
 	return nil
@@ -67,11 +67,8 @@ func (e *engineImpl) updateBranchInCache(branchName string) {
 			delete(e.parentMap, branchName)
 			// Remove from old parent's children list
 			if children, ok := e.childrenMap[oldParent]; ok {
-				for i, child := range children {
-					if child == branchName {
-						e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
-						break
-					}
+				if i := slices.Index(children, branchName); i >= 0 {
+					e.childrenMap[oldParent] = slices.Delete(children, i, i+1)
 				}
 				// Remove empty children lists
 				if len(e.childrenMap[oldParent]) == 0 {
@@ -108,11 +105,8 @@ func (e *engineImpl) updateBranchInCache(branchName string) {
 	// Remove from old parent's children if parent changed
 	if oldParent != "" && oldParent != newParent {
 		if children, ok := e.childrenMap[oldParent]; ok {
-			for i, child := range children {
-				if child == branchName {
-					e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
-					break
-				}
+			if i := slices.Index(children, branchName); i >= 0 {
+				e.childrenMap[oldParent] = slices.Delete(children, i, i+1)
 			}
 			// Remove empty children lists
 			if len(e.childrenMap[oldParent]) == 0 {
@@ -125,7 +119,7 @@ func (e *engineImpl) updateBranchInCache(branchName string) {
 	if newParent != "" {
 		e.childrenMap[newParent] = append(e.childrenMap[newParent], branchName)
 		// Sort for deterministic traversal
-		sort.Strings(e.childrenMap[newParent])
+		slices.Sort(e.childrenMap[newParent])
 	}
 }
 
@@ -257,13 +251,4 @@ func stringPtr(s string) *string {
 
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

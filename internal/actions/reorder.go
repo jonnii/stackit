@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"stackit.dev/stackit/internal/engine"
@@ -94,7 +95,7 @@ func ReorderAction(ctx *runtime.Context) error {
 	}
 
 	// Check if order actually changed
-	if slicesEqual(originalOrder, newOrder) {
+	if slices.Equal(originalOrder, newOrder) {
 		splog.Info("Branch order unchanged. No action taken.")
 		return nil
 	}
@@ -254,17 +255,4 @@ func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string
 		return newOrder[0]
 	}
 	return ""
-}
-
-// slicesEqual checks if two string slices are equal
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

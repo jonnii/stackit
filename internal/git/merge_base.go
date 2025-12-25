@@ -26,6 +26,10 @@ func GetMergeBaseByRef(ref1Name, ref2Name string) (string, error) {
 		return "", fmt.Errorf("failed to resolve ref2: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit1, err := repo.CommitObject(hash1)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit1: %w", err)
@@ -70,6 +74,10 @@ func IsAncestor(ancestor, descendant string) (bool, error) {
 	if ancestorHash == descendantHash {
 		return true, nil
 	}
+
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
 
 	// Get commit objects
 	ancestorCommit, err := repo.CommitObject(ancestorHash)

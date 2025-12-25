@@ -15,25 +15,82 @@ type Restacker interface {
 	engine.SyncManager
 }
 
-// RestackBranches restacks a list of branches
+// RestackBranches restacks a list of branches using the engine's batch restack method
 func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog, repoRoot string) error {
-	for i, branch := range branches {
-		if branch.IsTrunk() {
-			splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branch.Name, false))
-			continue
+	// Use the engine's optimized batch restack method
+	batchResult, err := eng.RestackBranches(ctx, branches)
+	if err != nil {
+		// Check if this is a conflict that needs continuation state
+		if batchResult.ConflictBranch != "" {
+			// Persist continuation state
+			currentBranch := eng.CurrentBranch()
+			currentBranchName := ""
+			if currentBranch != nil {
+				currentBranchName = currentBranch.Name
+			}
+			continuation := &config.ContinuationState{
+				BranchesToRestack:     batchResult.RemainingBranches,
+				RebasedBranchBase:     batchResult.RebasedBranchBase,
+				CurrentBranchOverride: currentBranchName,
+			}
+
+			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
+				return fmt.Errorf("failed to persist continuation: %w", err)
+			}
+
+			// Print conflict status
+			if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
+				return fmt.Errorf("failed to print conflict status: %w", err)
+			}
+		}
+		return fmt.Errorf("batch restack failed: %w", err)
+	}
+
+	// Check if there was a conflict (even if no error was returned)
+	if batchResult.ConflictBranch != "" {
+		// Persist continuation state
+		currentBranch := eng.CurrentBranch()
+		currentBranchName := ""
+		if currentBranch != nil {
+			currentBranchName = currentBranch.Name
+		}
+		continuation := &config.ContinuationState{
+			BranchesToRestack:     batchResult.RemainingBranches,
+			RebasedBranchBase:     batchResult.RebasedBranchBase,
+			CurrentBranchOverride: currentBranchName,
 		}
 
-		result, err := eng.RestackBranch(ctx, branch)
-		if err != nil {
-			return fmt.Errorf("failed to restack %s: %w", branch.Name, err)
+		if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
+			return fmt.Errorf("failed to persist continuation: %w", err)
+		}
+
+		// Print conflict status
+		if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
+			return fmt.Errorf("failed to print conflict status: %w", err)
+		}
+
+		return fmt.Errorf("restack stopped due to conflict on %s", batchResult.ConflictBranch)
+	}
+
+	// Process results and provide user feedback
+	currentBranch := eng.CurrentBranch()
+	currentBranchName := ""
+	if currentBranch != nil {
+		currentBranchName = currentBranch.Name
+	}
+
+	for _, branch := range branches {
+		branchName := branch.Name
+		result, exists := batchResult.Results[branchName]
+		if !exists {
+			continue // Skip branches not processed (e.g., trunk)
 		}
 
 		// Log reparenting if it happened
 		if result.Reparented {
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
+			isCurrent := branchName == currentBranchName
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branch.Name, isCurrent),
+				tui.ColorBranchName(branchName, isCurrent),
 				tui.ColorBranchName(result.OldParent, false),
 				tui.ColorBranchName(result.NewParent, false))
 		}
@@ -47,52 +104,29 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			} else {
 				parentName = parent.Name
 			}
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
+			isCurrent := branchName == currentBranchName
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branch.Name, isCurrent),
+				tui.ColorBranchName(branchName, isCurrent),
 				tui.ColorBranchName(parentName, false))
 		case engine.RestackConflict:
-			// Persist continuation state with remaining branches
-			currentBranch := eng.CurrentBranch()
-			currentBranchName := ""
-			if currentBranch != nil {
-				currentBranchName = currentBranch.Name
-			}
-			// Convert remaining branches to []string for continuation state
-			remainingBranchNames := make([]string, len(branches[i+1:]))
-			for j, b := range branches[i+1:] {
-				remainingBranchNames[j] = b.Name
-			}
-			continuation := &config.ContinuationState{
-				BranchesToRestack:     remainingBranchNames, // Remaining branches
-				RebasedBranchBase:     result.RebasedBranchBase,
-				CurrentBranchOverride: currentBranchName,
-			}
-
-			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
-				return fmt.Errorf("failed to persist continuation: %w", err)
-			}
-
-			// Print conflict status
-			if err := PrintConflictStatus(ctx, branch.Name, splog); err != nil {
-				return fmt.Errorf("failed to print conflict status: %w", err)
-			}
-
-			return fmt.Errorf("hit conflict restacking %s", branch.Name)
+			// This should not happen since conflicts are handled at the batch level
+			return fmt.Errorf("unexpected conflict in batch result for branch %s", branchName)
 		case engine.RestackUnneeded:
-			parent := eng.GetParent(branch)
-			parentName := ""
-			if parent == nil {
-				parentName = eng.Trunk().Name
+			if branch.IsTrunk() {
+				splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
 			} else {
-				parentName = parent.Name
+				parent := eng.GetParent(branch)
+				parentName := ""
+				if parent == nil {
+					parentName = eng.Trunk().Name
+				} else {
+					parentName = parent.Name
+				}
+				isCurrent := branchName == currentBranchName
+				splog.Info("%s does not need to be restacked on %s.",
+					tui.ColorBranchName(branchName, isCurrent),
+					tui.ColorBranchName(parentName, false))
 			}
-			currentBranch := eng.CurrentBranch()
-			isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
-			splog.Info("%s does not need to be restacked on %s.",
-				tui.ColorBranchName(branch.Name, isCurrent),
-				tui.ColorBranchName(parentName, false))
 		}
 	}
 

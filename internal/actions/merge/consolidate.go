@@ -334,15 +334,22 @@ func (c *ConsolidateMergeExecutor) restackRemainingBranches(ctx context.Context)
 		return err
 	}
 
-	for _, upstackBranch := range c.plan.UpstackBranches {
-		branch := c.engine.GetBranch(upstackBranch)
-		if result, err := c.engine.RestackBranch(ctx, branch); err != nil {
-			if result.Result == engine.RestackConflict {
-				c.splog.Warn("Conflict restacking %s - manual resolution needed", upstackBranch)
-			} else {
-				return fmt.Errorf("failed to restack %s: %w", upstackBranch, err)
-			}
+	if len(c.plan.UpstackBranches) == 0 {
+		return nil
+	}
+
+	branches := make([]engine.Branch, len(c.plan.UpstackBranches))
+	for i, name := range c.plan.UpstackBranches {
+		branches[i] = c.engine.GetBranch(name)
+	}
+
+	batchResult, err := c.engine.RestackBranches(ctx, branches)
+	if err != nil {
+		if batchResult.ConflictBranch != "" {
+			c.splog.Warn("Conflict restacking %s - manual resolution needed", batchResult.ConflictBranch)
+			return nil // Don't fail the whole cleanup for a conflict
 		}
+		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 
 	return nil

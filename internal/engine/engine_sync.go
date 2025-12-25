@@ -86,9 +86,15 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	return nil
 }
 
-// RestackBranch rebases a branch onto its parent
+// restackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
-func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackBranchResult, error) {
+func (e *engineImpl) restackBranch(
+	ctx context.Context,
+	branch Branch,
+	metaMap map[string]*git.Meta,
+	revMap map[string]string,
+	rebuildAfterRestack bool,
+) (RestackBranchResult, error) {
 	branchName := branch.Name
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
@@ -116,7 +122,7 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 
 	// Check if parent needs reparenting (merged, deleted, or has MERGED PR state)
 	e.mu.RLock()
-	needsReparent := e.shouldReparentBranch(ctx, parent)
+	needsReparent := e.shouldReparentBranch(ctx, parent, metaMap)
 	e.mu.RUnlock()
 
 	if needsReparent {
@@ -124,7 +130,7 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 
 		// Find nearest valid ancestor
 		e.mu.RLock()
-		newParent := e.findNearestValidAncestor(ctx, branchName)
+		newParent := e.findNearestValidAncestor(ctx, branchName, metaMap)
 		e.mu.RUnlock()
 
 		// Reparent to the nearest valid ancestor
@@ -133,17 +139,44 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 		}
 		parent = newParent
 		reparented = true
+
+		// Update the cached metadata if we're using a metaMap, otherwise the subsequent
+		// write will overwrite the parent change.
+		if metaMap != nil {
+			if updatedMeta, err := git.ReadMetadataRef(branchName); err == nil {
+				metaMap[branchName] = updatedMeta
+			}
+		}
 	}
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
 	parentBranch := e.GetBranch(parent)
-	parentRev, err := parentBranch.GetRevision()
-	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
+	var parentRev string
+	var err error
+	if revMap != nil {
+		parentRev = revMap[parent]
+	}
+	if parentRev == "" {
+		parentRev, err = parentBranch.GetRevision()
+		if err != nil {
+			return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
+		}
 	}
 
-	// Check if branch needs restacking
-	if branch.IsBranchUpToDate() {
+	// Get metadata (read once to avoid duplicate disk I/O)
+	var meta *git.Meta
+	if metaMap != nil {
+		meta = metaMap[branchName]
+	}
+	if meta == nil {
+		meta, err = git.ReadMetadataRef(branchName)
+		if err != nil {
+			return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
+		}
+	}
+
+	// Check if branch needs restacking using cached metadata
+	if meta.ParentBranchRevision != nil && *meta.ParentBranchRevision == parentRev {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
 			RebasedBranchBase: parentRev,
@@ -153,15 +186,20 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 		}, nil
 	}
 
-	// Get old parent revision from metadata
-	meta, err := git.ReadMetadataRef(branchName)
-	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
-	}
-
 	oldParentRev := parentRev
 	if meta.ParentBranchRevision != nil {
 		oldParentRev = *meta.ParentBranchRevision
+	}
+
+	// If parent hasn't changed, no need to restack (early exit before expensive operations)
+	if parentRev == oldParentRev {
+		return RestackBranchResult{
+			Result:            RestackUnneeded,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, nil
 	}
 
 	// RESILIENCY: If oldParentRev is no longer an ancestor of branchName,
@@ -180,7 +218,7 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 		}
 	}
 
-	// If parent hasn't changed, no need to restack
+	// Check again after resiliency logic - parent might still be unchanged
 	if parentRev == oldParentRev {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
@@ -225,15 +263,9 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 		}, fmt.Errorf("failed to update metadata: %w", err)
 	}
 
-	// Rebuild to refresh cache
-	if err := e.rebuild(); err != nil {
-		return RestackBranchResult{
-			Result:            RestackDone,
-			RebasedBranchBase: parentRev,
-			Reparented:        reparented,
-			OldParent:         oldParent,
-			NewParent:         parent,
-		}, fmt.Errorf("failed to rebuild after restack: %w", err)
+	// Update cache incrementally if requested (much faster than full rebuild)
+	if rebuildAfterRestack {
+		e.updateBranchInCache(branchName)
 	}
 
 	return RestackBranchResult{
@@ -245,13 +277,67 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch) (RestackB
 	}, nil
 }
 
-// RestackBranches restacks multiple branches in order
+// RestackBranches implements a hybrid batch approach for performance:
+// 1. Collect all data required for the restack (in bulk)
+// 2. Process branches using individual restackBranch calls with deferred rebuilds
+// 3. Final cache rebuild
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
+	// 1. Collect all the data required for the restack (in bulk)
+	branchNames := make([]string, len(branches))
+	for i, b := range branches {
+		branchNames[i] = b.Name
+	}
+
+	// Identify all potential parents and ancestors to fetch their metadata and revisions too
+	e.mu.RLock()
+	allInvolvedBranches := make(map[string]bool)
+	for _, name := range branchNames {
+		allInvolvedBranches[name] = true
+		// Crawl up the parent map to find all ancestors
+		current := name
+		for {
+			parent, ok := e.parentMap[current]
+			if !ok || parent == e.trunk || allInvolvedBranches[parent] {
+				break
+			}
+			allInvolvedBranches[parent] = true
+			current = parent
+		}
+	}
+	// Also include trunk
+	involvedBranchNames := make([]string, 0, len(allInvolvedBranches)+1)
+	for name := range allInvolvedBranches {
+		involvedBranchNames = append(involvedBranchNames, name)
+	}
+	involvedBranchNames = append(involvedBranchNames, e.trunk)
+	e.mu.RUnlock()
+
+	// Fetch ALL metadata in parallel
+	allMeta, _ := git.BatchReadMetadataRefs(involvedBranchNames)
+
+	// Fetch ALL revisions in parallel
+	allRevisions, _ := git.BatchGetRevisions(involvedBranchNames)
+
+	// 2. Apply the restack changes
 	results := make(map[string]RestackBranchResult)
+	needsRebuild := false
+
 	for i, branch := range branches {
 		branchName := branch.Name
-		result, err := e.RestackBranch(ctx, branch)
+		result, err := e.restackBranch(ctx, branch, allMeta, allRevisions, false) // Don't rebuild after each branch
 		results[branchName] = result
+
+		if err == nil && (result.Result == RestackDone || result.Result == RestackUnneeded) {
+			// Update the revision map with the current SHA of the branch.
+			// This is important because subsequent branches in the batch might
+			// use this branch as their parent.
+			if currentSha, err := git.GetRevision(branchName); err == nil {
+				if allRevisions == nil {
+					allRevisions = make(map[string]string)
+				}
+				allRevisions[branchName] = currentSha
+			}
+		}
 
 		if err != nil {
 			// Convert remaining branches to []string for RestackBatchResult
@@ -279,6 +365,22 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 				RemainingBranches: remainingBranchNames,
 				Results:           results,
 			}, nil
+		}
+
+		if result.Result == RestackDone {
+			needsRebuild = true
+		}
+	}
+
+	// 3. Collect the results
+	// (results map already contains the results)
+
+	// Single rebuild at the end if any branches were restacked
+	if needsRebuild {
+		if err := e.rebuild(); err != nil {
+			return RestackBatchResult{
+				Results: results,
+			}, fmt.Errorf("failed to rebuild after batch restack: %w", err)
 		}
 	}
 

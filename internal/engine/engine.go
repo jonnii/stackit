@@ -26,7 +26,6 @@ type SyncManager interface {
 	// Sync operations
 	PullTrunk(ctx context.Context) (PullResult, error)
 	ResetTrunkToRemote(ctx context.Context) error
-	RestackBranch(ctx context.Context, branch Branch) (RestackBranchResult, error)
 	RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error)
 	ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error)
 }

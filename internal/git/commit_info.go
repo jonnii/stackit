@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -306,4 +307,34 @@ func GetCommitHistorySHAs(branchName string) ([]string, error) {
 	}
 
 	return shas, nil
+}
+
+// BatchGetRevisions gets SHA revisions for multiple branches in parallel
+// Returns a map of branchName -> SHA, with errors collected separately
+func BatchGetRevisions(branchNames []string) (map[string]string, []error) {
+	results := make(map[string]string)
+	var errors []error
+	resultsMu := sync.Mutex{}
+	errorsMu := sync.Mutex{}
+	var wg sync.WaitGroup
+
+	for _, branchName := range branchNames {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			sha, err := GetRevision(name)
+			resultsMu.Lock()
+			if err != nil {
+				errorsMu.Lock()
+				errors = append(errors, fmt.Errorf("failed to get revision for %s: %w", name, err))
+				errorsMu.Unlock()
+			} else {
+				results[name] = sha
+			}
+			resultsMu.Unlock()
+		}(branchName)
+	}
+
+	wg.Wait()
+	return results, errors
 }

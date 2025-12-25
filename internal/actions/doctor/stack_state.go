@@ -67,13 +67,18 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	}
 
 	// Check for corrupted metadata
-	corruptedCount := 0
+	metadataRefNames := make([]string, 0, len(metadataRefs))
 	for branchName := range metadataRefs {
-		meta, err := git.ReadMetadataRef(branchName)
-		if err != nil {
+		metadataRefNames = append(metadataRefNames, branchName)
+	}
+	allMeta, allMetaErrs := git.BatchReadMetadataRefs(metadataRefNames)
+
+	corruptedCount := 0
+	for _, branchName := range metadataRefNames {
+		if err := allMetaErrs[branchName]; err != nil {
 			corruptedCount++
 			errors = append(errors, fmt.Sprintf("corrupted metadata for branch '%s': %v", branchName, err))
-		} else if meta != nil {
+		} else if meta := allMeta[branchName]; meta != nil {
 			// Validate that if parent is set, it's not empty
 			if meta.ParentBranchName != nil && *meta.ParentBranchName == "" {
 				corruptedCount++

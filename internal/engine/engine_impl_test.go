@@ -433,7 +433,7 @@ func indexOf(slice []string, item string) int {
 	return -1
 }
 
-func TestRestackBranch(t *testing.T) {
+func TestRestackBranches(t *testing.T) {
 	t.Run("restacks branch when parent has moved", func(t *testing.T) {
 		s := scenario.NewScenario(t, testhelpers.BasicSceneSetup).
 			WithStack(map[string]string{
@@ -447,9 +447,9 @@ func TestRestackBranch(t *testing.T) {
 
 		// Restack branch1 (should rebase onto new main)
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		batchResult, err := s.Engine.RestackBranches(context.Background(), []engine.Branch{branch1})
 		require.NoError(t, err)
-		require.Equal(t, engine.RestackDone, result.Result)
+		require.Equal(t, engine.RestackDone, batchResult.Results["branch1"].Result)
 
 		// Verify branch1 is now fixed
 		require.True(t, s.Engine.GetBranch("branch1").IsBranchUpToDate())
@@ -463,9 +463,9 @@ func TestRestackBranch(t *testing.T) {
 
 		// Branch is already fixed (no changes to main)
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		batchResult, err := s.Engine.RestackBranches(context.Background(), []engine.Branch{branch1})
 		require.NoError(t, err)
-		require.Equal(t, engine.RestackUnneeded, result.Result)
+		require.Equal(t, engine.RestackUnneeded, batchResult.Results["branch1"].Result)
 	})
 
 	t.Run("auto-tracks branch when branch is not tracked", func(t *testing.T) {
@@ -474,12 +474,12 @@ func TestRestackBranch(t *testing.T) {
 			Commit("branch1 change")
 
 		// Don't track the branch explicitly
-		// RestackBranch should auto-discover parent (main) and succeed
+		// RestackBranches should auto-discover parent (main) and succeed
 		// In this case, main is still at the fork point, so FindMostRecentTrackedAncestors finds it.
 		branch1 := s.Engine.GetBranch("branch1")
-		result, err := s.Engine.RestackBranch(context.Background(), branch1)
+		batchResult, err := s.Engine.RestackBranches(context.Background(), []engine.Branch{branch1})
 		require.NoError(t, err)
-		require.Equal(t, engine.RestackUnneeded, result.Result)
+		require.Equal(t, engine.RestackUnneeded, batchResult.Results["branch1"].Result)
 
 		// Verify it is now tracked
 		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
@@ -1154,7 +1154,7 @@ func TestSetParentScenarios(t *testing.T) {
 		// 4. Rebase branch1 onto main (changing its SHA)
 		s.Checkout("branch1")
 		branch1 := s.Engine.GetBranch("branch1")
-		s.Engine.RestackBranch(context.Background(), branch1)
+		_, _ = s.Engine.RestackBranches(context.Background(), []engine.Branch{branch1})
 		branch1NewSHA, _ := s.Engine.GetBranch("branch1").GetRevision()
 		require.NotEqual(t, branch1OriginalSHA, branch1NewSHA)
 

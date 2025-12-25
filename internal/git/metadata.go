@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 )
 
 const (
@@ -144,4 +145,34 @@ func RenameMetadataRef(oldBranchName, newBranchName string) error {
 	}
 
 	return nil
+}
+
+// BatchReadMetadataRefs reads metadata for multiple branches in parallel
+// Returns a map of branchName -> *Meta and a map of branchName -> error for failed reads
+func BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, map[string]error) {
+	results := make(map[string]*Meta)
+	errs := make(map[string]error)
+	resultsMu := sync.Mutex{}
+	errsMu := sync.Mutex{}
+	var wg sync.WaitGroup
+
+	for _, branchName := range branchNames {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			meta, err := ReadMetadataRef(name)
+			if err != nil {
+				errsMu.Lock()
+				errs[name] = err
+				errsMu.Unlock()
+				return
+			}
+			resultsMu.Lock()
+			results[name] = meta
+			resultsMu.Unlock()
+		}(branchName)
+	}
+
+	wg.Wait()
+	return results, errs
 }

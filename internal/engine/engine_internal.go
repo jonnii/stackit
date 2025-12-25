@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -36,40 +35,17 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	e.scopeMap = make(map[string]string)
 
 	// Load metadata for each branch in parallel
-	type branchMeta struct {
-		name string
-		meta *git.Meta
-	}
-	metaChan := make(chan branchMeta, len(branches))
-	var wg sync.WaitGroup
-
-	for _, branchName := range branches {
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-			meta, err := git.ReadMetadataRef(name)
-			if err != nil {
-				return
-			}
-			metaChan <- branchMeta{name: name, meta: meta}
-		}(branchName)
-	}
-
-	// Close channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(metaChan)
-	}()
+	allMeta, _ := git.BatchReadMetadataRefs(branches)
 
 	// Collect results and populate maps sequentially to avoid lock contention/races
-	for bm := range metaChan {
-		if bm.meta.ParentBranchName != nil {
-			parent := *bm.meta.ParentBranchName
-			e.parentMap[bm.name] = parent
-			e.childrenMap[parent] = append(e.childrenMap[parent], bm.name)
+	for name, meta := range allMeta {
+		if meta.ParentBranchName != nil {
+			parent := *meta.ParentBranchName
+			e.parentMap[name] = parent
+			e.childrenMap[parent] = append(e.childrenMap[parent], name)
 		}
-		if bm.meta.Scope != nil {
-			e.scopeMap[bm.name] = *bm.meta.Scope
+		if meta.Scope != nil {
+			e.scopeMap[name] = *meta.Scope
 		}
 	}
 
@@ -79,6 +55,78 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	}
 
 	return nil
+}
+
+// updateBranchInCache updates the cache for a specific branch after restack/metadata changes
+func (e *engineImpl) updateBranchInCache(branchName string) {
+	// Read metadata for this branch
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		// If metadata doesn't exist, remove branch from all maps
+		if oldParent, exists := e.parentMap[branchName]; exists {
+			delete(e.parentMap, branchName)
+			// Remove from old parent's children list
+			if children, ok := e.childrenMap[oldParent]; ok {
+				for i, child := range children {
+					if child == branchName {
+						e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
+						break
+					}
+				}
+				// Remove empty children lists
+				if len(e.childrenMap[oldParent]) == 0 {
+					delete(e.childrenMap, oldParent)
+				}
+			}
+		}
+		delete(e.scopeMap, branchName)
+	}
+
+	// Get the old parent before updating
+	oldParent := e.parentMap[branchName]
+
+	// Update parent map
+	if meta.ParentBranchName != nil {
+		e.parentMap[branchName] = *meta.ParentBranchName
+	} else {
+		delete(e.parentMap, branchName)
+	}
+
+	// Update scope map
+	if meta.Scope != nil {
+		e.scopeMap[branchName] = *meta.Scope
+	} else {
+		delete(e.scopeMap, branchName)
+	}
+
+	// Update children map - remove from old parent, add to new parent
+	newParent := ""
+	if meta.ParentBranchName != nil {
+		newParent = *meta.ParentBranchName
+	}
+
+	// Remove from old parent's children if parent changed
+	if oldParent != "" && oldParent != newParent {
+		if children, ok := e.childrenMap[oldParent]; ok {
+			for i, child := range children {
+				if child == branchName {
+					e.childrenMap[oldParent] = append(children[:i], children[i+1:]...)
+					break
+				}
+			}
+			// Remove empty children lists
+			if len(e.childrenMap[oldParent]) == 0 {
+				delete(e.childrenMap, oldParent)
+			}
+		}
+	}
+
+	// Add to new parent's children if it has a parent
+	if newParent != "" {
+		e.childrenMap[newParent] = append(e.childrenMap[newParent], branchName)
+		// Sort for deterministic traversal
+		sort.Strings(e.childrenMap[newParent])
+	}
 }
 
 // rebuild loads all branches and their metadata from Git
@@ -94,7 +142,7 @@ func (e *engineImpl) rebuild() error {
 // - No longer exists locally
 // - Has been merged into trunk
 // - Has a "MERGED" PR state in metadata
-func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string) bool {
+func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string, metaMap map[string]*git.Meta) bool {
 	// Check if parent is trunk (no need to reparent)
 	if parentBranchName == e.trunk {
 		return false
@@ -119,6 +167,17 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has "MERGED" PR state in metadata
+	if metaMap != nil {
+		if meta, ok := metaMap[parentBranchName]; ok && meta != nil && meta.PrInfo != nil {
+			if meta.PrInfo.State != nil && *meta.PrInfo.State == "MERGED" {
+				return true
+			}
+			// If metadata exists but state isn't MERGED, we don't need to check further
+			return false
+		}
+	}
+
+	// Fall back to engine cache/disk if not in metaMap or state unknown
 	prInfo, err := e.GetPrInfo(parentBranchName)
 	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
 		return true
@@ -129,11 +188,11 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 
 // findNearestValidAncestor finds the nearest ancestor that hasn't been merged/deleted
 // Returns trunk if all ancestors have been merged
-func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string) string {
+func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string, metaMap map[string]*git.Meta) string {
 	current := e.parentMap[branchName]
 
 	for current != "" && current != e.trunk {
-		if !e.shouldReparentBranch(ctx, current) {
+		if !e.shouldReparentBranch(ctx, current, metaMap) {
 			return current
 		}
 		// Move to the next parent

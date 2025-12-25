@@ -482,10 +482,11 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		}
 
 	case StepRestack:
-		// Restack the branch - RestackBranch will automatically handle reparenting
+		// Restack the branch - RestackBranches will automatically handle reparenting
 		// if the parent has been merged/deleted
 		branch := eng.GetBranch(step.BranchName)
-		result, err := eng.RestackBranch(ctx, branch)
+		batchResult, err := eng.RestackBranches(ctx, []engine.Branch{branch})
+		result := batchResult.Results[step.BranchName]
 		if err != nil {
 			return fmt.Errorf("failed to restack: %w", err)
 		}

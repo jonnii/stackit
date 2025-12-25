@@ -126,6 +126,13 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		metadataRefs = make(map[string]string)
 	}
 
+	// Collect all metadata in bulk
+	branchNames := make([]string, len(allBranches))
+	for i, b := range allBranches {
+		branchNames[i] = b.Name
+	}
+	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
+
 	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
 	for _, branch := range allBranches {
@@ -137,21 +144,20 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get SHA
-		branch := eng.GetBranch(branchName)
-		sha, err := branch.GetRevision()
+		branchObj := eng.GetBranch(branchName)
+		sha, err := branchObj.GetRevision()
 		if err == nil {
 			branchInfo.SHA = sha
 		}
 
 		// Get parent
-		parent := eng.GetParent(branch)
+		parent := eng.GetParent(branchObj)
 		if parent != nil {
 			branchInfo.Parent = parent.Name
 		}
 
 		// Get children
-		branch = eng.GetBranch(branchName)
-		children := branch.GetChildren()
+		children := branchObj.GetChildren()
 		if len(children) > 0 {
 			childNames := make([]string, len(children))
 			for i, c := range children {
@@ -161,8 +167,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 
 		// Get metadata
-		meta, err := git.ReadMetadataRef(branchName)
-		if err == nil && meta != nil {
+		if meta, ok := allMeta[branchName]; ok && meta != nil {
 			if meta.ParentBranchRevision != nil {
 				branchInfo.ParentRevision = *meta.ParentBranchRevision
 			}

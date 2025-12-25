@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "echo 'Linting temporarily disabled due to Next.js 16 + ESLint compatibility issues'"
+    "lint": "echo 'Linting temporarily disabled'"
   },
   "dependencies": {
     "next": "16.1.1",
@@ -18,7 +18,7 @@
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^8",
+    "eslint": "^9.39.2",
     "eslint-config-next": "16.1.1",
     "typescript": "^5"
   }

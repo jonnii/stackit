@@ -170,7 +170,7 @@ website-build:
 
 # Run the website production server
 website-run: website-build
-	cd website && npm start
+	cd website && npx serve@latest out
 
 # Run the website in development mode with hot reload
 website-dev:

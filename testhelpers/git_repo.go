@@ -382,6 +382,35 @@ func (r *GitRepo) GetRevision(rev string) (string, error) {
 	return r.runGitCommandAndGetOutput("rev-parse", rev)
 }
 
+// GetCommitCount returns the number of commits between two refs.
+func (r *GitRepo) GetCommitCount(from, to string) (int, error) {
+	output, err := r.runGitCommandAndGetOutput("rev-list", "--count", from+".."+to)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	_, err = fmt.Sscanf(output, "%d", &count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse commit count: %w", err)
+	}
+	return count, nil
+}
+
+// GetBranchSHA returns the SHA of a branch.
+func (r *GitRepo) GetBranchSHA(branch string) (string, error) {
+	return r.GetRevision(branch)
+}
+
+// GetCurrentSHA returns the SHA of HEAD.
+func (r *GitRepo) GetCurrentSHA() (string, error) {
+	return r.GetRevision("HEAD")
+}
+
+// CheckoutDetached checks out a revision in detached HEAD state.
+func (r *GitRepo) CheckoutDetached(rev string) error {
+	return r.runGitCommand("checkout", "--detach", rev)
+}
+
 // HasUnstagedChanges checks if there are unstaged changes to tracked files.
 func (r *GitRepo) HasUnstagedChanges() (bool, error) {
 	output, err := r.runGitCommandAndGetOutput("diff", "--name-only")

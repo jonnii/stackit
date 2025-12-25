@@ -107,6 +107,8 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 			Default: true,
 		}
 		if err := survey.AskOne(prompt, &editMessage); err != nil {
+			// If user cancels, restore branch
+			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 			return nil, fmt.Errorf("canceled")
 		}
 
@@ -114,6 +116,8 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 			// Get message from user
 			msg, err := tui.OpenEditor(defaultCommitMessage, "COMMIT_EDITMSG-*")
 			if err != nil {
+				// If user cancels, restore branch
+				_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 				return nil, err
 			}
 			commitMessage = utils.CleanCommitMessage(msg)
@@ -121,15 +125,28 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 
 		// Create commit
 		if err := git.Commit(commitMessage, 0); err != nil {
+			// If user cancels, restore branch
+			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 			return nil, fmt.Errorf("failed to create commit: %w", err)
 		}
 
 		// Get branch name
 		branchName, err := promptBranchName(branchNames, branchToSplit, len(branchNames)+1, eng)
 		if err != nil {
+			// If user cancels, restore branch
+			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
 			return nil, err
 		}
 		branchNames = append(branchNames, branchName)
+	}
+
+	// Update branchToSplit to point to the last commit we created.
+	// This is necessary because ApplySplitToCommits will use this branch name
+	// to resolve commit SHAs using GetCommitSHA(branchToSplit, offset).
+	// Since we've been creating commits in detached HEAD on top of the parent,
+	// we need the original branch name to now point to the tip of our new commits.
+	if err := git.UpdateBranchRef(branchToSplit, "HEAD"); err != nil {
+		return nil, fmt.Errorf("failed to update branch reference: %w", err)
 	}
 
 	return &Result{

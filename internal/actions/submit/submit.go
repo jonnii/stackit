@@ -103,7 +103,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		for i, branchName := range branches {
 			branchObjects[i] = eng.GetBranch(branchName)
 		}
-		if err := actions.RestackBranches(context, branchObjects, eng, splog); err != nil {
+		if err := actions.RestackBranches(context, branchObjects, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack branches: %w", err)
 		}
 		ui.ShowRestackComplete()

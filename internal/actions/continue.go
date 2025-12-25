@@ -102,7 +102,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		for i, name := range continuation.BranchesToRestack {
 			branches[i] = eng.GetBranch(name)
 		}
-		if err := RestackBranches(ctx.Context, branches, eng, splog); err != nil {
+		if err := RestackBranches(ctx.Context, branches, eng, splog, ctx.RepoRoot); err != nil {
 			return err
 		}
 	}

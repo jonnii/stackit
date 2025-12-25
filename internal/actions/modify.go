@@ -124,7 +124,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(gctx, upstackBranches, eng, splog); err != nil {
+		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}
@@ -170,7 +170,7 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 
 	if len(upstackBranches) > 0 {
 		splog.Info("Restacking %d upstack branch(es)...", len(upstackBranches))
-		if err := RestackBranches(gctx, upstackBranches, eng, splog); err != nil {
+		if err := RestackBranches(gctx, upstackBranches, eng, splog, ctx.RepoRoot); err != nil {
 			return fmt.Errorf("failed to restack upstack branches: %w", err)
 		}
 	}

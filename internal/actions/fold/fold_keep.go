@@ -69,7 +69,7 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 		RecursiveParents:  false,
 	})
 
-	if err := actions.RestackBranches(gctx, branchesToRestack, eng, splog); err != nil {
+	if err := actions.RestackBranches(gctx, branchesToRestack, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -15,10 +16,33 @@ type Restacker interface {
 }
 
 // RestackBranches restacks a list of branches using the engine's batch restack method
-func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog) error {
+func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog, repoRoot string) error {
 	// Use the engine's optimized batch restack method
 	batchResult, err := eng.RestackBranches(ctx, branches)
 	if err != nil {
+		// Check if this is a conflict that needs continuation state
+		if batchResult.ConflictBranch != "" {
+			// Persist continuation state
+			currentBranch := eng.CurrentBranch()
+			currentBranchName := ""
+			if currentBranch != nil {
+				currentBranchName = currentBranch.Name
+			}
+			continuation := &config.ContinuationState{
+				BranchesToRestack:     batchResult.RemainingBranches,
+				RebasedBranchBase:     batchResult.RebasedBranchBase,
+				CurrentBranchOverride: currentBranchName,
+			}
+
+			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
+				return fmt.Errorf("failed to persist continuation: %w", err)
+			}
+
+			// Print conflict status
+			if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
+				return fmt.Errorf("failed to print conflict status: %w", err)
+			}
+		}
 		return fmt.Errorf("batch restack failed: %w", err)
 	}
 
@@ -36,8 +60,14 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			continue // Skip branches not processed (e.g., trunk)
 		}
 
-		// Log reparenting if it happened (batch version doesn't track this, so we skip for now)
-		// TODO: Consider adding reparenting info to RestackBatchResult if needed
+		// Log reparenting if it happened
+		if result.Reparented {
+			isCurrent := branchName == currentBranchName
+			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
+				tui.ColorBranchName(branchName, isCurrent),
+				tui.ColorBranchName(result.OldParent, false),
+				tui.ColorBranchName(result.NewParent, false))
+		}
 
 		switch result.Result {
 		case engine.RestackDone:
@@ -53,9 +83,8 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 				tui.ColorBranchName(branchName, isCurrent),
 				tui.ColorBranchName(parentName, false))
 		case engine.RestackConflict:
-			// This should have been handled by the batch method returning an error
-			// If we get here, it means there was a conflict but batch processing continued
-			return fmt.Errorf("unexpected conflict state for branch %s", branchName)
+			// This should not happen since conflicts are handled at the batch level
+			return fmt.Errorf("unexpected conflict in batch result for branch %s", branchName)
 		case engine.RestackUnneeded:
 			if branch.IsTrunk() {
 				splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))

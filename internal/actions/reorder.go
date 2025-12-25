@@ -116,7 +116,7 @@ func ReorderAction(ctx *runtime.Context) error {
 	})
 
 	// Restack all affected branches
-	if err := RestackBranches(gctx, affectedBranches, eng, splog); err != nil {
+	if err := RestackBranches(gctx, affectedBranches, eng, splog, ctx.RepoRoot); err != nil {
 		return fmt.Errorf("failed to restack branches: %w", err)
 	}
 

@@ -267,10 +267,19 @@ func TestSyncWorkflow(t *testing.T) {
 		err = git.InitDefaultRepo()
 		require.NoError(t, err)
 
+		// Batch read metadata for all individual branches at once
+		branchNames := []string{"branch-a", "branch-b", "branch-c"}
+		metas, readErrs := git.BatchReadMetadataRefs(branchNames)
+		for branch, readErr := range readErrs {
+			require.NoError(t, readErr, "failed to read metadata for %s", branch)
+		}
+
 		// Mark individual branches as merged
-		for i, branch := range []string{"branch-a", "branch-b", "branch-c"} {
-			meta, err := git.ReadMetadataRef(branch)
-			require.NoError(t, err)
+		for i, branch := range branchNames {
+			meta := metas[branch]
+			if meta == nil {
+				meta = &git.Meta{}
+			}
 			if meta.PrInfo == nil {
 				meta.PrInfo = &git.PrInfo{}
 			}
@@ -283,13 +292,6 @@ func TestSyncWorkflow(t *testing.T) {
 			err = git.WriteMetadataRef(branch, meta)
 			require.NoError(t, err)
 		}
-
-		// Initialize git package for metadata operations
-		err = os.Chdir(sh.Dir())
-		require.NoError(t, err)
-		git.ResetDefaultRepo()
-		err = git.InitDefaultRepo()
-		require.NoError(t, err)
 
 		// Track the consolidation branch (normally consolidation branches aren't tracked,
 		// but for the test to work with current clean_branches logic, we need to track it)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 
 	"stackit.dev/stackit/internal/git"
 )
@@ -36,40 +35,17 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	e.scopeMap = make(map[string]string)
 
 	// Load metadata for each branch in parallel
-	type branchMeta struct {
-		name string
-		meta *git.Meta
-	}
-	metaChan := make(chan branchMeta, len(branches))
-	var wg sync.WaitGroup
-
-	for _, branchName := range branches {
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-			meta, err := git.ReadMetadataRef(name)
-			if err != nil {
-				return
-			}
-			metaChan <- branchMeta{name: name, meta: meta}
-		}(branchName)
-	}
-
-	// Close channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(metaChan)
-	}()
+	allMeta, _ := git.BatchReadMetadataRefs(branches)
 
 	// Collect results and populate maps sequentially to avoid lock contention/races
-	for bm := range metaChan {
-		if bm.meta.ParentBranchName != nil {
-			parent := *bm.meta.ParentBranchName
-			e.parentMap[bm.name] = parent
-			e.childrenMap[parent] = append(e.childrenMap[parent], bm.name)
+	for name, meta := range allMeta {
+		if meta.ParentBranchName != nil {
+			parent := *meta.ParentBranchName
+			e.parentMap[name] = parent
+			e.childrenMap[parent] = append(e.childrenMap[parent], name)
 		}
-		if bm.meta.Scope != nil {
-			e.scopeMap[bm.name] = *bm.meta.Scope
+		if meta.Scope != nil {
+			e.scopeMap[name] = *meta.Scope
 		}
 	}
 

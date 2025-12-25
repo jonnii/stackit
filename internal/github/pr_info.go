@@ -47,6 +47,9 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		return nil //nolint:nilerr // Skip if can't create client
 	}
 
+	// Fetch all metadata in bulk first
+	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
+
 	// Fetch PR info for each branch in parallel
 	var wg sync.WaitGroup
 	for _, branchName := range branchNames {
@@ -59,9 +62,9 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 			}
 
 			if prInfo != nil {
-				// Update metadata
-				meta, err := git.ReadMetadataRef(name)
-				if err != nil {
+				// Use cached metadata or create new
+				meta, ok := allMeta[name]
+				if !ok || meta == nil {
 					meta = &git.Meta{}
 				}
 

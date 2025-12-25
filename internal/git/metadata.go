@@ -148,10 +148,12 @@ func RenameMetadataRef(oldBranchName, newBranchName string) error {
 }
 
 // BatchReadMetadataRefs reads metadata for multiple branches in parallel
-// Returns a map of branchName -> *Meta
-func BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, error) {
+// Returns a map of branchName -> *Meta and a map of branchName -> error for failed reads
+func BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, map[string]error) {
 	results := make(map[string]*Meta)
+	errs := make(map[string]error)
 	resultsMu := sync.Mutex{}
+	errsMu := sync.Mutex{}
 	var wg sync.WaitGroup
 
 	for _, branchName := range branchNames {
@@ -160,8 +162,9 @@ func BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, error) {
 			defer wg.Done()
 			meta, err := ReadMetadataRef(name)
 			if err != nil {
-				// For batch operations, we log errors but don't fail the whole operation
-				// This allows partial success for robustness
+				errsMu.Lock()
+				errs[name] = err
+				errsMu.Unlock()
 				return
 			}
 			resultsMu.Lock()
@@ -171,5 +174,5 @@ func BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, error) {
 	}
 
 	wg.Wait()
-	return results, nil
+	return results, errs
 }

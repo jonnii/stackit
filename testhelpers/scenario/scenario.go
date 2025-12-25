@@ -103,17 +103,29 @@ func (s *Scenario) RunGit(args ...string) *Scenario {
 // Checkout checks out a branch and rebuilds the engine.
 func (s *Scenario) Checkout(branch string) *Scenario {
 	s.T.Helper()
+	return s.CheckoutQuiet(branch).Rebuild()
+}
+
+// CheckoutQuiet checks out a branch without rebuilding the engine.
+func (s *Scenario) CheckoutQuiet(branch string) *Scenario {
+	s.T.Helper()
 	err := s.Scene.Repo.CheckoutBranch(branch)
 	require.NoError(s.T, err)
-	return s.Rebuild()
+	return s
 }
 
 // CreateBranch creates and checks out a new branch and rebuilds the engine.
 func (s *Scenario) CreateBranch(name string) *Scenario {
 	s.T.Helper()
+	return s.CreateBranchQuiet(name).Rebuild()
+}
+
+// CreateBranchQuiet creates and checks out a new branch without rebuilding the engine.
+func (s *Scenario) CreateBranchQuiet(name string) *Scenario {
+	s.T.Helper()
 	err := s.Scene.Repo.CreateAndCheckoutBranch(name)
 	require.NoError(s.T, err)
-	return s.Rebuild()
+	return s
 }
 
 // Rebuild refreshes the engine's internal state from the Git repository.
@@ -180,17 +192,15 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 				continue
 			}
 			if created[parent] {
-				// Create branch directly using Repo to avoid engine rebuilds
-				err := s.Scene.Repo.CheckoutBranch(parent)
-				require.NoError(s.T, err)
-				err = s.Scene.Repo.CreateAndCheckoutBranch(branch)
-				require.NoError(s.T, err)
-				err = s.Scene.Repo.CreateChangeAndCommit("change on "+branch, branch)
+				// Create branch without rebuilding engine
+				s.CheckoutQuiet(parent)
+				s.CreateBranchQuiet(branch)
+
+				err := s.Scene.Repo.CreateChangeAndCommit("change on "+branch, branch)
 				require.NoError(s.T, err)
 
-				// Track it directly using the engine (doesn't trigger full rebuild)
-				err = s.Engine.TrackBranch(context.Background(), branch, parent)
-				require.NoError(s.T, err)
+				// Track it
+				s.TrackBranch(branch, parent)
 
 				created[branch] = true
 				progress = true

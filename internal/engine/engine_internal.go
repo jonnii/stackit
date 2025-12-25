@@ -142,7 +142,7 @@ func (e *engineImpl) rebuild() error {
 // - No longer exists locally
 // - Has been merged into trunk
 // - Has a "MERGED" PR state in metadata
-func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string) bool {
+func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string, metaMap map[string]*git.Meta) bool {
 	// Check if parent is trunk (no need to reparent)
 	if parentBranchName == e.trunk {
 		return false
@@ -167,6 +167,17 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has "MERGED" PR state in metadata
+	if metaMap != nil {
+		if meta, ok := metaMap[parentBranchName]; ok && meta != nil && meta.PrInfo != nil {
+			if meta.PrInfo.State != nil && *meta.PrInfo.State == "MERGED" {
+				return true
+			}
+			// If metadata exists but state isn't MERGED, we don't need to check further
+			return false
+		}
+	}
+
+	// Fall back to engine cache/disk if not in metaMap or state unknown
 	prInfo, err := e.GetPrInfo(parentBranchName)
 	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
 		return true
@@ -177,11 +188,11 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 
 // findNearestValidAncestor finds the nearest ancestor that hasn't been merged/deleted
 // Returns trunk if all ancestors have been merged
-func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string) string {
+func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string, metaMap map[string]*git.Meta) string {
 	current := e.parentMap[branchName]
 
 	for current != "" && current != e.trunk {
-		if !e.shouldReparentBranch(ctx, current) {
+		if !e.shouldReparentBranch(ctx, current, metaMap) {
 			return current
 		}
 		// Move to the next parent

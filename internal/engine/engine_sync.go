@@ -122,7 +122,7 @@ func (e *engineImpl) restackBranch(
 
 	// Check if parent needs reparenting (merged, deleted, or has MERGED PR state)
 	e.mu.RLock()
-	needsReparent := e.shouldReparentBranch(ctx, parent)
+	needsReparent := e.shouldReparentBranch(ctx, parent, metaMap)
 	e.mu.RUnlock()
 
 	if needsReparent {
@@ -130,7 +130,7 @@ func (e *engineImpl) restackBranch(
 
 		// Find nearest valid ancestor
 		e.mu.RLock()
-		newParent := e.findNearestValidAncestor(ctx, branchName)
+		newParent := e.findNearestValidAncestor(ctx, branchName, metaMap)
 		e.mu.RUnlock()
 
 		// Reparent to the nearest valid ancestor
@@ -288,27 +288,35 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 		branchNames[i] = b.Name
 	}
 
-	// Fetch metadata in parallel
-	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
-
-	// Identify all potential parents to fetch their revisions too
-	branchesToFetchRev := make([]string, 0, len(branches)*2)
-	branchesToFetchRev = append(branchesToFetchRev, branchNames...)
-
+	// Identify all potential parents and ancestors to fetch their metadata and revisions too
 	e.mu.RLock()
+	allInvolvedBranches := make(map[string]bool)
 	for _, name := range branchNames {
-		if meta, ok := allMeta[name]; ok && meta.ParentBranchName != nil {
-			branchesToFetchRev = append(branchesToFetchRev, *meta.ParentBranchName)
-		} else if parent, ok := e.parentMap[name]; ok {
-			branchesToFetchRev = append(branchesToFetchRev, parent)
+		allInvolvedBranches[name] = true
+		// Crawl up the parent map to find all ancestors
+		current := name
+		for {
+			parent, ok := e.parentMap[current]
+			if !ok || parent == e.trunk || allInvolvedBranches[parent] {
+				break
+			}
+			allInvolvedBranches[parent] = true
+			current = parent
 		}
 	}
 	// Also include trunk
-	branchesToFetchRev = append(branchesToFetchRev, e.trunk)
+	involvedBranchNames := make([]string, 0, len(allInvolvedBranches)+1)
+	for name := range allInvolvedBranches {
+		involvedBranchNames = append(involvedBranchNames, name)
+	}
+	involvedBranchNames = append(involvedBranchNames, e.trunk)
 	e.mu.RUnlock()
 
-	// Fetch revisions in parallel
-	allRevisions, _ := git.BatchGetRevisions(branchesToFetchRev)
+	// Fetch ALL metadata in parallel
+	allMeta, _ := git.BatchReadMetadataRefs(involvedBranchNames)
+
+	// Fetch ALL revisions in parallel
+	allRevisions, _ := git.BatchGetRevisions(involvedBranchNames)
 
 	// 2. Apply the restack changes
 	results := make(map[string]RestackBranchResult)

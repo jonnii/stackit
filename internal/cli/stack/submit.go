@@ -76,7 +76,8 @@ func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
 	}
 
 	// Get config values
-	submitFooter, _ := config.GetSubmitFooter(ctx.RepoRoot)
+	cfg, _ := config.LoadConfig(ctx.RepoRoot)
+	submitFooter := cfg.SubmitFooter()
 
 	// Run submit action
 	opts := submit.Options{

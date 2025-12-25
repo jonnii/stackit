@@ -37,11 +37,12 @@ func NewScenario(t *testing.T, setup testhelpers.SceneSetup) *Scenario {
 	t.Setenv("STACKIT_NON_INTERACTIVE", "true")
 
 	scene := testhelpers.NewScene(t, setup)
-	trunk, _ := config.GetTrunk(scene.Dir)
+	cfg, _ := config.LoadConfig(scene.Dir)
+	trunk := cfg.Trunk()
 	if trunk == "" {
 		trunk = "main"
 	}
-	maxUndoDepth, _ := config.GetUndoStackDepth(scene.Dir)
+	maxUndoDepth := cfg.UndoStackDepth()
 	if maxUndoDepth <= 0 {
 		maxUndoDepth = engine.DefaultMaxUndoStackDepth
 	}

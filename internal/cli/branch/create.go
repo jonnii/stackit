@@ -44,7 +44,8 @@ If you have any unstaged changes, you will be asked whether you'd like to stage 
 			}
 
 			// Get config values
-			branchPattern, _ := config.GetBranchPattern(ctx.RepoRoot)
+			cfg, _ := config.LoadConfig(ctx.RepoRoot)
+			branchPattern := cfg.GetBranchPattern()
 
 			// Prepare options
 			opts := create.Options{

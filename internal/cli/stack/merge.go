@@ -66,7 +66,8 @@ If no flags are provided, an interactive wizard will guide you through the merge
 			}
 
 			// Get config values
-			undoStackDepth, _ := config.GetUndoStackDepth(ctx.RepoRoot)
+			cfg, _ := config.LoadConfig(ctx.RepoRoot)
+			undoStackDepth := cfg.UndoStackDepth()
 
 			// Create plan if scope is specified
 			var plan *merge.Plan
@@ -317,7 +318,8 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	}
 
 	// Get config values
-	undoStackDepth, _ := config.GetUndoStackDepth(ctx.RepoRoot)
+	cfg, _ := config.LoadConfig(ctx.RepoRoot)
+	undoStackDepth := cfg.UndoStackDepth()
 
 	// Execute the plan
 	mergeOpts := merge.Options{

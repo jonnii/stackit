@@ -149,6 +149,11 @@ func (c *Config) SetUndoStackDepth(depth int) {
 	c.data.UndoStackDepth = &depth
 }
 
+// GetBranchPattern returns the branch name pattern as a BranchPattern type
+func (c *Config) GetBranchPattern() BranchPattern {
+	return c.data.GetBranchPattern()
+}
+
 // RepoConfig represents the repository configuration
 type RepoConfig struct {
 	Trunk                      *string  `json:"trunk,omitempty"`

@@ -30,22 +30,16 @@ func TestSubmitCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize stackit
-		cmd := exec.Command(binaryPath, "init")
-		cmd.Dir = scene.Dir
-		initOutput, err := cmd.CombinedOutput()
+		initOutput, err := testhelpers.RunCLICommand(t, binaryPath, scene.Dir, "init")
 		require.NoError(t, err, "init failed: %s", string(initOutput))
 
 		// Create a stack: main -> branch1 -> branch2 (current)
 		// Use stackit create which automatically tracks the parent relationship
-		cmd = exec.Command(binaryPath, "create", "branch1")
-		cmd.Dir = scene.Dir
-		createOutput, err := cmd.CombinedOutput()
+		createOutput, err := testhelpers.RunCLICommand(t, binaryPath, scene.Dir, "create", "branch1")
 		require.NoError(t, err, "create branch1 failed: %s", string(createOutput))
 
 		// Create branch2 from branch1 (which is now current)
-		cmd = exec.Command(binaryPath, "create", "branch2")
-		cmd.Dir = scene.Dir
-		createOutput2, err := cmd.CombinedOutput()
+		createOutput2, err := testhelpers.RunCLICommand(t, binaryPath, scene.Dir, "create", "branch2")
 		require.NoError(t, err, "create branch2 failed: %s", string(createOutput2))
 
 		// Verify we're on branch2
@@ -54,10 +48,7 @@ func TestSubmitCommand(t *testing.T) {
 		require.Equal(t, "branch2", currentBranch)
 
 		// Run submit command with --dry-run, --no-edit, and --draft to avoid interactive prompts
-		cmd = exec.Command(binaryPath, "submit", "--dry-run", "--no-edit", "--draft")
-		cmd.Dir = scene.Dir
-		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
-		output, err := cmd.CombinedOutput()
+		output, err := testhelpers.RunCLICommand(t, binaryPath, scene.Dir, "submit", "--dry-run", "--no-edit", "--draft")
 
 		// Should succeed
 		require.NoError(t, err, "submit command failed: %s", string(output))

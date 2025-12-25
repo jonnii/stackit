@@ -100,14 +100,12 @@ func NewContextAuto(ctx context.Context, repoRoot string) (*Context, error) {
 	}
 
 	// Read config and create engine options
-	trunk, err := config.GetTrunk(repoRoot)
+	cfg, err := config.LoadConfig(repoRoot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trunk: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
-	maxUndoDepth, err := config.GetUndoStackDepth(repoRoot)
-	if err != nil {
-		maxUndoDepth = engine.DefaultMaxUndoStackDepth
-	}
+	trunk := cfg.Trunk()
+	maxUndoDepth := cfg.UndoStackDepth()
 
 	// Create real engine
 	eng, err := engine.NewEngine(engine.Options{
@@ -151,7 +149,11 @@ func GetContext(ctx context.Context) (*Context, error) {
 	}
 
 	// Check if initialized
-	if !config.IsInitialized(repoRoot) {
+	cfg, err := config.LoadConfig(repoRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	if !cfg.IsInitialized() {
 		return nil, fmt.Errorf("stackit not initialized. Run 'stackit init' first")
 	}
 

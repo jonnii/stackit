@@ -75,8 +75,17 @@ func handleAddTrunk(repoRoot string, trunkName string) error {
 	}
 
 	// Add the trunk
-	if err := config.AddTrunk(repoRoot, trunkName); err != nil {
+	cfg, err := config.LoadConfig(repoRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	if err := cfg.AddTrunk(trunkName); err != nil {
 		return err
+	}
+
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	splog := tui.NewSplog()
@@ -86,13 +95,15 @@ func handleAddTrunk(repoRoot string, trunkName string) error {
 
 // handleShowAllTrunks shows all configured trunk branches
 func handleShowAllTrunks(repoRoot string) error {
-	trunks, err := config.GetAllTrunks(repoRoot)
+	cfg, err := config.LoadConfig(repoRoot)
 	if err != nil {
-		return fmt.Errorf("failed to get trunks: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	trunks := cfg.AllTrunks()
+
 	// Get primary trunk to mark it
-	primaryTrunk, _ := config.GetTrunk(repoRoot)
+	primaryTrunk := cfg.Trunk()
 
 	for _, trunk := range trunks {
 		if trunk == primaryTrunk {
@@ -133,10 +144,11 @@ func handleShowTrunk(ctx *runtime.Context) error {
 // findTrunkForBranch walks up the parent chain to find the trunk
 func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) string {
 	// Get all configured trunks
-	trunks, err := config.GetAllTrunks(repoRoot)
+	cfg, err := config.LoadConfig(repoRoot)
 	if err != nil {
 		return eng.Trunk().Name
 	}
+	trunks := cfg.AllTrunks()
 
 	// Walk up the parent chain
 	currentBranch := eng.GetBranch(branchName)

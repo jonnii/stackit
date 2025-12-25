@@ -83,7 +83,8 @@ func EnsureInitialized(ctx context.Context) (string, error) {
 	}
 
 	// Auto-initialize if not initialized
-	if !config.IsInitialized(repoRoot) {
+	cfg, _ := config.LoadConfig(repoRoot)
+	if !cfg.IsInitialized() {
 		splog := tui.NewSplog()
 		splog.Info("Stackit has not been initialized, attempting to setup now...")
 
@@ -114,7 +115,8 @@ func EnsureInitialized(ctx context.Context) (string, error) {
 			}
 		}
 
-		if err := config.SetTrunk(repoRoot, trunkName); err != nil {
+		cfg.SetTrunk(trunkName)
+		if err := cfg.Save(); err != nil {
 			return "", fmt.Errorf("failed to initialize: %w", err)
 		}
 	}
@@ -145,6 +147,12 @@ func newInitCmd() *cobra.Command {
 			repoRoot, err := git.GetRepoRoot()
 			if err != nil {
 				return fmt.Errorf("failed to get repo root: %w", err)
+			}
+
+			// Load config
+			cfg, err := config.LoadConfig(repoRoot)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
 
 			// Get all branch names
@@ -188,10 +196,11 @@ func newInitCmd() *cobra.Command {
 			}
 
 			// Check if already initialized
-			wasInitialized := config.IsInitialized(repoRoot)
+			wasInitialized := cfg.IsInitialized()
 
 			// Set trunk in config
-			if err := config.SetTrunk(repoRoot, trunkName); err != nil {
+			cfg.SetTrunk(trunkName)
+			if err := cfg.Save(); err != nil {
 				return fmt.Errorf("failed to write config: %w", err)
 			}
 
@@ -208,10 +217,7 @@ func newInitCmd() *cobra.Command {
 			splog.Info("Trunk set to %s", coloredTrunk)
 
 			// Read config for engine options
-			maxUndoDepth, err := config.GetUndoStackDepth(repoRoot)
-			if err != nil {
-				maxUndoDepth = engine.DefaultMaxUndoStackDepth
-			}
+			maxUndoDepth := cfg.UndoStackDepth()
 
 			// Create engine and perform reset/rebuild
 			eng, err := engine.NewEngine(engine.Options{

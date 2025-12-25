@@ -89,6 +89,16 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 // RestackBranch rebases a branch onto its parent
 // If the parent has been merged/deleted, it will automatically reparent to the nearest valid ancestor
 func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAfterRestack bool) (RestackBranchResult, error) {
+	return e.restackBranchInternal(ctx, branch, nil, nil, rebuildAfterRestack)
+}
+
+func (e *engineImpl) restackBranchInternal(
+	ctx context.Context,
+	branch Branch,
+	metaMap map[string]*git.Meta,
+	revMap map[string]string,
+	rebuildAfterRestack bool,
+) (RestackBranchResult, error) {
 	branchName := branch.Name
 	e.mu.RLock()
 	parent, ok := e.parentMap[branchName]
@@ -137,15 +147,28 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 
 	// Get parent revision (needed for rebasedBranchBase even if restack is unneeded)
 	parentBranch := e.GetBranch(parent)
-	parentRev, err := parentBranch.GetRevision()
-	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
+	var parentRev string
+	var err error
+	if revMap != nil {
+		parentRev = revMap[parent]
+	}
+	if parentRev == "" {
+		parentRev, err = parentBranch.GetRevision()
+		if err != nil {
+			return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
+		}
 	}
 
 	// Get metadata (read once to avoid duplicate disk I/O)
-	meta, err := git.ReadMetadataRef(branchName)
-	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
+	var meta *git.Meta
+	if metaMap != nil {
+		meta = metaMap[branchName]
+	}
+	if meta == nil {
+		meta, err = git.ReadMetadataRef(branchName)
+		if err != nil {
+			return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
+		}
 	}
 
 	// Check if branch needs restacking using cached metadata
@@ -251,17 +274,58 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 }
 
 // RestackBranches implements a hybrid batch approach for performance:
-// 1. Collect data in bulk (metadata, parent revisions)
+// 1. Collect all data required for the restack (in bulk)
 // 2. Process branches using individual RestackBranch calls with deferred rebuilds
 // 3. Final cache rebuild
 func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error) {
+	// 1. Collect all the data required for the restack (in bulk)
+	branchNames := make([]string, len(branches))
+	for i, b := range branches {
+		branchNames[i] = b.Name
+	}
+
+	// Fetch metadata in parallel
+	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
+
+	// Identify all potential parents to fetch their revisions too
+	branchesToFetchRev := make([]string, 0, len(branches)*2)
+	branchesToFetchRev = append(branchesToFetchRev, branchNames...)
+
+	e.mu.RLock()
+	for _, name := range branchNames {
+		if meta, ok := allMeta[name]; ok && meta.ParentBranchName != nil {
+			branchesToFetchRev = append(branchesToFetchRev, *meta.ParentBranchName)
+		} else if parent, ok := e.parentMap[name]; ok {
+			branchesToFetchRev = append(branchesToFetchRev, parent)
+		}
+	}
+	// Also include trunk
+	branchesToFetchRev = append(branchesToFetchRev, e.trunk)
+	e.mu.RUnlock()
+
+	// Fetch revisions in parallel
+	allRevisions, _ := git.BatchGetRevisions(branchesToFetchRev)
+
+	// 2. Apply the restack changes
 	results := make(map[string]RestackBranchResult)
 	needsRebuild := false
 
 	for i, branch := range branches {
 		branchName := branch.Name
-		result, err := e.RestackBranch(ctx, branch, false) // Don't rebuild after each branch
+		result, err := e.restackBranchInternal(ctx, branch, allMeta, allRevisions, false) // Don't rebuild after each branch
 		results[branchName] = result
+
+		if err == nil && (result.Result == RestackDone || result.Result == RestackUnneeded) {
+			// Update the revision map with the current SHA of the branch.
+			// This is important because subsequent branches in the batch might
+			// use this branch as their parent.
+			if currentSha, err := git.GetRevision(branchName); err == nil {
+				if allRevisions == nil {
+					allRevisions = make(map[string]string)
+				}
+				allRevisions[branchName] = currentSha
+			}
+		}
 
 		if err != nil {
 			// Convert remaining branches to []string for RestackBatchResult
@@ -295,6 +359,9 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 			needsRebuild = true
 		}
 	}
+
+	// 3. Collect the results
+	// (results map already contains the results)
 
 	// Single rebuild at the end if any branches were restacked
 	if needsRebuild {

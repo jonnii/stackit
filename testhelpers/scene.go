@@ -11,12 +11,12 @@ import (
 )
 
 var (
-	minimalTemplateDir string
-	minimalTemplateErr error
+	minimalTemplateDir  string
+	minimalTemplateErr  error
 	minimalTemplateOnce sync.Once
 
-	basicTemplateDir string
-	basicTemplateErr error
+	basicTemplateDir  string
+	basicTemplateErr  error
 	basicTemplateOnce sync.Once
 )
 
@@ -47,7 +47,7 @@ func getMinimalTemplate(t *testing.T) string {
 func getBasicTemplate(t *testing.T) string {
 	basicTemplateOnce.Do(func() {
 		minimalDir := getMinimalTemplate(t)
-		
+
 		dir, err := os.MkdirTemp("", "stackit-test-basic-template-*")
 		if err != nil {
 			basicTemplateErr = fmt.Errorf("failed to create basic template dir: %w", err)
@@ -110,7 +110,7 @@ func NewScene(t *testing.T, setup SceneSetup) *Scene {
 	// Initialize Git repository
 	var repo *GitRepo
 	isBasicSetup := false
-	
+
 	// Determine which template to use
 	if setup != nil && fmt.Sprintf("%p", setup) == fmt.Sprintf("%p", BasicSceneSetup) {
 		templateDir := getBasicTemplate(t)

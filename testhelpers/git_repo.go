@@ -35,13 +35,14 @@ func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 		return repo, nil
 	}
 
-	if options.repoURL != "" {
+	switch {
+	case options.repoURL != "":
 		// Clone repository
 		cmd := exec.Command("git", "clone", options.repoURL, dir)
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("failed to clone repo: %w", err)
 		}
-	} else if options.templatePath != "" {
+	case options.templatePath != "":
 		// Clone from template using --local for speed
 		cmd := exec.Command("git", "clone", "--local", options.templatePath, dir)
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
@@ -53,7 +54,7 @@ func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 		// as it points to the template directory and will interfere with tests
 		// that want to set up their own remotes.
 		_ = repo.runGitCommand("remote", "remove", "origin")
-	} else {
+	default:
 		// Initialize new repository with optimized config
 		// Use git -c flags to avoid reading global config and set local configs
 		cmd := exec.Command("git", "-c", "init.defaultBranch=main", "-c", "core.autocrlf=false", "-c", "core.fileMode=false", "init", dir, "-b", "main")

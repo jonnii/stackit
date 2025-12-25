@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	configtui "stackit.dev/stackit/internal/tui/config"
 )
 
 // newConfigCmd creates the config command
@@ -49,7 +50,7 @@ Examples:
 			}
 
 			// Otherwise, show interactive TUI
-			return actions.ConfigTUIAction(repoRoot)
+			return configtui.TUIAction(repoRoot)
 		},
 	}
 
@@ -80,19 +81,16 @@ func newConfigGetCmd() *cobra.Command {
 			}
 
 			key := args[0]
+			cfg, err := config.LoadConfig(repoRoot)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			switch key {
 			case "branch.pattern":
-				pattern, err := config.GetBranchNamePattern(repoRoot)
-				if err != nil {
-					return fmt.Errorf("failed to get branch.pattern: %w", err)
-				}
-				fmt.Println(pattern)
+				fmt.Println(cfg.BranchNamePattern())
 			case "submit.footer":
-				enabled, err := config.GetSubmitFooter(repoRoot)
-				if err != nil {
-					return fmt.Errorf("failed to get submit.footer: %w", err)
-				}
-				fmt.Println(enabled)
+				fmt.Println(cfg.SubmitFooter())
 			default:
 				return fmt.Errorf("unknown configuration key: %s", key)
 			}
@@ -125,12 +123,20 @@ func newConfigSetCmd() *cobra.Command {
 			key := args[0]
 			value := args[1]
 
+			cfg, err := config.LoadConfig(repoRoot)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			splog := tui.NewSplog()
 
 			switch key {
 			case "branch.pattern":
-				if err := config.SetBranchNamePattern(repoRoot, value); err != nil {
+				if err := cfg.SetBranchNamePattern(value); err != nil {
 					return fmt.Errorf("failed to set branch.pattern: %w", err)
+				}
+				if err := cfg.Save(); err != nil {
+					return fmt.Errorf("failed to save config: %w", err)
 				}
 				splog.Info("Set branch.pattern to: %s", value)
 			case "submit.footer":
@@ -138,8 +144,9 @@ func newConfigSetCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("invalid value for submit.footer: %s (must be 'true' or 'false')", value)
 				}
-				if err := config.SetSubmitFooter(repoRoot, enabled); err != nil {
-					return fmt.Errorf("failed to set submit.footer: %w", err)
+				cfg.SetSubmitFooter(enabled)
+				if err := cfg.Save(); err != nil {
+					return fmt.Errorf("failed to save config: %w", err)
 				}
 				splog.Info("Set submit.footer to: %v", enabled)
 			default:

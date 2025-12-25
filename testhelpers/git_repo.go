@@ -17,31 +17,59 @@ type GitRepo struct {
 	UserConfigPath string
 }
 
-// NewGitRepo creates a new Git repository in the specified directory.
-// If opts.ExistingRepo is true, it assumes the repo already exists.
-// If opts.RepoURL is provided, it clones the repository instead of initializing.
-func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
+// NewGitRepo initializes a new Git repository in the specified directory using 'git init'.
+func NewGitRepo(dir string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{})
+}
+
+// NewGitRepoFromTemplate clones a repository from a local template using 'git clone --local'.
+func NewGitRepoFromTemplate(dir string, templatePath string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{templatePath: templatePath})
+}
+
+// NewGitRepoFromURL clones a repository from a remote URL.
+func NewGitRepoFromURL(dir string, repoURL string) (*GitRepo, error) {
+	return newGitRepoInternal(dir, &gitRepoOptions{repoURL: repoURL})
+}
+
+// gitRepoOptions holds options for creating a GitRepo.
+type gitRepoOptions struct {
+	existingRepo bool
+	repoURL      string
+	templatePath string
+}
+
+// newGitRepoInternal is the internal implementation for creating a GitRepo.
+func newGitRepoInternal(dir string, options *gitRepoOptions) (*GitRepo, error) {
 	repo := &GitRepo{
 		Dir:            dir,
 		UserConfigPath: filepath.Join(dir, ".git", ".stackit_user_config"),
-	}
-
-	options := &gitRepoOptions{}
-	for _, opt := range opts {
-		opt(options)
 	}
 
 	if options.existingRepo {
 		return repo, nil
 	}
 
-	if options.repoURL != "" {
+	switch {
+	case options.repoURL != "":
 		// Clone repository
 		cmd := exec.Command("git", "clone", options.repoURL, dir)
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("failed to clone repo: %w", err)
 		}
-	} else {
+	case options.templatePath != "":
+		// Clone from template using --local for speed
+		cmd := exec.Command("git", "clone", "--local", options.templatePath, dir)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("failed to clone from template: %w", err)
+		}
+
+		// Remove the 'origin' remote that git clone automatically creates
+		// as it points to the template directory and will interfere with tests
+		// that want to set up their own remotes.
+		_ = repo.runGitCommand("remote", "remove", "origin")
+	default:
 		// Initialize new repository with optimized config
 		// Use git -c flags to avoid reading global config and set local configs
 		cmd := exec.Command("git", "-c", "init.defaultBranch=main", "-c", "core.autocrlf=false", "-c", "core.fileMode=false", "init", dir, "-b", "main")
@@ -60,29 +88,6 @@ func NewGitRepo(dir string, opts ...GitRepoOption) (*GitRepo, error) {
 	}
 
 	return repo, nil
-}
-
-// gitRepoOptions holds options for creating a GitRepo.
-type gitRepoOptions struct {
-	existingRepo bool
-	repoURL      string
-}
-
-// GitRepoOption is a function that configures GitRepo creation.
-type GitRepoOption func(*gitRepoOptions)
-
-// WithExistingRepo indicates the repository already exists.
-func WithExistingRepo() GitRepoOption {
-	return func(opts *gitRepoOptions) {
-		opts.existingRepo = true
-	}
-}
-
-// WithRepoURL specifies a URL to clone from.
-func WithRepoURL(url string) GitRepoOption {
-	return func(opts *gitRepoOptions) {
-		opts.repoURL = url
-	}
 }
 
 // runGitCommand executes a git command in the repository directory.

@@ -142,8 +142,14 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to get parent revision: %w", err)
 	}
 
-	// Check if branch needs restacking
-	if branch.IsBranchUpToDate() {
+	// Get metadata (read once to avoid duplicate disk I/O)
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	// Check if branch needs restacking using cached metadata
+	if meta.ParentBranchRevision != nil && *meta.ParentBranchRevision == parentRev {
 		return RestackBranchResult{
 			Result:            RestackUnneeded,
 			RebasedBranchBase: parentRev,
@@ -151,12 +157,6 @@ func (e *engineImpl) RestackBranch(ctx context.Context, branch Branch, rebuildAf
 			OldParent:         oldParent,
 			NewParent:         parent,
 		}, nil
-	}
-
-	// Get old parent revision from metadata
-	meta, err := git.ReadMetadataRef(branchName)
-	if err != nil {
-		return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
 	}
 
 	oldParentRev := parentRev

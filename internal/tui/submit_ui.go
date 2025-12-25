@@ -38,6 +38,12 @@ type SubmitUI interface {
 	// UpdateSubmitItem updates status during submission
 	UpdateSubmitItem(branchName string, status string, url string, err error)
 
+	// Pause suspends the UI (for interactive prompts)
+	Pause()
+
+	// Resume resumes the UI
+	Resume()
+
 	// Complete finalizes and shows summary
 	Complete()
 }
@@ -187,6 +193,12 @@ func (u *SimpleSubmitUI) UpdateSubmitItem(branchName string, status string, url 
 	u.items[itemIdx].Error = err
 }
 
+// Pause is a no-op for simple UI
+func (u *SimpleSubmitUI) Pause() {}
+
+// Resume is a no-op for simple UI
+func (u *SimpleSubmitUI) Resume() {}
+
 // Complete finalizes the display and shows a summary
 func (u *SimpleSubmitUI) Complete() {
 	u.mu.Lock()
@@ -210,11 +222,33 @@ type TTYSubmitUI struct {
 	program       *tea.Program
 	model         *ttySubmitModel
 	inSubmitPhase bool
+	mu            sync.Mutex
 }
 
 // NewTTYSubmitUI creates a new TTY submit UI
 func NewTTYSubmitUI(splog *Splog) *TTYSubmitUI {
 	return &TTYSubmitUI{splog: splog}
+}
+
+func (u *TTYSubmitUI) ensureProgramStarted() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	if u.program != nil {
+		return
+	}
+
+	// Quiet the splog so it doesn't interfere with the TUI
+	u.splog.SetQuiet(true)
+
+	u.program = tea.NewProgram(u.model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+
+	// Run program in background
+	go func() {
+		if _, err := u.program.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error running submit TUI: %v\n", err)
+		}
+	}()
 }
 
 // ShowStack displays the branch stack being submitted
@@ -223,21 +257,13 @@ func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) 
 	u.model.renderer = renderer
 	u.model.rootBranch = rootBranch
 
-	// Print the stack once initially
-	lines := renderer.RenderStack(rootBranch, TreeRenderOptions{})
-	for _, line := range lines {
-		u.splog.Info("%s", line)
-	}
-	u.splog.Newline()
+	u.ensureProgramStarted()
 }
 
 // ShowRestackStart indicates the start of the restack process
 func (u *TTYSubmitUI) ShowRestackStart() {
-	if u.program != nil {
-		u.program.Send(globalMessageMsg("Restacking branches..."))
-	} else {
-		u.splog.Info("Restacking branches before submitting...")
-	}
+	u.ensureProgramStarted()
+	u.program.Send(globalMessageMsg("Restacking branches..."))
 }
 
 // ShowRestackComplete indicates the completion of the restack process
@@ -249,74 +275,34 @@ func (u *TTYSubmitUI) ShowRestackComplete() {
 
 // ShowPreparing indicates the preparation phase
 func (u *TTYSubmitUI) ShowPreparing() {
-	if u.program != nil {
-		u.program.Send(globalMessageMsg("Preparing branches..."))
-	} else {
-		u.splog.Info("Preparing branches...")
-	}
+	u.ensureProgramStarted()
+	u.program.Send(globalMessageMsg("Preparing branches..."))
 }
 
 // ShowBranchPlan indicates the action planned for a branch
 func (u *TTYSubmitUI) ShowBranchPlan(branchName string, action string, isCurrent bool, skip bool, skipReason string) {
-	if u.program != nil {
-		u.program.Send(planUpdateMsg{
-			branchName: branchName,
-			action:     action,
-			isCurrent:  isCurrent,
-			skip:       skip,
-			skipReason: skipReason,
-		})
-	} else {
-		// Update model items so they are ready when the program starts
-		found := false
-		for i, item := range u.model.items {
-			if item.BranchName == branchName {
-				u.model.items[i].Action = action
-				u.model.items[i].IsSkipped = skip
-				u.model.items[i].SkipReason = skipReason
-				found = true
-				break
-			}
-		}
-		if !found {
-			u.model.items = append(u.model.items, SubmitItem{
-				BranchName: branchName,
-				Action:     action,
-				IsSkipped:  skip,
-				SkipReason: skipReason,
-				Status:     "pending",
-			})
-		}
-
-		// Only show if skipping (important info)
-		if skip {
-			displayName := branchName
-			if isCurrent {
-				displayName = branchName + " (current)"
-			}
-			u.splog.Info("  ▸ %s %s", ColorDim(displayName), ColorDim("— "+skipReason))
-		}
-	}
+	u.ensureProgramStarted()
+	u.program.Send(planUpdateMsg{
+		branchName: branchName,
+		action:     action,
+		isCurrent:  isCurrent,
+		skip:       skip,
+		skipReason: skipReason,
+	})
 }
 
 // ShowNoChanges indicates no changes were detected
 func (u *TTYSubmitUI) ShowNoChanges() {
-	if u.program != nil {
-		u.program.Send(globalMessageMsg("All PRs up to date."))
-		u.program.Send(progressCompleteMsg{})
-	} else {
-		u.splog.Info("All PRs up to date.")
-	}
+	u.ensureProgramStarted()
+	u.program.Send(globalMessageMsg("All PRs up to date."))
+	u.program.Send(progressCompleteMsg{})
 }
 
 // ShowDryRunComplete indicates completion of a dry run
 func (u *TTYSubmitUI) ShowDryRunComplete() {
-	if u.program != nil {
-		u.program.Send(globalMessageMsg("Dry run complete."))
-		u.program.Send(progressCompleteMsg{})
-	} else {
-		u.splog.Info("Dry run complete.")
-	}
+	u.ensureProgramStarted()
+	u.program.Send(globalMessageMsg("Dry run complete."))
+	u.program.Send(progressCompleteMsg{})
 }
 
 // StartSubmitting begins the actual submission phase
@@ -340,16 +326,7 @@ func (u *TTYSubmitUI) StartSubmitting(items []SubmitItem) {
 		}
 	}
 
-	// Start the program now that we're past the potential interactive phase
-	u.program = tea.NewProgram(u.model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
-
-	// Run program in background
-	go func() {
-		if _, err := u.program.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running submit TUI: %v\n", err)
-		}
-	}()
-
+	u.ensureProgramStarted()
 	u.program.Send(globalMessageMsg("Submitting..."))
 }
 
@@ -364,6 +341,22 @@ func (u *TTYSubmitUI) UpdateSubmitItem(branchName string, status string, url str
 		url:        url,
 		err:        err,
 	})
+}
+
+// Pause suspends the UI for interactive prompts
+func (u *TTYSubmitUI) Pause() {
+	if u.program != nil {
+		_ = u.program.ReleaseTerminal()
+		u.splog.SetQuiet(false)
+	}
+}
+
+// Resume resumes the UI after interactive prompts
+func (u *TTYSubmitUI) Resume() {
+	if u.program != nil {
+		u.splog.SetQuiet(true)
+		_ = u.program.RestoreTerminal()
+	}
 }
 
 // Complete finalizes the display and shows a summary
@@ -383,6 +376,7 @@ func (u *TTYSubmitUI) Complete() {
 
 	u.program.Wait()
 	u.program = nil
+	u.splog.SetQuiet(false)
 }
 
 // ============================================================================
@@ -532,6 +526,11 @@ func (m *ttySubmitModel) View() string {
 		statusError      = "error"
 	)
 
+	if m.globalMessage != "" {
+		b.WriteString(m.styles.dimStyle.Render(m.globalMessage))
+		b.WriteString("\n\n")
+	}
+
 	if m.renderer != nil {
 		// Update annotations based on items
 		for _, item := range m.items {
@@ -610,11 +609,6 @@ func (m *ttySubmitModel) View() string {
 				b.WriteString("\n")
 			}
 		}
-	}
-
-	if m.globalMessage != "" {
-		b.WriteString("\n\n")
-		b.WriteString(m.styles.dimStyle.Render(m.globalMessage))
 	}
 
 	if m.done {

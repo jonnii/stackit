@@ -27,7 +27,7 @@ func TestReadMetadataRef(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize git repo
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// No metadata exists yet - ReadMetadataRef returns empty meta, not error
@@ -50,7 +50,7 @@ func TestReadMetadataRef(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize git repo
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// Get actual parent revision
@@ -91,7 +91,7 @@ func TestWriteMetadataRef(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize git repo
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// Get actual parent revision
@@ -130,7 +130,7 @@ func TestDeleteMetadataRef(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize git repo
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// Write metadata
@@ -173,7 +173,7 @@ func TestGetMetadataRefList(t *testing.T) {
 		require.NoError(t, err)
 
 		// Initialize git repo
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// Write metadata for both branches

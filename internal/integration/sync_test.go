@@ -265,11 +265,17 @@ func TestSyncWorkflow(t *testing.T) {
 		}
 
 		// Mark individual branches as merged
+<<<<<<< HEAD
 		for i, branch := range branchNames {
 			meta := metas[branch]
 			if meta == nil {
 				meta = &git.Meta{}
 			}
+=======
+		for i, branch := range []string{"branch-a", "branch-b", "branch-c"} {
+			meta, err := git.ReadMetadataRefInDir(sh.Dir(), branch)
+			require.NoError(t, err)
+>>>>>>> ce7c76cb (refactor: run tests in parallel more often)
 			if meta.PrInfo == nil {
 				meta.PrInfo = &git.PrInfo{}
 			}

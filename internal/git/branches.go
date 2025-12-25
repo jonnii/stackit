@@ -10,6 +10,9 @@ import (
 var (
 	defaultRepo   *Repository
 	defaultRepoMu sync.RWMutex
+	// goGitMu synchronizes go-git operations that access packfiles to prevent
+	// "concurrent map iteration and map write" panics
+	goGitMu sync.Mutex
 )
 
 // InitDefaultRepo initializes the default repository from the current directory

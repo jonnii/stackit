@@ -139,6 +139,10 @@ func GetCommitDiff(commitSHA, parentSHA string) (string, error) {
 		return "", fmt.Errorf("failed to resolve commit: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	c1, err := repo.CommitObject(h1)
 	if err != nil {
 		return "", fmt.Errorf("failed to get parent commit: %w", err)
@@ -168,6 +172,10 @@ func GetParentCommitSHA(commitSHA string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve commit: %w", err)
 	}
+
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
 
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
@@ -445,6 +453,10 @@ func GetCommitMessage(commitSHA string) (string, error) {
 		return "", fmt.Errorf("failed to resolve commit: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit: %w", err)
@@ -471,6 +483,10 @@ func GetCommitAuthorFromSHA(commitSHA string) (*CommitAuthor, error) {
 		return nil, fmt.Errorf("failed to resolve commit: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit: %w", err)
@@ -493,6 +509,10 @@ func GetCommitDateFromSHA(commitSHA string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to resolve commit: %w", err)
 	}
+
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
 
 	commit, err := repo.CommitObject(hash)
 	if err != nil {

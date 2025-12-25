@@ -21,6 +21,10 @@ func GetCommitDate(branchName string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("failed to resolve branch reference: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get commit: %w", err)
@@ -83,6 +87,10 @@ func GetRemoteRevision(branchName string) (string, error) {
 // iterateCommits iterates commits from head to base (exclusive of base)
 // Returns commits in order from head to base (newest first)
 func iterateCommits(repo *Repository, headHash, baseHash plumbing.Hash) ([]*object.Commit, error) {
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	var commits []*object.Commit
 	visited := make(map[plumbing.Hash]bool)
 

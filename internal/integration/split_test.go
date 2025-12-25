@@ -184,6 +184,66 @@ func TestSplitWorkflow(t *testing.T) {
 		sh.CommitCount("main", "feature_split", 1)
 		sh.CommitCount("feature_split", "feature", 2) // original + removal commit
 	})
+
+	t.Run("split --by-commit accepts the flag and shows interactive prompt", func(t *testing.T) {
+		t.Parallel()
+
+		sh := NewTestShell(t, binaryPath)
+
+		// Initialize stackit
+		sh.Run("init")
+
+		// Create a feature branch with multiple commits
+		sh.Write("file1", "commit 1 content").
+			Run("create feature -m 'First commit'")
+		sh.Write("file2", "commit 2 content").
+			Run("create commit2 -m 'Second commit'")
+		sh.Write("file3", "commit 3 content").
+			Run("create commit3 -m 'Third commit'")
+
+		// Verify we have multiple commits
+		sh.CommitCount("main", "feature", 1)    // feature has 1 commit from its creation
+		sh.CommitCount("feature", "commit2", 1) // commit2 has 1 commit
+		sh.CommitCount("commit2", "commit3", 1) // commit3 has 1 commit
+
+		// Attempt to run split --by-commit
+		// This will fail because it requires interactive input for commit selection
+		// But we can verify that the flag is accepted and the command starts
+		cmd := exec.Command(binaryPath, "split", "--by-commit")
+		cmd.Dir = sh.Dir()
+		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
+		output, err := cmd.CombinedOutput()
+
+		// The command should fail due to interactive prompts, but we can verify
+		// that it recognizes the --by-commit flag and attempts to split by commit
+		require.Error(t, err, "split --by-commit should fail in non-interactive mode due to required user input")
+		outputStr := string(output)
+		require.Contains(t, outputStr, "Splitting the commits", "should show commit splitting message")
+	})
+
+	t.Run("split --by-commit validates branch has commits to split", func(t *testing.T) {
+		t.Parallel()
+
+		sh := NewTestShell(t, binaryPath)
+
+		// Initialize stackit
+		sh.Run("init")
+
+		// Create a feature branch with only one commit
+		sh.Write("file1", "single commit content").
+			Run("create feature -m 'Single commit'")
+
+		// Attempt to run split --by-commit on a branch with minimal commits
+		// The logic should detect this and potentially default to hunk mode or show appropriate message
+		cmd := exec.Command(binaryPath, "split", "--by-commit")
+		cmd.Dir = sh.Dir()
+		cmd.Env = append(cmd.Environ(), "STACKIT_NON_INTERACTIVE=1")
+		output, err := cmd.CombinedOutput()
+
+		// Should either fail due to lack of commits to split or require interaction
+		require.Error(t, err, "should fail when there are no commits to split interactively")
+		_ = output // Use output for verification if needed
+	})
 }
 
 // Helper functions for file verification

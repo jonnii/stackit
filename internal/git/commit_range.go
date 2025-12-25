@@ -83,6 +83,10 @@ func GetCommitSHA(branchName string, offset int) (string, error) {
 		return "", fmt.Errorf("failed to get branch reference: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit, err := repo.CommitObject(branchRef.Hash())
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit: %w", err)

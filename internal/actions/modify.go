@@ -34,7 +34,7 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 	splog := ctx.Splog
 	gctx := ctx.Context
 
-	currentBranch, err := utils.ValidateOnBranch(ctx)
+	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}

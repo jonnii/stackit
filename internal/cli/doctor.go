@@ -31,7 +31,8 @@ The doctor command checks:
 			}
 
 			// Get config values
-			trunk, _ := config.GetTrunk(ctx.RepoRoot)
+			cfg, _ := config.LoadConfig(ctx.RepoRoot)
+			trunk := cfg.Trunk()
 
 			// Run doctor action
 			return doctor.Action(ctx, doctor.Options{

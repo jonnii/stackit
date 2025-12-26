@@ -19,12 +19,29 @@ func NewLogCmd() *cobra.Command {
 		Short:        "Log all branches tracked by Stackit, showing dependencies and info for each",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeLog(cmd, f, "FULL")
+			return executeLog(cmd, f, "NORMAL")
 		},
 	}
 
 	addLogFlags(cmd, f)
 
+	// Add subcommands
+	cmd.AddCommand(newLogFullCmd())
+
+	return cmd
+}
+
+func newLogFullCmd() *cobra.Command {
+	f := &logFlags{}
+	cmd := &cobra.Command{
+		Use:          "full",
+		Short:        "Log branches with GitHub state (PR status, CI checks)",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return executeLog(cmd, f, "FULL")
+		},
+	}
+	addLogFlags(cmd, f)
 	return cmd
 }
 

@@ -65,6 +65,7 @@ func NewDemoEngine() *Engine {
 	for _, b := range GetDemoBranches() {
 		e.parentMap[b.Name] = b.Parent
 		e.childrenMap[b.Parent] = append(e.childrenMap[b.Parent], b.Name)
+		e.scopeMap[b.Name] = b.Scope
 
 		// Build PR info
 		num := b.PRNumber
@@ -277,6 +278,26 @@ func (e *Engine) GetCommitAuthorInternal(_ string) (string, error) {
 func (e *Engine) GetRevisionInternal(branchName string) (string, error) {
 	// Return fake SHA based on branch name
 	return fmt.Sprintf("abc%x123", len(branchName)), nil
+}
+
+// GetCommitCountInternal returns a fake commit count in the demo engine
+func (e *Engine) GetCommitCountInternal(branchName string) (int, error) {
+	for _, b := range GetDemoBranches() {
+		if b.Name == branchName {
+			return b.Commits, nil
+		}
+	}
+	return 0, nil
+}
+
+// GetDiffStatsInternal returns fake diff stats in the demo engine
+func (e *Engine) GetDiffStatsInternal(branchName string) (int, int, error) {
+	for _, b := range GetDemoBranches() {
+		if b.Name == branchName {
+			return b.Added, b.Deleted, nil
+		}
+	}
+	return 0, 0, nil
 }
 
 // FindBranchForCommit returns the current branch in the demo engine

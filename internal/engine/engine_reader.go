@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"strings"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -255,6 +256,108 @@ func (e *engineImpl) GetCommitAuthorInternal(branchName string) (string, error) 
 // GetRevisionInternal returns the SHA of a branch
 func (e *engineImpl) GetRevisionInternal(branchName string) (string, error) {
 	return git.GetRevision(branchName)
+}
+
+// GetCommitCountInternal returns the number of commits for a branch
+func (e *engineImpl) GetCommitCountInternal(branchName string) (int, error) {
+	e.mu.RLock()
+	trunk := e.trunk
+	parent, ok := e.parentMap[branchName]
+	e.mu.RUnlock()
+
+	if !ok {
+		parent = trunk
+	}
+
+	// Get base revision (stored parent revision)
+	meta, err := git.ReadMetadataRef(branchName)
+	var base string
+	if err == nil && meta.ParentBranchRevision != nil {
+		base = *meta.ParentBranchRevision
+	} else {
+		// Fallback to current parent branch tip if metadata is missing
+		baseRev, err := git.GetRevision(parent)
+		if err != nil {
+			return 0, err
+		}
+		base = baseRev
+	}
+
+	branchRev, err := git.GetRevision(branchName)
+	if err != nil {
+		return 0, err
+	}
+
+	// If revisions are same, count is 0
+	if branchRev == base {
+		return 0, nil
+	}
+
+	// For real git, we'd use a git helper. I'll use git.GetCommitRange count.
+	commits, err := e.GetAllCommitsInternal(branchName, CommitFormatSHA)
+	if err != nil {
+		return 0, err
+	}
+	return len(commits), nil
+}
+
+// GetDiffStatsInternal returns diff stats for a branch
+func (e *engineImpl) GetDiffStatsInternal(branchName string) (int, int, error) {
+	e.mu.RLock()
+	trunk := e.trunk
+	parent, ok := e.parentMap[branchName]
+	e.mu.RUnlock()
+
+	if !ok {
+		parent = trunk
+	}
+
+	// Get base revision (stored parent revision)
+	meta, err := git.ReadMetadataRef(branchName)
+	var base string
+	if err == nil && meta.ParentBranchRevision != nil {
+		base = *meta.ParentBranchRevision
+	} else {
+		baseRev, err := git.GetRevision(parent)
+		if err != nil {
+			return 0, 0, err
+		}
+		base = baseRev
+	}
+
+	branchRev, err := git.GetRevision(branchName)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// If revisions are same, stats are 0
+	if branchRev == base {
+		return 0, 0, nil
+	}
+
+	// Use git diff --numstat
+	output, err := git.RunGitCommand("diff", "--numstat", base, branchRev)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	added, deleted := 0, 0
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			var a, d int
+			fmt.Sscanf(fields[0], "%d", &a)
+			fmt.Sscanf(fields[1], "%d", &d)
+			added += a
+			deleted += d
+		}
+	}
+
+	return added, deleted, nil
 }
 
 // BranchMatchesRemote checks if a branch matches its remote

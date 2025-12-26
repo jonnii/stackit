@@ -13,19 +13,24 @@ type Branch struct {
 	PRTitle  string
 	IsDraft  bool
 	Checks   string // PASSING, FAILING, PENDING, NONE
+	Commits  int
+	Added    int
+	Deleted  int
+	Scope    string
 }
 
 // Demo stack structure - branching stack with no upstack from current branch
 //
 // main
-// ├── feature/auth-base (#101)
-// │   ├── feature/auth-validation (#102)
-// │   │   └── feature/auth-login (#103) ← current
-// │   └── feature/auth-oauth (#105)
-// │       └── feature/auth-oauth-google (#106)
-// └── feature/api-refactor (#107)
+// ├── feature/auth-base (#101) [AUTH]
+// │   ├── feature/auth-validation (#102) [AUTH]
+// │   │   └── feature/auth-login (#103) [AUTH] ← current
+// │   └── feature/auth-oauth (#105) [AUTH]
+// │       └── feature/auth-oauth-google (#106) [AUTH]
+// └── feature/api-refactor (#107) [API]
 //
-//	└── feature/api-v2 (#108)
+//	└── feature/api-v2 (#108) [API]
+
 var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-base",
@@ -35,6 +40,10 @@ var demoBranches = []Branch{
 		PRTitle:  "Add authentication base module",
 		IsDraft:  false,
 		Checks:   "PASSING",
+		Commits:  3,
+		Added:    150,
+		Deleted:  10,
+		Scope:    "AUTH",
 	},
 	{
 		Name:     "feature/auth-validation",
@@ -44,6 +53,10 @@ var demoBranches = []Branch{
 		PRTitle:  "Add input validation for auth",
 		IsDraft:  false,
 		Checks:   "PASSING",
+		Commits:  2,
+		Added:    50,
+		Deleted:  5,
+		Scope:    "AUTH",
 	},
 	{
 		Name:     "feature/auth-login",
@@ -53,15 +66,23 @@ var demoBranches = []Branch{
 		PRTitle:  "Implement login flow",
 		IsDraft:  false,
 		Checks:   "PASSING",
+		Commits:  5,
+		Added:    200,
+		Deleted:  20,
+		Scope:    "AUTH",
 	},
 	{
 		Name:     "feature/auth-oauth",
 		Parent:   "feature/auth-base",
 		PRNumber: 105,
-		PRState:  "OPEN",
+		PRState:  "MERGED",
 		PRTitle:  "Add OAuth support",
 		IsDraft:  false,
 		Checks:   "PASSING",
+		Commits:  1,
+		Added:    30,
+		Deleted:  2,
+		Scope:    "AUTH",
 	},
 	{
 		Name:     "feature/auth-oauth-google",
@@ -69,8 +90,12 @@ var demoBranches = []Branch{
 		PRNumber: 106,
 		PRState:  "OPEN",
 		PRTitle:  "Add Google OAuth provider",
-		IsDraft:  false,
-		Checks:   "PASSING",
+		IsDraft:  true,
+		Checks:   "PENDING",
+		Commits:  2,
+		Added:    80,
+		Deleted:  5,
+		Scope:    "AUTH",
 	},
 	{
 		Name:     "feature/api-refactor",
@@ -79,16 +104,24 @@ var demoBranches = []Branch{
 		PRState:  "OPEN",
 		PRTitle:  "Refactor API layer",
 		IsDraft:  false,
-		Checks:   "PASSING",
+		Checks:   "FAILING",
+		Commits:  8,
+		Added:    500,
+		Deleted:  150,
+		Scope:    "API",
 	},
 	{
 		Name:     "feature/api-v2",
 		Parent:   "feature/api-refactor",
 		PRNumber: 108,
-		PRState:  "OPEN",
+		PRState:  "CLOSED",
 		PRTitle:  "Implement API v2 endpoints",
 		IsDraft:  false,
-		Checks:   "PASSING",
+		Checks:   "NONE",
+		Commits:  0,
+		Added:    0,
+		Deleted:  0,
+		Scope:    "API",
 	},
 }
 

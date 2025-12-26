@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -31,9 +32,13 @@ func FormatShortLine(line string, circleIndex, arrowIndex int, isCurrent bool, o
 		return line
 	}
 
-	// Split line into parts
+	// Find the arrow character and get its full width in bytes
+	arrowRune := '▸'
+	arrowWidth := utf8.RuneLen(arrowRune)
+
+	// Split line into parts, skipping the full arrow character
 	beforeArrow := line[:arrowIndex]
-	afterArrow := line[arrowIndex+1:]
+	afterArrow := line[arrowIndex+arrowWidth:]
 
 	// Color the tree characters before the arrow
 	var coloredBefore strings.Builder
@@ -46,6 +51,9 @@ func FormatShortLine(line string, circleIndex, arrowIndex int, isCurrent bool, o
 		coloredBefore.WriteString(coloredChar)
 	}
 
+	// Color the arrow character
+	arrowChar := GetLogShortColor("▸", arrowIndex)
+
 	// Color the branch name and details after the arrow
 	coloredAfter := GetLogShortColor(afterArrow, circleIndex)
 
@@ -55,7 +63,7 @@ func FormatShortLine(line string, circleIndex, arrowIndex int, isCurrent bool, o
 		coloredBefore.WriteString(strings.Repeat(" ", padding))
 	}
 
-	return coloredBefore.String() + coloredAfter
+	return coloredBefore.String() + arrowChar + coloredAfter
 }
 
 // ColorBranchName colors a branch name based on whether it's current
@@ -117,4 +125,27 @@ func ColorPRState(state string, isDraft bool) string {
 		// No review decision means review isn't required
 		return ""
 	}
+}
+
+// GetScopeColor returns a deterministic color for a scope string
+func GetScopeColor(scope string) (lipgloss.Color, bool) {
+	if scope == "" {
+		return lipgloss.Color(""), false
+	}
+	// Simple hash to select from StackitColors
+	var hash uint32
+	for i := 0; i < len(scope); i++ {
+		hash = uint32(scope[i]) + (hash << 6) + (hash << 16) - hash
+	}
+	colorIndex := int(hash) % len(StackitColors)
+	color := StackitColors[colorIndex]
+	return lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", color[0], color[1], color[2])), true
+}
+
+// ColorScope colors a scope string deterministically
+func ColorScope(scope string) string {
+	if color, ok := GetScopeColor(scope); ok {
+		return lipgloss.NewStyle().Foreground(color).Render("[" + scope + "]")
+	}
+	return ColorDim("[" + scope + "]")
 }

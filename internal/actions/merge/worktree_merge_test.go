@@ -75,9 +75,9 @@ func TestExecuteInWorktree(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Verify we are still on branch-a in the main workspace
+		// Verify we have switched to main since branch-a was merged and deleted
 		currentBranch := s.Engine.CurrentBranch()
 		require.NotNil(t, currentBranch)
-		require.Equal(t, "branch-a", currentBranch.Name)
+		require.Equal(t, "main", currentBranch.Name)
 	})
 }

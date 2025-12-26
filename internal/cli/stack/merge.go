@@ -9,6 +9,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions/merge"
 	"stackit.dev/stackit/internal/config"
+	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/tui/components/tree"
@@ -26,25 +27,30 @@ func NewMergeCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "merge",
-		Short: "Merge the pull requests associated with all branches from trunk to the current branch via Stackit",
+		Use:   "merge [this]",
+		Short: "Merge pull requests for a stack or scope",
 		Long: `Merge the pull requests associated with all branches from trunk to the current branch via Stackit.
 This command merges PRs for all branches in the stack from trunk up to (and including) the current branch.
 
 If --scope is specified, all branches with that scope will be merged.
 
-If no flags are provided, an interactive wizard will guide you through the merge process.`,
+If no flags or arguments are provided, an interactive wizard will guide you through the merge process.`,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}
 
+			// Handle 'stackit merge this'
+			if len(args) > 0 && args[0] == "this" {
+				return runInteractiveMergeWizard(ctx, dryRun, force, "")
+			}
+
 			// Determine if we should run in interactive mode
 			// Interactive if no flags are provided (except dry-run and scope which are always allowed)
-			interactive := strategy == "" && !yes && !force
+			interactive := strategy == "" && !yes && !force && scope == "" && len(args) == 0
 
 			// Parse strategy
 			var mergeStrategy merge.Strategy
@@ -63,7 +69,7 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 			// Run interactive wizard if needed
 			if interactive {
-				return runInteractiveMergeWizard(ctx, dryRun, force, scope)
+				return runMergeTypeSelector(ctx, dryRun, force)
 			}
 
 			// Get config values
@@ -109,6 +115,11 @@ If no flags are provided, an interactive wizard will guide you through the merge
 
 // runInteractiveMergeWizard runs the interactive merge wizard
 func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool, scope string) error {
+	return runInteractiveMergeWizardForBranch(ctx, dryRun, forceFlag, scope, "")
+}
+
+// runInteractiveMergeWizardForBranch runs the interactive merge wizard for a specific branch (if scope is empty)
+func runInteractiveMergeWizardForBranch(ctx *runtime.Context, dryRun bool, forceFlag bool, scope string, targetBranchName string) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
@@ -120,17 +131,12 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		splog.Debug("Failed to populate remote SHAs: %v", err)
 	}
 
-	// Get current branch info
-	currentBranch := eng.CurrentBranch()
-	if currentBranch == nil {
-		return fmt.Errorf("not on a branch")
-	}
-
 	// Create initial plan with bottom-up strategy (default)
 	plan, validation, err := merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
-		Strategy: merge.StrategyBottomUp,
-		Force:    forceFlag,
-		Scope:    scope,
+		Strategy:     merge.StrategyBottomUp,
+		Force:        forceFlag,
+		Scope:        scope,
+		TargetBranch: targetBranchName,
 	})
 	if err != nil {
 		return err
@@ -140,14 +146,14 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 	if scope != "" {
 		splog.Info("Merging scope: [%s]", scope)
 	} else {
-		splog.Info("You are on branch: %s", tui.ColorBranchName(currentBranch.Name, false))
+		splog.Info("Target branch: %s", tui.ColorBranchName(plan.CurrentBranch, false))
 	}
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {
 		// Create tree renderer
 		renderer := tree.NewStackTreeRenderer(
-			currentBranch.Name,
+			plan.CurrentBranch,
 			eng.Trunk().Name,
 			func(branchName string) []string {
 				branch := eng.GetBranch(branchName)
@@ -275,8 +281,10 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	// Recreate plan with selected strategy
 	plan, validation, err = merge.CreateMergePlan(ctx.Context, eng, splog, ctx.GitHubClient, merge.CreatePlanOptions{
-		Strategy: mergeStrategy,
-		Force:    forceFlag,
+		Strategy:     mergeStrategy,
+		Force:        forceFlag,
+		Scope:        scope,
+		TargetBranch: targetBranchName,
 	})
 	if err != nil {
 		return err
@@ -335,6 +343,76 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	if err := merge.Action(ctx, mergeOpts); err != nil {
 		return fmt.Errorf("merge action failed: %w", err)
+	}
+
+	return nil
+}
+
+// runMergeTypeSelector runs an interactive selector to choose what to merge
+func runMergeTypeSelector(ctx *runtime.Context, dryRun bool, force bool) error {
+	eng := ctx.Engine
+
+	options := []tui.SelectOption{
+		{Label: "🌿 This branch — Merge the current branch and its stack", Value: "this"},
+		{Label: "🏷️  Select a scope — Merge all branches in a specific scope", Value: "scope"},
+		{Label: "📚 Select an entire stack — Merge a stack from its top branch", Value: "stack"},
+	}
+
+	selected, err := tui.PromptSelect("What would you like to merge?", options, 0)
+	if err != nil {
+		return err
+	}
+
+	switch selected {
+	case "this":
+		return runInteractiveMergeWizard(ctx, dryRun, force, "")
+	case "scope":
+		// Get all unique scopes
+		scopes := make(map[string]bool)
+		for _, b := range eng.AllBranches() {
+			s := eng.GetScopeInternal(b.Name).String()
+			if s != "" && s != "none" && s != "clear" {
+				scopes[s] = true
+			}
+		}
+
+		if len(scopes) == 0 {
+			return fmt.Errorf("no branches with scopes found")
+		}
+
+		scopeOptions := make([]tui.SelectOption, 0, len(scopes))
+		for s := range scopes {
+			scopeOptions = append(scopeOptions, tui.SelectOption{Label: s, Value: s})
+		}
+
+		selectedScope, err := tui.PromptSelect("Select scope to merge:", scopeOptions, 0)
+		if err != nil {
+			return err
+		}
+
+		return runInteractiveMergeWizard(ctx, dryRun, force, selectedScope)
+
+	case "stack":
+		// Get all leaf branches (branches with no children)
+		branches := eng.AllBranches()
+		leafBranches := make([]engine.Branch, 0)
+		for _, b := range branches {
+			if !b.IsTrunk() && len(b.GetChildren()) == 0 {
+				leafBranches = append(leafBranches, b)
+			}
+		}
+
+		if len(leafBranches) == 0 {
+			return fmt.Errorf("no stacks found")
+		}
+
+		// Use branch selector
+		selectedBranch, err := tui.PromptBranchCheckout(leafBranches, eng)
+		if err != nil {
+			return err
+		}
+
+		return runInteractiveMergeWizardForBranch(ctx, dryRun, force, "", selectedBranch)
 	}
 
 	return nil

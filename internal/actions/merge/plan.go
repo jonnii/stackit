@@ -99,9 +99,10 @@ type PlanValidation struct {
 
 // CreatePlanOptions contains options for creating a merge plan
 type CreatePlanOptions struct {
-	Strategy Strategy
-	Force    bool
-	Scope    string
+	Strategy     Strategy
+	Force        bool
+	Scope        string
+	TargetBranch string // Optional branch to merge from (instead of current)
 }
 
 // mergePlanEngine is a minimal interface needed for creating a merge plan
@@ -113,10 +114,19 @@ type mergePlanEngine interface {
 
 // CreateMergePlan analyzes the current state and builds a merge plan
 func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog, githubClient github.Client, opts CreatePlanOptions) (*Plan, *PlanValidation, error) {
-	// 1. Get current branch, validate not on trunk
-	currentBranch := eng.CurrentBranch()
-	if currentBranch == nil {
-		return nil, nil, fmt.Errorf("not on a branch")
+	// 1. Get target branch, validate not on trunk
+	var targetBranch engine.Branch
+	if opts.TargetBranch != "" {
+		targetBranch = eng.GetBranch(opts.TargetBranch)
+		if !targetBranch.IsTracked() && !targetBranch.IsTrunk() {
+			return nil, nil, fmt.Errorf("branch %s is not tracked by stackit", opts.TargetBranch)
+		}
+	} else {
+		cb := eng.CurrentBranch()
+		if cb == nil {
+			return nil, nil, fmt.Errorf("not on a branch")
+		}
+		targetBranch = *cb
 	}
 
 	var allBranches []string
@@ -143,20 +153,20 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		// In scope mode, the "current branch" for the plan is the top-most branch in the scope
 		planCurrentBranch = allBranches[len(allBranches)-1]
 	} else {
-		if currentBranch.IsTrunk() {
+		if targetBranch.IsTrunk() {
 			return nil, nil, fmt.Errorf("cannot merge from trunk. You must be on a branch that has a PR")
 		}
 
-		// Check if current branch is tracked
-		if !currentBranch.IsTracked() {
-			return nil, nil, fmt.Errorf("current branch %s is not tracked by stackit", currentBranch.Name)
+		// Check if target branch is tracked
+		if !targetBranch.IsTracked() {
+			return nil, nil, fmt.Errorf("branch %s is not tracked by stackit", targetBranch.Name)
 		}
 
-		// 2. Collect branches from trunk to current
+		// 2. Collect branches from trunk to target
 		rng := engine.StackRange{RecursiveParents: true}
-		parentBranches := currentBranch.GetRelativeStack(rng)
+		parentBranches := targetBranch.GetRelativeStack(rng)
 
-		// Build full list: parent branches + current branch
+		// Build full list: parent branches + target branch
 		// Filter out trunk (it shouldn't be in the list, but be safe)
 		allBranches = make([]string, 0, len(parentBranches)+1)
 		for _, branch := range parentBranches {
@@ -164,8 +174,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 				allBranches = append(allBranches, branch.Name)
 			}
 		}
-		allBranches = append(allBranches, currentBranch.Name)
-		planCurrentBranch = currentBranch.Name
+		allBranches = append(allBranches, targetBranch.Name)
+		planCurrentBranch = targetBranch.Name
 	}
 
 	// 3. For each branch: fetch PR info, check status, CI checks

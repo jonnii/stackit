@@ -180,45 +180,47 @@ type SelectOption struct {
 	Value string // Value to return
 }
 
-// selectModel is a selection prompt model with arrow key navigation
-type selectModel struct {
-	options  []SelectOption
-	cursor   int
-	selected string
-	done     bool
-	err      error
-	title    string
+// SelectModel is a selection prompt model with arrow key navigation
+type SelectModel struct {
+	Options  []SelectOption
+	Cursor   int
+	Selected string
+	Done     bool
+	Err      error
+	Title    string
 }
 
-func (m selectModel) Init() tea.Cmd {
+// Init initializes the bubbletea model
+func (m SelectModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles message updates for the bubbletea model
+func (m SelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
-			if len(m.options) > 0 && m.cursor >= 0 && m.cursor < len(m.options) {
-				m.selected = m.options[m.cursor].Value
-				m.done = true
+			if len(m.Options) > 0 && m.Cursor >= 0 && m.Cursor < len(m.Options) {
+				m.Selected = m.Options[m.Cursor].Value
+				m.Done = true
 				return m, tea.Quit
 			}
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("canceled")
-			m.done = true
+			m.Err = fmt.Errorf("canceled")
+			m.Done = true
 			return m, tea.Quit
 		case tea.KeyUp, tea.KeyShiftTab:
-			if m.cursor > 0 {
-				m.cursor--
+			if m.Cursor > 0 {
+				m.Cursor--
 			} else {
-				m.cursor = len(m.options) - 1
+				m.Cursor = len(m.Options) - 1
 			}
 			return m, nil
 		case tea.KeyDown, tea.KeyTab:
-			if m.cursor < len(m.options)-1 {
-				m.cursor++
+			if m.Cursor < len(m.Options)-1 {
+				m.Cursor++
 			} else {
-				m.cursor = 0
+				m.Cursor = 0
 			}
 			return m, nil
 		}
@@ -226,23 +228,25 @@ func (m selectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m selectModel) View() string {
-	if m.done {
+// View renders the TUI
+func (m SelectModel) View() string {
+	if m.Done {
 		return ""
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s\n\n", m.title))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render(m.Title))
+	b.WriteString("\n\n")
 
-	for i, opt := range m.options {
-		if i == m.cursor {
-			b.WriteString(fmt.Sprintf("  → %s\n", opt.Label))
+	for i, opt := range m.Options {
+		if i == m.Cursor {
+			b.WriteString(fmt.Sprintf("  → %s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(opt.Label)))
 		} else {
 			b.WriteString(fmt.Sprintf("    %s\n", opt.Label))
 		}
 	}
 
-	b.WriteString("\n(↑/↓ to select, Enter to confirm, Ctrl+C to cancel)")
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("\n(↑/↓ to select, Enter to confirm, Ctrl+C to cancel)"))
 
 	styleObj := lipgloss.NewStyle().Margin(1, 0)
 	return styleObj.Render(b.String())
@@ -263,10 +267,10 @@ func PromptSelect(title string, options []SelectOption, defaultIndex int) (strin
 		cursor = 0
 	}
 
-	m := selectModel{
-		options: options,
-		cursor:  cursor,
-		title:   title,
+	m := SelectModel{
+		Options: options,
+		Cursor:  cursor,
+		Title:   title,
 	}
 
 	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
@@ -275,26 +279,26 @@ func PromptSelect(title string, options []SelectOption, defaultIndex int) (strin
 		return "", err
 	}
 
-	if finalModel, ok := model.(selectModel); ok {
-		if finalModel.err != nil {
-			return "", finalModel.err
+	if finalModel, ok := model.(SelectModel); ok {
+		if finalModel.Err != nil {
+			return "", finalModel.Err
 		}
-		return finalModel.selected, nil
+		return finalModel.Selected, nil
 	}
 
 	return "", fmt.Errorf("unexpected model type")
 }
 
-// branchSelectModel is a branch selection prompt model with filtering
-type branchSelectModel struct {
-	choices  []BranchChoice
-	filtered []BranchChoice
-	filter   string
-	cursor   int
-	selected string
-	done     bool
-	err      error
-	message  string
+// BranchSelectModel is a branch selection prompt model with filtering
+type BranchSelectModel struct {
+	Choices  []BranchChoice
+	Filtered []BranchChoice
+	Filter   string
+	Cursor   int
+	Selected string
+	Done     bool
+	Err      error
+	Message  string
 }
 
 // BranchChoice represents a branch option in a selection prompt
@@ -303,57 +307,59 @@ type BranchChoice struct {
 	Value   string // Actual branch name
 }
 
-func (m branchSelectModel) Init() tea.Cmd {
+// Init initializes the bubbletea model
+func (m BranchSelectModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles message updates for the bubbletea model
+func (m BranchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.Type {
 		case tea.KeyEnter:
-			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-				m.selected = m.filtered[m.cursor].Value
-				m.done = true
+			if len(m.Filtered) > 0 && m.Cursor >= 0 && m.Cursor < len(m.Filtered) {
+				m.Selected = m.Filtered[m.Cursor].Value
+				m.Done = true
 				return m, tea.Quit
 			}
 		case tea.KeyCtrlC, tea.KeyEsc:
-			m.err = fmt.Errorf("canceled")
-			m.done = true
+			m.Err = fmt.Errorf("canceled")
+			m.Done = true
 			return m, tea.Quit
 		case tea.KeyUp:
-			if m.cursor > 0 {
-				m.cursor--
+			if m.Cursor > 0 {
+				m.Cursor--
 			} else {
-				m.cursor = len(m.filtered) - 1
+				m.Cursor = len(m.Filtered) - 1
 			}
 			return m, nil
 		case tea.KeyDown:
-			if m.cursor < len(m.filtered)-1 {
-				m.cursor++
+			if m.Cursor < len(m.Filtered)-1 {
+				m.Cursor++
 			} else {
-				m.cursor = 0
+				m.Cursor = 0
 			}
 			return m, nil
 		case tea.KeyBackspace:
-			if len(m.filter) > 0 {
-				m.filter = m.filter[:len(m.filter)-1]
+			if len(m.Filter) > 0 {
+				m.Filter = m.Filter[:len(m.Filter)-1]
 				m.updateFiltered()
-				if m.cursor >= len(m.filtered) {
-					m.cursor = len(m.filtered) - 1
+				if m.Cursor >= len(m.Filtered) {
+					m.Cursor = len(m.Filtered) - 1
 				}
-				if m.cursor < 0 {
-					m.cursor = 0
+				if m.Cursor < 0 {
+					m.Cursor = 0
 				}
 			}
 			return m, nil
 		case tea.KeyRunes:
-			m.filter += string(msg.Runes)
+			m.Filter += string(msg.Runes)
 			m.updateFiltered()
-			if m.cursor >= len(m.filtered) {
-				m.cursor = len(m.filtered) - 1
+			if m.Cursor >= len(m.Filtered) {
+				m.Cursor = len(m.Filtered) - 1
 			}
-			if m.cursor < 0 {
-				m.cursor = 0
+			if m.Cursor < 0 {
+				m.Cursor = 0
 			}
 			return m, nil
 		}
@@ -361,47 +367,51 @@ func (m branchSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *branchSelectModel) updateFiltered() {
-	if m.filter == "" {
-		m.filtered = m.choices
+func (m *BranchSelectModel) updateFiltered() {
+	if m.Filter == "" {
+		m.Filtered = m.Choices
 		return
 	}
 
-	filterLower := strings.ToLower(m.filter)
-	m.filtered = []BranchChoice{}
-	for _, choice := range m.choices {
+	filterLower := strings.ToLower(m.Filter)
+	m.Filtered = []BranchChoice{}
+	for _, choice := range m.Choices {
 		if strings.Contains(strings.ToLower(choice.Display), filterLower) ||
 			strings.Contains(strings.ToLower(choice.Value), filterLower) {
-			m.filtered = append(m.filtered, choice)
+			m.Filtered = append(m.Filtered, choice)
 		}
 	}
 }
 
-func (m branchSelectModel) View() string {
-	if m.done {
+// View renders the TUI
+func (m BranchSelectModel) View() string {
+	if m.Done {
 		return ""
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s\n", m.message))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render(m.Message))
+	b.WriteString("\n")
 
-	if m.filter != "" {
-		b.WriteString(fmt.Sprintf("Filter: %s\n\n", m.filter))
+	if m.Filter != "" {
+		b.WriteString(fmt.Sprintf("Filter: %s\n\n", lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(m.Filter)))
+	} else {
+		b.WriteString("\n")
 	}
 
-	if len(m.filtered) == 0 {
+	if len(m.Filtered) == 0 {
 		b.WriteString("No branches match the filter.\n")
 	} else {
-		for i, choice := range m.filtered {
+		for i, choice := range m.Filtered {
 			cursor := " "
-			if i == m.cursor {
-				cursor = ">"
+			if i == m.Cursor {
+				cursor = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(">")
 			}
 			b.WriteString(fmt.Sprintf("%s %s\n", cursor, choice.Display))
 		}
 	}
 
-	b.WriteString("\n(Press Enter to select, Ctrl+C to cancel, type to filter)")
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("\n(Press Enter to select, Ctrl+C to cancel, type to filter)"))
 
 	styleObj := lipgloss.NewStyle().Margin(1, 0)
 	return styleObj.Render(b.String())
@@ -413,28 +423,28 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 		return "", err
 	}
 
-	m := branchSelectModel{
-		choices: choices,
-		filter:  "",
-		cursor:  initialIndex,
-		message: message,
+	m := BranchSelectModel{
+		Choices: choices,
+		Filter:  "",
+		Cursor:  initialIndex,
+		Message: message,
 	}
 	m.updateFiltered()
 
 	// Adjust cursor to initial index in filtered list
 	if initialIndex >= 0 && initialIndex < len(choices) {
 		initialChoice := choices[initialIndex]
-		for i, filtered := range m.filtered {
+		for i, filtered := range m.Filtered {
 			if filtered.Value == initialChoice.Value {
-				m.cursor = i
+				m.Cursor = i
 				break
 			}
 		}
 	}
 
-	if m.cursor < 0 || m.cursor >= len(m.filtered) {
-		if len(m.filtered) > 0 {
-			m.cursor = 0
+	if m.Cursor < 0 || m.Cursor >= len(m.Filtered) {
+		if len(m.Filtered) > 0 {
+			m.Cursor = 0
 		}
 	}
 
@@ -444,11 +454,11 @@ func PromptBranchSelection(message string, choices []BranchChoice, initialIndex 
 		return "", err
 	}
 
-	if finalModel, ok := model.(branchSelectModel); ok {
-		if finalModel.err != nil {
-			return "", finalModel.err
+	if finalModel, ok := model.(BranchSelectModel); ok {
+		if finalModel.Err != nil {
+			return "", finalModel.Err
 		}
-		return finalModel.selected, nil
+		return finalModel.Selected, nil
 	}
 
 	return "", fmt.Errorf("unexpected model type")

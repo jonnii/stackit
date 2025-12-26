@@ -124,7 +124,7 @@ func Execute(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, gith
 }
 
 // ExecuteInWorktree executes the merge plan in a temporary worktree
-func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, _ string, opts ExecuteOptions) error {
+func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, _ string, opts ExecuteOptions) (err error) {
 	// If using TUI, show a brief message about the worktree
 	if tui.IsTTY() {
 		splog.Debug("🔨 Creating temporary worktree for merge execution...")
@@ -152,21 +152,50 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 	originalWorkDir := git.GetWorkingDir()
 	git.SetWorkingDir(worktreePath)
 
+	trunk := eng.Trunk()
+
 	// Ensure we restore working directory and clean up on exit (unless there's a conflict)
 	cleanupWorktree := true
 	defer func() {
 		git.SetWorkingDir(originalWorkDir)
 		if cleanupWorktree {
 			splog.Debug("Cleaning up worktree at %s", worktreePath)
-			if err := git.RemoveWorktree(context.Background(), worktreePath); err != nil {
-				splog.Warn("Failed to remove worktree at %s: %v", worktreePath, err)
+			if cleanupErr := git.RemoveWorktree(context.Background(), worktreePath); cleanupErr != nil {
+				splog.Warn("Failed to remove worktree at %s: %v", worktreePath, cleanupErr)
 			}
 			_ = os.RemoveAll(tmpDir)
+		}
+
+		// If the merge succeeded, refresh the main workspace state
+		if err == nil {
+			// After cleanup, we are back in the main workspace.
+			// Check if the branch we were on was merged/deleted, or if it just needs a worktree refresh.
+			currentBranchName, _ := git.GetCurrentBranch()
+			if currentBranchName != "" {
+				wasMerged := false
+				for _, b := range opts.Plan.BranchesToMerge {
+					if b.BranchName == currentBranchName {
+						wasMerged = true
+						break
+					}
+				}
+
+				if wasMerged {
+					splog.Newline()
+					splog.Info("💡 Branch %s was merged and deleted. Switching main workspace to %s...", currentBranchName, trunk.Name)
+					if checkoutErr := git.CheckoutBranch(ctx, trunk.Name); checkoutErr != nil {
+						splog.Debug("Failed to checkout trunk in main workspace: %v", checkoutErr)
+					}
+				} else {
+					// Refresh the worktree in case the branch ref was moved (e.g. restacked or trunk pulled)
+					// We use git reset --merge HEAD to safely refresh the worktree without losing local changes.
+					_, _ = git.RunGitCommand("reset", "--merge", "HEAD")
+				}
+			}
 		}
 	}()
 
 	// 4. Create a new engine for the worktree
-	trunk := eng.Trunk()
 	maxUndoDepth := opts.UndoStackDepth
 	if maxUndoDepth <= 0 {
 		maxUndoDepth = engine.DefaultMaxUndoStackDepth

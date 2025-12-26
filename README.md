@@ -115,7 +115,7 @@ This merges all approved PRs in your stack, bottom-up, and cleans up the merged 
 ### Navigation
 | Command | Description |
 |:---|:---|
-| `stackit log` | Display the branch tree (aliases: `l`, `ls`, `ll`) |
+| `stackit log` | Display the branch tree |
 | `stackit checkout` | Interactive branch switcher |
 | `stackit up` / `down` | Move to the child or parent branch |
 | `stackit top` / `bottom` | Move to the top or bottom of the stack |

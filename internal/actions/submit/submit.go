@@ -115,10 +115,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// Validate and prepare branches
 	ui.ShowPreparing()
 
-	ui.Pause()
-	err = ValidateBranchesToSubmit(context, branches, eng, ctx)
-	ui.Resume()
-	if err != nil {
+	if err := ValidateBranchesToSubmit(context, branches, eng, ctx); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 

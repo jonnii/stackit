@@ -179,7 +179,9 @@ func registerTreeStories() {
 				LinesDeleted:  5,
 			})
 
-			return tree.NewModel(renderer)
+			model := tree.NewModel(renderer)
+			model.Options.HideStats = true
+			return model
 		},
 	})
 }

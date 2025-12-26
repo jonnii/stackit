@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
 // ErrInteractiveDisabled is returned when interactive prompts are disabled via STACKIT_TEST_NO_INTERACTIVE
@@ -58,8 +59,8 @@ func (m textInputModel) View() string {
 	if m.done {
 		return ""
 	}
-	style := lipgloss.NewStyle().Margin(1, 0)
-	return style.Render(fmt.Sprintf("%s\n%s\n\n(Press Enter to submit, Ctrl+C to cancel)", m.prompt, m.textInput.View()))
+	styleObj := lipgloss.NewStyle().Margin(1, 0)
+	return styleObj.Render(fmt.Sprintf("%s\n%s\n\n(Press Enter to submit, Ctrl+C to cancel)", m.prompt, m.textInput.View()))
 }
 
 // confirmModel is a simple yes/no confirmation prompt model
@@ -104,12 +105,12 @@ func (m confirmModel) View() string {
 	if m.done {
 		return ""
 	}
-	style := lipgloss.NewStyle().Margin(1, 0)
+	styleObj := lipgloss.NewStyle().Margin(1, 0)
 	yesNo := "[y/N]"
 	if m.choice {
 		yesNo = "[Y/n]"
 	}
-	return style.Render(fmt.Sprintf("%s %s\n\n(Press y/yes or n/no, Enter to confirm, Ctrl+C to cancel)", m.prompt, yesNo))
+	return styleObj.Render(fmt.Sprintf("%s %s\n\n(Press y/yes or n/no, Enter to confirm, Ctrl+C to cancel)", m.prompt, yesNo))
 }
 
 // PromptTextInput prompts the user for text input
@@ -243,8 +244,8 @@ func (m selectModel) View() string {
 
 	b.WriteString("\n(↑/↓ to select, Enter to confirm, Ctrl+C to cancel)")
 
-	style := lipgloss.NewStyle().Margin(1, 0)
-	return style.Render(b.String())
+	styleObj := lipgloss.NewStyle().Margin(1, 0)
+	return styleObj.Render(b.String())
 }
 
 // PromptSelect prompts the user to select from a list of options
@@ -402,8 +403,8 @@ func (m branchSelectModel) View() string {
 
 	b.WriteString("\n(Press Enter to select, Ctrl+C to cancel, type to filter)")
 
-	style := lipgloss.NewStyle().Margin(1, 0)
-	return style.Render(b.String())
+	styleObj := lipgloss.NewStyle().Margin(1, 0)
+	return styleObj.Render(b.String())
 }
 
 // PromptBranchSelection prompts the user to select a branch
@@ -468,7 +469,7 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 		currentBranchName = currentBranch.Name
 	}
 	trunk := eng.Trunk()
-	renderer := NewStackTreeRenderer(
+	renderer := tree.NewStackTreeRenderer(
 		currentBranchName,
 		trunk.Name,
 		func(branchName string) []string {
@@ -495,12 +496,12 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 	)
 
 	// Add annotations for all branches
-	annotations := make(map[string]BranchAnnotation)
+	annotations := make(map[string]tree.BranchAnnotation)
 	for _, branch := range branches {
-		scope := eng.GetScopeInternal(branch.Name)
-		if !scope.IsEmpty() {
-			annotations[branch.Name] = BranchAnnotation{
-				Scope: scope.String(),
+		scopeStr := eng.GetScopeInternal(branch.Name)
+		if !scopeStr.IsEmpty() {
+			annotations[branch.Name] = tree.BranchAnnotation{
+				Scope: scopeStr.String(),
 			}
 		}
 	}
@@ -538,9 +539,9 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 		indent := strings.Repeat("  ", depth)
 		var symbol string
 		if isCurrent {
-			symbol = CurrentBranchSymbol
+			symbol = tree.CurrentBranchSymbol
 		} else {
-			symbol = BranchSymbol
+			symbol = tree.BranchSymbol
 		}
 
 		// Get colored branch name
@@ -548,7 +549,7 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 
 		// Add annotation
 		annotation := annotations[branch.Name]
-		coloredBranchName += renderer.formatAnnotationColored(annotation)
+		coloredBranchName += renderer.FormatAnnotationColored(annotation)
 
 		// Add restack indicator if needed
 		if !eng.IsBranchUpToDateInternal(branch.Name) {

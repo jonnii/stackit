@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
 // NewMergeCmd creates the merge command
@@ -145,7 +146,7 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 
 	if len(plan.BranchesToMerge) > 0 {
 		// Create tree renderer
-		renderer := tui.NewStackTreeRenderer(
+		renderer := tree.NewStackTreeRenderer(
 			currentBranch.Name,
 			eng.Trunk().Name,
 			func(branchName string) []string {
@@ -172,9 +173,9 @@ func runInteractiveMergeWizard(ctx *runtime.Context, dryRun bool, forceFlag bool
 		)
 
 		// Build annotations for branches to merge
-		annotations := make(map[string]tui.BranchAnnotation)
+		annotations := make(map[string]tree.BranchAnnotation)
 		for _, branchInfo := range plan.BranchesToMerge {
-			annotation := tui.BranchAnnotation{
+			annotation := tree.BranchAnnotation{
 				PRNumber:    &branchInfo.PRNumber,
 				CheckStatus: string(branchInfo.ChecksStatus),
 				IsDraft:     branchInfo.IsDraft,

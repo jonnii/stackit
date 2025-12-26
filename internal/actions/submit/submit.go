@@ -14,6 +14,8 @@ import (
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/components/submit"
+	"stackit.dev/stackit/internal/tui/components/tree"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -139,9 +141,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// TODO: Add interactive confirmation prompt if opts.Confirm is set
 
 	// Build progress items
-	progressItems := make([]tui.SubmitItem, len(submissionInfos))
+	progressItems := make([]submit.Item, len(submissionInfos))
 	for i, info := range submissionInfos {
-		progressItems[i] = tui.SubmitItem{
+		progressItems[i] = submit.Item{
 			BranchName: info.BranchName,
 			Action:     info.Action,
 			PRNumber:   info.PRNumber,
@@ -497,11 +499,11 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 }
 
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
-func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *tui.StackTreeRenderer {
+func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *tree.StackTreeRenderer {
 	// Create the tree renderer
 	currentBranchObj := eng.CurrentBranch()
 	trunk := eng.Trunk()
-	renderer := tui.NewStackTreeRenderer(
+	renderer := tree.NewStackTreeRenderer(
 		currentBranchObj.Name,
 		trunk.Name,
 		func(branchName string) []string {
@@ -528,7 +530,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 	)
 
 	// Build annotations for each branch
-	annotations := make(map[string]tui.BranchAnnotation)
+	annotations := make(map[string]tree.BranchAnnotation)
 	branchSet := make(map[string]bool)
 	for _, b := range branches {
 		branchSet[b] = true
@@ -541,7 +543,7 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 			continue
 		}
 
-		annotation := tui.BranchAnnotation{
+		annotation := tree.BranchAnnotation{
 			NeedsRestack: !eng.GetBranch(branchName).IsBranchUpToDate(),
 		}
 

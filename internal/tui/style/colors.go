@@ -1,4 +1,5 @@
-package tui
+// Package style provides styling and coloring for the TUI.
+package style
 
 import "github.com/charmbracelet/lipgloss"
 

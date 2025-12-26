@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
 // LogOptions contains options for the log command
@@ -33,7 +33,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	if currentBranch != nil {
 		currentBranchName = currentBranch.Name
 	}
-	renderer := tui.NewStackTreeRenderer(
+	renderer := tree.NewStackTreeRenderer(
 		currentBranchName,
 		trunk.Name,
 		func(branchName string) []string {
@@ -61,12 +61,12 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 
 	// Render the stack
 	// First, collect annotations for all branches in the stack
-	annotations := make(map[string]tui.BranchAnnotation)
+	annotations := make(map[string]tree.BranchAnnotation)
 	allBranches := ctx.Engine.AllBranches()
 
 	type result struct {
 		branchName string
-		annotation tui.BranchAnnotation
+		annotation tree.BranchAnnotation
 	}
 	results := make(chan result, len(allBranches))
 	var wg sync.WaitGroup
@@ -76,7 +76,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 		go func(bName string) {
 			defer wg.Done()
 			branchObj := ctx.Engine.GetBranch(bName)
-			annotation := tui.BranchAnnotation{
+			annotation := tree.BranchAnnotation{
 				Scope:         ctx.Engine.GetScopeInternal(bName).String(),
 				ExplicitScope: ctx.Engine.GetExplicitScopeInternal(bName).String(),
 			}
@@ -129,7 +129,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 
 	renderer.SetAnnotations(annotations)
 
-	stackLines := renderer.RenderStack(opts.BranchName, tui.TreeRenderOptions{
+	stackLines := renderer.RenderStack(opts.BranchName, tree.RenderOptions{
 		Short:   false, // We want the full tree characters with stats
 		Reverse: opts.Reverse,
 		Steps:   opts.Steps,

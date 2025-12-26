@@ -108,6 +108,19 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 	}
 
+	// Take snapshot before any modifications
+	snapshotArgs := []string{string(style)}
+	if style == StyleFile && len(opts.Pathspecs) > 0 {
+		snapshotArgs = append(snapshotArgs, opts.Pathspecs...)
+	}
+
+	if err := eng.TakeSnapshot(engine.SnapshotOptions{
+		Command: "split",
+		Args:    snapshotArgs,
+	}); err != nil {
+		return fmt.Errorf("failed to take snapshot: %w", err)
+	}
+
 	// Perform the split
 	var result *Result
 	switch style {

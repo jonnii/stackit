@@ -446,11 +446,20 @@ func (e *engineImpl) RestoreSnapshot(ctx context.Context, snapshotID string) err
 
 		if branchExists {
 			branch := e.GetBranch(snapshot.CurrentBranch)
-			if err := git.CheckoutBranch(ctx, branch.Name); err != nil {
-				// If checkout fails, try to continue - we're still in a valid state
-				_ = err
+			// If we are already on this branch, checkout might not update the working directory
+			// after we've updated the ref. Use reset --hard to be sure.
+			current, _ := git.GetCurrentBranch()
+			if current == branch.Name {
+				if _, err := git.RunGitCommandWithContext(ctx, "reset", "--hard", "HEAD"); err != nil {
+					return fmt.Errorf("failed to reset working directory: %w", err)
+				}
 			} else {
-				e.currentBranch = snapshot.CurrentBranch
+				if err := git.CheckoutBranch(ctx, branch.Name); err != nil {
+					// If checkout fails, try to continue - we're still in a valid state
+					_ = err
+				} else {
+					e.currentBranch = snapshot.CurrentBranch
+				}
 			}
 		} else {
 			// Branch was deleted, switch to trunk

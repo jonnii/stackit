@@ -14,6 +14,7 @@ import (
 // Options contains options for the undo command
 type Options struct {
 	SnapshotID string // Optional: specific snapshot to restore (skips interactive selection)
+	Force      bool   // Optional: skip confirmation prompt
 }
 
 // Action performs the undo operation
@@ -105,9 +106,12 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 	confirmMessage += " Are you sure?"
 
-	confirmed, err := tui.PromptConfirm(confirmMessage, false)
-	if err != nil {
-		return fmt.Errorf("failed to get confirmation: %w", err)
+	confirmed := opts.Force
+	if !opts.Force {
+		confirmed, err = tui.PromptConfirm(confirmMessage, false)
+		if err != nil {
+			return fmt.Errorf("failed to get confirmation: %w", err)
+		}
 	}
 
 	if !confirmed {

@@ -27,7 +27,7 @@ type SyncManager interface {
 	PullTrunk(ctx context.Context) (PullResult, error)
 	ResetTrunkToRemote(ctx context.Context) error
 	RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error)
-	ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error)
+	ContinueRebase(ctx context.Context, branchName string, rebasedBranchBase string) (ContinueRebaseResult, error)
 }
 
 // SquashManager provides operations for squashing commits

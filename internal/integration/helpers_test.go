@@ -157,6 +157,15 @@ func (s *TestShell) Write(filename, content string) *TestShell {
 	return s
 }
 
+// WriteFile creates/modifies a file with the exact filename and stages it
+func (s *TestShell) WriteFile(filename, content string) *TestShell {
+	s.t.Helper()
+	filePath := filepath.Join(s.scene.Dir, filename)
+	err := os.WriteFile(filePath, []byte(content), 0644)
+	require.NoError(s.t, err, "failed to write file %s", filename)
+	return s.Git("add " + filename)
+}
+
 // Amend modifies a file and amends the last commit using raw git
 func (s *TestShell) Amend(filename, content string) *TestShell {
 	s.t.Helper()

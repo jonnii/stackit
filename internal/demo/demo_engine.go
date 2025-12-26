@@ -557,10 +557,10 @@ func (e *Engine) RestackBranches(_ context.Context, branches []engine.Branch) (e
 }
 
 // ContinueRebase simulates continuing rebase in the demo engine
-func (e *Engine) ContinueRebase(_ context.Context, _ string) (engine.ContinueRebaseResult, error) {
+func (e *Engine) ContinueRebase(_ context.Context, branchName string, _ string) (engine.ContinueRebaseResult, error) {
 	return engine.ContinueRebaseResult{
 		Result:     0, // RebaseDone
-		BranchName: GetDemoCurrentBranch(),
+		BranchName: branchName,
 	}, nil
 }
 

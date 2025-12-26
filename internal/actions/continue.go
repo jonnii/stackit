@@ -66,7 +66,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 	}
 
 	// Continue the rebase
-	result, err := eng.ContinueRebase(ctx.Context, continuation.RebasedBranchBase)
+	result, err := eng.ContinueRebase(ctx.Context, continuation.CurrentBranchOverride, continuation.RebasedBranchBase)
 	if err != nil {
 		return fmt.Errorf("failed to continue rebase: %w", err)
 	}

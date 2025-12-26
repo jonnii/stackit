@@ -39,6 +39,7 @@ Date:    ` + date,
 	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(navigation.NewDownCmd())
 	rootCmd.AddCommand(branch.NewFoldCmd())
+	rootCmd.AddCommand(stack.NewForeachCmd())
 	rootCmd.AddCommand(newInfoCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(navigation.NewLogCmd())

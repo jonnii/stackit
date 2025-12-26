@@ -141,6 +141,7 @@ This merges all approved PRs in your stack, bottom-up, and cleans up the merged 
 | Command | Description |
 |:---|:---|
 | `stackit restack` | Rebase all branches in the stack to ensure proper ancestry |
+| `stackit foreach` | Run a shell command on each branch in the stack (default: upstack) |
 | `stackit submit` | Push branches and create/update GitHub PRs (alias: `ss` for `--stack`) |
 | `stackit sync` | Pull trunk, delete merged branches, and restack |
 | `stackit merge` | Merge approved PRs and clean up merged branches |

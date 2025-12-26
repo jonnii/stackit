@@ -206,11 +206,9 @@ func (u *SimpleSubmitUI) Complete() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	u.splog.Newline()
 	if u.failed > 0 {
+		u.splog.Newline()
 		u.splog.Info("Completed: %d, Failed: %d", u.completed, u.failed)
-	} else if u.completed > 0 {
-		u.splog.Info("✓ All %d PRs submitted successfully", u.completed)
 	}
 }
 

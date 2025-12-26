@@ -226,6 +226,9 @@ func registerSubmitStories() {
 		CreateModel: func() tea.Model {
 			m := submit.NewModel(nil)
 			m.Renderer = createRenderer()
+			m.Renderer.SetAnnotation("feature-1", tree.BranchAnnotation{Scope: "CORE", ExplicitScope: "CORE"})
+			m.Renderer.SetAnnotation("feature-2", tree.BranchAnnotation{Scope: "API", ExplicitScope: "API"})
+			m.Renderer.SetAnnotation("feature-3", tree.BranchAnnotation{Scope: "UI", ExplicitScope: "UI"})
 			m.RootBranch = mockData.Trunk
 			return &submitSimulationModel{
 				submitModel: m,
@@ -245,6 +248,9 @@ func registerSubmitStories() {
 				{BranchName: "feature-3", Action: "create", Status: submit.StatusPending},
 			})
 			m.Renderer = createRenderer()
+			m.Renderer.SetAnnotation("feature-1", tree.BranchAnnotation{Scope: "CORE", ExplicitScope: "CORE"})
+			m.Renderer.SetAnnotation("feature-2", tree.BranchAnnotation{Scope: "API", ExplicitScope: "API"})
+			m.Renderer.SetAnnotation("feature-3", tree.BranchAnnotation{Scope: "UI", ExplicitScope: "UI"})
 			m.RootBranch = mockData.Trunk
 			m.GlobalMessage = "Submitting 3 branches..."
 			m.Done = true
@@ -271,7 +277,7 @@ func (m *submitSimulationModel) nextTick() tea.Cmd {
 	if m.step == 0 {
 		delay = 100 * time.Millisecond
 	}
-	return tea.Tick(delay, func(t time.Time) tea.Msg {
+	return tea.Tick(delay, func(_ time.Time) tea.Msg {
 		return simulationTickMsg(m.step)
 	})
 }
@@ -305,8 +311,11 @@ func (m *submitSimulationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return parents[b]
 				},
 				func(b string) bool { return b == "main" },
-				func(b string) bool { return true },
+				func(_ string) bool { return true },
 			)
+			m.submitModel.Renderer.SetAnnotation("feature-1", tree.BranchAnnotation{Scope: "CORE", ExplicitScope: "CORE"})
+			m.submitModel.Renderer.SetAnnotation("feature-2", tree.BranchAnnotation{Scope: "API", ExplicitScope: "API"})
+			m.submitModel.Renderer.SetAnnotation("feature-3", tree.BranchAnnotation{Scope: "UI", ExplicitScope: "UI"})
 			m.submitModel.RootBranch = "main"
 			return m, m.nextTick()
 		}
@@ -334,11 +343,10 @@ func (m *submitSimulationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case 5:
 			_, c := m.submitModel.Update(submit.ProgressUpdateMsg{BranchName: "feature-3", Status: submit.StatusDone, URL: "https://github.com/owner/repo/pull/103"})
 			cmds = append(cmds, c, m.nextTick())
-		case 6:
 			m.submitModel.Update(submit.GlobalMessageMsg("✓ All branches submitted"))
 			// We don't send ProgressCompleteMsg because it would trigger tea.Quit
 			m.submitModel.Done = true
-			cmds = append(cmds, tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+			cmds = append(cmds, tea.Tick(3*time.Second, func(_ time.Time) tea.Msg {
 				return simulationTickMsg(-1) // Signal reset
 			}))
 		}

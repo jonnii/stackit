@@ -1,3 +1,4 @@
+// Package submit provides a TUI component for displaying the progress of a stack submission.
 package submit
 
 import (
@@ -6,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
@@ -61,10 +63,12 @@ func NewModel(items []Item) *Model {
 	}
 }
 
+// Init initializes the model.
 func (m *Model) Init() tea.Cmd {
 	return m.Spinner.Tick
 }
 
+// Update handles messages and updates the model.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -142,14 +146,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View renders the model as a string.
 func (m *Model) View() string {
 	var b strings.Builder
-	b.WriteString("\n")
-
-	if m.GlobalMessage != "" {
-		b.WriteString(m.Styles.DimStyle.Render(m.GlobalMessage))
-		b.WriteString("\n\n")
-	}
 
 	if m.Renderer != nil {
 		// Update annotations based on items
@@ -171,7 +170,7 @@ func (m *Model) View() string {
 				case StatusDone:
 					ann.CustomLabel = m.Styles.DoneStyle.Render("✓")
 					if item.URL != "" {
-						ann.CustomLabel += " " + m.Styles.UrlStyle.Render("→ "+item.URL)
+						ann.CustomLabel += " " + m.Styles.URLStyle.Render("→ "+item.URL)
 					}
 				case StatusError:
 					ann.CustomLabel = m.Styles.ErrorStyle.Render("✗")
@@ -216,7 +215,7 @@ func (m *Model) View() string {
 			line := fmt.Sprintf("  %s %s %s", icon, branchName, status)
 
 			if item.Status == StatusDone && item.URL != "" {
-				line += " " + m.Styles.UrlStyle.Render("→ "+item.URL)
+				line += " " + m.Styles.URLStyle.Render("→ "+item.URL)
 			}
 			if item.Status == StatusError && item.Error != nil {
 				line += " " + m.Styles.ErrorStyle.Render(item.Error.Error())
@@ -239,11 +238,9 @@ func (m *Model) View() string {
 				failed++
 			}
 		}
-		b.WriteString("\n\n")
 		if failed > 0 {
+			b.WriteString("\n\n")
 			b.WriteString(m.Styles.ErrorStyle.Render(fmt.Sprintf("Completed: %d, Failed: %d", completed, failed)))
-		} else if completed > 0 {
-			b.WriteString(m.Styles.DoneStyle.Render(fmt.Sprintf("✓ All %d PRs submitted successfully", completed)))
 		}
 	}
 

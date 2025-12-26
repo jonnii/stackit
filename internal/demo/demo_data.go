@@ -20,7 +20,17 @@ type Branch struct {
 }
 
 // Demo stack structure - branching stack with no upstack from current branch
-// ... (trimmed for brevity)
+//
+// main
+// ├── feature/auth-base (#101) [AUTH]
+// │   ├── feature/auth-validation (#102) [AUTH]
+// │   │   └── feature/auth-login (#103) [AUTH] ← current
+// │   └── feature/auth-oauth (#105) [AUTH]
+// │       └── feature/auth-oauth-google (#106) [AUTH]
+// └── feature/api-refactor (#107) [API]
+//
+//	└── feature/api-v2 (#108) [API]
+
 var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-base",

@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
+	"stackit.dev/stackit/internal/tui/components/submit"
 )
 
 // Key constants for TUI interactions
@@ -22,21 +23,9 @@ const (
 	KeyTab   = "tab"
 )
 
-// SubmitItem represents a branch being submitted
-type SubmitItem struct {
-	BranchName string
-	Action     string // "create" or "update"
-	PRNumber   *int
-	Status     string // "pending", "submitting", "done", "error"
-	IsSkipped  bool
-	SkipReason string
-	URL        string
-	Error      error
-}
-
 // SubmitTUIModel is the bubbletea model for submit progress
 type SubmitTUIModel struct {
-	items      []SubmitItem
+	items      []submit.Item
 	currentIdx int
 	spinner    spinner.Model
 	done       bool
@@ -65,7 +54,7 @@ type SubmitResultMsg struct {
 type AllDoneMsg struct{}
 
 // NewSubmitTUIModel creates a new submit TUI model
-func NewSubmitTUIModel(items []SubmitItem, submitFunc func(idx int) tea.Cmd) SubmitTUIModel {
+func NewSubmitTUIModel(items []submit.Item, submitFunc func(idx int) tea.Cmd) SubmitTUIModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -242,7 +231,7 @@ func IsTTY() bool {
 }
 
 // RunSubmitTUI runs the submit TUI and returns when complete
-func RunSubmitTUI(items []SubmitItem, submitFunc func(idx int) tea.Cmd) error {
+func RunSubmitTUI(items []submit.Item, submitFunc func(idx int) tea.Cmd) error {
 	m := NewSubmitTUIModel(items, submitFunc)
 	// Use WithInput/WithOutput to avoid TTY requirement in non-interactive environments
 	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
@@ -251,7 +240,7 @@ func RunSubmitTUI(items []SubmitItem, submitFunc func(idx int) tea.Cmd) error {
 }
 
 // RunSubmitTUISimple runs a simple non-interactive version for non-TTY environments
-func RunSubmitTUISimple(items []SubmitItem, submitFunc func(idx int) (string, error), splog *Splog) error {
+func RunSubmitTUISimple(items []submit.Item, submitFunc func(idx int) (string, error), splog *Splog) error {
 	const (
 		actionUpdate  = "update"
 		actionCreated = "created"

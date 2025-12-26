@@ -14,6 +14,7 @@ import (
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/components/submit"
 	"stackit.dev/stackit/internal/tui/components/tree"
 	"stackit.dev/stackit/internal/utils"
 )
@@ -140,9 +141,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 	// TODO: Add interactive confirmation prompt if opts.Confirm is set
 
 	// Build progress items
-	progressItems := make([]tui.SubmitItem, len(submissionInfos))
+	progressItems := make([]submit.Item, len(submissionInfos))
 	for i, info := range submissionInfos {
-		progressItems[i] = tui.SubmitItem{
+		progressItems[i] = submit.Item{
 			BranchName: info.BranchName,
 			Action:     info.Action,
 			PRNumber:   info.PRNumber,

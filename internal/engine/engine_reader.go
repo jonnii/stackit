@@ -294,6 +294,7 @@ func (e *engineImpl) GetCommitCountInternal(branchName string) (int, error) {
 	}
 
 	// For real git, we'd use a git helper. I'll use git.GetCommitRange count.
+
 	commits, err := e.GetAllCommitsInternal(branchName, CommitFormatSHA)
 	if err != nil {
 		return 0, err

@@ -128,9 +128,9 @@ func ColorPRState(state string, isDraft bool) string {
 }
 
 // GetScopeColor returns a deterministic color for a scope string
-func GetScopeColor(scope string) lipgloss.Color {
+func GetScopeColor(scope string) (lipgloss.Color, bool) {
 	if scope == "" {
-		return lipgloss.Color("8") // Dim gray
+		return lipgloss.Color(""), false
 	}
 	// Simple hash to select from StackitColors
 	var hash uint32
@@ -139,13 +139,13 @@ func GetScopeColor(scope string) lipgloss.Color {
 	}
 	colorIndex := int(hash) % len(StackitColors)
 	color := StackitColors[colorIndex]
-	return lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", color[0], color[1], color[2]))
+	return lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", color[0], color[1], color[2])), true
 }
 
 // ColorScope colors a scope string deterministically
 func ColorScope(scope string) string {
-	if scope == "" {
-		return ""
+	if color, ok := GetScopeColor(scope); ok {
+		return lipgloss.NewStyle().Foreground(color).Render("[" + scope + "]")
 	}
-	return lipgloss.NewStyle().Foreground(GetScopeColor(scope)).Render("[" + scope + "]")
+	return ColorDim("[" + scope + "]")
 }

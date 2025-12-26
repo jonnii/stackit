@@ -3,7 +3,15 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
+
+func init() {
+	// Force color output for all tests in this file to ensure ANSI escape codes are generated
+	lipgloss.SetColorProfile(termenv.TrueColor)
+}
 
 // mockTreeData provides test data for tree rendering
 type mockTreeData struct {
@@ -319,5 +327,295 @@ func TestBranchAnnotation_CheckStatus(t *testing.T) {
 	}
 	if !strings.Contains(output, "✗") {
 		t.Errorf("expected failing check icon ✗, got: %s", output)
+	}
+}
+
+func TestStackTreeRenderer_ScopeColoring(t *testing.T) {
+	mock := &mockTreeData{
+		currentBranch: "feature-login",
+		trunk:         "main",
+		children: map[string][]string{
+			"main":              {"feature-auth-base", "feature-api-v1"},
+			"feature-auth-base": {"feature-login"},
+			"feature-api-v1":    {},
+			"feature-login":     {},
+		},
+		parents: map[string]string{
+			"feature-auth-base": "main",
+			"feature-login":     "feature-auth-base",
+			"feature-api-v1":    "main",
+		},
+		fixed: map[string]bool{
+			"main":              true,
+			"feature-auth-base": true,
+			"feature-login":     true,
+			"feature-api-v1":    true,
+		},
+	}
+
+	renderer := NewStackTreeRenderer(
+		mock.currentBranch,
+		mock.trunk,
+		mock.getChildren,
+		mock.getParent,
+		mock.isTrunk,
+		mock.isBranchFixed,
+	)
+
+	// Set scopes
+	renderer.SetAnnotation("feature-auth-base", BranchAnnotation{Scope: "AUTH", ExplicitScope: "AUTH"})
+	renderer.SetAnnotation("feature-login", BranchAnnotation{Scope: "AUTH"})
+	renderer.SetAnnotation("feature-api-v1", BranchAnnotation{Scope: "API", ExplicitScope: "API"})
+
+	lines := renderer.RenderStack("main", TreeRenderOptions{
+		Short: false,
+	})
+
+	output := strings.Join(lines, "\n")
+
+	// Get expected colors
+	authHex, _ := GetScopeColor("AUTH")
+
+	// Verify that the scope labels are present and colored
+	if !strings.Contains(output, "[AUTH]") {
+		t.Errorf("expected output to contain [AUTH]")
+	}
+	if !strings.Contains(output, "[API]") {
+		t.Errorf("expected output to contain [API]")
+	}
+
+	// Verify that tree lines are colored
+	authStyle := lipgloss.NewStyle().Foreground(authHex).Render("│")
+
+	if !strings.Contains(output, authStyle) {
+		t.Errorf("expected output to contain colored vertical line for AUTH scope")
+	}
+	// feature-api-v1 has no children, so it should not have a colored vertical line (│)
+}
+
+func TestStackTreeRenderer_InheritedScopeColoring(t *testing.T) {
+	mock := &mockTreeData{
+		currentBranch: "feature-login",
+		trunk:         "main",
+		children: map[string][]string{
+			"main":              {"feature-auth-base"},
+			"feature-auth-base": {"feature-login"},
+			"feature-login":     {},
+		},
+		parents: map[string]string{
+			"feature-auth-base": "main",
+			"feature-login":     "feature-auth-base",
+		},
+		fixed: map[string]bool{
+			"main":              true,
+			"feature-auth-base": true,
+			"feature-login":     true,
+		},
+	}
+
+	renderer := NewStackTreeRenderer(
+		mock.currentBranch,
+		mock.trunk,
+		mock.getChildren,
+		mock.getParent,
+		mock.isTrunk,
+		mock.isBranchFixed,
+	)
+
+	// Set scope only on the base branch
+	renderer.SetAnnotation("feature-auth-base", BranchAnnotation{Scope: "AUTH", ExplicitScope: "AUTH"})
+	// Inherited scope on child, but NO ExplicitScope
+	renderer.SetAnnotation("feature-login", BranchAnnotation{Scope: "AUTH"})
+
+	lines := renderer.RenderStack("main", TreeRenderOptions{
+		Short: false,
+	})
+
+	output := strings.Join(lines, "\n")
+
+	// Get expected colors
+	authHex, _ := GetScopeColor("AUTH")
+
+	// Verify that the scope label is present only for the base branch
+	if !strings.Contains(output, "feature-auth-base") || !strings.Contains(output, "[AUTH]") {
+		t.Errorf("expected base branch to have [AUTH] label")
+	}
+
+	// feature-login should NOT have the [AUTH] label but its symbol and tree lines should be colored
+	loginLine := ""
+	trailingLine := ""
+	for i, line := range lines {
+		if strings.Contains(line, "feature-login") {
+			loginLine = line
+			if i+1 < len(lines) {
+				trailingLine = lines[i+1]
+			}
+			break
+		}
+	}
+
+	if loginLine == "" {
+		t.Fatalf("could not find line for feature-login")
+	}
+
+	if strings.Contains(loginLine, "[AUTH]") {
+		t.Errorf("expected inherited branch to NOT have [AUTH] label")
+	}
+
+	authStyleSymbol := lipgloss.NewStyle().Foreground(authHex).Render("◉")
+	if !strings.Contains(loginLine, authStyleSymbol) {
+		t.Errorf("expected inherited branch symbol to be colored with AUTH scope. Line was: %q", loginLine)
+	}
+
+	authStyleVertical := lipgloss.NewStyle().Foreground(authHex).Render("│")
+	if !strings.Contains(trailingLine, authStyleVertical) {
+		t.Errorf("expected trailing line to be colored with AUTH scope. Line was: %q", trailingLine)
+	}
+}
+
+func TestStackTreeRenderer_BranchingScopeColoring(t *testing.T) {
+	mock := &mockTreeData{
+		currentBranch: "feature-1a",
+		trunk:         "main",
+		children: map[string][]string{
+			"main":       {"feature-1a", "feature-1b"},
+			"feature-1a": {},
+			"feature-1b": {},
+		},
+		parents: map[string]string{
+			"feature-1a": "main",
+			"feature-1b": "main",
+		},
+		fixed: map[string]bool{
+			"main":       true,
+			"feature-1a": true,
+			"feature-1b": true,
+		},
+	}
+
+	renderer := NewStackTreeRenderer(
+		mock.currentBranch,
+		mock.trunk,
+		mock.getChildren,
+		mock.getParent,
+		mock.isTrunk,
+		mock.isBranchFixed,
+	)
+
+	// Set scope on main
+	renderer.SetAnnotation("main", BranchAnnotation{Scope: "AUTH", ExplicitScope: "AUTH"})
+	renderer.SetAnnotation("feature-1a", BranchAnnotation{Scope: "AUTH"})
+	renderer.SetAnnotation("feature-1b", BranchAnnotation{Scope: "AUTH"})
+
+	lines := renderer.RenderStack("main", TreeRenderOptions{
+		Short: false,
+	})
+
+	output := strings.Join(lines, "\n")
+
+	// Get expected color for AUTH
+	authHex, _ := GetScopeColor("AUTH")
+	authStyleBranch := lipgloss.NewStyle().Foreground(authHex).Render("├──┘")
+
+	if !strings.Contains(output, authStyleBranch) {
+		t.Errorf("expected output to contain colored branching characters for AUTH scope. Output was:\n%s", output)
+	}
+}
+
+func TestStackTreeRenderer_ScopeColoringBoundaries(t *testing.T) {
+	// Setup a branching structure where one branch has a scope
+	// main
+	//   └─ base (A)
+	//       ├─ scoped-branch (B) [SCOPE-X]
+	//       └─ unscoped-branch (C)
+	mock := &mockTreeData{
+		currentBranch: "scoped-branch",
+		trunk:         "main",
+		children: map[string][]string{
+			"main": {"base"},
+			"base": {
+				"scoped-branch",
+				"unscoped-branch",
+			},
+			"scoped-branch":   {},
+			"unscoped-branch": {},
+		},
+		parents: map[string]string{
+			"base":            "main",
+			"scoped-branch":   "base",
+			"unscoped-branch": "base",
+		},
+		fixed: map[string]bool{
+			"main":            true,
+			"base":            true,
+			"scoped-branch":   true,
+			"unscoped-branch": true,
+		},
+	}
+
+	renderer := NewStackTreeRenderer(
+		mock.currentBranch,
+		mock.trunk,
+		mock.getChildren,
+		mock.getParent,
+		mock.isTrunk,
+		mock.isBranchFixed,
+	)
+
+	// Only scoped-branch has the scope
+	renderer.SetAnnotation("scoped-branch", BranchAnnotation{
+		Scope:         "SCOPE-X",
+		ExplicitScope: "SCOPE-X",
+	})
+	renderer.SetAnnotation("base", BranchAnnotation{Scope: ""})
+	renderer.SetAnnotation("unscoped-branch", BranchAnnotation{Scope: ""})
+
+	lines := renderer.RenderStack("main", TreeRenderOptions{
+		Short: false,
+	})
+
+	// Get colors
+	scopeXColor, _ := GetScopeColor("SCOPE-X")
+	scopeXStyle := lipgloss.NewStyle().Foreground(scopeXColor)
+	scopeXLine := scopeXStyle.Render("│")
+
+	// 1. unscoped-branch should NOT have the scope color in its vertical line
+	for _, line := range lines {
+		if strings.Contains(line, "unscoped-branch") {
+			if strings.Contains(line, scopeXLine) {
+				t.Errorf("unscoped-branch line should not contain SCOPE-X color. Line: %q", line)
+			}
+		}
+	}
+
+	// 2. The vertical line connecting scoped-branch to its UNSCOPED parent should NOT be colored
+	foundScoped := false
+	for i, line := range lines {
+		if strings.Contains(line, "scoped-branch") {
+			foundScoped = true
+			if i+1 < len(lines) {
+				nextLine := lines[i+1] // Vertical line below scoped-branch
+				if strings.Contains(nextLine, scopeXLine) {
+					t.Errorf("Vertical line connecting scoped-branch to unscoped parent should not be colored. Line: %q", nextLine)
+				}
+			}
+		}
+	}
+	if !foundScoped {
+		t.Error("scoped-branch not found in output")
+	}
+
+	// 3. The symbol for scoped-branch SHOULD be colored
+	scopeXSymbol := scopeXStyle.Render(CurrentBranchSymbol)
+	foundSymbol := false
+	for _, line := range lines {
+		if strings.Contains(line, "scoped-branch") {
+			if strings.Contains(line, scopeXSymbol) {
+				foundSymbol = true
+			}
+		}
+	}
+	if !foundSymbol {
+		t.Error("scoped-branch symbol should be colored")
 	}
 }

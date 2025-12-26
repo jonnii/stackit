@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
 // TrackOptions contains options for the track command
@@ -187,7 +188,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	trunk := eng.Trunk().Name
 
 	// Render the tree to get visual context for each branch
-	renderer := tui.NewStackTreeRenderer(
+	renderer := tree.NewStackTreeRenderer(
 		branchName,
 		trunk,
 		func(branchName string) []string {
@@ -212,7 +213,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	)
 
 	// Render the full tree from trunk
-	treeLines := renderer.RenderStack(trunk, tui.TreeRenderOptions{
+	treeLines := renderer.RenderStack(trunk, tree.RenderOptions{
 		Short:             true,
 		NoStyleBranchName: true, // We'll add our own coloring
 	})

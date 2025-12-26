@@ -9,12 +9,14 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
 // SubmitUI defines the interface for the full submit workflow display
 type SubmitUI interface {
 	// ShowStack displays the stack to be submitted
-	ShowStack(renderer *StackTreeRenderer, rootBranch string)
+	ShowStack(renderer *tree.StackTreeRenderer, rootBranch string)
 
 	// ShowRestack shows restack progress
 	ShowRestackStart()
@@ -75,9 +77,9 @@ func NewSimpleSubmitUI(splog *Splog) *SimpleSubmitUI {
 }
 
 // ShowStack displays the branch stack being submitted
-func (u *SimpleSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
+func (u *SimpleSubmitUI) ShowStack(renderer *tree.StackTreeRenderer, rootBranch string) {
 	u.splog.Info("Stack to submit:")
-	lines := renderer.RenderStack(rootBranch, TreeRenderOptions{})
+	lines := renderer.RenderStack(rootBranch, tree.RenderOptions{})
 	for _, line := range lines {
 		u.splog.Info("%s", line)
 	}
@@ -252,7 +254,7 @@ func (u *TTYSubmitUI) ensureProgramStarted() {
 }
 
 // ShowStack displays the branch stack being submitted
-func (u *TTYSubmitUI) ShowStack(renderer *StackTreeRenderer, rootBranch string) {
+func (u *TTYSubmitUI) ShowStack(renderer *tree.StackTreeRenderer, rootBranch string) {
 	u.model = newTTYSubmitModel(nil)
 	u.model.renderer = renderer
 	u.model.rootBranch = rootBranch
@@ -385,7 +387,7 @@ func (u *TTYSubmitUI) Complete() {
 
 type ttySubmitModel struct {
 	items         []SubmitItem
-	renderer      *StackTreeRenderer
+	renderer      *tree.StackTreeRenderer
 	rootBranch    string
 	spinner       spinner.Model
 	done          bool
@@ -563,7 +565,7 @@ func (m *ttySubmitModel) View() string {
 			m.renderer.SetAnnotation(item.BranchName, ann)
 		}
 
-		lines := m.renderer.RenderStack(m.rootBranch, TreeRenderOptions{})
+		lines := m.renderer.RenderStack(m.rootBranch, tree.RenderOptions{})
 		b.WriteString(strings.Join(lines, "\n"))
 	} else {
 		// Fallback to list view if no renderer

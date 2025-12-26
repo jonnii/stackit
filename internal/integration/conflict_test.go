@@ -142,4 +142,63 @@ func TestConflictResolution(t *testing.T) {
 
 		sh.Log("✓ Mid-stack conflict resolution test complete!")
 	})
+
+	t.Run("continue handles branching stack conflict", func(t *testing.T) {
+		t.Parallel()
+		sh := NewTestShell(t, binaryPath)
+
+		// 1. Build branching stack: main → branch-a → [branch-b, branch-c]
+		sh.Log("Building branching stack: main -> branch-a -> [branch-b, branch-c]")
+		sh.WriteFile("common.txt", "base").
+			Run("create branch-a -m 'a'").
+			OnBranch("branch-a")
+
+		sh.WriteFile("b.txt", "b").
+			Run("create branch-b -m 'b'").
+			OnBranch("branch-b")
+
+		sh.Checkout("branch-a").
+			WriteFile("c.txt", "c").
+			Run("create branch-c -m 'c'").
+			OnBranch("branch-c")
+
+		// 2. Introduce conflict in branch-a
+		sh.Log("Introducing conflict in branch-a...")
+		sh.Checkout("main").
+			WriteFile("common.txt", "main").
+			Git("commit -m 'main'").
+			Checkout("branch-a")
+
+		// 3. Run restack --upstack from branch-a
+		sh.Log("Running restack --upstack from branch-a...")
+		sh.RunExpectError("restack --upstack").
+			OutputContains("conflict").
+			OutputContains("branch-a")
+
+		// 4. Resolve conflict in branch-a
+		sh.Log("Resolving conflict in branch-a...")
+		sh.WriteFile("common.txt", "main\nplus a").
+			Run("continue")
+
+		// 5. Verify that both branch-b and branch-c were restacked
+		sh.Log("Verifying branch-b and branch-c were restacked...")
+
+		sh.Checkout("branch-b").
+			Run("info").
+			OutputContains("branch-b").
+			OutputContains("Parent: branch-a")
+
+		sh.Checkout("branch-c").
+			Run("info").
+			OutputContains("branch-c").
+			OutputContains("Parent: branch-a")
+
+		// Verify branch-a is parented to main
+		sh.Checkout("branch-a").
+			Run("info").
+			OutputContains("branch-a").
+			OutputContains("Parent: main")
+
+		sh.Log("✓ Branching stack conflict resolution test complete!")
+	})
 }

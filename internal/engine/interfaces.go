@@ -35,6 +35,8 @@ type BranchReader interface {
 	GetCommitDateInternal(branchName string) (time.Time, error)                     // Internal method for Branch type
 	GetCommitAuthorInternal(branchName string) (string, error)                      // Internal method for Branch type
 	GetRevisionInternal(branchName string) (string, error)                          // Internal method for Branch type
+	GetCommitCountInternal(branchName string) (int, error)                          // Internal method for Branch type
+	GetDiffStatsInternal(branchName string) (added int, deleted int, err error)     // Internal method for Branch type
 	GetAllCommitsInternal(branchName string, format CommitFormat) ([]string, error) // Internal method for Branch type
 	GetRelativeStackInternal(branchName string, rng StackRange) []Branch            // Internal method for Branch type
 

@@ -1,8 +1,8 @@
 package actions
 
 import (
-	"fmt"
 	"strings"
+	"sync"
 
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -10,7 +10,7 @@ import (
 
 // LogOptions contains options for the log command
 type LogOptions struct {
-	Style         string // "SHORT" or "FULL"
+	Style         string // "NORMAL" or "FULL"
 	Reverse       bool
 	Steps         *int
 	BranchName    string
@@ -19,9 +19,11 @@ type LogOptions struct {
 
 // LogAction displays the branch tree
 func LogAction(ctx *runtime.Context, opts LogOptions) error {
-	// Populate remote SHAs if needed
-	if err := ctx.Engine.PopulateRemoteShas(); err != nil {
-		return fmt.Errorf("failed to populate remote SHAs: %w", err)
+	// Populate remote SHAs if needed (only for FULL mode)
+	if opts.Style == "FULL" {
+		if err := ctx.Engine.PopulateRemoteShas(); err != nil {
+			ctx.Splog.Debug("Failed to populate remote SHAs: %v", err)
+		}
 	}
 
 	// Create tree renderer
@@ -60,18 +62,74 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	// Render the stack
 	// First, collect annotations for all branches in the stack
 	annotations := make(map[string]tui.BranchAnnotation)
-	for _, branch := range ctx.Engine.AllBranches() {
-		scope := ctx.Engine.GetScopeInternal(branch.Name)
-		if !scope.IsEmpty() {
-			annotations[branch.Name] = tui.BranchAnnotation{
-				Scope: scope.String(),
-			}
-		}
+	allBranches := ctx.Engine.AllBranches()
+
+	type result struct {
+		branchName string
+		annotation tui.BranchAnnotation
 	}
+	results := make(chan result, len(allBranches))
+	var wg sync.WaitGroup
+
+	for _, branch := range allBranches {
+		wg.Add(1)
+		go func(bName string) {
+			defer wg.Done()
+			branchObj := ctx.Engine.GetBranch(bName)
+			annotation := tui.BranchAnnotation{
+				Scope: ctx.Engine.GetScopeInternal(bName).String(),
+			}
+
+			// Local stats (always fast enough)
+			if !branchObj.IsTrunk() {
+				if count, err := branchObj.GetCommitCount(); err == nil {
+					annotation.CommitCount = count
+				}
+				if added, deleted, err := branchObj.GetDiffStats(); err == nil {
+					annotation.LinesAdded = added
+					annotation.LinesDeleted = deleted
+				}
+			}
+
+			// PR info (local metadata)
+			if !branchObj.IsTrunk() {
+				prInfo, _ := ctx.Engine.GetPrInfo(bName)
+				if prInfo != nil {
+					annotation.PRNumber = prInfo.Number
+					annotation.PRState = prInfo.State
+					annotation.IsDraft = prInfo.IsDraft
+				}
+			}
+
+			// CI status (only in FULL mode)
+			if opts.Style == "FULL" && !branchObj.IsTrunk() && ctx.GitHubClient != nil {
+				if status, err := ctx.GitHubClient.GetPRChecksStatus(ctx.Context, bName); err == nil && status != nil {
+					annotation.CheckStatus = "PASSING"
+					if status.Pending {
+						annotation.CheckStatus = "PENDING"
+					} else if !status.Passing {
+						annotation.CheckStatus = "FAILING"
+					}
+				}
+			}
+
+			results <- result{bName, annotation}
+		}(branch.Name)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for res := range results {
+		annotations[res.branchName] = res.annotation
+	}
+
 	renderer.SetAnnotations(annotations)
 
 	stackLines := renderer.RenderStack(opts.BranchName, tui.TreeRenderOptions{
-		Short:   opts.Style == "SHORT",
+		Short:   false, // We want the full tree characters with stats
 		Reverse: opts.Reverse,
 		Steps:   opts.Steps,
 	})

@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -21,6 +24,10 @@ type BranchAnnotation struct {
 	NeedsRestack bool
 	CustomLabel  string // Additional text to display after branch name
 	Scope        string
+	CommitCount  int
+	LinesAdded   int
+	LinesDeleted int
+	PRState      string // "OPEN", "MERGED", "CLOSED"
 }
 
 // TreeRenderOptions configures rendering behavior
@@ -81,6 +88,7 @@ func (r *StackTreeRenderer) RenderStack(branchName string, opts TreeRenderOption
 		reverse:           opts.Reverse,
 		branchName:        branchName,
 		indentLevel:       0,
+		parentScopes:      []string{},
 		steps:             opts.Steps,
 		omitCurrentBranch: opts.OmitCurrentBranch,
 		noStyleBranchName: opts.NoStyleBranchName,
@@ -119,6 +127,7 @@ type treeRenderArgs struct {
 	reverse           bool
 	branchName        string
 	indentLevel       int
+	parentScopes      []string
 	steps             *int
 	omitCurrentBranch bool
 	noStyleBranchName bool
@@ -163,6 +172,7 @@ func (r *StackTreeRenderer) getUpstackExclusiveLines(args treeRenderArgs) []stri
 			reverse:           args.reverse,
 			branchName:        child,
 			indentLevel:       childIndent,
+			parentScopes:      append(append([]string{}, args.parentScopes...), r.Annotations[args.branchName].Scope),
 			steps:             childSteps,
 			omitCurrentBranch: args.omitCurrentBranch,
 			noStyleBranchName: args.noStyleBranchName,
@@ -231,6 +241,7 @@ func (r *StackTreeRenderer) getDownstackExclusiveLines(args treeRenderArgs) []st
 			reverse:           args.reverse,
 			branchName:        branchName,
 			indentLevel:       args.indentLevel,
+			parentScopes:      args.parentScopes,
 			skipBranchingLine: true,
 			overallIndent:     args.overallIndent,
 		})
@@ -302,7 +313,7 @@ func (r *StackTreeRenderer) getBranchLines(args treeRenderArgs) []string {
 
 	// Branching line
 	if !args.skipBranchingLine && numChildren >= 2 {
-		result = append(result, r.getBranchingLine(numChildren, args.reverse, args.indentLevel))
+		result = append(result, r.getBranchingLine(numChildren, args.reverse, args.indentLevel, args.parentScopes))
 	}
 
 	// Branch info lines
@@ -318,14 +329,29 @@ func (r *StackTreeRenderer) getBranchLines(args treeRenderArgs) []string {
 	return result
 }
 
-func (r *StackTreeRenderer) getBranchingLine(numChildren int, reverse bool, indentLevel int) string {
+func (r *StackTreeRenderer) getBranchingLine(numChildren int, reverse bool, indentLevel int, parentScopes []string) string {
 	if numChildren < 2 {
 		return ""
 	}
 
-	prefix := strings.Repeat("│  ", indentLevel)
+	var prefixBuilder strings.Builder
+	for i := 0; i < indentLevel; i++ {
+		scope := ""
+		if i < len(parentScopes) {
+			scope = parentScopes[i]
+		}
+		prefixBuilder.WriteString(lipgloss.NewStyle().Foreground(GetScopeColor(scope)).Render("│") + "  ")
+	}
+	prefix := prefixBuilder.String()
 
 	var middle, last string
+	// Use current branch scope for branching characters
+	scope := ""
+	if indentLevel < len(parentScopes) {
+		scope = parentScopes[indentLevel]
+	}
+	style := lipgloss.NewStyle().Foreground(GetScopeColor(scope))
+
 	if reverse {
 		middle = "──┬"
 		last = "──┐"
@@ -334,33 +360,52 @@ func (r *StackTreeRenderer) getBranchingLine(numChildren int, reverse bool, inde
 		last = "──┘"
 	}
 
-	line := prefix + "├"
+	line := prefix + style.Render("├")
 	if numChildren > 2 {
-		line += strings.Repeat(middle, numChildren-2)
+		line += style.Render(strings.Repeat(middle, numChildren-2))
 	}
-	line += last
+	line += style.Render(last)
 
 	return line
 }
 
 func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 	isCurrent := args.branchName == r.currentBranch
+	annotation := r.Annotations[args.branchName]
+	isTrunk := r.isTrunk(args.branchName)
+	isMerged := annotation.PRState == "MERGED"
+	isClosed := annotation.PRState == "CLOSED"
+	isDim := isMerged || isClosed
 
 	// Get branch info with colors
 	branchName := args.branchName
 	coloredBranchName := ColorBranchName(branchName, isCurrent)
 
 	// Add annotation
-	annotation := r.Annotations[branchName]
 	coloredBranchName += r.formatAnnotationColored(annotation)
+
+	// Add compact stats
+	coloredBranchName += " " + r.formatCompactStats(annotation, isTrunk)
 
 	// Add restack indicator if needed
 	if !r.isBranchFixed(branchName) {
 		coloredBranchName += " " + ColorNeedsRestack("(needs restack)")
 	}
 
+	if isDim {
+		coloredBranchName = ColorDim(coloredBranchName)
+	}
+
 	var result []string
-	prefix := strings.Repeat("│  ", args.indentLevel)
+	var prefixBuilder strings.Builder
+	for i := 0; i < args.indentLevel; i++ {
+		scope := ""
+		if i < len(args.parentScopes) {
+			scope = args.parentScopes[i]
+		}
+		prefixBuilder.WriteString(lipgloss.NewStyle().Foreground(GetScopeColor(scope)).Render("│") + "  ")
+	}
+	prefix := prefixBuilder.String()
 
 	var symbol string
 	if isCurrent {
@@ -369,10 +414,17 @@ func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 		symbol = BranchSymbol
 	}
 
-	result = append(result, prefix+symbol+" "+coloredBranchName)
+	// Color the symbol and current branch line based on its own scope
+	scope := annotation.Scope
+	style := lipgloss.NewStyle().Foreground(GetScopeColor(scope))
+	if isDim {
+		style = style.Foreground(lipgloss.Color("8"))
+	}
+
+	result = append(result, prefix+style.Render(symbol)+" "+coloredBranchName)
 
 	// Add trailing line
-	result = append(result, prefix+"│")
+	result = append(result, prefix+style.Render("│"))
 
 	return result
 }
@@ -412,15 +464,32 @@ func (r *StackTreeRenderer) formatAnnotation(annotation BranchAnnotation, _ bool
 	return " " + strings.Join(parts, " ")
 }
 
-func (r *StackTreeRenderer) formatAnnotationColored(annotation BranchAnnotation) string {
+func (r *StackTreeRenderer) formatCompactStats(annotation BranchAnnotation, isTrunk bool) string {
 	var parts []string
 
 	if annotation.PRNumber != nil {
-		parts = append(parts, ColorPRNumber(*annotation.PRNumber))
+		parts = append(parts, fmt.Sprintf("#%d", *annotation.PRNumber))
 	}
 
+	if !isTrunk {
+		parts = append(parts, fmt.Sprintf("%d commits", annotation.CommitCount))
+		if annotation.LinesAdded > 0 || annotation.LinesDeleted > 0 {
+			parts = append(parts, fmt.Sprintf("+%d/-%d", annotation.LinesAdded, annotation.LinesDeleted))
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return ColorDim("[" + strings.Join(parts, " • ") + "]")
+}
+
+func (r *StackTreeRenderer) formatAnnotationColored(annotation BranchAnnotation) string {
+	var parts []string
+
 	if annotation.Scope != "" {
-		parts = append(parts, ColorDim("["+annotation.Scope+"]"))
+		parts = append(parts, ColorScope(annotation.Scope))
 	}
 
 	if annotation.PRAction != "" {
@@ -443,6 +512,12 @@ func (r *StackTreeRenderer) formatAnnotationColored(annotation BranchAnnotation)
 
 	if annotation.IsDraft {
 		parts = append(parts, ColorDim("(Draft)"))
+	}
+
+	if annotation.PRState == "MERGED" {
+		parts = append(parts, ColorDim("(Merged)"))
+	} else if annotation.PRState == "CLOSED" {
+		parts = append(parts, ColorDim("(Closed)"))
 	}
 
 	if annotation.CustomLabel != "" {

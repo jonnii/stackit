@@ -1,8 +1,13 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"fmt"
+	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"stackit.dev/stackit/internal/tui/components/submit"
 	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
@@ -24,6 +29,7 @@ func RegisterStory(story Story) {
 
 func init() {
 	registerTreeStories()
+	registerSubmitStories()
 }
 
 func registerTreeStories() {
@@ -184,4 +190,175 @@ func registerTreeStories() {
 			return model
 		},
 	})
+}
+
+func registerSubmitStories() {
+	mockData := &tree.MockTreeData{
+		CurrentBranch: "feature-3",
+		Trunk:         "main",
+		Children: map[string][]string{
+			"main":      {"feature-1"},
+			"feature-1": {"feature-2"},
+			"feature-2": {"feature-3"},
+			"feature-3": {},
+		},
+		Parents: map[string]string{
+			"feature-1": "main",
+			"feature-2": "feature-1",
+			"feature-3": "feature-2",
+		},
+		Fixed: map[string]bool{
+			"main":      true,
+			"feature-1": true,
+			"feature-2": true,
+			"feature-3": true,
+		},
+	}
+
+	createRenderer := func() *tree.StackTreeRenderer {
+		return tree.NewStackTreeRenderer(mockData.CurrentBranch, mockData.Trunk, mockData.GetChildren, mockData.GetParent, mockData.IsTrunk, mockData.IsBranchFixed)
+	}
+
+	RegisterStory(Story{
+		Name:        "Full Submission",
+		Category:    "Submit",
+		Description: "A simulated full submission process with state transitions",
+		CreateModel: func() tea.Model {
+			m := submit.NewModel(nil)
+			m.Renderer = createRenderer()
+			m.RootBranch = mockData.Trunk
+			return &submitSimulationModel{
+				submitModel: m,
+				startTime:   time.Now(),
+			}
+		},
+	})
+
+	RegisterStory(Story{
+		Name:        "Submission Error",
+		Category:    "Submit",
+		Description: "A submission with an error on one of the branches",
+		CreateModel: func() tea.Model {
+			m := submit.NewModel([]submit.Item{
+				{BranchName: "feature-1", Action: "update", Status: submit.StatusDone, URL: "https://github.com/owner/repo/pull/101"},
+				{BranchName: "feature-2", Action: "update", Status: submit.StatusError, Error: fmt.Errorf("failed to push branch: remote rejected")},
+				{BranchName: "feature-3", Action: "create", Status: submit.StatusPending},
+			})
+			m.Renderer = createRenderer()
+			m.RootBranch = mockData.Trunk
+			m.GlobalMessage = "Submitting 3 branches..."
+			m.Done = true
+			return m
+		},
+	})
+}
+
+type submitSimulationModel struct {
+	submitModel *submit.Model
+	step        int
+	startTime   time.Time
+}
+
+func (m *submitSimulationModel) Init() tea.Cmd {
+	return tea.Batch(
+		m.submitModel.Init(),
+		m.nextTick(),
+	)
+}
+
+func (m *submitSimulationModel) nextTick() tea.Cmd {
+	delay := 1 * time.Second
+	if m.step == 0 {
+		delay = 100 * time.Millisecond
+	}
+	return tea.Tick(delay, func(t time.Time) tea.Msg {
+		return simulationTickMsg(m.step)
+	})
+}
+
+type simulationTickMsg int
+
+func (m *submitSimulationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case simulationTickMsg:
+		if int(msg) == -1 {
+			// Reset simulation
+			m.step = 0
+			m.submitModel = submit.NewModel(nil)
+			m.submitModel.Renderer = tree.NewStackTreeRenderer(
+				"feature-3", "main",
+				func(b string) []string {
+					children := map[string][]string{
+						"main":      {"feature-1"},
+						"feature-1": {"feature-2"},
+						"feature-2": {"feature-3"},
+						"feature-3": {},
+					}
+					return children[b]
+				},
+				func(b string) string {
+					parents := map[string]string{
+						"feature-1": "main",
+						"feature-2": "feature-1",
+						"feature-3": "feature-2",
+					}
+					return parents[b]
+				},
+				func(b string) bool { return b == "main" },
+				func(b string) bool { return true },
+			)
+			m.submitModel.RootBranch = "main"
+			return m, m.nextTick()
+		}
+
+		m.step++
+		var cmds []tea.Cmd
+
+		switch m.step {
+		case 1:
+			_, c := m.submitModel.Update(submit.GlobalMessageMsg("Preparing branches..."))
+			cmds = append(cmds, c, m.nextTick())
+		case 2:
+			m.submitModel.Update(submit.PlanUpdateMsg{BranchName: "feature-1", Action: "update", Skip: true, SkipReason: "already up to date"})
+			m.submitModel.Update(submit.PlanUpdateMsg{BranchName: "feature-2", Action: "update"})
+			_, c := m.submitModel.Update(submit.PlanUpdateMsg{BranchName: "feature-3", Action: "create"})
+			cmds = append(cmds, c, m.nextTick())
+		case 3:
+			m.submitModel.Update(submit.GlobalMessageMsg("Submitting..."))
+			_, c := m.submitModel.Update(submit.ProgressUpdateMsg{BranchName: "feature-2", Status: submit.StatusSubmitting})
+			cmds = append(cmds, c, m.nextTick())
+		case 4:
+			m.submitModel.Update(submit.ProgressUpdateMsg{BranchName: "feature-2", Status: submit.StatusDone, URL: "https://github.com/owner/repo/pull/102"})
+			_, c := m.submitModel.Update(submit.ProgressUpdateMsg{BranchName: "feature-3", Status: submit.StatusSubmitting})
+			cmds = append(cmds, c, m.nextTick())
+		case 5:
+			_, c := m.submitModel.Update(submit.ProgressUpdateMsg{BranchName: "feature-3", Status: submit.StatusDone, URL: "https://github.com/owner/repo/pull/103"})
+			cmds = append(cmds, c, m.nextTick())
+		case 6:
+			m.submitModel.Update(submit.GlobalMessageMsg("✓ All branches submitted"))
+			// We don't send ProgressCompleteMsg because it would trigger tea.Quit
+			m.submitModel.Done = true
+			cmds = append(cmds, tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+				return simulationTickMsg(-1) // Signal reset
+			}))
+		}
+
+		return m, tea.Batch(cmds...)
+
+	case tea.KeyMsg:
+		if msg.String() == "q" || msg.String() == "esc" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	}
+
+	newModel, cmd := m.submitModel.Update(msg)
+	m.submitModel = newModel.(*submit.Model)
+	return m, cmd
+}
+
+func (m *submitSimulationModel) View() string {
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).MarginTop(1)
+	return m.submitModel.View() + "\n" +
+		helpStyle.Render(fmt.Sprintf("Simulation step: %d/6", m.step)) + "\n" +
+		helpStyle.Render("q: back")
 }

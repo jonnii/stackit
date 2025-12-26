@@ -47,51 +47,49 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Global handlers
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.storyModel != nil {
-			var cmd tea.Cmd
-			m.storyModel, cmd = m.storyModel.Update(msg)
-			return m, cmd
-		}
-		return m, nil
+	}
 
-	case tea.KeyMsg:
-		if m.state == stateList {
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "up", "k":
-				if m.cursor > 0 {
-					m.cursor--
-				}
-			case "down", "j":
-				if m.cursor < len(m.stories)-1 {
-					m.cursor++
-				}
-			case "enter":
-				m.state = stateStory
-				m.activeStory = &m.stories[m.cursor]
-				m.storyModel = m.activeStory.CreateModel()
-				return m, m.storyModel.Init()
-			}
-		} else {
-			// Story mode
-			var cmd tea.Cmd
-			newStoryModel, cmd := m.storyModel.Update(msg)
-			m.storyModel = newStoryModel
-
-			// Check if story model quit
-			if msg.String() == "q" || msg.String() == "esc" {
+	if m.state == stateStory {
+		// Handle global back-to-list keys
+		if k, ok := msg.(tea.KeyMsg); ok {
+			if k.String() == "q" || k.String() == "esc" {
 				m.state = stateList
 				m.activeStory = nil
 				m.storyModel = nil
 				return m, nil
 			}
+		}
 
-			return m, cmd
+		// Pass ALL messages to the active story
+		var cmd tea.Cmd
+		m.storyModel, cmd = m.storyModel.Update(msg)
+		return m, cmd
+	}
+
+	// List mode handling
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.stories)-1 {
+				m.cursor++
+			}
+		case "enter":
+			m.state = stateStory
+			m.activeStory = &m.stories[m.cursor]
+			m.storyModel = m.activeStory.CreateModel()
+			return m, m.storyModel.Init()
 		}
 	}
 

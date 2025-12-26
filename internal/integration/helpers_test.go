@@ -1,7 +1,9 @@
 package integration
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -217,6 +219,32 @@ func (s *TestShell) OutputNotContains(substr string) *TestShell {
 // =============================================================================
 // Assertions
 // =============================================================================
+
+// GetLatestSnapshotID returns the ID of the most recent undo snapshot
+func (s *TestShell) GetLatestSnapshotID() string {
+	s.t.Helper()
+	undoDir := filepath.Join(s.scene.Dir, ".git", "stackit", "undo")
+	entries, err := os.ReadDir(undoDir)
+	require.NoError(s.t, err)
+	require.NotEmpty(s.t, entries, "no snapshots found")
+
+	var latest string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".json") {
+			if latest == "" || entry.Name() > latest {
+				latest = entry.Name()
+			}
+		}
+	}
+	return strings.TrimSuffix(latest, ".json")
+}
+
+// UndoLatest undos the last operation using the latest snapshot
+func (s *TestShell) UndoLatest() *TestShell {
+	s.t.Helper()
+	id := s.GetLatestSnapshotID()
+	return s.Run("undo --snapshot " + id + " --yes")
+}
 
 // OnBranch asserts we're on the expected branch
 func (s *TestShell) OnBranch(expected string) *TestShell {

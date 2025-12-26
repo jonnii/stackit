@@ -9,7 +9,10 @@ import (
 
 // newUndoCmd creates the undo command
 func newUndoCmd() *cobra.Command {
-	var snapshotID string
+	var (
+		snapshotID string
+		force      bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "undo",
@@ -33,12 +36,14 @@ state without prompting.`,
 			// Run undo action
 			return undo.Action(ctx, undo.Options{
 				SnapshotID: snapshotID,
+				Force:      force,
 			})
 		},
 	}
 
 	// Add flags
 	cmd.Flags().StringVar(&snapshotID, "snapshot", "", "Specific snapshot ID to restore (skips interactive selection)")
+	cmd.Flags().BoolVarP(&force, "yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

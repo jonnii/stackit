@@ -23,15 +23,10 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 		// Check if this is a conflict that needs continuation state
 		if batchResult.ConflictBranch != "" {
 			// Persist continuation state
-			currentBranch := eng.CurrentBranch()
-			currentBranchName := ""
-			if currentBranch != nil {
-				currentBranchName = currentBranch.Name
-			}
 			continuation := &config.ContinuationState{
 				BranchesToRestack:     batchResult.RemainingBranches,
 				RebasedBranchBase:     batchResult.RebasedBranchBase,
-				CurrentBranchOverride: currentBranchName,
+				CurrentBranchOverride: batchResult.ConflictBranch,
 			}
 
 			if err := config.PersistContinuationState(repoRoot, continuation); err != nil {
@@ -49,15 +44,10 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 	// Check if there was a conflict (even if no error was returned)
 	if batchResult.ConflictBranch != "" {
 		// Persist continuation state
-		currentBranch := eng.CurrentBranch()
-		currentBranchName := ""
-		if currentBranch != nil {
-			currentBranchName = currentBranch.Name
-		}
 		continuation := &config.ContinuationState{
 			BranchesToRestack:     batchResult.RemainingBranches,
 			RebasedBranchBase:     batchResult.RebasedBranchBase,
-			CurrentBranchOverride: currentBranchName,
+			CurrentBranchOverride: batchResult.ConflictBranch,
 		}
 
 		if err := config.PersistContinuationState(repoRoot, continuation); err != nil {

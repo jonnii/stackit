@@ -17,51 +17,129 @@ func TestConflictResolution(t *testing.T) {
 
 	t.Run("continue through cascading conflicts in stack", func(t *testing.T) {
 		t.Parallel()
-		// TODO: Implement multi-level conflict resolution test
-		//
-		// Scenario:
+		sh := NewTestShell(t, binaryPath)
+
 		// 1. Build stack: main → branch-a → branch-b → branch-c
 		//    where each branch modifies the SAME file (to create conflicts)
+		sh.Log("Building stack with potential conflicts...")
+		sh.WriteFile("common.txt", "initial content").
+			Run("create branch-a -m 'Branch A change'").
+			OnBranch("branch-a")
+
+		sh.WriteFile("common.txt", "branch a content\nbranch b change").
+			Run("create branch-b -m 'Branch B change'").
+			OnBranch("branch-b")
+
+		sh.WriteFile("common.txt", "branch a content\nbranch b content\nbranch c change").
+			Run("create branch-c -m 'Branch C change'").
+			OnBranch("branch-c")
+
 		// 2. Add a new commit to main that modifies the same file
+		sh.Log("Adding conflicting change to main...")
+		sh.Checkout("main").
+			WriteFile("common.txt", "main content").
+			Git("commit -m 'Main change'")
+
 		// 3. Run `stackit restack` from branch-a
+		sh.Log("Starting restack from branch-a...")
+		sh.Checkout("branch-a").
+			RunExpectError("restack --upstack").
+			OutputContains("conflict").
+			OutputContains("branch-a")
+
 		// 4. Verify: restack stops at branch-a with conflict
+		sh.Log("Verifying conflict on branch-a...")
+		sh.Git("status").OutputContains("rebase in progress")
+
 		// 5. Resolve conflict, run `stackit continue`
+		sh.Log("Resolving conflict on branch-a and continuing...")
+		sh.WriteFile("common.txt", "main content\nbranch a content").
+			RunExpectError("continue").
+			OutputContains("conflict").
+			OutputContains("branch-b")
+
 		// 6. Verify: restack continues, stops at branch-b with conflict
+		sh.Log("Verifying conflict on branch-b...")
+		sh.Git("status").OutputContains("rebase in progress")
+
 		// 7. Resolve conflict, run `stackit continue`
+		sh.Log("Resolving conflict on branch-b and continuing...")
+		sh.WriteFile("common.txt", "main content\nbranch a content\nbranch b content").
+			RunExpectError("continue").
+			OutputContains("conflict").
+			OutputContains("branch-c")
+
 		// 8. Verify: restack continues, stops at branch-c with conflict
+		sh.Log("Verifying conflict on branch-c...")
+		sh.Git("status").OutputContains("rebase in progress")
+
 		// 9. Resolve conflict, run `stackit continue`
+		sh.Log("Resolving conflict on branch-c and completing...")
+		sh.WriteFile("common.txt", "main content\nbranch a content\nbranch b content\nbranch c content").
+			Run("continue")
+
 		// 10. Verify: all branches are now successfully restacked
-		//
-		// This tests:
-		// - Continuation state persistence across multiple conflicts
-		// - Proper resumption of restack after conflict resolution
-		// - Cascading conflicts through a deep stack
+		sh.Log("Verifying final stack state...")
+		sh.Checkout("branch-c").
+			Run("info").
+			OutputContains("branch-c").
+			OutputContains("Parent: branch-b")
 
-		t.Skip("TODO: Implement cascading conflict resolution test")
+		sh.Checkout("branch-b").
+			Run("info").
+			OutputContains("branch-b").
+			OutputContains("Parent: branch-a")
 
-		_ = binaryPath // Will be used when implemented
+		sh.Checkout("branch-a").
+			Run("info").
+			OutputContains("branch-a").
+			OutputContains("Parent: main")
+
+		sh.Log("✓ Cascading conflict resolution test complete!")
 	})
 
 	t.Run("continue preserves stack structure after mid-stack conflict", func(t *testing.T) {
 		t.Parallel()
-		// TODO: Implement mid-stack conflict preservation test
-		//
-		// Scenario:
+		sh := NewTestShell(t, binaryPath)
+
 		// 1. Build stack: main → a → b → c → d
-		// 2. Amend branch-b with conflicting changes
+		sh.Log("Building stack: main -> a -> b -> c -> d")
+		sh.WriteFile("a.txt", "a").Run("create a -m 'a'")
+		sh.WriteFile("b.txt", "b").Run("create b -m 'b'")
+		sh.WriteFile("c.txt", "c").Run("create c -m 'c'")
+		sh.WriteFile("d.txt", "d").Run("create d -m 'd'")
+
+		// 2. Amend branch-b with conflicting changes for c
+		sh.Log("Amending branch-b with conflicting change for branch-c")
+		sh.Checkout("b")
+		sh.WriteFile("c.txt", "conflict with c").
+			Git("commit --amend --no-edit")
+
 		// 3. Run `stackit restack --upstack` from branch-b
+		sh.Log("Running restack --upstack from branch-b")
+		sh.RunExpectError("restack --upstack").
+			OutputContains("conflict").
+			OutputContains("restacking c")
+
 		// 4. Verify: conflict occurs at branch-c
+		sh.Log("Verifying conflict on branch-c")
+		sh.Git("status").OutputContains("rebase in progress")
+
 		// 5. Resolve conflict, run continue
+		sh.Log("Resolving conflict on branch-c and continuing")
+		sh.WriteFile("c.txt", "conflict with c resolved").
+			Run("continue")
+
 		// 6. Verify: branch-c and branch-d are properly restacked
+		sh.Log("Verifying branch-c and branch-d are restacked")
+		sh.Checkout("d").Run("info").OutputContains("d").OutputContains("Parent: c")
+		sh.Checkout("c").Run("info").OutputContains("c").OutputContains("Parent: b")
+
 		// 7. Verify: parent relationships are preserved correctly
-		//
-		// This tests:
-		// - Restack from mid-stack position
-		// - Conflict in middle of upstack chain
-		// - Preservation of deep stack structure
+		sh.Log("Verifying stack integrity")
+		sh.Checkout("b").Run("info").OutputContains("b").OutputContains("Parent: a")
+		sh.Checkout("a").Run("info").OutputContains("a").OutputContains("Parent: main")
 
-		t.Skip("TODO: Implement mid-stack conflict preservation test")
-
-		_ = binaryPath // Will be used when implemented
+		sh.Log("✓ Mid-stack conflict resolution test complete!")
 	})
 }

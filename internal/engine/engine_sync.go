@@ -390,21 +390,32 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 }
 
 // ContinueRebase continues an in-progress rebase
-func (e *engineImpl) ContinueRebase(ctx context.Context, rebasedBranchBase string) (ContinueRebaseResult, error) {
+func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, rebasedBranchBase string) (ContinueRebaseResult, error) {
 	// Call git rebase --continue
 	result, err := git.RebaseContinue(ctx)
 	if err != nil {
-		return ContinueRebaseResult{Result: int(git.RebaseConflict)}, err
+		return ContinueRebaseResult{Result: int(git.RebaseConflict), BranchName: branchName}, err
 	}
 
 	if result == git.RebaseConflict {
-		return ContinueRebaseResult{Result: int(git.RebaseConflict)}, nil
+		return ContinueRebaseResult{Result: int(git.RebaseConflict), BranchName: branchName}, nil
 	}
 
-	// Get current branch after successful rebase
-	branchName, err := git.GetCurrentBranch()
+	// Get the new rebased SHA
+	newRev, err := git.RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
 	if err != nil {
-		return ContinueRebaseResult{}, fmt.Errorf("failed to get current branch: %w", err)
+		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to get new revision after rebase: %w", err)
+	}
+
+	// Update the branch reference to the new rebased commit
+	_, err = git.RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, newRev)
+	if err != nil {
+		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to update branch reference %s: %w", branchName, err)
+	}
+
+	// Checkout the branch to re-attach HEAD
+	if err := git.CheckoutBranch(ctx, branchName); err != nil {
+		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
 	// Update metadata for the rebased branch

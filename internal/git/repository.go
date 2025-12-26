@@ -57,11 +57,19 @@ func (r *Repository) GetRepoRoot() string {
 
 // GetReference returns a reference by name
 func (r *Repository) GetReference(name string) (*plumbing.Reference, error) {
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	return r.Reference(plumbing.ReferenceName(name), true)
 }
 
 // GetBranchNames returns all branch names
 func (r *Repository) GetBranchNames() ([]string, error) {
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	branches, err := r.Branches()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branches: %w", err)
@@ -83,6 +91,10 @@ func (r *Repository) GetBranchNames() ([]string, error) {
 
 // GetCurrentBranch returns the current branch name
 func (r *Repository) GetCurrentBranch() (string, error) {
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	head, err := r.Head()
 	if err != nil {
 		return "", fmt.Errorf("failed to get HEAD: %w", err)

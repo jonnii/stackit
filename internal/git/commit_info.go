@@ -46,6 +46,10 @@ func GetCommitAuthor(branchName string) (string, error) {
 		return "", fmt.Errorf("failed to resolve branch reference: %w", err)
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit: %w", err)
@@ -128,6 +132,10 @@ func iterateCommits(repo *Repository, headHash, baseHash plumbing.Hash) ([]*obje
 
 // resolveRefHash resolves a ref (branch name, SHA, or ref path) to a hash
 func resolveRefHash(repo *Repository, ref string) (plumbing.Hash, error) {
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	// 1. Try as a full reference name
 	if r, err := repo.Reference(plumbing.ReferenceName(ref), true); err == nil {
 		return r.Hash(), nil
@@ -170,12 +178,16 @@ func GetCommitMessages(branchName string) ([]string, error) {
 		return nil, err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	// Resolve branch head
 	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
 	if err != nil {
+		goGitMu.Unlock()
 		return nil, fmt.Errorf("failed to get branch reference: %w", err)
 	}
 	headHash := branchRef.Hash()
+	goGitMu.Unlock()
 
 	// Resolve base (parent revision or zero)
 	var baseHash plumbing.Hash
@@ -215,12 +227,16 @@ func GetCommitSubject(branchName string) (string, error) {
 		return "", err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	// Resolve branch head
 	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
 	if err != nil {
+		goGitMu.Unlock()
 		return "", fmt.Errorf("failed to get branch reference: %w", err)
 	}
 	headHash := branchRef.Hash()
+	goGitMu.Unlock()
 
 	// Resolve base (parent revision or zero)
 	var baseHash plumbing.Hash
@@ -290,7 +306,10 @@ func GetCommitHistorySHAs(branchName string) ([]string, error) {
 		return nil, err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	goGitMu.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get branch reference: %w", err)
 	}

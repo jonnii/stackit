@@ -82,6 +82,10 @@ func GetCurrentBranch() (string, error) {
 		return "", err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	head, err := repo.Head()
 	if err != nil {
 		return "", fmt.Errorf("failed to get HEAD: %w", err)

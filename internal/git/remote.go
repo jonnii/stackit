@@ -15,8 +15,11 @@ func PruneRemote(remote string) error {
 		return err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	r, err := repo.Remote(remote)
 	if err != nil {
+		goGitMu.Unlock()
 		return err
 	}
 
@@ -24,6 +27,7 @@ func PruneRemote(remote string) error {
 	err = r.Fetch(&gogit.FetchOptions{
 		Prune: true,
 	})
+	goGitMu.Unlock()
 	if err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
 		// Prune is not critical, just log and continue
 		return nil //nolint:nilerr
@@ -37,6 +41,10 @@ func GetRemote() string {
 	if err != nil {
 		return "origin"
 	}
+
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
 
 	// Try to get current branch
 	head, err := repo.Head()
@@ -63,13 +71,19 @@ func FetchRemoteShas(remote string) (map[string]string, error) {
 		return nil, err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	r, err := repo.Remote(remote)
+	goGitMu.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote %s: %w", remote, err)
 	}
 
 	// List remote references
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	refs, err := r.List(&gogit.ListOptions{})
+	goGitMu.Unlock()
 	if err != nil {
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) || errors.Is(err, gogit.NoErrAlreadyUpToDate) {
 			return make(map[string]string), nil

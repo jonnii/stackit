@@ -79,7 +79,9 @@ func NewSimpleSubmitUI(splog *Splog) *SimpleSubmitUI {
 // ShowStack displays the branch stack being submitted
 func (u *SimpleSubmitUI) ShowStack(renderer *tree.StackTreeRenderer, rootBranch string) {
 	u.splog.Info("Stack to submit:")
-	lines := renderer.RenderStack(rootBranch, tree.RenderOptions{})
+	lines := renderer.RenderStack(rootBranch, tree.RenderOptions{
+		HideStats: true,
+	})
 	for _, line := range lines {
 		u.splog.Info("%s", line)
 	}
@@ -565,7 +567,9 @@ func (m *ttySubmitModel) View() string {
 			m.renderer.SetAnnotation(item.BranchName, ann)
 		}
 
-		lines := m.renderer.RenderStack(m.rootBranch, tree.RenderOptions{})
+		lines := m.renderer.RenderStack(m.rootBranch, tree.RenderOptions{
+			HideStats: true,
+		})
 		b.WriteString(strings.Join(lines, "\n"))
 	} else {
 		// Fallback to list view if no renderer

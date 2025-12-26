@@ -47,6 +47,7 @@ type RenderOptions struct {
 	Steps             *int
 	OmitCurrentBranch bool
 	NoStyleBranchName bool
+	HideStats         bool
 }
 
 // StackTreeRenderer renders branch trees with annotations
@@ -102,6 +103,7 @@ func (r *StackTreeRenderer) RenderStack(branchName string, opts RenderOptions) [
 		steps:             opts.Steps,
 		omitCurrentBranch: opts.OmitCurrentBranch,
 		noStyleBranchName: opts.NoStyleBranchName,
+		hideStats:         opts.HideStats,
 		overallIndent:     &overallIndent,
 	}
 
@@ -141,6 +143,7 @@ type treeRenderArgs struct {
 	steps             *int
 	omitCurrentBranch bool
 	noStyleBranchName bool
+	hideStats         bool
 	skipBranchingLine bool
 	overallIndent     *int
 }
@@ -195,6 +198,7 @@ func (r *StackTreeRenderer) getUpstackExclusiveLines(args treeRenderArgs) []stri
 			steps:             childSteps,
 			omitCurrentBranch: args.omitCurrentBranch,
 			noStyleBranchName: args.noStyleBranchName,
+			hideStats:         args.hideStats,
 			overallIndent:     args.overallIndent,
 		})
 
@@ -420,7 +424,7 @@ func (r *StackTreeRenderer) getInfoLines(args treeRenderArgs) []string {
 	coloredBranchName += r.FormatAnnotationColored(annotation)
 
 	// Add compact stats
-	coloredBranchName += " " + r.formatCompactStats(annotation, isTrunk)
+	coloredBranchName += " " + r.formatCompactStats(annotation, isTrunk, args.hideStats)
 
 	// Add restack indicator if needed
 	if !r.isBranchFixed(branchName) {
@@ -518,14 +522,14 @@ func (r *StackTreeRenderer) formatAnnotation(annotation BranchAnnotation, _ bool
 	return " " + strings.Join(parts, " ")
 }
 
-func (r *StackTreeRenderer) formatCompactStats(annotation BranchAnnotation, isTrunk bool) string {
+func (r *StackTreeRenderer) formatCompactStats(annotation BranchAnnotation, isTrunk bool, hideStats bool) string {
 	var parts []string
 
 	if annotation.PRNumber != nil {
 		parts = append(parts, fmt.Sprintf("#%d", *annotation.PRNumber))
 	}
 
-	if !isTrunk {
+	if !isTrunk && !hideStats {
 		parts = append(parts, fmt.Sprintf("%d commits", annotation.CommitCount))
 		if annotation.LinesAdded > 0 || annotation.LinesDeleted > 0 {
 			parts = append(parts, fmt.Sprintf("+%d/-%d", annotation.LinesAdded, annotation.LinesDeleted))

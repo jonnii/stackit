@@ -537,6 +537,11 @@ func UpdateBranchRef(branchName, commitSHA string) error {
 	// Update the reference
 	refName := plumbing.ReferenceName("refs/heads/" + branchName)
 	ref := plumbing.NewHashReference(refName, hash)
+
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	if err := repo.Storer.SetReference(ref); err != nil {
 		return fmt.Errorf("failed to update branch ref: %w", err)
 	}

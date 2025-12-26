@@ -77,20 +77,21 @@ func GetCommitSHA(branchName string, offset int) (string, error) {
 		return "", err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
 	// Resolve branch reference
 	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
 	if err != nil {
+		goGitMu.Unlock()
 		return "", fmt.Errorf("failed to get branch reference: %w", err)
 	}
 
-	// Synchronize go-git operations to prevent concurrent packfile access
-	goGitMu.Lock()
-	defer goGitMu.Unlock()
-
 	commit, err := repo.CommitObject(branchRef.Hash())
 	if err != nil {
+		goGitMu.Unlock()
 		return "", fmt.Errorf("failed to get commit: %w", err)
 	}
+	defer goGitMu.Unlock()
 
 	// Walk back offset number of commits
 	for i := 0; i < offset; i++ {

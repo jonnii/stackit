@@ -138,6 +138,10 @@ func GetRebaseHead() (string, error) {
 		return "", err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	// Try the standard rebase head refs
 	refs := []plumbing.ReferenceName{
 		"refs/rebase-merge/head",

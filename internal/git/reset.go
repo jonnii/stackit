@@ -32,6 +32,10 @@ func GetRemoteSha(remote, branchName string) (string, error) {
 		return "", err
 	}
 
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	refName := plumbing.ReferenceName(fmt.Sprintf("refs/remotes/%s/%s", remote, branchName))
 	ref, err := repo.Reference(refName, true)
 	if err != nil {

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -485,7 +486,10 @@ func (r *StackTreeRenderer) formatShortLines(lines []string, args treeRenderArgs
 
 		if circleIndex != -1 && arrowIndex != -1 {
 			// Extract branch name to check if it's current
-			branchNameAndDetails := line[arrowIndex+1:]
+			// arrowIndex is a byte index, need to skip full UTF-8 character
+			arrowRune := '▸'
+			arrowWidth := utf8.RuneLen(arrowRune)
+			branchNameAndDetails := line[arrowIndex+arrowWidth:]
 			branchName := strings.Fields(branchNameAndDetails)[0]
 			isCurrent := !args.noStyleBranchName && r.currentBranch != "" && branchName == r.currentBranch
 

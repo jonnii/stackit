@@ -64,8 +64,6 @@ Date:    ` + date,
 	rootCmd.AddCommand(newConfigCmd())
 
 	// Add aliases
-	rootCmd.AddCommand(navigation.NewLsCmd())
-	rootCmd.AddCommand(navigation.NewLlCmd())
 	rootCmd.AddCommand(stack.NewSsCmd())
 
 	return rootCmd

@@ -1,7 +1,6 @@
 package navigation_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -75,20 +74,5 @@ func TestLogCommand(t *testing.T) {
 
 		require.NoError(t, err, "log command failed: %s", output)
 		require.Contains(t, output, "feature")
-	})
-
-	t.Run("log subcommands and top-level aliases", func(t *testing.T) {
-		t.Parallel()
-		s := scenario.NewScenarioParallel(t, testhelpers.BasicSceneSetup).WithBinaryPath(binaryPath)
-
-		commands := []string{"log short", "log long", "ls", "ll", "log ls", "log ll"}
-		for _, cmdStr := range commands {
-			t.Run(cmdStr, func(t *testing.T) {
-				args := strings.Fields(cmdStr)
-				output, err := s.RunCliAndGetOutput(args...)
-				require.NoError(t, err, "%s command failed: %s", cmdStr, output)
-				require.Contains(t, output, "main")
-			})
-		}
 	})
 }

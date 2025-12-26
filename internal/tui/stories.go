@@ -120,4 +120,66 @@ func registerTreeStories() {
 			return tree.NewModel(renderer)
 		},
 	})
+
+	RegisterStory(Story{
+		Name:        "Stack Submission",
+		Category:    "Tree",
+		Description: "The configuration view before submitting a stack, showing planned actions",
+		CreateModel: func() tea.Model {
+			mock := &tree.MockTreeData{
+				CurrentBranch: "feature-3",
+				Trunk:         "main",
+				Children: map[string][]string{
+					"main":      {"feature-1"},
+					"feature-1": {"feature-2"},
+					"feature-2": {"feature-3"},
+					"feature-3": {},
+				},
+				Parents: map[string]string{
+					"feature-1": "main",
+					"feature-2": "feature-1",
+					"feature-3": "feature-2",
+				},
+				Fixed: map[string]bool{
+					"main":      true,
+					"feature-1": true,
+					"feature-2": true,
+					"feature-3": true,
+				},
+			}
+			renderer := tree.NewStackTreeRenderer(mock.CurrentBranch, mock.Trunk, mock.GetChildren, mock.GetParent, mock.IsTrunk, mock.IsBranchFixed)
+
+			pr1 := 101
+			renderer.SetAnnotation("feature-1", tree.BranchAnnotation{
+				PRNumber:      &pr1,
+				PRAction:      "skip",
+				CustomLabel:   "(up to date)",
+				Scope:         "CORE",
+				ExplicitScope: "CORE",
+				CommitCount:   0,
+			})
+
+			pr2 := 102
+			renderer.SetAnnotation("feature-2", tree.BranchAnnotation{
+				PRNumber:      &pr2,
+				PRAction:      "update",
+				Scope:         "API",
+				ExplicitScope: "API",
+				CommitCount:   3,
+				LinesAdded:    45,
+				LinesDeleted:  12,
+			})
+
+			renderer.SetAnnotation("feature-3", tree.BranchAnnotation{
+				PRAction:      "create",
+				Scope:         "UI",
+				ExplicitScope: "UI",
+				CommitCount:   5,
+				LinesAdded:    120,
+				LinesDeleted:  5,
+			})
+
+			return tree.NewModel(renderer)
+		},
+	})
 }

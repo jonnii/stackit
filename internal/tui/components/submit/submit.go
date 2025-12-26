@@ -1,3 +1,4 @@
+// Package submit provides a TUI component for displaying the progress of a stack submission.
 package submit
 
 import (
@@ -22,7 +23,7 @@ type Styles struct {
 	DoneStyle    lipgloss.Style
 	ErrorStyle   lipgloss.Style
 	BranchStyle  lipgloss.Style
-	UrlStyle     lipgloss.Style
+	URLStyle     lipgloss.Style
 	DimStyle     lipgloss.Style
 }
 
@@ -33,14 +34,18 @@ func DefaultStyles() Styles {
 		DoneStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("42")),
 		ErrorStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
 		BranchStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true),
-		UrlStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
+		URLStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		DimStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 	}
 }
 
 const (
+	// StatusSubmitting indicates the branch is currently being submitted
 	StatusSubmitting = "submitting"
-	StatusDone       = "done"
-	StatusError      = "error"
-	StatusPending    = "pending"
+	// StatusDone indicates the branch submission was successful
+	StatusDone = "done"
+	// StatusError indicates the branch submission failed
+	StatusError = "error"
+	// StatusPending indicates the branch is waiting to be submitted
+	StatusPending = "pending"
 )

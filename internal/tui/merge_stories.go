@@ -10,15 +10,11 @@ func registerMergeStories() {
 		Category:    "Merge",
 		Description: "The initial selector to choose what to merge (this branch, scope, or stack)",
 		CreateModel: func() tea.Model {
-			return SelectModel{
-				Title: "What would you like to merge?",
-				Options: []SelectOption{
-					{Label: "🌿 This branch — Merge the current branch and its stack", Value: "this"},
-					{Label: "🏷️  Select a scope — Merge all branches in a specific scope", Value: "scope"},
-					{Label: "📚 Select an entire stack — Merge a stack from its top branch", Value: "stack"},
-				},
-				Cursor: 0,
-			}
+			return NewSelectModel("What would you like to merge?", []SelectOption{
+				{Label: "🌿 This branch — Merge the current branch and its stack", Value: "this"},
+				{Label: "🏷️  Select a scope — Merge all branches in a specific scope", Value: "scope"},
+				{Label: "📚 Select an entire stack — Merge a stack from its top branch", Value: "stack"},
+			}, 0)
 		},
 	})
 
@@ -27,15 +23,11 @@ func registerMergeStories() {
 		Category:    "Merge",
 		Description: "Selecting the merge strategy (bottom-up, top-down, or consolidate)",
 		CreateModel: func() tea.Model {
-			return SelectModel{
-				Title: "Select merge strategy:",
-				Options: []SelectOption{
-					{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
-					{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
-					{Label: "🔀 Consolidate — Create single PR with all stack commits for atomic merge", Value: "consolidate"},
-				},
-				Cursor: 0,
-			}
+			return NewSelectModel("Select merge strategy:", []SelectOption{
+				{Label: "🔄 Bottom-up — Merge PRs one at a time from bottom (recommended)", Value: "bottom-up"},
+				{Label: "📦 Top-down — Squash all changes into one PR, merge once", Value: "top-down"},
+				{Label: "🔀 Consolidate — Create single PR with all stack commits for atomic merge", Value: "consolidate"},
+			}, 0)
 		},
 	})
 
@@ -44,16 +36,12 @@ func registerMergeStories() {
 		Category:    "Merge",
 		Description: "Selecting a scope from a list of available scopes",
 		CreateModel: func() tea.Model {
-			return SelectModel{
-				Title: "Select scope to merge:",
-				Options: []SelectOption{
-					{Label: "API", Value: "API"},
-					{Label: "UI", Value: "UI"},
-					{Label: "Auth", Value: "Auth"},
-					{Label: "Refactor", Value: "Refactor"},
-				},
-				Cursor: 0,
-			}
+			return NewSelectModel("Select scope to merge:", []SelectOption{
+				{Label: "API", Value: "API"},
+				{Label: "UI", Value: "UI"},
+				{Label: "Auth", Value: "Auth"},
+				{Label: "Refactor", Value: "Refactor"},
+			}, 0)
 		},
 	})
 
@@ -62,17 +50,11 @@ func registerMergeStories() {
 		Category:    "Merge",
 		Description: "Selecting a leaf branch to merge an entire stack",
 		CreateModel: func() tea.Model {
-			m := BranchSelectModel{
-				Message: "Select a stack to merge (choose the top branch):",
-				Choices: []BranchChoice{
-					{Display: "  feature-3 (UI)", Value: "feature-3"},
-					{Display: "  api-v2 (API)", Value: "api-v2"},
-					{Display: "  auth-fix (Auth)", Value: "auth-fix"},
-				},
-				Cursor: 0,
-			}
-			m.updateFiltered()
-			return m
+			return NewBranchSelectModel("Select a stack to merge (choose the top branch):", []BranchChoice{
+				{Display: "  feature-3 (UI)", Value: "feature-3"},
+				{Display: "  api-v2 (API)", Value: "api-v2"},
+				{Display: "  auth-fix (Auth)", Value: "auth-fix"},
+			}, 0)
 		},
 	})
 }

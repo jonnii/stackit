@@ -31,6 +31,7 @@ func init() {
 	registerTreeStories()
 	registerSubmitStories()
 	registerMergeStories()
+	registerPromptStories()
 }
 
 func registerTreeStories() {

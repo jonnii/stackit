@@ -87,7 +87,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateStory
 			m.activeStory = &m.stories[m.cursor]
 			m.storyModel = m.activeStory.CreateModel()
-			return m, m.storyModel.Init()
+			// Send initial window size to the story model
+			var sizeCmd tea.Cmd
+			if m.width > 0 && m.height > 0 {
+				m.storyModel, sizeCmd = m.storyModel.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			}
+			return m, tea.Batch(m.storyModel.Init(), sizeCmd)
 		}
 	}
 

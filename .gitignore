@@ -29,3 +29,4 @@ st
 website/server
 website/tmp/
 .gocache/
+st-tui

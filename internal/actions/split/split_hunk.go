@@ -10,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -47,11 +48,11 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 	defaultCommitMessage := strings.Join(commitMessages, "\n\n")
 
 	// Show instructions
-	splog.Info("Splitting %s into multiple single-commit branches.", tui.ColorBranchName(branchToSplit, true))
+	splog.Info("Splitting %s into multiple single-commit branches.", style.ColorBranchName(branchToSplit, true))
 	prInfo, _ := eng.GetPrInfo(branchToSplit)
 	if prInfo != nil && prInfo.Number != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
-			tui.ColorBranchName(branchToSplit, true), *prInfo.Number)
+			style.ColorBranchName(branchToSplit, true), *prInfo.Number)
 	}
 	splog.Info("")
 	splog.Info("For each branch you'd like to create:")

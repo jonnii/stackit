@@ -9,6 +9,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog, _ Options) error {
@@ -58,9 +59,9 @@ func foldWithKeep(gctx context.Context, ctx *runtime.Context, currentBranch, par
 	}
 
 	splog.Info("Folded %s into %s (kept %s).",
-		tui.ColorBranchName(parent, true),
-		tui.ColorBranchName(currentBranch, false),
-		tui.ColorBranchName(currentBranch, false))
+		style.ColorBranchName(parent, true),
+		style.ColorBranchName(currentBranch, false),
+		style.ColorBranchName(currentBranch, false))
 
 	// Restack current branch and all its descendants
 	branchesToRestack := currentBranchObj.GetRelativeStack(engine.StackRange{

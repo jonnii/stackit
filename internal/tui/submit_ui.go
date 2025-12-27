@@ -9,6 +9,7 @@ import (
 
 	"stackit.dev/stackit/internal/tui/components/submit"
 	"stackit.dev/stackit/internal/tui/components/tree"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // SubmitUI defines the interface for the full submit workflow display
@@ -109,7 +110,7 @@ func (u *SimpleSubmitUI) ShowBranchPlan(branchName string, _ string, isCurrent b
 		if isCurrent {
 			displayName = branchName + " (current)"
 		}
-		u.splog.Info("  ▸ %s %s", ColorDim(displayName), ColorDim("— "+skipReason))
+		u.splog.Info("  ▸ %s %s", style.ColorDim(displayName), style.ColorDim("— "+skipReason))
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/tui/components/tree"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewMergeCmd creates the merge command
@@ -146,37 +147,13 @@ func runInteractiveMergeWizardForBranch(ctx *runtime.Context, dryRun bool, force
 	if scope != "" {
 		splog.Info("Merging scope: [%s]", scope)
 	} else {
-		splog.Info("Target branch: %s", tui.ColorBranchName(plan.CurrentBranch, false))
+		splog.Info("Target branch: %s", style.ColorBranchName(plan.CurrentBranch, false))
 	}
 	splog.Newline()
 
 	if len(plan.BranchesToMerge) > 0 {
 		// Create tree renderer
-		renderer := tree.NewStackTreeRenderer(
-			plan.CurrentBranch,
-			eng.Trunk().Name,
-			func(branchName string) []string {
-				branch := eng.GetBranch(branchName)
-				children := branch.GetChildren()
-				childNames := make([]string, len(children))
-				for i, c := range children {
-					childNames[i] = c.Name
-				}
-				return childNames
-			},
-			func(branchName string) string {
-				branch := eng.GetBranch(branchName)
-				parent := eng.GetParent(branch)
-				if parent == nil {
-					return ""
-				}
-				return parent.Name
-			},
-			func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
-			func(branchName string) bool {
-				return eng.GetBranch(branchName).IsBranchUpToDate()
-			},
-		)
+		renderer := tui.NewStackTreeRenderer(eng)
 
 		// Build annotations for branches to merge
 		annotations := make(map[string]tree.BranchAnnotation)
@@ -206,7 +183,7 @@ func runInteractiveMergeWizardForBranch(ctx *runtime.Context, dryRun bool, force
 		if len(plan.UpstackBranches) > 0 {
 			splog.Info("Branches above (will be restacked on trunk):")
 			for _, branchName := range plan.UpstackBranches {
-				splog.Info("  • %s", tui.ColorBranchName(branchName, false))
+				splog.Info("  • %s", style.ColorBranchName(branchName, false))
 			}
 			splog.Newline()
 		}

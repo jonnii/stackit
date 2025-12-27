@@ -11,6 +11,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui/components/tree"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ErrInteractiveDisabled is returned when interactive prompts are disabled via STACKIT_TEST_NO_INTERACTIVE
@@ -474,36 +475,8 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 
 	// Create tree renderer
 	currentBranch := eng.CurrentBranch()
-	currentBranchName := ""
-	if currentBranch != nil {
-		currentBranchName = currentBranch.Name
-	}
 	trunk := eng.Trunk()
-	renderer := tree.NewStackTreeRenderer(
-		currentBranchName,
-		trunk.Name,
-		func(branchName string) []string {
-			branch := eng.GetBranch(branchName)
-			children := branch.GetChildren()
-			childNames := make([]string, len(children))
-			for i, c := range children {
-				childNames[i] = c.Name
-			}
-			return childNames
-		},
-		func(branchName string) string {
-			branch := eng.GetBranch(branchName)
-			parent := eng.GetParent(branch)
-			if parent == nil {
-				return ""
-			}
-			return parent.Name
-		},
-		func(branchName string) bool { return eng.IsTrunkInternal(branchName) },
-		func(branchName string) bool {
-			return eng.IsBranchUpToDateInternal(branchName)
-		},
-	)
+	renderer := NewStackTreeRenderer(eng)
 
 	// Add annotations for all branches
 	annotations := make(map[string]tree.BranchAnnotation)
@@ -555,7 +528,7 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 		}
 
 		// Get colored branch name
-		coloredBranchName := ColorBranchName(branch.Name, isCurrent)
+		coloredBranchName := style.ColorBranchName(branch.Name, isCurrent)
 
 		// Add annotation
 		annotation := annotations[branch.Name]
@@ -563,7 +536,7 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 
 		// Add restack indicator if needed
 		if !eng.IsBranchUpToDateInternal(branch.Name) {
-			coloredBranchName += " " + ColorNeedsRestack("(needs restack)")
+			coloredBranchName += " " + style.ColorNeedsRestack("(needs restack)")
 		}
 
 		display := indent + symbol + " " + coloredBranchName

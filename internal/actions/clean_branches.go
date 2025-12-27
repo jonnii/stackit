@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // CleanBranchesOptions contains options for cleaning branches
@@ -125,8 +126,8 @@ func CleanBranches(ctx *runtime.Context, opts CleanBranchesOptions) (*CleanBranc
 					return nil, fmt.Errorf("failed to set parent for %s: %w", branchName, err)
 				}
 				splog.Info("Set parent of %s to %s.",
-					tui.ColorBranchName(branchName, false),
-					tui.ColorBranchName(newParentName, false))
+					style.ColorBranchName(branchName, false),
+					style.ColorBranchName(newParentName, false))
 				branchesWithNewParents = append(branchesWithNewParents, branchName)
 
 				// Remove this branch as a blocker for its old parent
@@ -166,7 +167,7 @@ func greedilyDeleteUnblockedBranches(ctx context.Context, branchesToDelete map[s
 				continue
 			}
 
-			splog.Info("Deleted branch %s", tui.ColorBranchName(branchName, false))
+			splog.Info("Deleted branch %s", style.ColorBranchName(branchName, false))
 
 			// Remove from deletion map
 			delete(branchesToDelete, branchName)

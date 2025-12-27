@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // CheckoutOptions contains options for the checkout command
@@ -52,8 +53,8 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 
 	// Check if already on the branch
 	currentBranch := eng.CurrentBranch()
-	if branchName == currentBranch.Name {
-		splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
+	if currentBranch != nil && branchName == currentBranch.Name {
+		splog.Info("Already on %s.", style.ColorBranchName(branchName, true))
 		return nil
 	}
 
@@ -63,7 +64,7 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
-	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
+	splog.Info("Checked out %s.", style.ColorBranchName(branchName, false))
 	printBranchInfo(ctx, branch)
 
 	return nil
@@ -171,8 +172,8 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	if !branch.IsBranchUpToDate() {
 		parent := branch.GetParentPrecondition()
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
-			tui.ColorBranchName(parent, false),
-			tui.ColorCyan("stackit upstack restack"))
+			style.ColorBranchName(parent, false),
+			style.ColorCyan("stackit upstack restack"))
 		return
 	}
 
@@ -190,9 +191,9 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 		if !ancestor.IsBranchUpToDate() {
 			parent := ancestor.GetParentPrecondition()
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
-				tui.ColorBranchName(ancestor.Name, false),
-				tui.ColorBranchName(parent, false),
-				tui.ColorCyan("stackit stack restack"))
+				style.ColorBranchName(ancestor.Name, false),
+				style.ColorBranchName(parent, false),
+				style.ColorCyan("stackit stack restack"))
 			return
 		}
 	}

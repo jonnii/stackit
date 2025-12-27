@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewMoveCmd creates the move command
@@ -29,36 +30,32 @@ func NewMoveCmd() *cobra.Command {
 If no branch is passed in, opens an interactive selector to choose the target branch.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Default source to current branch
-			sourceBranch := source
-			if sourceBranch == "" {
-				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch == nil {
-					return fmt.Errorf("not on a branch and no source branch specified")
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Default source to current branch
+				sourceBranch := source
+				if sourceBranch == "" {
+					currentBranch := ctx.Engine.CurrentBranch()
+					if currentBranch == nil {
+						return fmt.Errorf("not on a branch and no source branch specified")
+					}
+					sourceBranch = currentBranch.Name
 				}
-				sourceBranch = currentBranch.Name
-			}
 
-			// Handle interactive selection for onto if not provided
-			ontoBranch := onto
-			if ontoBranch == "" {
-				var err error
-				ontoBranch, err = interactiveOntoSelection(ctx, sourceBranch)
-				if err != nil {
-					return err
+				// Handle interactive selection for onto if not provided
+				ontoBranch := onto
+				if ontoBranch == "" {
+					var err error
+					ontoBranch, err = interactiveOntoSelection(ctx, sourceBranch)
+					if err != nil {
+						return err
+					}
 				}
-			}
 
-			// Run move action
-			return move.Action(ctx, move.Options{
-				Source: sourceBranch,
-				Onto:   ontoBranch,
+				// Run move action
+				return move.Action(ctx, move.Options{
+					Source: sourceBranch,
+					Onto:   ontoBranch,
+				})
 			})
 		},
 	}
@@ -109,7 +106,7 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 
 		currentBranch := eng.CurrentBranch()
 		isCurrent := branch.Name == currentBranch.Name
-		display := tui.ColorBranchName(branch.Name, isCurrent)
+		display := style.ColorBranchName(branch.Name, isCurrent)
 		if isCurrent {
 			initialIndex = len(choices)
 		}
@@ -128,10 +125,10 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 			currentBranch := eng.CurrentBranch()
 			var display string
 			if trunk.Name == currentBranch.Name {
-				display = tui.ColorBranchName(trunk.Name, true)
+				display = style.ColorBranchName(trunk.Name, true)
 				initialIndex = 0
 			} else {
-				display = tui.ColorBranchName(trunk.Name, false)
+				display = style.ColorBranchName(trunk.Name, false)
 			}
 			choices = append(choices, tui.BranchChoice{
 				Display: display,
@@ -150,10 +147,10 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 				var display string
 				currentBranch := eng.CurrentBranch()
 				if branchName == currentBranch.Name {
-					display = tui.ColorBranchName(branchName, true)
+					display = style.ColorBranchName(branchName, true)
 					initialIndex = len(choices)
 				} else {
-					display = tui.ColorBranchName(branchName, false)
+					display = style.ColorBranchName(branchName, false)
 				}
 				choices = append(choices, tui.BranchChoice{
 					Display: display,

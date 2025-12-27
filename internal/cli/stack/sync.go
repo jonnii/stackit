@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/sync"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -24,17 +25,13 @@ Restacks all branches in your repository that can be restacked without conflicts
 If trunk cannot be fast-forwarded to match remote, overwrites trunk with the remote version.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Run sync action
-			return sync.Action(ctx, sync.Options{
-				All:     all,
-				Force:   force,
-				Restack: restack,
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Run sync action
+				return sync.Action(ctx, sync.Options{
+					All:     all,
+					Force:   force,
+					Restack: restack,
+				})
 			})
 		},
 	}

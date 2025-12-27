@@ -6,6 +6,7 @@ import (
 
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ConfigListAction prints all configuration values in a formatted way
@@ -31,7 +32,7 @@ func ConfigListAction(repoRoot string) error {
 
 	// Format and print
 	var lines []string
-	lines = append(lines, fmt.Sprintf("%s: %s", tui.ColorCyan("trunk"), trunk))
+	lines = append(lines, fmt.Sprintf("%s: %s", style.ColorCyan("trunk"), trunk))
 
 	if len(trunks) > 1 {
 		additionalTrunks := []string{}
@@ -41,12 +42,12 @@ func ConfigListAction(repoRoot string) error {
 			}
 		}
 		if len(additionalTrunks) > 0 {
-			lines = append(lines, fmt.Sprintf("%s: %s", tui.ColorCyan("trunks"), strings.Join(additionalTrunks, ", ")))
+			lines = append(lines, fmt.Sprintf("%s: %s", style.ColorCyan("trunks"), strings.Join(additionalTrunks, ", ")))
 		}
 	}
 
-	lines = append(lines, fmt.Sprintf("%s: %s", tui.ColorCyan("branch.pattern"), branchPattern))
-	lines = append(lines, fmt.Sprintf("%s: %v", tui.ColorCyan("submit.footer"), submitFooter))
+	lines = append(lines, fmt.Sprintf("%s: %s", style.ColorCyan("branch.pattern"), branchPattern))
+	lines = append(lines, fmt.Sprintf("%s: %v", style.ColorCyan("submit.footer"), submitFooter))
 
 	splog.Page(strings.Join(lines, "\n"))
 	splog.Newline()

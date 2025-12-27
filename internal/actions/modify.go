@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -114,9 +114,9 @@ func ModifyAction(ctx *runtime.Context, opts ModifyOptions) error {
 
 	// Log success
 	if opts.CreateCommit {
-		splog.Info("Created new commit in %s.", tui.ColorBranchName(currentBranch, true))
+		splog.Info("Created new commit in %s.", style.ColorBranchName(currentBranch, true))
 	} else {
-		splog.Info("Amended commit in %s.", tui.ColorBranchName(currentBranch, true))
+		splog.Info("Amended commit in %s.", style.ColorBranchName(currentBranch, true))
 	}
 
 	// Restack upstack branches
@@ -150,8 +150,8 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	}
 
 	splog.Info("Starting interactive rebase for %s onto %s...",
-		tui.ColorBranchName(currentBranch.Name, true),
-		tui.ColorBranchName(parentName, false))
+		style.ColorBranchName(currentBranch.Name, true),
+		style.ColorBranchName(parentName, false))
 
 	// Run interactive rebase
 	if err := git.RunGitCommandInteractive("rebase", "-i", parentName); err != nil {

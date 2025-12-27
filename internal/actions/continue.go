@@ -7,7 +7,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ContinueOptions contains options for the continue command
@@ -93,7 +93,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 	}
 
 	// Success - inform user
-	splog.Info("Resolved rebase conflict for %s.", tui.ColorBranchName(result.BranchName, true))
+	splog.Info("Resolved rebase conflict for %s.", style.ColorBranchName(result.BranchName, true))
 
 	// Continue with remaining branches to restack
 	if len(continuation.BranchesToRestack) > 0 {

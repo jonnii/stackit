@@ -501,33 +501,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 // getStackTreeRenderer returns the stack tree renderer with PR annotations
 func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *tree.StackTreeRenderer {
 	// Create the tree renderer
-	currentBranchObj := eng.CurrentBranch()
-	trunk := eng.Trunk()
-	renderer := tree.NewStackTreeRenderer(
-		currentBranchObj.Name,
-		trunk.Name,
-		func(branchName string) []string {
-			branch := eng.GetBranch(branchName)
-			children := branch.GetChildren()
-			childNames := make([]string, len(children))
-			for i, c := range children {
-				childNames[i] = c.Name
-			}
-			return childNames
-		},
-		func(branchName string) string {
-			branch := eng.GetBranch(branchName)
-			parent := eng.GetParent(branch)
-			if parent == nil {
-				return ""
-			}
-			return parent.Name
-		},
-		func(branchName string) bool { return eng.GetBranch(branchName).IsTrunk() },
-		func(branchName string) bool {
-			return eng.GetBranch(branchName).IsBranchUpToDate()
-		},
-	)
+	renderer := tui.NewStackTreeRenderer(eng)
 
 	// Build annotations for each branch
 	annotations := make(map[string]tree.BranchAnnotation)

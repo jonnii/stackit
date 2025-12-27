@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -60,37 +61,33 @@ func addLogFlags(cmd *cobra.Command, f *logFlags) {
 }
 
 func executeLog(cmd *cobra.Command, f *logFlags, style string) error {
-	// Get context (demo or real)
-	ctx, err := runtime.GetContext(cmd.Context())
-	if err != nil {
-		return err
-	}
+	return helpers.Run(cmd, func(ctx *runtime.Context) error {
+		eng := ctx.Engine
 
-	eng := ctx.Engine
-
-	// Determine branch name
-	trunk := eng.Trunk()
-	branchName := trunk.Name
-	if f.stack || f.steps > 0 {
-		currentBranch := eng.CurrentBranch()
-		if currentBranch == nil {
-			return fmt.Errorf("not on a branch")
+		// Determine branch name
+		trunk := eng.Trunk()
+		branchName := trunk.Name
+		if f.stack || f.steps > 0 {
+			currentBranch := eng.CurrentBranch()
+			if currentBranch == nil {
+				return fmt.Errorf("not on a branch")
+			}
+			branchName = currentBranch.Name
 		}
-		branchName = currentBranch.Name
-	}
 
-	// Prepare options
-	opts := actions.LogOptions{
-		Style:         style,
-		Reverse:       f.reverse,
-		BranchName:    branchName,
-		ShowUntracked: f.showUntracked,
-	}
+		// Prepare options
+		opts := actions.LogOptions{
+			Style:         style,
+			Reverse:       f.reverse,
+			BranchName:    branchName,
+			ShowUntracked: f.showUntracked,
+		}
 
-	if f.steps > 0 {
-		opts.Steps = &f.steps
-	}
+		if f.steps > 0 {
+			opts.Steps = &f.steps
+		}
 
-	// Execute log action
-	return actions.LogAction(ctx, opts)
+		// Execute log action
+		return actions.LogAction(ctx, opts)
+	})
 }

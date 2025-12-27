@@ -28,29 +28,25 @@ by typing. Use flags to customize which branches are shown.`,
 		ValidArgsFunction: helpers.CompleteBranches,
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Get branch name from args
+				branchName := ""
+				if len(args) > 0 {
+					branchName = args[0]
+				}
 
-			// Get branch name from args
-			branchName := ""
-			if len(args) > 0 {
-				branchName = args[0]
-			}
+				// Prepare options
+				opts := actions.CheckoutOptions{
+					BranchName:    branchName,
+					ShowUntracked: showUntracked,
+					All:           all,
+					StackOnly:     stack,
+					CheckoutTrunk: trunk,
+				}
 
-			// Prepare options
-			opts := actions.CheckoutOptions{
-				BranchName:    branchName,
-				ShowUntracked: showUntracked,
-				All:           all,
-				StackOnly:     stack,
-				CheckoutTrunk: trunk,
-			}
-
-			// Execute checkout action
-			return actions.CheckoutAction(ctx, opts)
+				// Execute checkout action
+				return actions.CheckoutAction(ctx, opts)
+			})
 		},
 	}
 

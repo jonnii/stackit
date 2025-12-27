@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -238,7 +239,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 			return fmt.Errorf("failed to apply hunks to commit %s: %w", commitSHA[:8], err)
 		}
 
-		splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], tui.ColorBranchName(branchName, false))
+		splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], style.ColorBranchName(branchName, false))
 	}
 
 	// Warn about unabsorbed hunks

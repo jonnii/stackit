@@ -63,23 +63,46 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 		return RebaseConflict, fmt.Errorf("failed to get new revision after rebase: %w", err)
 	}
 
-	// Update the branch reference to the new rebased commit
-	_, err = RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, newRev)
-	if err != nil {
-		return RebaseConflict, fmt.Errorf("failed to update branch reference %s: %w", branchName, err)
-	}
+	// Resolve onto to a SHA for metadata
+	ontoRev, _ := RunGitCommandWithContext(ctx, "rev-parse", onto)
 
-	// Restore original state
-	if currentBranch != "" {
-		if err := CheckoutBranch(ctx, currentBranch); err != nil {
-			// If original branch is now used elsewhere (unlikely but possible), checkout detached
-			_ = CheckoutDetached(ctx, currentBranch)
-		}
-	} else if currentRev != "" {
-		_ = CheckoutDetached(ctx, currentRev)
+	// Finalize the rebase (update ref, metadata and restore state)
+	if err := FinalizeRebase(ctx, branchName, newRev, currentBranch, currentRev, ontoRev); err != nil {
+		return RebaseConflict, err
 	}
 
 	return RebaseDone, nil
+}
+
+// FinalizeRebase updates the branch reference, metadata, and restores the original state after a successful rebase.
+// If rebasedBranchBase is non-empty, it updates the branch's metadata with the new parent revision.
+func FinalizeRebase(ctx context.Context, branchName, newRev, originalBranch, originalRev string, rebasedBranchBase string) error {
+	// Update the branch reference to the new rebased commit
+	_, err := RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, newRev)
+	if err != nil {
+		return fmt.Errorf("failed to update branch reference %s: %w", branchName, err)
+	}
+
+	// Update metadata if rebasedBranchBase is provided
+	if rebasedBranchBase != "" {
+		meta, err := ReadMetadataRef(branchName)
+		if err == nil {
+			meta.ParentBranchRevision = &rebasedBranchBase
+			_ = WriteMetadataRef(branchName, meta)
+		}
+	}
+
+	// Restore original state or checkout the rebased branch
+	if originalBranch != "" {
+		if err := CheckoutBranch(ctx, originalBranch); err != nil {
+			// If original branch is now used elsewhere (unlikely but possible), checkout detached
+			_ = CheckoutDetached(ctx, originalBranch)
+		}
+	} else if originalRev != "" {
+		_ = CheckoutDetached(ctx, originalRev)
+	}
+
+	return nil
 }
 
 // IsRebaseInProgress checks if a rebase is currently in progress

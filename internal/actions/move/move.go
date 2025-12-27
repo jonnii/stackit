@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -106,7 +107,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 				if err := eng.RenameBranch(gctx, eng.GetBranch(source), eng.GetBranch(newName)); err != nil {
 					splog.Info("Warning: failed to rename branch: %v", err)
 				} else {
-					splog.Info("Renamed branch %s to %s.", tui.ColorBranchName(source, false), tui.ColorBranchName(newName, true))
+					splog.Info("Renamed branch %s to %s.", style.ColorBranchName(source, false), style.ColorBranchName(newName, true))
 					source = newName
 					sourceBranch = eng.GetBranch(source)
 				}
@@ -130,9 +131,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	splog.Info("Moved %s from %s to %s.",
-		tui.ColorBranchName(source, true),
-		tui.ColorBranchName(oldParentName, false),
-		tui.ColorBranchName(onto, false))
+		style.ColorBranchName(source, true),
+		style.ColorBranchName(oldParentName, false),
+		style.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
 	branchesToRestack := sourceBranch.GetRelativeStack(engine.StackRange{

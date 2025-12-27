@@ -5,9 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewParentCmd creates the parent command
@@ -22,34 +23,30 @@ in the stack. This is useful for understanding the structure of your stack
 and seeing which branch the current branch is based on.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Get current branch
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch == nil {
+					return errors.ErrNotOnBranch
+				}
 
-			// Get current branch
-			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == nil {
-				return errors.ErrNotOnBranch
-			}
+				// Check if on trunk
+				if currentBranch.IsTrunk() {
+					ctx.Splog.Info("%s is trunk and has no parent.", style.ColorBranchName(currentBranch.Name, true))
+					return nil
+				}
 
-			// Check if on trunk
-			if currentBranch.IsTrunk() {
-				ctx.Splog.Info("%s is trunk and has no parent.", tui.ColorBranchName(currentBranch.Name, true))
+				// Get parent
+				parent := ctx.Engine.GetParent(*currentBranch)
+				if parent == nil {
+					ctx.Splog.Info("%s has no parent (untracked branch).", style.ColorBranchName(currentBranch.Name, true))
+					return nil
+				}
+
+				// Print parent
+				fmt.Println(parent.Name)
 				return nil
-			}
-
-			// Get parent
-			parent := ctx.Engine.GetParent(*currentBranch)
-			if parent == nil {
-				ctx.Splog.Info("%s has no parent (untracked branch).", tui.ColorBranchName(currentBranch.Name, true))
-				return nil
-			}
-
-			// Print parent
-			fmt.Println(parent.Name)
-			return nil
+			})
 		},
 	}
 

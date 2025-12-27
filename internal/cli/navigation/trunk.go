@@ -5,11 +5,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewTrunkCmd creates the trunk command
@@ -28,24 +30,20 @@ By default, displays the trunk branch that the current branch's stack is based o
 Use --all to see all configured trunk branches, or --add to add an additional trunk.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Handle --add flag
+				if add != "" {
+					return handleAddTrunk(ctx.RepoRoot, add)
+				}
 
-			// Handle --add flag
-			if add != "" {
-				return handleAddTrunk(ctx.RepoRoot, add)
-			}
+				// Handle --all flag
+				if all {
+					return handleShowAllTrunks(ctx.RepoRoot)
+				}
 
-			// Handle --all flag
-			if all {
-				return handleShowAllTrunks(ctx.RepoRoot)
-			}
-
-			// Default: show trunk for current branch
-			return handleShowTrunk(ctx)
+				// Default: show trunk for current branch
+				return handleShowTrunk(ctx)
+			})
 		},
 	}
 
@@ -89,7 +87,7 @@ func handleAddTrunk(repoRoot string, trunkName string) error {
 	}
 
 	splog := tui.NewSplog()
-	splog.Info("Added %s as a trunk branch.", tui.ColorBranchName(trunkName, false))
+	splog.Info("Added %s as a trunk branch.", style.ColorBranchName(trunkName, false))
 	return nil
 }
 

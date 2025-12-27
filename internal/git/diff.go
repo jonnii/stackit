@@ -8,18 +8,15 @@ import (
 
 // IsDiffEmpty checks if there are no differences between a branch and a base revision
 func IsDiffEmpty(ctx context.Context, branchName, baseRevision string) (bool, error) {
-	// Get branch revision
 	branchRev, err := GetRevision(branchName)
 	if err != nil {
 		return false, fmt.Errorf("failed to get branch revision: %w", err)
 	}
 
-	// Check if branch revision equals base revision
 	if branchRev == baseRevision {
 		return true, nil
 	}
 
-	// Use git diff to check if there are any changes
 	_, err = RunGitCommandWithContext(ctx, "diff", "--quiet", baseRevision, branchRev)
 	return err == nil, nil
 }
@@ -28,7 +25,6 @@ func IsDiffEmpty(ctx context.Context, branchName, baseRevision string) (bool, er
 func GetUnmergedFiles(ctx context.Context) ([]string, error) {
 	output, err := RunGitCommandWithContext(ctx, "diff", "--name-only", "--diff-filter=U")
 	if err != nil {
-		// If there are no unmerged files, return empty list
 		return []string{}, nil //nolint:nilerr
 	}
 	if output == "" {
@@ -57,11 +53,9 @@ func ShowCommits(ctx context.Context, base, head string, patch, stat bool) (stri
 	case patch:
 		args = append(args, "-p")
 	default:
-		// Default to oneline format if no patch
 		args = append(args, "--pretty=format:%h - %s")
 	}
 
-	// Always use base..head format
 	// If base is empty, use head~ (parent commit) for trunk
 	baseRef := base
 	if base == "" {

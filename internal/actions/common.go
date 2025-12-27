@@ -18,12 +18,9 @@ type Restacker interface {
 
 // RestackBranches restacks a list of branches using the engine's batch restack method
 func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacker, splog *tui.Splog, repoRoot string) error {
-	// Use the engine's optimized batch restack method
 	batchResult, err := eng.RestackBranches(ctx, branches)
 	if err != nil {
-		// Check if this is a conflict that needs continuation state
 		if batchResult.ConflictBranch != "" {
-			// Persist continuation state
 			continuation := &config.ContinuationState{
 				BranchesToRestack:     batchResult.RemainingBranches,
 				RebasedBranchBase:     batchResult.RebasedBranchBase,
@@ -34,7 +31,6 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 				return fmt.Errorf("failed to persist continuation: %w", err)
 			}
 
-			// Print conflict status
 			if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
 				return fmt.Errorf("failed to print conflict status: %w", err)
 			}
@@ -42,9 +38,8 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 		return fmt.Errorf("batch restack failed: %w", err)
 	}
 
-	// Check if there was a conflict (even if no error was returned)
+	// Handle conflicts even when no error was returned
 	if batchResult.ConflictBranch != "" {
-		// Persist continuation state
 		continuation := &config.ContinuationState{
 			BranchesToRestack:     batchResult.RemainingBranches,
 			RebasedBranchBase:     batchResult.RebasedBranchBase,
@@ -55,7 +50,6 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			return fmt.Errorf("failed to persist continuation: %w", err)
 		}
 
-		// Print conflict status
 		if err := PrintConflictStatus(ctx, batchResult.ConflictBranch, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)
 		}
@@ -63,7 +57,6 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 		return fmt.Errorf("restack stopped due to conflict on %s", batchResult.ConflictBranch)
 	}
 
-	// Process results and provide user feedback
 	currentBranch := eng.CurrentBranch()
 	currentBranchName := ""
 	if currentBranch != nil {
@@ -77,7 +70,6 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			continue // Skip branches not processed (e.g., trunk)
 		}
 
-		// Log reparenting if it happened
 		if result.Reparented {
 			isCurrent := branchName == currentBranchName
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
@@ -151,13 +143,11 @@ func ShouldDeleteBranch(ctx context.Context, branchName string, eng engine.Engin
 		return true, status.Reason
 	}
 
-	// If force, don't prompt
 	if force {
 		return false, ""
 	}
 
-	// For now, we don't prompt interactively
-	// In a full implementation, we would prompt here
+	// Interactive prompting not yet implemented
 	return false, ""
 }
 

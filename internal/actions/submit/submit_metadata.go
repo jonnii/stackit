@@ -16,31 +16,24 @@ var scopeRegex = regexp.MustCompile(`^\[[^\]]+\]\s*`)
 
 // GetPRTitle gets the PR title, prompting if needed
 func GetPRTitle(branchName string, editInline bool, existingTitle string, scope string, eng engine.BranchReader) (string, error) {
-	// First check if we have a saved title
 	title := existingTitle
 	if title == "" {
-		// Otherwise, use the subject of the oldest commit on the branch
 		branch := eng.GetBranch(branchName)
 		commits, err := branch.GetAllCommits(engine.CommitFormatSubject)
 		if err != nil || len(commits) == 0 {
-			// Non-fatal, use branch name as fallback
 			title = branchName
 		} else {
-			// GetAllCommits returns newest to oldest.
-			// So oldest is last.
+			// GetAllCommits returns newest to oldest, so oldest is last
 			title = commits[len(commits)-1]
 		}
 	}
 
-	// Prefix scope if present and not already in title
 	if scope != "" {
 		if scopeRegex.MatchString(title) {
-			// Replace existing scope prefix if it's different
 			if !strings.HasPrefix(strings.ToUpper(title), "["+strings.ToUpper(scope)+"]") {
 				title = scopeRegex.ReplaceAllString(title, "["+scope+"] ")
 			}
 		} else {
-			// No scope prefix, add it
 			title = fmt.Sprintf("[%s] %s", scope, title)
 		}
 	}
@@ -49,7 +42,6 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, scope 
 		return title, nil
 	}
 
-	// Prompt for title
 	result, err := tui.PromptTextInput("Title:", title)
 	if err != nil {
 		return "", fmt.Errorf("failed to get PR title: %w", err)
@@ -62,23 +54,21 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, scope 
 func GetPRBody(branchName string, editInline bool, existingBody string, eng engine.BranchReader) (string, error) {
 	body := existingBody
 	if body == "" {
-		// Infer from commit messages
 		branch := eng.GetBranch(branchName)
 		messages, err := branch.GetAllCommits(engine.CommitFormatMessage)
 		if err == nil && len(messages) > 0 {
 			if len(messages) == 1 {
-				// Single commit - use body (skip first line which is subject)
+				// Use body (skip first line which is subject)
 				lines := strings.Split(messages[0], "\n")
 				if len(lines) > 1 {
 					body = strings.Join(lines[1:], "\n")
 				}
 			} else {
-				// Multiple commits - format as a bulleted list of subjects in chronological order
+				// Format as a bulleted list of subjects in chronological order
 				var sb strings.Builder
-				// GetAllCommits returns newest to oldest.
+				// GetAllCommits returns newest to oldest
 				for i := len(messages) - 1; i >= 0; i-- {
 					msg := messages[i]
-					// Get just the subject (first line)
 					subject := strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
 					if subject != "" {
 						sb.WriteString("- " + subject + "\n")
@@ -93,18 +83,15 @@ func GetPRBody(branchName string, editInline bool, existingBody string, eng engi
 		return body, nil
 	}
 
-	// Use editor for body editing
 	return tui.OpenEditor(body, "stackit-pr-description-*.md")
 }
 
 // GetReviewers gets reviewers from flag or prompts user
 func GetReviewers(reviewersFlag string, _ *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
-		// Don't prompt by default - return empty
 		return nil, nil, nil
 	}
 
-	// Parse reviewers
 	reviewers, teamReviewers := github.ParseReviewers(reviewersFlag)
 	return reviewers, teamReviewers, nil
 }
@@ -112,7 +99,6 @@ func GetReviewers(reviewersFlag string, _ *runtime.Context) ([]string, []string,
 // GetReviewersWithPrompt gets reviewers, prompting if flag is empty
 func GetReviewersWithPrompt(reviewersFlag string, _ *runtime.Context) ([]string, []string, error) {
 	if reviewersFlag == "" {
-		// Prompt for reviewers
 		result, err := tui.PromptTextInput("Reviewers (comma-separated GitHub usernames):", "")
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get reviewers: %w", err)
@@ -121,7 +107,6 @@ func GetReviewersWithPrompt(reviewersFlag string, _ *runtime.Context) ([]string,
 		reviewersFlag = result
 	}
 
-	// Parse reviewers
 	reviewers, teamReviewers := github.ParseReviewers(reviewersFlag)
 	return reviewers, teamReviewers, nil
 }
@@ -137,7 +122,6 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 		IsDraft: false,
 	}
 
-	// Determine if we should edit
 	shouldEditTitle := opts.EditTitle || (opts.Edit && !opts.NoEditTitle)
 	shouldEditBody := opts.EditDescription || (opts.Edit && !opts.NoEditDescription)
 
@@ -159,20 +143,17 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 		metadata.Body = finalBody
 	}
 
-	// Get draft status - respect flags, default to published (not draft)
 	switch {
 	case opts.Draft:
 		metadata.IsDraft = true
 	case opts.Publish:
 		metadata.IsDraft = false
 	case prInfo == nil:
-		// New PR - default to published (not draft)
 		metadata.IsDraft = false
 	default:
 		metadata.IsDraft = prInfo.IsDraft()
 	}
 
-	// Get reviewers
 	if opts.ReviewersPrompt {
 		reviewers, teamReviewers, err := GetReviewersWithPrompt(opts.Reviewers, ctx)
 		if err != nil {
@@ -189,7 +170,7 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 		metadata.TeamReviewers = teamReviewers
 	}
 
-	// Save metadata to engine (in case command fails)
+	// Save metadata to engine in case command fails
 	if err := eng.UpsertPrInfo(branch, engine.NewPrInfo(
 		nil,
 		metadata.Title,

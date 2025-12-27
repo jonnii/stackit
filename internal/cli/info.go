@@ -29,19 +29,16 @@ If no branch is specified, displays information about the current branch.`,
 		ValidArgsFunction: common.CompleteBranches,
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get context (demo or real)
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {
 				return err
 			}
 
-			// Determine branch name
 			branchName := ""
 			if len(args) > 0 {
 				branchName = args[0]
 			}
 
-			// Run info action
 			return actions.InfoAction(ctx, actions.InfoOptions{
 				BranchName: branchName,
 				Body:       body,

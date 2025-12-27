@@ -21,18 +21,15 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 	eng := ctx.Engine
 	splog := ctx.Splog
 
-	// Get current branch
 	currentBranch, err := utils.ValidateOnBranch(ctx.Engine)
 	if err != nil {
 		return err
 	}
 
-	// Validate not renaming trunk
 	if currentBranch == eng.Trunk().GetName() {
 		return fmt.Errorf("cannot rename trunk branch %s", currentBranch)
 	}
 
-	// Determine new name
 	newName := opts.NewName
 	if newName == "" {
 		if !utils.IsInteractive() {
@@ -45,7 +42,6 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		}
 	}
 
-	// Sanitize new name
 	newName = utils.SanitizeBranchName(newName)
 	if newName == "" {
 		return fmt.Errorf("invalid branch name")
@@ -56,7 +52,6 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		return nil
 	}
 
-	// Check if new name already exists
 	allBranches, err := git.GetAllBranchNames()
 	if err != nil {
 		return fmt.Errorf("failed to check existing branches: %w", err)
@@ -67,7 +62,6 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		}
 	}
 
-	// Check for PR association
 	branch := eng.GetBranch(currentBranch)
 	prInfo, _ := eng.GetPrInfo(branch)
 
@@ -76,13 +70,11 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 			return fmt.Errorf("branch %s is associated with PR #%d. Renaming it will remove this association. Use --force to proceed", currentBranch, *prInfo.Number())
 		}
 		splog.Info("Removing association with PR #%d as GitHub PR branch names are immutable.", *prInfo.Number())
-		// Clear PrInfo via engine
 		if err := eng.UpsertPrInfo(branch, nil); err != nil {
 			return fmt.Errorf("failed to update metadata: %w", err)
 		}
 	}
 
-	// Take snapshot before modifying the repository
 	snapshotOpts := NewSnapshot("rename",
 		WithArg(newName),
 		WithFlag(opts.Force, "--force"),
@@ -91,7 +83,6 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		splog.Debug("Failed to take snapshot: %v", err)
 	}
 
-	// Perform rename via engine
 	oldBranchObj := eng.GetBranch(currentBranch)
 	newBranchObj := eng.GetBranch(newName)
 	if err := eng.RenameBranch(ctx.Context, oldBranchObj, newBranchObj); err != nil {

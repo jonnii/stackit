@@ -17,20 +17,18 @@ const (
 	RebaseConflict
 )
 
-// Rebase rebases a branch onto another branch
-// onto is the branch name to rebase onto (parent branch)
-// from is the base revision (old parent branch revision)
+// Rebase rebases a branch onto another branch.
+// onto is the branch name to rebase onto (parent branch).
+// from is the base revision (old parent branch revision).
 func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, error) {
-	// Perform rebase using detached HEAD to avoid "already used by worktree" errors
+	// Use detached HEAD to avoid "already used by worktree" errors
 	// git rebase --onto <onto> <from> <branchName>
-	// This will result in a detached HEAD at the new rebased commit
 	_, err := RunGitCommandWithContext(ctx, "rebase", "--onto", onto, from, branchName)
 	if err != nil {
-		// Check if rebase is in progress (conflict)
 		if IsRebaseInProgress(ctx) {
 			return RebaseConflict, nil
 		}
-		// Try to abort rebase if it failed for other reasons
+		// Abort rebase if it failed for other reasons
 		_, _ = RunGitCommandWithContext(ctx, "rebase", "--abort")
 
 		return RebaseConflict, nil
@@ -41,19 +39,15 @@ func Rebase(ctx context.Context, branchName, onto, from string) (RebaseResult, e
 
 // CherryPick cherry-picks a commit onto another revision
 func CherryPick(ctx context.Context, commitSHA, onto string) (string, error) {
-	// Checkout onto in detached HEAD
 	if _, err := RunGitCommandWithContext(ctx, "checkout", "--detach", onto); err != nil {
 		return "", fmt.Errorf("failed to checkout %s: %w", onto, err)
 	}
 
-	// Cherry-pick the commit
 	if _, err := RunGitCommandWithContext(ctx, "cherry-pick", commitSHA); err != nil {
-		// Abort cherry-pick on conflict
 		_, _ = RunGitCommandWithContext(ctx, "cherry-pick", "--abort")
 		return "", fmt.Errorf("failed to cherry-pick %s: %w", commitSHA, err)
 	}
 
-	// Get new SHA
 	newSHA, err := RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("failed to get new SHA after cherry-pick: %w", err)
@@ -66,7 +60,6 @@ func CherryPick(ctx context.Context, commitSHA, onto string) (string, error) {
 func RebaseContinue(ctx context.Context) (RebaseResult, error) {
 	_, err := RunGitCommandWithEnv(ctx, []string{"GIT_EDITOR=true"}, "rebase", "--continue")
 	if err != nil {
-		// Check if rebase is still in progress (another conflict)
 		if IsRebaseInProgress(ctx) {
 			return RebaseConflict, nil
 		}
@@ -93,11 +86,9 @@ func IsRebaseInProgress(ctx context.Context) bool {
 	}
 
 	gitDir := strings.TrimSpace(output)
-	// Check for interactive rebase
 	if _, err := os.Stat(gitDir + "/rebase-merge"); err == nil {
 		return true
 	}
-	// Check for non-interactive rebase
 	if _, err := os.Stat(gitDir + "/rebase-apply"); err == nil {
 		return true
 	}
@@ -106,7 +97,7 @@ func IsRebaseInProgress(ctx context.Context) bool {
 
 // GetRebaseHead returns the commit being rebased (REBASE_HEAD)
 func GetRebaseHead() (string, error) {
-	// Try the standard rebase head refs using git rev-parse
+	// Try standard rebase head refs in order:
 	// 1. REBASE_HEAD (standard)
 	// 2. refs/rebase-merge/head (interactive)
 	// 3. refs/rebase-apply/head (non-interactive)

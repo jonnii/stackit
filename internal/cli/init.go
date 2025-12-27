@@ -24,12 +24,9 @@ func isInteractive() bool {
 }
 
 // InferTrunk attempts to infer the trunk branch name
-// Exported so it can be used by other commands
 func InferTrunk(ctx context.Context, branchNames []string) string {
-	// First, try to find a remote branch (check origin)
 	remoteBranch, err := git.FindRemoteBranch(ctx, "origin")
 	if err == nil && remoteBranch != "" {
-		// Validate it exists in branch list
 		for _, name := range branchNames {
 			if name == remoteBranch {
 				return remoteBranch
@@ -37,7 +34,6 @@ func InferTrunk(ctx context.Context, branchNames []string) string {
 		}
 	}
 
-	// Second, check for commonly named trunks
 	if common := engine.FindCommonlyNamedTrunk(branchNames); common != "" {
 		return common
 	}
@@ -54,13 +50,11 @@ func selectTrunkBranch(branchNames []string, inferredTrunk string, interactive b
 		return "", fmt.Errorf("could not infer trunk branch, pass in an existing branch name with --trunk or run in interactive mode")
 	}
 
-	// For now, if we have an inferred trunk, use it
 	// TODO: Add proper interactive prompt with bubbletea for full branch selection
 	if inferredTrunk != "" {
 		return inferredTrunk, nil
 	}
 
-	// Fallback: use first branch
 	if len(branchNames) > 0 {
 		return branchNames[0], nil
 	}
@@ -72,24 +66,20 @@ func selectTrunkBranch(branchNames []string, inferredTrunk string, interactive b
 // Returns the repo root path. This is used by commands that need stackit
 // to be initialized but want to auto-initialize for convenience.
 func EnsureInitialized(ctx context.Context) (string, error) {
-	// Initialize git repository
 	if err := git.InitDefaultRepo(); err != nil {
 		return "", fmt.Errorf("not a git repository: %w", err)
 	}
 
-	// Get repo root
 	repoRoot, err := git.GetRepoRoot()
 	if err != nil {
 		return "", fmt.Errorf("failed to get repo root: %w", err)
 	}
 
-	// Auto-initialize if not initialized
 	cfg, _ := config.LoadConfig(repoRoot)
 	if !cfg.IsInitialized() {
 		splog := tui.NewSplog()
 		splog.Info("Stackit has not been initialized, attempting to setup now...")
 
-		// Run init logic
 		branchNames, err := git.GetAllBranchNames()
 		if err != nil {
 			return "", fmt.Errorf("failed to get branches: %w", err)
@@ -99,10 +89,8 @@ func EnsureInitialized(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("no branches found in current repo; cannot initialize Stackit.\nPlease create your first commit and then re-run stackit init")
 		}
 
-		// Infer trunk
 		trunkName := InferTrunk(ctx, branchNames)
 		if trunkName == "" {
-			// Fallback to first branch or main
 			trunkName = "main"
 			found := false
 			for _, name := range branchNames {
@@ -139,24 +127,20 @@ func newInitCmd() *cobra.Command {
 		Short:        "Initialize Stackit in the current repository",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Initialize git repository
 			if err := git.InitDefaultRepo(); err != nil {
 				return fmt.Errorf("not a git repository: %w", err)
 			}
 
-			// Get repo root
 			repoRoot, err := git.GetRepoRoot()
 			if err != nil {
 				return fmt.Errorf("failed to get repo root: %w", err)
 			}
 
-			// Load config
 			cfg, err := config.LoadConfig(repoRoot)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			// Get all branch names
 			branchNames, err := git.GetAllBranchNames()
 			if err != nil {
 				return fmt.Errorf("failed to get branches: %w", err)
@@ -166,16 +150,12 @@ func newInitCmd() *cobra.Command {
 				return fmt.Errorf("no branches found in current repo; cannot initialize Stackit.\nPlease create your first commit and then re-run stackit init")
 			}
 
-			// Create splog for output
 			splog := tui.NewSplog()
 
-			// Determine trunk
 			trunkName := trunk
 			if trunkName == "" {
-				// Try to infer trunk
 				inferredTrunk := InferTrunk(cmd.Context(), branchNames)
 
-				// Select trunk (with interactive prompt if needed)
 				interactive := !noInteractive && isInteractive()
 				selected, err := selectTrunkBranch(branchNames, inferredTrunk, interactive)
 				if err != nil {
@@ -183,7 +163,6 @@ func newInitCmd() *cobra.Command {
 				}
 				trunkName = selected
 			} else {
-				// Validate trunk exists
 				found := false
 				for _, name := range branchNames {
 					if name == trunkName {
@@ -196,16 +175,13 @@ func newInitCmd() *cobra.Command {
 				}
 			}
 
-			// Check if already initialized
 			wasInitialized := cfg.IsInitialized()
 
-			// Set trunk in config
 			cfg.SetTrunk(trunkName)
 			if err := cfg.Save(); err != nil {
 				return fmt.Errorf("failed to write config: %w", err)
 			}
 
-			// Output welcome message
 			if wasInitialized {
 				splog.Info("Reinitializing Stackit...")
 			} else {
@@ -213,14 +189,11 @@ func newInitCmd() *cobra.Command {
 			}
 			splog.Newline()
 
-			// Use output formatter for colored output
 			coloredTrunk := style.ColorBranchName(trunkName, false)
 			splog.Info("Trunk set to %s", coloredTrunk)
 
-			// Read config for engine options
 			maxUndoDepth := cfg.UndoStackDepth()
 
-			// Create engine and perform reset/rebuild
 			eng, err := engine.NewEngine(engine.Options{
 				RepoRoot:          repoRoot,
 				Trunk:             trunkName,

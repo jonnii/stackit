@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -30,7 +31,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no source branch specified")
 		}
-		source = currentBranch.Name
+		source = currentBranch.GetName()
 	}
 
 	// Take snapshot before modifying the repository
@@ -67,7 +68,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		allBranches := eng.AllBranches()
 		found := false
 		for _, branch := range allBranches {
-			if branch.Name == onto {
+			if branch.GetName() == onto {
 				found = true
 				break
 			}
@@ -90,7 +91,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		RecursiveParents:  false,
 	})
 	for _, d := range descendants {
-		if d.Name == onto {
+		if d.GetName() == onto {
 			return fmt.Errorf("cannot move %s onto its own descendant %s", source, onto)
 		}
 	}
@@ -106,7 +107,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 				if err := eng.RenameBranch(gctx, eng.GetBranch(source), eng.GetBranch(newName)); err != nil {
 					splog.Info("Warning: failed to rename branch: %v", err)
 				} else {
-					splog.Info("Renamed branch %s to %s.", tui.ColorBranchName(source, false), tui.ColorBranchName(newName, true))
+					splog.Info("Renamed branch %s to %s.", style.ColorBranchName(source, false), style.ColorBranchName(newName, true))
 					source = newName
 					sourceBranch = eng.GetBranch(source)
 				}
@@ -119,20 +120,20 @@ func Action(ctx *runtime.Context, opts Options) error {
 	oldParent := eng.GetParent(sourceBranch)
 	oldParentName := ""
 	if oldParent == nil {
-		oldParentName = eng.Trunk().Name
+		oldParentName = eng.Trunk().GetName()
 	} else {
-		oldParentName = oldParent.Name
+		oldParentName = oldParent.GetName()
 	}
 
 	// Update parent in engine
-	if err := eng.SetParent(gctx, source, onto); err != nil {
+	if err := eng.SetParent(gctx, sourceBranch, ontoBranch); err != nil {
 		return fmt.Errorf("failed to set parent: %w", err)
 	}
 
 	splog.Info("Moved %s from %s to %s.",
-		tui.ColorBranchName(source, true),
-		tui.ColorBranchName(oldParentName, false),
-		tui.ColorBranchName(onto, false))
+		style.ColorBranchName(source, true),
+		style.ColorBranchName(oldParentName, false),
+		style.ColorBranchName(onto, false))
 
 	// Get all branches that need restacking: source and all its descendants
 	branchesToRestack := sourceBranch.GetRelativeStack(engine.StackRange{

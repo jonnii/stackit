@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -25,7 +26,7 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 
 	// Get current branch
 	currentBranch, _ := git.GetCurrentBranch()
-	isOnTrunk := currentBranch == eng.Trunk().Name || currentBranch == ""
+	isOnTrunk := currentBranch == eng.Trunk().GetName() || currentBranch == ""
 
 	// Handle Show
 	if opts.Show {
@@ -38,14 +39,14 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 		switch {
 		case !explicitScope.IsEmpty():
 			if explicitScope.IsNone() {
-				splog.Info("Branch %s has scope inheritance DISABLED (explicitly set to '%s').", tui.ColorBranchName(currentBranch, false), explicitScope.String())
+				splog.Info("Branch %s has scope inheritance DISABLED (explicitly set to '%s').", style.ColorBranchName(currentBranch, false), explicitScope.String())
 			} else {
-				splog.Info("Branch %s has explicit scope: %s", tui.ColorBranchName(currentBranch, false), tui.ColorDim(explicitScope.String()))
+				splog.Info("Branch %s has explicit scope: %s", style.ColorBranchName(currentBranch, false), style.ColorDim(explicitScope.String()))
 			}
 		case !resolvedScope.IsEmpty():
-			splog.Info("Branch %s inherits scope: %s", tui.ColorBranchName(currentBranch, false), tui.ColorDim(resolvedScope.String()))
+			splog.Info("Branch %s inherits scope: %s", style.ColorBranchName(currentBranch, false), style.ColorDim(resolvedScope.String()))
 		default:
-			splog.Info("Branch %s has no scope set.", tui.ColorBranchName(currentBranch, false))
+			splog.Info("Branch %s has no scope set.", style.ColorBranchName(currentBranch, false))
 		}
 		return nil
 	}
@@ -58,7 +59,7 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 		if err := eng.SetScope(eng.GetBranch(currentBranch), engine.Empty()); err != nil {
 			return fmt.Errorf("failed to unset scope: %w", err)
 		}
-		splog.Info("Unset explicit scope for branch %s. It will now inherit from its parent.", tui.ColorBranchName(currentBranch, false))
+		splog.Info("Unset explicit scope for branch %s. It will now inherit from its parent.", style.ColorBranchName(currentBranch, false))
 		return nil
 	}
 
@@ -80,9 +81,9 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 	}
 
 	if newScope.IsNone() {
-		splog.Info("Disabled scope for branch %s (breaks inheritance).", tui.ColorBranchName(currentBranch, false))
+		splog.Info("Disabled scope for branch %s (breaks inheritance).", style.ColorBranchName(currentBranch, false))
 	} else {
-		splog.Info("Set scope for branch %s to: %s", tui.ColorBranchName(currentBranch, false), tui.ColorDim(opts.Scope))
+		splog.Info("Set scope for branch %s to: %s", style.ColorBranchName(currentBranch, false), style.ColorDim(opts.Scope))
 
 		// Rename prompt
 		if oldScope.IsDefined() && !oldScope.Equal(newScope) && utils.IsInteractive() && strings.Contains(currentBranch, oldScope.String()) {
@@ -92,7 +93,7 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 				if err := eng.RenameBranch(ctx.Context, eng.GetBranch(currentBranch), eng.GetBranch(newName)); err != nil {
 					splog.Info("Warning: failed to rename branch: %v", err)
 				} else {
-					splog.Info("Renamed branch %s to %s.", tui.ColorBranchName(currentBranch, false), tui.ColorBranchName(newName, true))
+					splog.Info("Renamed branch %s to %s.", style.ColorBranchName(currentBranch, false), style.ColorBranchName(newName, true))
 				}
 			}
 		}

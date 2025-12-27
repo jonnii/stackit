@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -20,7 +20,7 @@ func newUntrackCmd() *cobra.Command {
 If the branch has children, they will also be untracked.`,
 		SilenceUsage:      true,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: helpers.CompleteBranches,
+		ValidArgsFunction: common.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get context
 			ctx, err := runtime.GetContext(cmd.Context())
@@ -37,7 +37,7 @@ If the branch has children, they will also be untracked.`,
 				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
-				branchName = currentBranch.Name
+				branchName = currentBranch.GetName()
 			}
 
 			// Execute untrack action

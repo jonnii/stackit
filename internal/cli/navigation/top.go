@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -20,14 +21,10 @@ children exist at any level, you will be prompted to select which branch
 to follow.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Execute top action
-			return actions.SwitchBranchAction(actions.DirectionTop, ctx)
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Execute top action
+				return actions.SwitchBranchAction(actions.DirectionTop, ctx)
+			})
 		},
 	}
 

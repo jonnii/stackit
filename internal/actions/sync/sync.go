@@ -56,7 +56,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		branch := eng.GetBranch(branchName)
 		upstack := eng.GetRelativeStackUpstack(branch)
 		for _, b := range upstack {
-			branchesToRestack = append(branchesToRestack, b.Name)
+			branchesToRestack = append(branchesToRestack, b.GetName())
 		}
 		branchesToRestack = append(branchesToRestack, branchName)
 	}

@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/create"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -31,37 +32,33 @@ If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Get branch name from args
+				branchName := ""
+				if len(args) > 0 {
+					branchName = args[0]
+				}
 
-			// Get branch name from args
-			branchName := ""
-			if len(args) > 0 {
-				branchName = args[0]
-			}
+				// Get config values
+				cfg, _ := config.LoadConfig(ctx.RepoRoot)
+				branchPattern := cfg.GetBranchPattern()
 
-			// Get config values
-			cfg, _ := config.LoadConfig(ctx.RepoRoot)
-			branchPattern := cfg.GetBranchPattern()
+				// Prepare options
+				opts := create.Options{
+					BranchName:    branchName,
+					Message:       message,
+					Scope:         scope,
+					All:           all,
+					Insert:        insert,
+					Patch:         patch,
+					Update:        update,
+					Verbose:       verbose,
+					BranchPattern: branchPattern,
+				}
 
-			// Prepare options
-			opts := create.Options{
-				BranchName:    branchName,
-				Message:       message,
-				Scope:         scope,
-				All:           all,
-				Insert:        insert,
-				Patch:         patch,
-				Update:        update,
-				Verbose:       verbose,
-				BranchPattern: branchPattern,
-			}
-
-			// Execute create action
-			return create.Action(ctx, opts)
+				// Execute create action
+				return create.Action(ctx, opts)
+			})
 		},
 	}
 

@@ -58,18 +58,18 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Ensure branch is tracked
-	currentBranchObj := eng.GetBranch(currentBranch.Name)
+	currentBranchObj := eng.GetBranch(currentBranch.GetName())
 	if !currentBranchObj.IsTracked() {
 		// Auto-track the branch
 		parent := eng.GetParent(*currentBranch)
 		parentName := ""
 		if parent == nil {
 			// Try to find parent from git
-			parentName = eng.Trunk().Name
+			parentName = eng.Trunk().GetName()
 		} else {
-			parentName = parent.Name
+			parentName = parent.GetName()
 		}
-		if err := eng.TrackBranch(context, currentBranch.Name, parentName); err != nil {
+		if err := eng.TrackBranch(context, currentBranch.GetName(), parentName); err != nil {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 	}
@@ -87,7 +87,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 			// Prompt for style
 			var styleStr string
 			prompt := &survey.Select{
-				Message: fmt.Sprintf("How would you like to split %s?", currentBranch.Name),
+				Message: fmt.Sprintf("How would you like to split %s?", currentBranch.GetName()),
 				Options: []string{"By commit - slice up the history of this branch", "By hunk - split into new single-commit branches", "Cancel"},
 			}
 			if err := survey.AskOne(prompt, &styleStr); err != nil {
@@ -125,14 +125,14 @@ func Action(ctx *runtime.Context, opts Options) error {
 	var result *Result
 	switch style {
 	case StyleCommit:
-		result, err = splitByCommit(context, currentBranch.Name, eng, splog)
+		result, err = splitByCommit(context, currentBranch.GetName(), eng, splog)
 	case StyleHunk:
-		result, err = splitByHunk(context, currentBranch.Name, eng, splog)
+		result, err = splitByHunk(context, *currentBranch, eng, splog)
 	case StyleFile:
 		pathspecs := opts.Pathspecs
 		// If no pathspecs provided, prompt interactively
 		if len(pathspecs) == 0 {
-			pathspecs, err = promptForFiles(context, currentBranch.Name, eng, splog)
+			pathspecs, err = promptForFiles(context, *currentBranch, eng, splog)
 			if err != nil {
 				return err
 			}
@@ -142,7 +142,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 		// splitByFile handles everything internally (creating branches, tracking, etc.)
 		// and updates the parent relationship, so we just need to restack upstack branches
-		_, err = splitByFile(context, currentBranch.Name, pathspecs, eng)
+		_, err = splitByFile(context, *currentBranch, pathspecs, eng)
 		if err != nil {
 			return err
 		}
@@ -177,7 +177,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Apply the split
 	if err := eng.ApplySplitToCommits(context, engine.ApplySplitOptions{
-		BranchToSplit: currentBranch.Name,
+		BranchToSplit: currentBranch.GetName(),
 		BranchNames:   result.BranchNames,
 		BranchPoints:  result.BranchPoints,
 	}); err != nil {

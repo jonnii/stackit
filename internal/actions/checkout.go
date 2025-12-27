@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
+	"stackit.dev/stackit/internal/utils"
 )
 
 // CheckoutOptions contains options for the checkout command
@@ -34,12 +35,15 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	// Handle --trunk flag
 	switch {
 	case opts.CheckoutTrunk:
-		branchName = eng.Trunk().Name
+		branchName = eng.Trunk().GetName()
 	case opts.BranchName != "":
 		// Direct checkout
 		branchName = opts.BranchName
 	default:
 		// Interactive selection
+		if !utils.IsInteractive() {
+			return fmt.Errorf("interactive branch selection is not available in non-interactive mode; please specify a branch name")
+		}
 		branches, err := buildBranchChoices(ctx, opts)
 		if err != nil {
 			return err
@@ -52,18 +56,18 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 
 	// Check if already on the branch
 	currentBranch := eng.CurrentBranch()
-	if branchName == currentBranch.Name {
-		splog.Info("Already on %s.", tui.ColorBranchName(branchName, true))
+	if currentBranch != nil && branchName == currentBranch.GetName() {
+		splog.Info("Already on %s.", style.ColorBranchName(branchName, true))
 		return nil
 	}
 
 	// Checkout the branch
 	branch := eng.GetBranch(branchName)
-	if err := git.CheckoutBranch(context, branch.Name); err != nil {
+	if err := eng.CheckoutBranch(context, branch); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
-	splog.Info("Checked out %s.", tui.ColorBranchName(branchName, false))
+	splog.Info("Checked out %s.", style.ColorBranchName(branchName, false))
 	printBranchInfo(ctx, branch)
 
 	return nil
@@ -103,19 +107,19 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 
 		// Build branch list from stack
 		for _, branch := range stack {
-			if seenBranches[branch.Name] {
+			if seenBranches[branch.GetName()] {
 				continue
 			}
-			seenBranches[branch.Name] = true
+			seenBranches[branch.GetName()] = true
 			branches = append(branches, branch)
 		}
 	} else {
 		// Get branches in stack order: trunk first, then children recursively
 		for branch := range eng.BranchesDepthFirst(trunk) {
-			if seenBranches[branch.Name] {
+			if seenBranches[branch.GetName()] {
 				continue
 			}
-			seenBranches[branch.Name] = true
+			seenBranches[branch.GetName()] = true
 			branches = append(branches, branch)
 		}
 	}
@@ -124,9 +128,9 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 	if opts.ShowUntracked {
 		untracked := getUntrackedBranchesForCheckout(eng)
 		for _, branch := range untracked {
-			if !seenBranches[branch.Name] {
+			if !seenBranches[branch.GetName()] {
 				branches = append(branches, branch)
-				seenBranches[branch.Name] = true
+				seenBranches[branch.GetName()] = true
 			}
 		}
 	}
@@ -136,16 +140,16 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 		allBranches := eng.AllBranches()
 
 		// Ensure trunk is always included
-		if trunk.Name != "" && !seenBranches[trunk.Name] {
+		if trunk.GetName() != "" && !seenBranches[trunk.GetName()] {
 			branches = append(branches, trunk)
-			seenBranches[trunk.Name] = true
+			seenBranches[trunk.GetName()] = true
 		}
 
 		// Add all other branches
 		for _, branch := range allBranches {
-			if !seenBranches[branch.Name] {
+			if !seenBranches[branch.GetName()] {
 				branches = append(branches, branch)
-				seenBranches[branch.Name] = true
+				seenBranches[branch.GetName()] = true
 			}
 		}
 
@@ -171,8 +175,8 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	if !branch.IsBranchUpToDate() {
 		parent := branch.GetParentPrecondition()
 		ctx.Splog.Info("This branch has fallen behind %s - you may want to %s.",
-			tui.ColorBranchName(parent, false),
-			tui.ColorCyan("stackit upstack restack"))
+			style.ColorBranchName(parent, false),
+			style.ColorCyan("stackit upstack restack"))
 		return
 	}
 
@@ -190,9 +194,9 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 		if !ancestor.IsBranchUpToDate() {
 			parent := ancestor.GetParentPrecondition()
 			ctx.Splog.Info("The downstack branch %s has fallen behind %s - you may want to %s.",
-				tui.ColorBranchName(ancestor.Name, false),
-				tui.ColorBranchName(parent, false),
-				tui.ColorCyan("stackit stack restack"))
+				style.ColorBranchName(ancestor.GetName(), false),
+				style.ColorBranchName(parent, false),
+				style.ColorCyan("stackit stack restack"))
 			return
 		}
 	}

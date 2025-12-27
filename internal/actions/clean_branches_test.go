@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -28,13 +27,9 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Mark branch1 as merged via PR info
-		prNumber := 1
-		prInfo := &engine.PrInfo{
-			Number: &prNumber,
-			State:  "MERGED",
-			Base:   "main",
-		}
-		err = s.Engine.UpsertPrInfo("branch1", prInfo)
+		prInfo := testhelpers.NewTestPrInfoMerged(1, "main")
+		branch := s.Engine.GetBranch("branch1")
+		err = s.Engine.UpsertPrInfo(branch, prInfo)
 		require.NoError(t, err)
 
 		result, err := actions.CleanBranches(s.Context, actions.CleanBranchesOptions{
@@ -49,7 +44,7 @@ func TestCleanBranches(t *testing.T) {
 		branchparent2 := s.Engine.GetBranch("branch2")
 		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
-		require.Equal(t, "main", parent2.Name)
+		require.Equal(t, "main", parent2.GetName())
 		require.Contains(t, result.BranchesWithNewParents, "branch2")
 	})
 
@@ -70,12 +65,9 @@ func TestCleanBranches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Mark branch1 as merged
-		prNumber := 1
-		prInfo := &engine.PrInfo{
-			Number: &prNumber,
-			State:  "MERGED",
-		}
-		err = s.Engine.UpsertPrInfo("branch1", prInfo)
+		prInfo := testhelpers.NewTestPrInfoWithState(1, "MERGED")
+		branch := s.Engine.GetBranch("branch1")
+		err = s.Engine.UpsertPrInfo(branch, prInfo)
 		require.NoError(t, err)
 
 		result, err := actions.CleanBranches(s.Context, actions.CleanBranchesOptions{
@@ -87,11 +79,11 @@ func TestCleanBranches(t *testing.T) {
 		branchparent2 := s.Engine.GetBranch("branch2")
 		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
-		require.Equal(t, "main", parent2.Name)
+		require.Equal(t, "main", parent2.GetName())
 		branchparent3 := s.Engine.GetBranch("branch3")
 		parent3 := s.Engine.GetParent(branchparent3)
 		require.NotNil(t, parent3)
-		require.Equal(t, "main", parent3.Name)
+		require.Equal(t, "main", parent3.GetName())
 		require.Contains(t, result.BranchesWithNewParents, "branch2")
 		require.Contains(t, result.BranchesWithNewParents, "branch3")
 	})

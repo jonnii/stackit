@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"slices"
-
-	"stackit.dev/stackit/internal/git"
 )
 
 // rebuildInternal is the internal rebuild logic without locking
 // refreshCurrentBranch indicates whether to refresh currentBranch from Git
 func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	// Get all branch names
-	branches, err := git.GetAllBranchNames()
+	branches, err := e.git.GetAllBranchNames()
 	if err != nil {
 		return fmt.Errorf("failed to get branches: %w", err)
 	}
@@ -20,7 +18,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 
 	// Refresh current branch from Git if requested (needed when called from Rebuild/Reset after branch switches)
 	if refreshCurrentBranch {
-		currentBranch, err := git.GetCurrentBranch()
+		currentBranch, err := e.git.GetCurrentBranch()
 		if err != nil {
 			// Not on a branch (e.g., detached HEAD) - that's okay
 			e.currentBranch = ""
@@ -35,7 +33,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	e.scopeMap = make(map[string]string)
 
 	// Load metadata for each branch in parallel
-	allMeta, _ := git.BatchReadMetadataRefs(branches)
+	allMeta, _ := e.batchReadMetadataRefs(branches)
 
 	// Collect results and populate maps sequentially to avoid lock contention/races
 	for name, meta := range allMeta {
@@ -60,7 +58,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 // updateBranchInCache updates the cache for a specific branch after restack/metadata changes
 func (e *engineImpl) updateBranchInCache(branchName string) {
 	// Read metadata for this branch
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.readMetadataRef(branchName)
 	if err != nil {
 		// If metadata doesn't exist, remove branch from all maps
 		if oldParent, exists := e.parentMap[branchName]; exists {
@@ -136,7 +134,7 @@ func (e *engineImpl) rebuild() error {
 // - No longer exists locally
 // - Has been merged into trunk
 // - Has a "MERGED" PR state in metadata
-func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string, metaMap map[string]*git.Meta) bool {
+func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName string, metaMap map[string]*Meta) bool {
 	// Check if parent is trunk (no need to reparent)
 	if parentBranchName == e.trunk {
 		return false
@@ -155,7 +153,7 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has been merged into trunk
-	merged, err := git.IsMerged(ctx, parentBranchName, e.trunk)
+	merged, err := e.git.IsMerged(ctx, parentBranchName, e.trunk)
 	if err == nil && merged {
 		return true
 	}
@@ -172,8 +170,9 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Fall back to engine cache/disk if not in metaMap or state unknown
-	prInfo, err := e.GetPrInfo(parentBranchName)
-	if err == nil && prInfo != nil && prInfo.State == "MERGED" {
+	parentBranch := e.GetBranch(parentBranchName)
+	prInfo, err := e.GetPrInfo(parentBranch)
+	if err == nil && prInfo != nil && prInfo.State() == "MERGED" {
 		return true
 	}
 
@@ -182,7 +181,7 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 
 // findNearestValidAncestor finds the nearest ancestor that hasn't been merged/deleted
 // Returns trunk if all ancestors have been merged
-func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string, metaMap map[string]*git.Meta) string {
+func (e *engineImpl) findNearestValidAncestor(ctx context.Context, branchName string, metaMap map[string]*Meta) string {
 	current := e.parentMap[branchName]
 
 	for current != "" && current != e.trunk {
@@ -214,12 +213,12 @@ func (e *engineImpl) getRelativeStackUpstackInternal(branchName string) []Branch
 
 		// Don't include the starting branch
 		if branch != branchName {
-			result = append(result, Branch{Name: branch, Reader: e})
+			result = append(result, NewBranch(branch, e))
 		}
 
 		children := e.GetChildrenInternal(branch)
 		for _, child := range children {
-			collectDescendants(child.Name)
+			collectDescendants(child.GetName())
 		}
 	}
 
@@ -251,4 +250,25 @@ func stringPtr(s string) *string {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// FindCommonlyNamedTrunk checks for common trunk branch names
+// Returns the branch name if exactly one is found, empty string otherwise
+func FindCommonlyNamedTrunk(branchNames []string) string {
+	commonNames := []string{"main", "master", "development", "develop"}
+	var found []string
+
+	for _, name := range branchNames {
+		for _, common := range commonNames {
+			if name == common {
+				found = append(found, name)
+				break
+			}
+		}
+	}
+
+	if len(found) == 1 {
+		return found[0]
+	}
+	return ""
 }

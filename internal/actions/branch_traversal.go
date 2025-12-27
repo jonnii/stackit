@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"stackit.dev/stackit/internal/errors"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
@@ -28,16 +27,16 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 		return errors.ErrNotOnBranch
 	}
 
-	ctx.Splog.Info("%s", currentBranch.Name)
+	ctx.Splog.Info("%s", currentBranch.GetName())
 
 	var targetBranch string
 	var err error
 
 	switch direction {
 	case DirectionBottom:
-		targetBranch = traverseDownward(currentBranch.Name, ctx)
+		targetBranch = traverseDownward(currentBranch.GetName(), ctx)
 	case DirectionTop:
-		targetBranch, err = traverseUpward(currentBranch.Name, ctx)
+		targetBranch, err = traverseUpward(currentBranch.GetName(), ctx)
 		if err != nil {
 			return err
 		}
@@ -45,7 +44,7 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 		return fmt.Errorf("invalid direction: %s", direction)
 	}
 
-	if targetBranch == currentBranch.Name {
+	if targetBranch == currentBranch.GetName() {
 		directionText := "bottom most"
 		if direction == DirectionTop {
 			directionText = "top most"
@@ -56,7 +55,7 @@ func SwitchBranchAction(direction Direction, ctx *runtime.Context) error {
 
 	// Checkout the target branch
 	targetBranchObj := ctx.Engine.GetBranch(targetBranch)
-	if err := git.CheckoutBranch(ctx.Context, targetBranchObj.Name); err != nil {
+	if err := ctx.Engine.CheckoutBranch(ctx.Context, targetBranchObj); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 	}
 
@@ -82,8 +81,8 @@ func traverseDownward(currentBranch string, ctx *runtime.Context) string {
 		return currentBranch
 	}
 
-	ctx.Splog.Info("⮑  %s", parent.Name)
-	return traverseDownward(parent.Name, ctx)
+	ctx.Splog.Info("⮑  %s", parent.GetName())
+	return traverseDownward(parent.GetName(), ctx)
 }
 
 // traverseUpward walks up the children chain to find the tip branch
@@ -100,12 +99,12 @@ func traverseUpward(currentBranch string, ctx *runtime.Context) (string, error) 
 
 	if len(children) == 1 {
 		// Single child, follow it
-		nextBranch = children[0].Name
+		nextBranch = children[0].GetName()
 	} else {
 		// Multiple children, prompt user
 		childNames := make([]string, len(children))
 		for i, c := range children {
-			childNames[i] = c.Name
+			childNames[i] = c.GetName()
 		}
 		nextBranch, err = handleMultipleChildren(childNames)
 		if err != nil {

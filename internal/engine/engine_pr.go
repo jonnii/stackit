@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"stackit.dev/stackit/internal/git"
 )
 
 // GetPrInfo returns PR information for a branch
-func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
-	meta, err := git.ReadMetadataRef(branchName)
+func (e *engineImpl) GetPrInfo(branch Branch) (*PrInfo, error) {
+	meta, err := e.readMetadataRef(branch.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -19,71 +17,84 @@ func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
 		return nil, nil
 	}
 
-	prInfo := &PrInfo{
-		Number:  meta.PrInfo.Number,
-		Title:   getStringValue(meta.PrInfo.Title),
-		Body:    getStringValue(meta.PrInfo.Body),
-		IsDraft: getBoolValue(meta.PrInfo.IsDraft),
-		State:   getStringValue(meta.PrInfo.State),
-		Base:    getStringValue(meta.PrInfo.Base),
-		URL:     getStringValue(meta.PrInfo.URL),
-	}
+	prInfo := NewPrInfo(
+		meta.PrInfo.Number,
+		getStringValue(meta.PrInfo.Title),
+		getStringValue(meta.PrInfo.Body),
+		getStringValue(meta.PrInfo.State),
+		getStringValue(meta.PrInfo.Base),
+		getStringValue(meta.PrInfo.URL),
+		getBoolValue(meta.PrInfo.IsDraft),
+	)
 
 	return prInfo, nil
 }
 
 // UpsertPrInfo updates or creates PR information for a branch
-func (e *engineImpl) UpsertPrInfo(branchName string, prInfo *PrInfo) error {
-	meta, err := git.ReadMetadataRef(branchName)
+func (e *engineImpl) UpsertPrInfo(branch Branch, prInfo *PrInfo) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	meta, err := e.readMetadataRef(branch.GetName())
 	if err != nil {
-		meta = &git.Meta{}
+		meta = &Meta{}
+	}
+
+	if prInfo == nil {
+		meta.PrInfo = nil
+		return e.writeMetadataRef(branch.GetName(), meta)
 	}
 
 	if meta.PrInfo == nil {
-		meta.PrInfo = &git.PrInfo{}
+		meta.PrInfo = &PrInfoPersistence{}
 	}
 
 	// Update PR info fields
-	if prInfo.Number != nil {
-		meta.PrInfo.Number = prInfo.Number
+	if prInfo.Number() != nil {
+		meta.PrInfo.Number = prInfo.Number()
 	}
-	if prInfo.Title != "" {
-		meta.PrInfo.Title = &prInfo.Title
+	if prInfo.Title() != "" {
+		title := prInfo.Title()
+		meta.PrInfo.Title = &title
 	}
-	if prInfo.Body != "" {
-		meta.PrInfo.Body = &prInfo.Body
+	if prInfo.Body() != "" {
+		body := prInfo.Body()
+		meta.PrInfo.Body = &body
 	}
-	meta.PrInfo.IsDraft = &prInfo.IsDraft
-	if prInfo.State != "" {
-		meta.PrInfo.State = &prInfo.State
+	isDraft := prInfo.IsDraft()
+	meta.PrInfo.IsDraft = &isDraft
+	if prInfo.State() != "" {
+		state := prInfo.State()
+		meta.PrInfo.State = &state
 	}
-	if prInfo.Base != "" {
-		meta.PrInfo.Base = &prInfo.Base
+	if prInfo.Base() != "" {
+		base := prInfo.Base()
+		meta.PrInfo.Base = &base
 	}
-	if prInfo.URL != "" {
-		meta.PrInfo.URL = &prInfo.URL
+	if prInfo.URL() != "" {
+		url := prInfo.URL()
+		meta.PrInfo.URL = &url
 	}
 
-	return git.WriteMetadataRef(branchName, meta)
+	return e.writeMetadataRef(branch.GetName(), meta)
 }
 
 // GetPRSubmissionStatus returns the submission status of a branch
-func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatus, error) {
-	prInfo, err := e.GetPrInfo(branchName)
+func (e *engineImpl) GetPRSubmissionStatus(branch Branch) (PRSubmissionStatus, error) {
+	prInfo, err := e.GetPrInfo(branch)
 	if err != nil {
 		return PRSubmissionStatus{}, err
 	}
 
-	branch := e.GetBranch(branchName)
 	parentBranch := e.GetParent(branch)
 	parentBranchName := ""
 	if parentBranch == nil {
 		parentBranchName = e.trunk
 	} else {
-		parentBranchName = parentBranch.Name
+		parentBranchName = parentBranch.GetName()
 	}
 
-	if prInfo == nil || prInfo.Number == nil {
+	if prInfo == nil || prInfo.Number() == nil {
 		return PRSubmissionStatus{
 			Action:      "create",
 			NeedsUpdate: true,
@@ -92,11 +103,11 @@ func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatu
 	}
 
 	// It's an update
-	baseChanged := prInfo.Base != parentBranchName
-	branchChanged, _ := e.BranchMatchesRemote(branchName)
+	baseChanged := prInfo.Base() != parentBranchName
+	branchChanged, _ := e.BranchMatchesRemote(branch.GetName())
 
 	// Check if PR title needs update due to scope changes
-	titleNeedsUpdate := e.prTitleNeedsUpdate(branchName, prInfo)
+	titleNeedsUpdate := e.prTitleNeedsUpdate(branch, prInfo)
 
 	needsUpdate := baseChanged || !branchChanged || titleNeedsUpdate
 
@@ -109,7 +120,7 @@ func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatu
 		Action:      "update",
 		NeedsUpdate: needsUpdate,
 		Reason:      reason,
-		PRNumber:    prInfo.Number,
+		PRNumber:    prInfo.Number(),
 		PRInfo:      prInfo,
 	}, nil
 }
@@ -117,13 +128,13 @@ func (e *engineImpl) GetPRSubmissionStatus(branchName string) (PRSubmissionStatu
 var scopeRegex = regexp.MustCompile(`^\[[^\]]+\]\s*`)
 
 // prTitleNeedsUpdate checks if the PR title needs to be updated due to scope changes
-func (e *engineImpl) prTitleNeedsUpdate(branchName string, prInfo *PrInfo) bool {
-	if prInfo == nil || prInfo.Title == "" {
+func (e *engineImpl) prTitleNeedsUpdate(branch Branch, prInfo *PrInfo) bool {
+	if prInfo == nil || prInfo.Title() == "" {
 		return false
 	}
 
-	scope := e.GetScopeInternal(branchName)
-	updatedTitle := prInfo.Title
+	scope := e.GetScopeInternal(branch.GetName())
+	updatedTitle := prInfo.Title()
 
 	if !scope.IsEmpty() {
 		// If title already has a scope prefix, replace it
@@ -138,5 +149,5 @@ func (e *engineImpl) prTitleNeedsUpdate(branchName string, prInfo *PrInfo) bool 
 		}
 	}
 
-	return updatedTitle != prInfo.Title
+	return updatedTitle != prInfo.Title()
 }

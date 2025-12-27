@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ForeachOptions contains options for the foreach command
@@ -36,10 +35,10 @@ func ForeachAction(ctx *runtime.Context, opts ForeachOptions) error {
 		return nil
 	}
 
-	originalBranchName := currentBranch.Name
+	originalBranchName := currentBranch.GetName()
 	defer func() {
 		// Always try to return to the original branch
-		if err := git.CheckoutBranch(ctx.Context, originalBranchName); err != nil {
+		if err := eng.CheckoutBranch(ctx.Context, eng.GetBranch(originalBranchName)); err != nil {
 			splog.Error("Failed to return to original branch %s: %v", originalBranchName, err)
 		}
 	}()
@@ -53,11 +52,11 @@ func ForeachAction(ctx *runtime.Context, opts ForeachOptions) error {
 			continue
 		}
 
-		isCurrent := branch.Name == originalBranchName
-		splog.Info("\nRunning on branch %s...", tui.ColorBranchName(branch.Name, isCurrent))
+		isCurrent := branch.GetName() == originalBranchName
+		splog.Info("\nRunning on branch %s...", style.ColorBranchName(branch.GetName(), isCurrent))
 
-		if err := git.CheckoutBranch(ctx.Context, branch.Name); err != nil {
-			splog.Error("Failed to checkout %s: %v", branch.Name, err)
+		if err := eng.CheckoutBranch(ctx.Context, branch); err != nil {
+			splog.Error("Failed to checkout %s: %v", branch.GetName(), err)
 			if opts.FailFast {
 				return err
 			}
@@ -72,12 +71,12 @@ func ForeachAction(ctx *runtime.Context, opts ForeachOptions) error {
 		cmd.Dir = ctx.RepoRoot
 
 		if err := cmd.Run(); err != nil {
-			splog.Error("✗ Command failed on branch %s: %v", branch.Name, err)
+			splog.Error("✗ Command failed on branch %s: %v", branch.GetName(), err)
 			if opts.FailFast {
-				return fmt.Errorf("command failed on branch %s", branch.Name)
+				return fmt.Errorf("command failed on branch %s", branch.GetName())
 			}
 		} else {
-			splog.Info("✓ Command succeeded on branch %s", branch.Name)
+			splog.Info("✓ Command succeeded on branch %s", branch.GetName())
 		}
 	}
 

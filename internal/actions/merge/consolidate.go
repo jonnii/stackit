@@ -101,12 +101,13 @@ func (c *ConsolidateMergeExecutor) Execute(ctx context.Context, opts ExecuteOpti
 func (c *ConsolidateMergeExecutor) preValidateStack(ctx context.Context, force bool) error {
 	for _, branchInfo := range c.plan.BranchesToMerge {
 		// Check PR exists and is open
-		prInfo, err := c.engine.GetPrInfo(branchInfo.BranchName)
-		if err != nil || prInfo == nil || prInfo.Number == nil {
+		branch := c.engine.GetBranch(branchInfo.BranchName)
+		prInfo, err := c.engine.GetPrInfo(branch)
+		if err != nil || prInfo == nil || prInfo.Number() == nil {
 			return fmt.Errorf("PR not found for branch %s", branchInfo.BranchName)
 		}
-		if prInfo.State != prStateOpen {
-			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, branchInfo.BranchName, prInfo.State)
+		if prInfo.State() != prStateOpen {
+			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number(), branchInfo.BranchName, prInfo.State())
 		}
 
 		// Check if local matches remote for consolidation validation
@@ -116,7 +117,7 @@ func (c *ConsolidateMergeExecutor) preValidateStack(ctx context.Context, force b
 		}
 		if !matchesRemote {
 			// Get detailed difference information like the planning phase does
-			diffInfo := getBranchRemoteDifference(branchInfo.BranchName, c.splog)
+			diffInfo, _ := c.engine.GetBranchRemoteDifference(branchInfo.BranchName)
 			if diffInfo != "" {
 				if !force {
 					return fmt.Errorf("branch %s differs from remote: %s, use --force to proceed", branchInfo.BranchName, diffInfo)
@@ -155,12 +156,12 @@ func (c *ConsolidateMergeExecutor) createConsolidationBranch(ctx context.Context
 	c.splog.Info("📋 Creating consolidation branch: %s", branchName)
 
 	// Start from trunk
-	if err := git.CreateAndCheckoutBranch(ctx, branchName); err != nil {
+	if err := c.engine.CreateAndCheckoutBranch(ctx, c.engine.GetBranch(branchName)); err != nil {
 		return "", fmt.Errorf("failed to create and checkout branch: %w", err)
 	}
 
 	// Reset to trunk (since CreateAndCheckoutBranch creates from current HEAD)
-	if _, err := git.RunGitCommandWithContext(ctx, "reset", "--hard", c.engine.Trunk().Name); err != nil {
+	if _, err := git.RunGitCommandWithContext(ctx, "reset", "--hard", c.engine.Trunk().GetName()); err != nil {
 		return "", fmt.Errorf("failed to reset to trunk: %w", err)
 	}
 
@@ -176,8 +177,8 @@ func (c *ConsolidateMergeExecutor) createConsolidationBranch(ctx context.Context
 	}
 
 	// Push the consolidation branch
-	if err := git.PushBranch(ctx, branchName, git.GetRemote(), false, false); err != nil {
-		return "", fmt.Errorf("failed to push consolidation branch: %w", err)
+	if err := c.engine.PushBranch(ctx, branchName, c.engine.GetRemote(), false, false); err != nil {
+		return "", fmt.Errorf("failed to push consolidation branch %s: %w", branchName, err)
 	}
 
 	c.splog.Info("✅ Consolidation branch created and pushed")
@@ -196,7 +197,7 @@ func (c *ConsolidateMergeExecutor) createConsolidationPR(ctx context.Context, br
 		Title: title,
 		Body:  body,
 		Head:  branchName,
-		Base:  c.engine.Trunk().Name,
+		Base:  c.engine.Trunk().GetName(),
 		Draft: false, // Ready for review
 	}
 
@@ -306,23 +307,24 @@ func (c *ConsolidateMergeExecutor) updateIndividualPRs(ctx context.Context) {
 	consolidationInfo := c.getConsolidationInfo()
 
 	for _, branchInfo := range c.plan.BranchesToMerge {
-		prInfo, err := c.engine.GetPrInfo(branchInfo.BranchName)
-		if err != nil || prInfo == nil || prInfo.Number == nil {
+		branch := c.engine.GetBranch(branchInfo.BranchName)
+		prInfo, err := c.engine.GetPrInfo(branch)
+		if err != nil || prInfo == nil || prInfo.Number() == nil {
 			continue // PR might already be gone
 		}
 
 		// Add consolidation notice to PR body
-		updatedBody := c.addConsolidationNotice(prInfo.Body, consolidationInfo)
+		updatedBody := c.addConsolidationNotice(prInfo.Body(), consolidationInfo)
 
 		updateOpts := github.UpdatePROptions{
 			Body: &updatedBody,
 		}
 
 		owner, repo := c.getOwnerRepo()
-		if err := c.githubClient.UpdatePullRequest(ctx, owner, repo, *prInfo.Number, updateOpts); err != nil {
-			c.splog.Warn("Failed to update PR #%d: %v", *prInfo.Number, err)
+		if err := c.githubClient.UpdatePullRequest(ctx, owner, repo, *prInfo.Number(), updateOpts); err != nil {
+			c.splog.Warn("Failed to update PR #%d: %v", *prInfo.Number(), err)
 		} else {
-			c.splog.Debug("✅ Updated documentation for PR #%d", *prInfo.Number)
+			c.splog.Debug("✅ Updated documentation for PR #%d", *prInfo.Number())
 		}
 	}
 }
@@ -369,9 +371,10 @@ func (c *ConsolidateMergeExecutor) getStackScope() string {
 }
 
 func (c *ConsolidateMergeExecutor) getBranchTitle(branchInfo BranchMergeInfo) string {
-	prInfo, _ := c.engine.GetPrInfo(branchInfo.BranchName)
+	branch := c.engine.GetBranch(branchInfo.BranchName)
+	prInfo, _ := c.engine.GetPrInfo(branch)
 	if prInfo != nil {
-		return prInfo.Title
+		return prInfo.Title()
 	}
 	return branchInfo.BranchName
 }
@@ -393,9 +396,10 @@ func (c *ConsolidateMergeExecutor) buildConsolidationPRBody() string {
 	body.WriteString("This PR consolidates the following stack of changes into a single merge:\n\n")
 
 	for i, branchInfo := range c.plan.BranchesToMerge {
-		prInfo, _ := c.engine.GetPrInfo(branchInfo.BranchName)
-		if prInfo != nil && prInfo.Number != nil {
-			body.WriteString(fmt.Sprintf("%d. **PR #%d**: %s\n", i+1, *prInfo.Number, prInfo.Title))
+		branch := c.engine.GetBranch(branchInfo.BranchName)
+		prInfo, _ := c.engine.GetPrInfo(branch)
+		if prInfo != nil && prInfo.Number() != nil {
+			body.WriteString(fmt.Sprintf("%d. **PR #%d**: %s\n", i+1, *prInfo.Number(), prInfo.Title()))
 		} else {
 			body.WriteString(fmt.Sprintf("%d. **%s**: %s\n", i+1, branchInfo.BranchName, c.getBranchTitle(branchInfo)))
 		}
@@ -421,7 +425,7 @@ func (c *ConsolidateMergeExecutor) buildConsolidationPRBody() string {
 
 func (c *ConsolidateMergeExecutor) buildStackTree() string {
 	var tree strings.Builder
-	trunkName := c.engine.Trunk().Name
+	trunkName := c.engine.Trunk().GetName()
 
 	tree.WriteString(trunkName + "\n")
 

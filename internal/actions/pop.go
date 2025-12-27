@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -51,9 +51,9 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	parent := eng.GetParent(currentBranchObj)
 	parentName := ""
 	if parent == nil {
-		parentName = eng.Trunk().Name
+		parentName = eng.Trunk().GetName()
 	} else {
-		parentName = parent.Name
+		parentName = parent.GetName()
 	}
 
 	// Get parent branch revision
@@ -70,12 +70,12 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	}
 
 	// Checkout parent branch
-	if err := git.CheckoutBranch(ctx.Context, parentBranch.Name); err != nil {
+	if err := eng.CheckoutBranch(ctx.Context, parentBranch); err != nil {
 		return fmt.Errorf("failed to checkout parent branch: %w", err)
 	}
 
 	// Delete the old branch (this will also reparent any children)
-	if err := eng.DeleteBranch(ctx.Context, currentBranchObj.Name); err != nil {
+	if err := eng.DeleteBranch(ctx.Context, currentBranchObj); err != nil {
 		return fmt.Errorf("failed to delete branch: %w", err)
 	}
 
@@ -83,12 +83,12 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	hasStaged, err := git.HasStagedChanges(ctx.Context)
 	if err == nil && hasStaged {
 		splog.Info("Popped branch %s. Changes are now staged on %s.",
-			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parentName, false))
+			style.ColorBranchName(currentBranch, false),
+			style.ColorBranchName(parentName, false))
 	} else {
 		splog.Info("Popped branch %s. Switched to %s.",
-			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parentName, false))
+			style.ColorBranchName(currentBranch, false),
+			style.ColorBranchName(parentName, false))
 	}
 
 	return nil

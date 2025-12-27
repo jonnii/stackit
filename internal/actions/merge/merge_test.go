@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions/merge"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -96,20 +95,18 @@ func TestAction(t *testing.T) {
 
 		// Add PR info
 		prNumber := 123
-		prInfo := &engine.PrInfo{
-			Number: &prNumber,
-			State:  "OPEN",
-			URL:    "https://github.com/owner/repo/pull/123",
-		}
-		err := s.Engine.UpsertPrInfo("branch1", prInfo)
+		prInfo := testhelpers.NewTestPrInfo(prNumber).
+			WithURL("https://github.com/owner/repo/pull/123")
+		branch1 := s.Engine.GetBranch("branch1")
+		err := s.Engine.UpsertPrInfo(branch1, prInfo)
 		require.NoError(t, err)
 
 		// Switch to branch1
 		s.Checkout("branch1")
 
 		// Verify branch is tracked and has PR info
-		require.True(t, s.Engine.GetBranch("branch1").IsTracked())
-		prInfo, err = s.Engine.GetPrInfo("branch1")
+		require.True(t, branch1.IsTracked())
+		prInfo, err = s.Engine.GetPrInfo(branch1)
 		require.NoError(t, err)
 		require.NotNil(t, prInfo)
 
@@ -161,30 +158,24 @@ func TestAction(t *testing.T) {
 
 		// Add PR info to engine
 		prA := 101
-		err := s.Engine.UpsertPrInfo("branch-a", &engine.PrInfo{
-			Number: &prA,
-			State:  "OPEN",
-			Base:   "main",
-			URL:    "https://github.com/owner/repo/pull/101",
-		})
+		branchA := s.Engine.GetBranch("branch-a")
+		branchB := s.Engine.GetBranch("branch-b")
+		branchC := s.Engine.GetBranch("branch-c")
+		err := s.Engine.UpsertPrInfo(branchA, testhelpers.NewTestPrInfo(prA).
+			WithBase("main").
+			WithURL("https://github.com/owner/repo/pull/101"))
 		require.NoError(t, err)
 
 		prB := 102
-		err = s.Engine.UpsertPrInfo("branch-b", &engine.PrInfo{
-			Number: &prB,
-			State:  "OPEN",
-			Base:   "branch-a",
-			URL:    "https://github.com/owner/repo/pull/102",
-		})
+		err = s.Engine.UpsertPrInfo(branchB, testhelpers.NewTestPrInfo(prB).
+			WithBase("branch-a").
+			WithURL("https://github.com/owner/repo/pull/102"))
 		require.NoError(t, err)
 
 		prC := 103
-		err = s.Engine.UpsertPrInfo("branch-c", &engine.PrInfo{
-			Number: &prC,
-			State:  "OPEN",
-			Base:   "branch-b",
-			URL:    "https://github.com/owner/repo/pull/103",
-		})
+		err = s.Engine.UpsertPrInfo(branchC, testhelpers.NewTestPrInfo(prC).
+			WithBase("branch-b").
+			WithURL("https://github.com/owner/repo/pull/103"))
 		require.NoError(t, err)
 
 		// Switch to branch-a (the bottom PR we'll merge)

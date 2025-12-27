@@ -5,6 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // UntrackOptions contains options for the untrack command
@@ -30,7 +31,7 @@ func UntrackAction(ctx *runtime.Context, opts UntrackOptions) error {
 	// If there are descendants and not forced, prompt for confirmation
 	if len(descendants) > 0 && !opts.Force {
 		message := fmt.Sprintf("Branch %s has %d tracked descendants. Untrack all of them?",
-			tui.ColorBranchName(branchName, false), len(descendants))
+			style.ColorBranchName(branchName, false), len(descendants))
 		options := []tui.SelectOption{
 			{Label: "Yes", Value: yesResponse},
 			{Label: "No", Value: noResponse},
@@ -50,16 +51,16 @@ func UntrackAction(ctx *runtime.Context, opts UntrackOptions) error {
 	// Untrack recursively (descendants first, then the branch itself)
 	// Actually order doesn't strictly matter for metadata deletion but it's cleaner
 	for _, descendant := range descendants {
-		if err := eng.UntrackBranch(descendant.Name); err != nil {
-			return fmt.Errorf("failed to untrack descendant %s: %w", descendant.Name, err)
+		if err := eng.UntrackBranch(descendant.GetName()); err != nil {
+			return fmt.Errorf("failed to untrack descendant %s: %w", descendant.GetName(), err)
 		}
-		ctx.Splog.Info("Stopped tracking %s.", tui.ColorBranchName(descendant.Name, false))
+		ctx.Splog.Info("Stopped tracking %s.", style.ColorBranchName(descendant.GetName(), false))
 	}
 
 	if err := eng.UntrackBranch(branchName); err != nil {
 		return fmt.Errorf("failed to untrack branch %s: %w", branchName, err)
 	}
-	ctx.Splog.Info("Stopped tracking %s.", tui.ColorBranchName(branchName, false))
+	ctx.Splog.Info("Stopped tracking %s.", style.ColorBranchName(branchName, false))
 
 	return nil
 }

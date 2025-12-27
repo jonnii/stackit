@@ -5,11 +5,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewTrunkCmd creates the trunk command
@@ -28,24 +30,20 @@ By default, displays the trunk branch that the current branch's stack is based o
 Use --all to see all configured trunk branches, or --add to add an additional trunk.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Handle --add flag
+				if add != "" {
+					return handleAddTrunk(ctx.RepoRoot, add)
+				}
 
-			// Handle --add flag
-			if add != "" {
-				return handleAddTrunk(ctx.RepoRoot, add)
-			}
+				// Handle --all flag
+				if all {
+					return handleShowAllTrunks(ctx.RepoRoot)
+				}
 
-			// Handle --all flag
-			if all {
-				return handleShowAllTrunks(ctx.RepoRoot)
-			}
-
-			// Default: show trunk for current branch
-			return handleShowTrunk(ctx)
+				// Default: show trunk for current branch
+				return handleShowTrunk(ctx)
+			})
 		},
 	}
 
@@ -89,7 +87,7 @@ func handleAddTrunk(repoRoot string, trunkName string) error {
 	}
 
 	splog := tui.NewSplog()
-	splog.Info("Added %s as a trunk branch.", tui.ColorBranchName(trunkName, false))
+	splog.Info("Added %s as a trunk branch.", style.ColorBranchName(trunkName, false))
 	return nil
 }
 
@@ -125,18 +123,18 @@ func handleShowTrunk(ctx *runtime.Context) error {
 	if currentBranch == nil {
 		// Not on a branch, just show primary trunk
 		trunk := eng.Trunk()
-		fmt.Println(trunk.Name)
+		fmt.Println(trunk.GetName())
 		return nil
 	}
 
 	// If current branch is trunk, show it
 	if currentBranch.IsTrunk() {
-		fmt.Println(currentBranch.Name)
+		fmt.Println(currentBranch.GetName())
 		return nil
 	}
 
 	// Find the trunk by walking up the parent chain
-	trunk := findTrunkForBranch(eng, currentBranch.Name, ctx.RepoRoot)
+	trunk := findTrunkForBranch(eng, currentBranch.GetName(), ctx.RepoRoot)
 	fmt.Println(trunk)
 	return nil
 }
@@ -146,7 +144,7 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	// Get all configured trunks
 	cfg, err := config.LoadConfig(repoRoot)
 	if err != nil {
-		return eng.Trunk().Name
+		return eng.Trunk().GetName()
 	}
 	trunks := cfg.AllTrunks()
 
@@ -154,13 +152,13 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	currentBranch := eng.GetBranch(branchName)
 	visited := make(map[string]bool)
 
-	for currentBranch.Name != "" && !visited[currentBranch.Name] {
-		visited[currentBranch.Name] = true
+	for currentBranch.GetName() != "" && !visited[currentBranch.GetName()] {
+		visited[currentBranch.GetName()] = true
 
 		// Check if current is a trunk
 		for _, t := range trunks {
-			if currentBranch.Name == t {
-				return currentBranch.Name
+			if currentBranch.GetName() == t {
+				return currentBranch.GetName()
 			}
 		}
 
@@ -173,5 +171,5 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	}
 
 	// Default to primary trunk
-	return eng.Trunk().Name
+	return eng.Trunk().GetName()
 }

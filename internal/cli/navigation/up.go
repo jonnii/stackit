@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/errors"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -36,111 +36,108 @@ the --to flag is used to specify a target branch to navigate towards.`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse steps from positional argument if provided
-			if len(args) > 0 {
-				parsedSteps, err := strconv.Atoi(args[0])
-				if err != nil {
-					return fmt.Errorf("invalid steps argument: %s (must be a number)", args[0])
-				}
-				steps = parsedSteps
-			}
-
-			if steps < 1 {
-				return fmt.Errorf("steps must be at least 1")
-			}
-
-			// Get context
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Get current branch
-			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == nil {
-				return errors.ErrNotOnBranch
-			}
-
-			// Traverse up the specified number of steps
-			targetBranch := currentBranch.Name
-			for i := 0; i < steps; i++ {
-				targetBranchObj := ctx.Engine.GetBranch(targetBranch)
-				children := targetBranchObj.GetChildren()
-				if len(children) == 0 {
-					if i == 0 {
-						ctx.Splog.Info("Already at the top of the stack.")
-						return nil
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Parse steps from positional argument if provided
+				if len(args) > 0 {
+					parsedSteps, err := strconv.Atoi(args[0])
+					if err != nil {
+						return fmt.Errorf("invalid steps argument: %s (must be a number)", args[0])
 					}
-					ctx.Splog.Info("Stopped at %s (no further children after %d step(s)).", tui.ColorBranchName(targetBranch, false), i)
-					break
+					steps = parsedSteps
 				}
 
-				var nextBranch string
-				if len(children) == 1 {
-					nextBranch = children[0].Name
-				} else {
-					// Multiple children, decide which way to go
-					if toBranch != "" {
-						// Try to find the child that leads to toBranch
-						var candidates []string
-						for _, child := range children {
-							upstack := ctx.Engine.GetRelativeStackUpstack(child)
-							upstackNames := make([]string, len(upstack))
-							for i, b := range upstack {
-								upstackNames[i] = b.Name
-							}
-							if child.Name == toBranch || slices.Contains(upstackNames, toBranch) {
-								candidates = append(candidates, child.Name)
-							}
-						}
+				if steps < 1 {
+					return fmt.Errorf("steps must be at least 1")
+				}
 
-						switch len(candidates) {
-						case 1:
-							nextBranch = candidates[0]
-						case 0:
-							// --to is not a descendant of any child
-							ctx.Splog.Warn("Branch %s is not a descendant of %s.", tui.ColorBranchName(toBranch, false), tui.ColorBranchName(targetBranch, false))
-							fallthrough
-						default:
-							// Still ambiguous even with --to (shouldn't happen in a tree)
+				// Get current branch
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch == nil {
+					return errors.ErrNotOnBranch
+				}
+
+				// Traverse up the specified number of steps
+				targetBranch := currentBranch.GetName()
+				for i := 0; i < steps; i++ {
+					targetBranchObj := ctx.Engine.GetBranch(targetBranch)
+					children := targetBranchObj.GetChildren()
+					if len(children) == 0 {
+						if i == 0 {
+							ctx.Splog.Info("Already at the top of the stack.")
+							return nil
+						}
+						ctx.Splog.Info("Stopped at %s (no further children after %d step(s)).", style.ColorBranchName(targetBranch, false), i)
+						break
+					}
+
+					var nextBranch string
+					var err error
+					if len(children) == 1 {
+						nextBranch = children[0].GetName()
+					} else {
+						// Multiple children, decide which way to go
+						if toBranch != "" {
+							// Try to find the child that leads to toBranch
+							var candidates []string
+							for _, child := range children {
+								upstack := ctx.Engine.GetRelativeStackUpstack(child)
+								upstackNames := make([]string, len(upstack))
+								for i, b := range upstack {
+									upstackNames[i] = b.GetName()
+								}
+								if child.GetName() == toBranch || slices.Contains(upstackNames, toBranch) {
+									candidates = append(candidates, child.GetName())
+								}
+							}
+
+							switch len(candidates) {
+							case 1:
+								nextBranch = candidates[0]
+							case 0:
+								// --to is not a descendant of any child
+								ctx.Splog.Warn("Branch %s is not a descendant of %s.", style.ColorBranchName(toBranch, false), style.ColorBranchName(targetBranch, false))
+								fallthrough
+							default:
+								// Still ambiguous even with --to (shouldn't happen in a tree)
+								childNames := make([]string, len(children))
+								for i, c := range children {
+									childNames[i] = c.GetName()
+								}
+								nextBranch, err = promptForChild(childNames, targetBranch)
+								if err != nil {
+									return err
+								}
+							}
+						} else {
 							childNames := make([]string, len(children))
 							for i, c := range children {
-								childNames[i] = c.Name
+								childNames[i] = c.GetName()
 							}
 							nextBranch, err = promptForChild(childNames, targetBranch)
 							if err != nil {
 								return err
 							}
 						}
-					} else {
-						childNames := make([]string, len(children))
-						for i, c := range children {
-							childNames[i] = c.Name
-						}
-						nextBranch, err = promptForChild(childNames, targetBranch)
-						if err != nil {
-							return err
-						}
 					}
+
+					ctx.Splog.Info("⮑  %s", nextBranch)
+					targetBranch = nextBranch
 				}
 
-				ctx.Splog.Info("⮑  %s", nextBranch)
-				targetBranch = nextBranch
-			}
+				// Check if we actually moved
+				if targetBranch == currentBranch.GetName() {
+					return nil
+				}
 
-			// Check if we actually moved
-			if targetBranch == currentBranch.Name {
+				// Checkout the target branch
+				targetBranchObj := ctx.Engine.GetBranch(targetBranch)
+				if err := ctx.Engine.CheckoutBranch(ctx.Context, targetBranchObj); err != nil {
+					return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
+				}
+
+				ctx.Splog.Info("Checked out %s.", style.ColorBranchName(targetBranch, false))
 				return nil
-			}
-
-			// Checkout the target branch
-			targetBranchObj := ctx.Engine.GetBranch(targetBranch)
-			if err := git.CheckoutBranch(ctx.Context, targetBranchObj.Name); err != nil {
-				return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
-			}
-
-			ctx.Splog.Info("Checked out %s.", tui.ColorBranchName(targetBranch, false))
-			return nil
+			})
 		},
 	}
 
@@ -148,7 +145,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 	cmd.Flags().IntVarP(&steps, "steps", "n", 1, "The number of levels to traverse upstack.")
 	cmd.Flags().StringVar(&toBranch, "to", "", "Target branch to navigate towards. When multiple children exist, selects the path leading to this branch.")
 
-	_ = cmd.RegisterFlagCompletionFunc("to", helpers.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("to", common.CompleteBranches)
 
 	return cmd
 }

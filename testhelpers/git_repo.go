@@ -429,6 +429,15 @@ func (r *GitRepo) HasUntrackedFiles() (bool, error) {
 	return strings.TrimSpace(output) != "", nil
 }
 
+// GetLocalBranches returns a list of all local branches.
+func (r *GitRepo) GetLocalBranches() ([]string, error) {
+	output, err := r.runGitCommandAndGetOutput("branch", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+	return splitLines(output), nil
+}
+
 // IsAncestor checks if the first ref is an ancestor of the second ref.
 func (r *GitRepo) IsAncestor(ancestor, descendant string) (bool, error) {
 	err := r.runGitCommand("merge-base", "--is-ancestor", ancestor, descendant)

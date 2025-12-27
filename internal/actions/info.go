@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // InfoOptions contains options for the info command
@@ -31,7 +30,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no branch specified")
 		}
-		branchName = currentBranch.Name
+		branchName = currentBranch.GetName()
 	}
 
 	// Get branch wrapper
@@ -40,7 +39,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	// Check if branch exists
 	if !branch.IsTracked() && !branch.IsTrunk() {
 		// Check if it's a git branch
-		_, err := git.GetRevision(branchName)
+		_, err := eng.GetRevisionInternal(branchName)
 		if err != nil {
 			return fmt.Errorf("branch %s does not exist", branchName)
 		}
@@ -56,15 +55,15 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 
 	// Get branch info
 	currentBranch := eng.CurrentBranch()
-	isCurrent := branchName == currentBranch.Name
+	isCurrent := branchName == currentBranch.GetName()
 	isTrunk := branch.IsTrunk()
 
 	// Branch name with current indicator
-	coloredBranchName := tui.ColorBranchName(branchName, isCurrent)
+	coloredBranchName := style.ColorBranchName(branchName, isCurrent)
 
 	// Add restack indicator if needed
 	if !isTrunk && !branch.IsBranchUpToDate() {
-		coloredBranchName += " " + tui.ColorNeedsRestack("(needs restack)")
+		coloredBranchName += " " + style.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
@@ -72,21 +71,22 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	commitDate, err := branch.GetCommitDate()
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
-		outputLines = append(outputLines, tui.ColorDim(dateStr))
+		outputLines = append(outputLines, style.ColorDim(dateStr))
 	}
 
 	// PR info (skip for trunk)
 	var prInfo *engine.PrInfo
 	if !isTrunk {
-		prInfo, _ = eng.GetPrInfo(branchName)
-		if prInfo != nil && prInfo.Number != nil {
+		branch := eng.GetBranch(branchName)
+		prInfo, _ = eng.GetPrInfo(branch)
+		if prInfo != nil && prInfo.Number() != nil {
 			prTitleLine := getPRTitleLine(prInfo)
 			if prTitleLine != "" {
 				outputLines = append(outputLines, "")
 				outputLines = append(outputLines, prTitleLine)
 			}
-			if prInfo.URL != "" {
-				outputLines = append(outputLines, tui.ColorMagenta(prInfo.URL))
+			if prInfo.URL() != "" {
+				outputLines = append(outputLines, style.ColorMagenta(prInfo.URL()))
 			}
 		}
 	}
@@ -96,23 +96,23 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 	parentBranch := eng.GetParent(branchObj)
 	if parentBranch != nil {
 		outputLines = append(outputLines, "")
-		outputLines = append(outputLines, fmt.Sprintf("%s: %s", tui.ColorCyan("Parent"), parentBranch.Name))
+		outputLines = append(outputLines, fmt.Sprintf("%s: %s", style.ColorCyan("Parent"), parentBranch.GetName()))
 	}
 
 	// Children branches
 	// branchObj already declared above
 	children := branchObj.GetChildren()
 	if len(children) > 0 {
-		outputLines = append(outputLines, fmt.Sprintf("%s:", tui.ColorCyan("Children")))
+		outputLines = append(outputLines, fmt.Sprintf("%s:", style.ColorCyan("Children")))
 		for _, child := range children {
-			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child.Name))
+			outputLines = append(outputLines, fmt.Sprintf("▸ %s", child.GetName()))
 		}
 	}
 
 	// PR body
-	if opts.Body && prInfo != nil && prInfo.Body != "" {
+	if opts.Body && prInfo != nil && prInfo.Body() != "" {
 		outputLines = append(outputLines, "")
-		outputLines = append(outputLines, prInfo.Body)
+		outputLines = append(outputLines, prInfo.Body())
 	}
 
 	// Commits listing
@@ -124,14 +124,18 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			// For trunk, use parent commit (branchName~)
 			baseRevision = branchName + "~"
 		} else {
-			meta, err := git.ReadMetadataRef(branchName)
-			if err == nil && meta.ParentBranchRevision != nil {
-				baseRevision = *meta.ParentBranchRevision
+			// Get all commits to find the oldest one's parent
+			// Alternatively, get parent revision from engine
+			// We already have branchObj
+			commits, err := branchObj.GetAllCommits(engine.CommitFormatSHA)
+			if err == nil && len(commits) > 0 {
+				oldestSHA := commits[0]
+				baseRevision, _ = eng.GetParentCommitSHA(oldestSHA)
 			}
 		}
 		branchRevision, err := branch.GetRevision()
 		if err == nil {
-			commitsOutput, err := git.ShowCommits(ctx.Context, baseRevision, branchRevision, true, opts.Stat)
+			commitsOutput, err := eng.ShowCommits(ctx.Context, baseRevision, branchRevision, true, opts.Stat)
 			if err == nil && commitsOutput != "" {
 				outputLines = append(outputLines, commitsOutput)
 			}
@@ -141,7 +145,7 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
-				outputLines = append(outputLines, tui.ColorDim(commit))
+				outputLines = append(outputLines, style.ColorDim(commit))
 			}
 		}
 	}
@@ -154,9 +158,9 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			headRevision, err := branch.GetRevision()
 			if err == nil {
 				// Get parent commit
-				parentSHA, err := git.GetCommitSHA(branchName, 1)
+				parentSHA, err := eng.GetCommitSHA(branchName, 1)
 				if err == nil {
-					diffOutput, err := git.ShowDiff(ctx.Context, parentSHA, headRevision, opts.Stat)
+					diffOutput, err := eng.ShowDiff(ctx.Context, parentSHA, headRevision, opts.Stat)
 					if err == nil && diffOutput != "" {
 						outputLines = append(outputLines, diffOutput)
 					}
@@ -164,11 +168,13 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			}
 		} else {
 			// For regular branches, show diff from parent revision
-			meta, err := git.ReadMetadataRef(branchName)
-			if err == nil && meta.ParentBranchRevision != nil {
+			commits, err := branchObj.GetAllCommits(engine.CommitFormatSHA)
+			if err == nil && len(commits) > 0 {
+				oldestSHA := commits[0]
+				parentSHA, _ := eng.GetParentCommitSHA(oldestSHA)
 				branchRevision, err := branch.GetRevision()
 				if err == nil {
-					diffOutput, err := git.ShowDiff(ctx.Context, *meta.ParentBranchRevision, branchRevision, opts.Stat)
+					diffOutput, err := eng.ShowDiff(ctx.Context, parentSHA, branchRevision, opts.Stat)
 					if err == nil && diffOutput != "" {
 						outputLines = append(outputLines, diffOutput)
 					}
@@ -182,9 +188,9 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		prStateMerged = "MERGED"
 		prStateClosed = "CLOSED"
 	)
-	if prInfo != nil && (prInfo.State == prStateMerged || prInfo.State == prStateClosed) {
+	if prInfo != nil && (prInfo.State() == prStateMerged || prInfo.State() == prStateClosed) {
 		for i := range outputLines {
-			outputLines[i] = tui.ColorDim(outputLines[i])
+			outputLines[i] = style.ColorDim(outputLines[i])
 		}
 	}
 
@@ -197,27 +203,27 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 
 // getPRTitleLine formats the PR title line with number, state, and title
 func getPRTitleLine(prInfo *engine.PrInfo) string {
-	if prInfo == nil || prInfo.Number == nil || prInfo.Title == "" {
+	if prInfo == nil || prInfo.Number() == nil || prInfo.Title() == "" {
 		return ""
 	}
 
-	state := prInfo.State
+	state := prInfo.State()
 
 	const (
 		prStateMerged = "MERGED"
 		prStateClosed = "CLOSED"
 	)
 
-	prNumber := tui.ColorPRNumber(*prInfo.Number)
+	prNumber := style.ColorPRNumber(*prInfo.Number())
 
 	switch state {
 	case prStateMerged:
-		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title)
+		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title())
 	case prStateClosed:
 		// Strikethrough not easily available, use dim instead
-		return fmt.Sprintf("%s (Abandoned) %s", prNumber, tui.ColorDim(prInfo.Title))
+		return fmt.Sprintf("%s (Abandoned) %s", prNumber, style.ColorDim(prInfo.Title()))
 	default:
-		prState := tui.ColorPRState(state, prInfo.IsDraft)
-		return fmt.Sprintf("%s %s %s", prNumber, prState, prInfo.Title)
+		prState := style.ColorPRState(state, prInfo.IsDraft())
+		return fmt.Sprintf("%s %s %s", prNumber, prState, prInfo.Title())
 	}
 }

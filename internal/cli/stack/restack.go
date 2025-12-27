@@ -55,7 +55,7 @@ If conflicts are encountered, you will be prompted to resolve them via an intera
 				if currentBranch == nil {
 					return fmt.Errorf("not on a branch and --branch not specified")
 				}
-				targetBranch = currentBranch.Name
+				targetBranch = currentBranch.GetName()
 			}
 
 			// Determine scope based on flags

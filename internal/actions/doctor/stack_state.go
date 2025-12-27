@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // checkStackState performs stack state and metadata integrity checks
@@ -20,7 +21,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	}
 
 	// Get all metadata refs
-	metadataRefs, err := git.GetMetadataRefList()
+	metadataRefs, err := eng.ListMetadataRefs()
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("failed to get metadata refs: %v", err))
 		splog.Error("  failed to get metadata refs: %v", err)
@@ -39,11 +40,11 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 		if !branchSet[branchName] {
 			orphanedCount++
 			if fix {
-				if err := git.DeleteMetadataRef(branchName); err != nil {
+				if err := eng.DeleteMetadataRef(eng.GetBranch(branchName)); err != nil {
 					splog.Error("  Failed to prune orphaned metadata for %s: %v", branchName, err)
 					warnings = append(warnings, fmt.Sprintf("orphaned metadata found for deleted branch '%s' (fix failed)", branchName))
 				} else {
-					splog.Info("  ✅ Pruned orphaned metadata for deleted branch %s", tui.ColorBranchName(branchName, false))
+					splog.Info("  ✅ Pruned orphaned metadata for deleted branch %s", style.ColorBranchName(branchName, false))
 					prunedCount++
 				}
 			} else {
@@ -71,7 +72,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 	for branchName := range metadataRefs {
 		metadataRefNames = append(metadataRefNames, branchName)
 	}
-	allMeta, allMetaErrs := git.BatchReadMetadataRefs(metadataRefNames)
+	allMeta, allMetaErrs := eng.BatchReadMetadataRefs(metadataRefNames)
 
 	corruptedCount := 0
 	for _, branchName := range metadataRefNames {
@@ -112,7 +113,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 			parent := eng.GetParent(branchObj)
 			parentName := "unknown"
 			if parent != nil {
-				parentName = parent.Name
+				parentName = parent.GetName()
 			}
 			warnings = append(warnings, fmt.Sprintf("branch '%s' has parent '%s' that does not exist", branch, parentName))
 		}
@@ -130,20 +131,20 @@ func detectCycles(eng engine.Engine) [][]string {
 	allBranches := eng.AllBranches()
 	branchNames := make([]string, len(allBranches))
 	for i, b := range allBranches {
-		branchNames[i] = b.Name
+		branchNames[i] = b.GetName()
 	}
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
 	parentMap := make(map[string]string)
 	trunk := eng.Trunk()
-	trunkName := trunk.Name
+	trunkName := trunk.GetName()
 
 	// Build parent map
 	for _, branch := range allBranches {
-		branchName := branch.Name
+		branchName := branch.GetName()
 		parent := eng.GetParent(branch)
-		if parent != nil && parent.Name != trunkName {
-			parentMap[branchName] = parent.Name
+		if parent != nil && parent.GetName() != trunkName {
+			parentMap[branchName] = parent.GetName()
 		}
 	}
 
@@ -199,7 +200,7 @@ func checkMissingParents(eng engine.Engine, allBranches []string) []string {
 	var missing []string
 	branchSet := make(map[string]bool)
 	trunk := eng.Trunk()
-	trunkName := trunk.Name
+	trunkName := trunk.GetName()
 
 	for _, branch := range allBranches {
 		branchSet[branch] = true
@@ -211,8 +212,8 @@ func checkMissingParents(eng engine.Engine, allBranches []string) []string {
 		}
 		branchObj := eng.GetBranch(branch)
 		parent := eng.GetParent(branchObj)
-		if parent != nil && parent.Name != trunkName {
-			if !branchSet[parent.Name] {
+		if parent != nil && parent.GetName() != trunkName {
+			if !branchSet[parent.GetName()] {
 				missing = append(missing, branch)
 			}
 		}

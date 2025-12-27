@@ -23,11 +23,11 @@ func TestMoveAction(t *testing.T) {
 		branchparent2Initial := s.Engine.GetBranch("branch2")
 		parent2Initial := s.Engine.GetParent(branchparent2Initial)
 		require.NotNil(t, parent2Initial)
-		require.Equal(t, "branch1", parent2Initial.Name)
+		require.Equal(t, "branch1", parent2Initial.GetName())
 		branchparent3Initial := s.Engine.GetBranch("branch3")
 		parent3Initial := s.Engine.GetParent(branchparent3Initial)
 		require.NotNil(t, parent3Initial)
-		require.Equal(t, "branch2", parent3Initial.Name)
+		require.Equal(t, "branch2", parent3Initial.GetName())
 
 		// Move branch2 from branch1 to main (downstack)
 		err := Action(s.Context, Options{
@@ -40,19 +40,19 @@ func TestMoveAction(t *testing.T) {
 		branchparent2After := s.Engine.GetBranch("branch2")
 		parent2After := s.Engine.GetParent(branchparent2After)
 		require.NotNil(t, parent2After)
-		require.Equal(t, "main", parent2After.Name)
+		require.Equal(t, "main", parent2After.GetName())
 		mainBranch := s.Engine.GetBranch("main")
 		mainChildren := mainBranch.GetChildren()
 		mainChildNames := make([]string, len(mainChildren))
 		for i, c := range mainChildren {
-			mainChildNames[i] = c.Name
+			mainChildNames[i] = c.GetName()
 		}
 		require.Contains(t, mainChildNames, "branch2")
 		branch1Obj := s.Engine.GetBranch("branch1")
 		branch1Children := branch1Obj.GetChildren()
 		branch1ChildNames := make([]string, len(branch1Children))
 		for i, c := range branch1Children {
-			branch1ChildNames[i] = c.Name
+			branch1ChildNames[i] = c.GetName()
 		}
 		require.NotContains(t, branch1ChildNames, "branch2")
 
@@ -60,7 +60,7 @@ func TestMoveAction(t *testing.T) {
 		branchparent3After := s.Engine.GetBranch("branch3")
 		parent3After := s.Engine.GetParent(branchparent3After)
 		require.NotNil(t, parent3After)
-		require.Equal(t, "branch2", parent3After.Name)
+		require.Equal(t, "branch2", parent3After.GetName())
 	})
 
 	t.Run("moves branch upstack and restacks descendants", func(t *testing.T) {
@@ -82,19 +82,19 @@ func TestMoveAction(t *testing.T) {
 		branchparentA := s.Engine.GetBranch("branchA")
 		parentA := s.Engine.GetParent(branchparentA)
 		require.NotNil(t, parentA)
-		require.Equal(t, "branchB", parentA.Name)
+		require.Equal(t, "branchB", parentA.GetName())
 		branchBObj := s.Engine.GetBranch("branchB")
 		branchBChildren := branchBObj.GetChildren()
 		branchBChildNames := make([]string, len(branchBChildren))
 		for i, c := range branchBChildren {
-			branchBChildNames[i] = c.Name
+			branchBChildNames[i] = c.GetName()
 		}
 		require.Contains(t, branchBChildNames, "branchA")
 		mainBranch := s.Engine.GetBranch("main")
 		mainChildren := mainBranch.GetChildren()
 		mainChildNames := make([]string, len(mainChildren))
 		for i, c := range mainChildren {
-			mainChildNames[i] = c.Name
+			mainChildNames[i] = c.GetName()
 		}
 		require.NotContains(t, mainChildNames, "branchA")
 
@@ -102,7 +102,7 @@ func TestMoveAction(t *testing.T) {
 		branchparentA2 := s.Engine.GetBranch("branchA2")
 		parentA2 := s.Engine.GetParent(branchparentA2)
 		require.NotNil(t, parentA2)
-		require.Equal(t, "branchA", parentA2.Name)
+		require.Equal(t, "branchA", parentA2.GetName())
 	})
 
 	t.Run("moves branch across different stack trees", func(t *testing.T) {
@@ -125,19 +125,19 @@ func TestMoveAction(t *testing.T) {
 		branchparentA2 := s.Engine.GetBranch("branchA2")
 		parentA2 := s.Engine.GetParent(branchparentA2)
 		require.NotNil(t, parentA2)
-		require.Equal(t, "branchB1", parentA2.Name)
+		require.Equal(t, "branchB1", parentA2.GetName())
 		branchB1Obj := s.Engine.GetBranch("branchB1")
 		branchB1Children := branchB1Obj.GetChildren()
 		branchB1ChildNames := make([]string, len(branchB1Children))
 		for i, c := range branchB1Children {
-			branchB1ChildNames[i] = c.Name
+			branchB1ChildNames[i] = c.GetName()
 		}
 		require.Contains(t, branchB1ChildNames, "branchA2")
 		branchA1Obj := s.Engine.GetBranch("branchA1")
 		branchA1Children := branchA1Obj.GetChildren()
 		branchA1ChildNames := make([]string, len(branchA1Children))
 		for i, c := range branchA1Children {
-			branchA1ChildNames[i] = c.Name
+			branchA1ChildNames[i] = c.GetName()
 		}
 		require.NotContains(t, branchA1ChildNames, "branchA2")
 	})
@@ -163,7 +163,7 @@ func TestMoveAction(t *testing.T) {
 		branchparent2 := s.Engine.GetBranch("branch2")
 		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
-		require.Equal(t, "main", parent2.Name)
+		require.Equal(t, "main", parent2.GetName())
 	})
 
 	t.Run("prevents moving trunk branch", func(t *testing.T) {
@@ -274,7 +274,7 @@ func TestMoveAction(t *testing.T) {
 		branchparent1 := s.Engine.GetBranch("branch1")
 		parent1 := s.Engine.GetParent(branchparent1)
 		require.NotNil(t, parent1)
-		require.Equal(t, "untracked", parent1.Name)
+		require.Equal(t, "untracked", parent1.GetName())
 	})
 
 	t.Run("restacks all descendants after move", func(t *testing.T) {

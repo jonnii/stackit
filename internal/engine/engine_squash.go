@@ -24,7 +24,7 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Read metadata to get parent branch revision
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.readMetadataRef(branchName)
 	if err != nil {
 		return fmt.Errorf("failed to read metadata: %w", err)
 	}
@@ -43,10 +43,12 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Get commit range SHAs from parent to current branch
-	commitSHAs, err := git.GetCommitRangeSHAs(parentBranchRevision, branchRevision)
+	commitSHAs, err := e.git.GetCommitRangeSHAs(parentBranchRevision, branchRevision)
 	if err != nil {
 		return fmt.Errorf("failed to get commit range: %w", err)
 	}
+
+	fmt.Printf("DEBUG: Squash branch=%s parentRev=%s headRev=%s range=%v\n", branchName, parentBranchRevision, branchRevision, commitSHAs)
 
 	// Check if there are commits to squash
 	if len(commitSHAs) == 0 {
@@ -54,13 +56,12 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Get the last (oldest) commit SHA from the range
-	// git log returns commits in reverse chronological order (newest first)
-	// So the last element is the oldest commit
+	// GetCommitRangeSHAs returns newest first (head...base)
 	oldestCommitSHA := commitSHAs[len(commitSHAs)-1]
 
 	// Soft reset to the oldest commit (keeps all changes staged)
 	// This moves HEAD to the oldest commit, staging all changes from newer commits
-	if err := git.SoftReset(ctx, oldestCommitSHA); err != nil {
+	if err := e.git.SoftReset(ctx, oldestCommitSHA); err != nil {
 		return fmt.Errorf("failed to soft reset: %w", err)
 	}
 
@@ -74,9 +75,9 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 		// Don't set Edit - git will open editor by default if no message and no noEdit
 	}
 
-	if err := git.CommitWithOptions(commitOpts); err != nil {
+	if err := e.git.CommitWithOptions(commitOpts); err != nil {
 		// Try to rollback on error
-		if rollbackErr := git.SoftReset(ctx, branchRevision); rollbackErr != nil {
+		if rollbackErr := e.git.SoftReset(ctx, branchRevision); rollbackErr != nil {
 			// Log rollback error but return original error
 			return fmt.Errorf("failed to commit and failed to rollback: commit error: %w, rollback error: %w", err, rollbackErr)
 		}

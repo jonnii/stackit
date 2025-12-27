@@ -3,7 +3,10 @@ package github
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/google/go-github/v62/github"
 )
 
 // PullRequestInfo contains information about a pull request
@@ -55,4 +58,43 @@ type Client interface {
 
 	// GetOwnerRepo returns the repository owner and name
 	GetOwnerRepo() (owner, repo string)
+}
+
+// ToPullRequestInfo converts a github.PullRequest to PullRequestInfo
+func ToPullRequestInfo(pr *github.PullRequest) *PullRequestInfo {
+	if pr == nil {
+		return nil
+	}
+
+	info := &PullRequestInfo{}
+
+	if pr.Number != nil {
+		info.Number = *pr.Number
+	}
+	if pr.NodeID != nil {
+		info.NodeID = *pr.NodeID
+	}
+	if pr.HTMLURL != nil {
+		info.HTMLURL = *pr.HTMLURL
+	}
+	if pr.Title != nil {
+		info.Title = *pr.Title
+	}
+	if pr.Body != nil {
+		info.Body = *pr.Body
+	}
+	if pr.State != nil {
+		info.State = strings.ToUpper(*pr.State)
+	}
+	if pr.Draft != nil {
+		info.Draft = *pr.Draft
+	}
+	if pr.Base != nil && pr.Base.Ref != nil {
+		info.Base = *pr.Base.Ref
+	}
+	if pr.Head != nil && pr.Head.Ref != nil {
+		info.Head = *pr.Head.Ref
+	}
+
+	return info
 }

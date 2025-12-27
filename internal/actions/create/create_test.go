@@ -84,11 +84,11 @@ func TestCreateAction_Insert(t *testing.T) {
 		branchparentInserted := eng.GetBranch("inserted")
 		parentInserted := eng.GetParent(branchparentInserted)
 		require.NotNil(t, parentInserted)
-		require.Equal(t, "main", parentInserted.Name)
+		require.Equal(t, "main", parentInserted.GetName())
 		branchparentChild1 := eng.GetBranch("child1")
 		parentChild1 := eng.GetParent(branchparentChild1)
 		require.NotNil(t, parentChild1)
-		require.Equal(t, "inserted", parentChild1.Name)
+		require.Equal(t, "inserted", parentChild1.GetName())
 
 		// 5. Verify physical relationship (child1 should have been restacked onto inserted)
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")
@@ -116,7 +116,7 @@ func TestCreateAction_Insert(t *testing.T) {
 		require.NoError(t, err)
 
 		// Rebuild engine to ensure it knows we're on child1
-		err = s.Context.Engine.Rebuild(s.Context.Engine.Trunk().Name)
+		err = s.Context.Engine.Rebuild(s.Context.Engine.Trunk().GetName())
 		require.NoError(t, err)
 
 		// 3. Insert 'inserted' after child1
@@ -134,11 +134,11 @@ func TestCreateAction_Insert(t *testing.T) {
 		branchparentInserted := eng.GetBranch("inserted")
 		parentInserted := eng.GetParent(branchparentInserted)
 		require.NotNil(t, parentInserted)
-		require.Equal(t, "child1", parentInserted.Name)
+		require.Equal(t, "child1", parentInserted.GetName())
 		branchparentChild2 := eng.GetBranch("child2")
 		parentChild2 := eng.GetParent(branchparentChild2)
 		require.NotNil(t, parentChild2)
-		require.Equal(t, "inserted", parentChild2.Name)
+		require.Equal(t, "inserted", parentChild2.GetName())
 
 		// 5. Verify physical relationship
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child2")
@@ -184,15 +184,15 @@ func TestCreateAction_Insert(t *testing.T) {
 		branchparentInserted := eng.GetBranch("inserted")
 		parentInserted := eng.GetParent(branchparentInserted)
 		require.NotNil(t, parentInserted)
-		require.Equal(t, "main", parentInserted.Name)
+		require.Equal(t, "main", parentInserted.GetName())
 		branchparentChild1 := eng.GetBranch("child1")
 		parentChild1 := eng.GetParent(branchparentChild1)
 		require.NotNil(t, parentChild1)
-		require.Equal(t, "inserted", parentChild1.Name)
+		require.Equal(t, "inserted", parentChild1.GetName())
 		branchparentChild2 := eng.GetBranch("child2")
 		parentChild2 := eng.GetParent(branchparentChild2)
 		require.NotNil(t, parentChild2)
-		require.Equal(t, "inserted", parentChild2.Name)
+		require.Equal(t, "inserted", parentChild2.GetName())
 
 		// 5. Verify physical relationships
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")
@@ -242,15 +242,15 @@ func TestCreateAction_Insert(t *testing.T) {
 		branchparentInserted := eng.GetBranch("inserted")
 		parentInserted := eng.GetParent(branchparentInserted)
 		require.NotNil(t, parentInserted)
-		require.Equal(t, "main", parentInserted.Name)
+		require.Equal(t, "main", parentInserted.GetName())
 		branchparentChild1 := eng.GetBranch("child1")
 		parentChild1 := eng.GetParent(branchparentChild1)
 		require.NotNil(t, parentChild1)
-		require.Equal(t, "inserted", parentChild1.Name, "child1 should have been moved to inserted")
+		require.Equal(t, "inserted", parentChild1.GetName(), "child1 should have been moved to inserted")
 		branchparentChild2 := eng.GetBranch("child2")
 		parentChild2 := eng.GetParent(branchparentChild2)
 		require.NotNil(t, parentChild2)
-		require.Equal(t, "main", parentChild2.Name, "child2 should have remained a child of main")
+		require.Equal(t, "main", parentChild2.GetName(), "child2 should have remained a child of main")
 
 		// 5. Verify physical relationships
 		isAncestor, err := s.Scene.Repo.IsAncestor("inserted", "child1")

@@ -6,6 +6,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -27,7 +28,7 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 	}
 
 	// Validate not renaming trunk
-	if currentBranch == eng.Trunk().Name {
+	if currentBranch == eng.Trunk().GetName() {
 		return fmt.Errorf("cannot rename trunk branch %s", currentBranch)
 	}
 
@@ -67,19 +68,16 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 	}
 
 	// Check for PR association
-	meta, err := git.ReadMetadataRef(currentBranch)
-	if err != nil {
-		return fmt.Errorf("failed to read metadata: %w", err)
-	}
+	branch := eng.GetBranch(currentBranch)
+	prInfo, _ := eng.GetPrInfo(branch)
 
-	if meta.PrInfo != nil && meta.PrInfo.Number != nil {
+	if prInfo != nil && prInfo.Number() != nil {
 		if !opts.Force {
-			return fmt.Errorf("branch %s is associated with PR #%d. Renaming it will remove this association. Use --force to proceed", currentBranch, *meta.PrInfo.Number)
+			return fmt.Errorf("branch %s is associated with PR #%d. Renaming it will remove this association. Use --force to proceed", currentBranch, *prInfo.Number())
 		}
-		splog.Info("Removing association with PR #%d as GitHub PR branch names are immutable.", *meta.PrInfo.Number)
-		// Clear PrInfo
-		meta.PrInfo = nil
-		if err := git.WriteMetadataRef(currentBranch, meta); err != nil {
+		splog.Info("Removing association with PR #%d as GitHub PR branch names are immutable.", *prInfo.Number())
+		// Clear PrInfo via engine
+		if err := eng.UpsertPrInfo(branch, nil); err != nil {
 			return fmt.Errorf("failed to update metadata: %w", err)
 		}
 	}
@@ -100,7 +98,7 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		return fmt.Errorf("failed to rename branch: %w", err)
 	}
 
-	splog.Info("Renamed %s to %s.", tui.ColorBranchName(currentBranch, false), tui.ColorBranchName(newName, true))
+	splog.Info("Renamed %s to %s.", style.ColorBranchName(currentBranch, false), style.ColorBranchName(newName, true))
 
 	return nil
 }

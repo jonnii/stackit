@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/doctor"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -24,20 +25,16 @@ The doctor command checks:
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Get config values
+				cfg, _ := config.LoadConfig(ctx.RepoRoot)
+				trunk := cfg.Trunk()
 
-			// Get config values
-			cfg, _ := config.LoadConfig(ctx.RepoRoot)
-			trunk := cfg.Trunk()
-
-			// Run doctor action
-			return doctor.Action(ctx, doctor.Options{
-				Fix:   fix,
-				Trunk: trunk,
+				// Run doctor action
+				return doctor.Action(ctx, doctor.Options{
+					Fix:   fix,
+					Trunk: trunk,
+				})
 			})
 		},
 	}

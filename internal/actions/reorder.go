@@ -52,7 +52,7 @@ func ReorderAction(ctx *runtime.Context) error {
 	branches := []string{}
 	for _, branch := range stack {
 		if !branch.IsTrunk() && branch.IsTracked() {
-			branches = append(branches, branch.Name)
+			branches = append(branches, branch.GetName())
 		}
 	}
 
@@ -197,14 +197,14 @@ func updateParentRelationships(ctx context.Context, eng engine.Engine, newOrder 
 	// Set parent of first branch to trunk
 	trunk := eng.Trunk()
 	if len(newOrder) > 0 {
-		if err := eng.SetParent(ctx, newOrder[0], trunk.Name); err != nil {
-			return fmt.Errorf("failed to set parent of %s to %s: %w", newOrder[0], trunk.Name, err)
+		if err := eng.SetParent(ctx, eng.GetBranch(newOrder[0]), trunk); err != nil {
+			return fmt.Errorf("failed to set parent of %s to %s: %w", newOrder[0], trunk.GetName(), err)
 		}
 	}
 
 	// Set parent of each subsequent branch to the branch before it
 	for i := 1; i < len(newOrder); i++ {
-		if err := eng.SetParent(ctx, newOrder[i], newOrder[i-1]); err != nil {
+		if err := eng.SetParent(ctx, eng.GetBranch(newOrder[i]), eng.GetBranch(newOrder[i-1])); err != nil {
 			return fmt.Errorf("failed to set parent of %s to %s: %w", newOrder[i], newOrder[i-1], err)
 		}
 	}
@@ -214,7 +214,7 @@ func updateParentRelationships(ctx context.Context, eng engine.Engine, newOrder 
 
 // findFirstAffectedBranch finds the first branch that moved or changed parent
 func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string) string {
-	trunk := eng.Trunk().Name
+	trunk := eng.Trunk().GetName()
 	// Create a map of original positions
 	originalPos := make(map[string]int)
 	for i, branch := range originalOrder {
@@ -242,7 +242,7 @@ func findFirstAffectedBranch(eng engine.Engine, originalOrder, newOrder []string
 		if currentParent == nil {
 			currentParentName = trunk
 		} else {
-			currentParentName = currentParent.Name
+			currentParentName = currentParent.GetName()
 		}
 
 		if currentParentName != expectedParent {

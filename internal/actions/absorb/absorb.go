@@ -3,7 +3,6 @@ package absorb
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"stackit.dev/stackit/internal/actions"
@@ -11,6 +10,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -51,7 +51,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Check if there are staged changes (before handling flags)
-	_, err := git.HasStagedChanges(ctx.Context)
+	_, err := eng.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -66,7 +66,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Re-check staged changes after flags
-	hasStaged, err := git.HasStagedChanges(ctx.Context)
+	hasStaged, err := eng.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -76,7 +76,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Parse staged hunks
-	hunks, err := git.ParseStagedHunks(ctx.Context)
+	hunks, err := eng.ParseStagedHunks(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to parse staged hunks: %w", err)
 	}
@@ -110,7 +110,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	for _, branch := range downstackBranches {
 		commits, err := branch.GetAllCommits(engine.CommitFormatSHA)
 		if err != nil {
-			return fmt.Errorf("failed to get commits for branch %s: %w", branch.Name, err)
+			return fmt.Errorf("failed to get commits for branch %s: %w", branch.GetName(), err)
 		}
 		// Commits are returned oldest to newest, but we want newest to oldest for search
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -123,7 +123,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	unabsorbedHunks := []git.Hunk{}
 
 	for _, hunk := range hunks {
-		commitSHA, commitIndex, err := git.FindTargetCommitForHunk(hunk, commitSHAs)
+		commitSHA, commitIndex, err := eng.FindTargetCommitForHunk(hunk, commitSHAs)
 		if err != nil {
 			return fmt.Errorf("failed to find target commit for hunk: %w", err)
 		}
@@ -141,13 +141,20 @@ func Action(ctx *runtime.Context, opts Options) error {
 		})
 	}
 
-	// Group hunks by commit
-	hunksByCommit := make(map[string][]git.Hunk)
+	// Group hunks by branch, then by commit
+	hunksByBranch := make(map[string]map[string][]git.Hunk)
 	for _, target := range hunkTargets {
-		hunksByCommit[target.CommitSHA] = append(hunksByCommit[target.CommitSHA], target.Hunk)
+		branchName, err := eng.FindBranchForCommit(target.CommitSHA)
+		if err != nil {
+			continue
+		}
+		if hunksByBranch[branchName] == nil {
+			hunksByBranch[branchName] = make(map[string][]git.Hunk)
+		}
+		hunksByBranch[branchName][target.CommitSHA] = append(hunksByBranch[branchName][target.CommitSHA], target.Hunk)
 	}
 
-	if len(hunksByCommit) == 0 {
+	if len(hunksByBranch) == 0 {
 		if len(unabsorbedHunks) > 0 {
 			splog.Warn("The following hunks could not be absorbed (they commute with all commits):")
 			for _, hunk := range unabsorbedHunks {
@@ -161,12 +168,25 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Print dry-run output or confirmation
 	if opts.DryRun {
-		printDryRunOutput(hunksByCommit, unabsorbedHunks, eng, splog)
+		// Flatten for printing
+		flatHunksByCommit := make(map[string][]git.Hunk)
+		for _, branchHunks := range hunksByBranch {
+			for commitSHA, hunks := range branchHunks {
+				flatHunksByCommit[commitSHA] = hunks
+			}
+		}
+		printDryRunOutput(flatHunksByCommit, unabsorbedHunks, eng, splog)
 		return nil
 	}
 
 	// Print what will be absorbed
-	printAbsorbPlan(hunksByCommit, unabsorbedHunks, eng, splog)
+	flatHunksByCommit := make(map[string][]git.Hunk)
+	for _, branchHunks := range hunksByBranch {
+		for commitSHA, hunks := range branchHunks {
+			flatHunksByCommit[commitSHA] = hunks
+		}
+	}
+	printAbsorbPlan(flatHunksByCommit, unabsorbedHunks, eng, splog)
 
 	// Prompt for confirmation if not --force
 	if !opts.Force {
@@ -180,65 +200,41 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 	}
 
-	// Apply hunks to commits
-	// Process commits from oldest to newest to avoid conflicts
-	commitList := make([]string, 0, len(hunksByCommit))
-	for commitSHA := range hunksByCommit {
-		commitList = append(commitList, commitSHA)
-	}
-	slices.SortFunc(commitList, func(a, b string) int {
-		// Sort by commit index (oldest first)
-		idxA := -1
-		idxB := -1
-		for _, target := range hunkTargets {
-			if target.CommitSHA == a {
-				idxA = target.CommitIndex
-			}
-			if target.CommitSHA == b {
-				idxB = target.CommitIndex
-			}
-		}
-		// Higher index = older commit search position
-		if idxA > idxB {
-			return -1
-		}
-		if idxA < idxB {
-			return 1
-		}
-		return 0
-	})
-
-	// Track the oldest modified branch to know where to start restacking from
-	var oldestModifiedBranch string
-	if len(commitList) > 0 {
-		oldestModifiedBranch, _ = eng.FindBranchForCommit(commitList[0])
-	}
-
 	// Stash all changes (staged and unstaged) before starting to rewrite commits
 	// This ensures a clean working directory for checkouts and prevents losing changes
-	stashOutput, stashErr := git.RunGitCommandWithContext(ctx.Context, "stash", "push", "-u", "-m", "stackit-absorb-temp")
+	stashOutput, stashErr := eng.StashPush(ctx.Context, "stackit-absorb-temp")
 	if stashErr == nil && !strings.Contains(stashOutput, "No local changes to save") {
 		defer func() {
 			// Restore stash after we're done
-			_, _ = git.RunGitCommandWithContext(ctx.Context, "stash", "pop")
+			_ = eng.StashPop(ctx.Context)
 		}()
 	}
 
-	for _, commitSHA := range commitList {
-		hunks := hunksByCommit[commitSHA]
+	// Track the oldest modified branch to know where to start restacking from
+	var oldestModifiedBranch string
 
-		// Find branch for this commit
-		branchName, err := eng.FindBranchForCommit(commitSHA)
-		if err != nil {
-			return fmt.Errorf("failed to find branch for commit %s: %w", commitSHA[:8], err)
+	// Get branches in topological order (bottom-up)
+	allBranches := eng.AllBranches()
+	sortedBranches := eng.SortBranchesTopologically(allBranches)
+
+	for _, branch := range sortedBranches {
+		branchHunks, ok := hunksByBranch[branch.GetName()]
+		if !ok {
+			continue
 		}
 
-		// Apply all hunks for this commit together
-		if err := git.ApplyHunksToCommit(ctx.Context, hunks, commitSHA, branchName); err != nil {
-			return fmt.Errorf("failed to apply hunks to commit %s: %w", commitSHA[:8], err)
+		if oldestModifiedBranch == "" {
+			oldestModifiedBranch = branch.GetName()
 		}
 
-		splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], tui.ColorBranchName(branchName, false))
+		// Apply all hunks for this branch together
+		if err := eng.ApplyHunksToBranch(ctx.Context, branch, branchHunks); err != nil {
+			return fmt.Errorf("failed to apply hunks to branch %s: %w", branch.GetName(), err)
+		}
+
+		for commitSHA := range branchHunks {
+			splog.Info("Absorbed changes into commit %s in %s", commitSHA[:8], style.ColorBranchName(branch.GetName(), false))
+		}
 	}
 
 	// Warn about unabsorbed hunks

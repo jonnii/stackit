@@ -11,6 +11,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui/components/tree"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ErrInteractiveDisabled is returned when interactive prompts are disabled via STACKIT_TEST_NO_INTERACTIVE
@@ -474,43 +475,15 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 
 	// Create tree renderer
 	currentBranch := eng.CurrentBranch()
-	currentBranchName := ""
-	if currentBranch != nil {
-		currentBranchName = currentBranch.Name
-	}
 	trunk := eng.Trunk()
-	renderer := tree.NewStackTreeRenderer(
-		currentBranchName,
-		trunk.Name,
-		func(branchName string) []string {
-			branch := eng.GetBranch(branchName)
-			children := branch.GetChildren()
-			childNames := make([]string, len(children))
-			for i, c := range children {
-				childNames[i] = c.Name
-			}
-			return childNames
-		},
-		func(branchName string) string {
-			branch := eng.GetBranch(branchName)
-			parent := eng.GetParent(branch)
-			if parent == nil {
-				return ""
-			}
-			return parent.Name
-		},
-		func(branchName string) bool { return eng.IsTrunkInternal(branchName) },
-		func(branchName string) bool {
-			return eng.IsBranchUpToDateInternal(branchName)
-		},
-	)
+	renderer := NewStackTreeRenderer(eng)
 
 	// Add annotations for all branches
 	annotations := make(map[string]tree.BranchAnnotation)
 	for _, branch := range branches {
-		scopeStr := eng.GetScopeInternal(branch.Name)
+		scopeStr := eng.GetScopeInternal(branch.GetName())
 		if !scopeStr.IsEmpty() {
-			annotations[branch.Name] = tree.BranchAnnotation{
+			annotations[branch.GetName()] = tree.BranchAnnotation{
 				Scope: scopeStr.String(),
 			}
 		}
@@ -519,7 +492,7 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 
 	// Calculate depth for each branch to create proper tree indentation
 	branchDepth := make(map[string]int)
-	branchDepth[trunk.Name] = 0
+	branchDepth[trunk.GetName()] = 0
 
 	// Build depth map by traversing from trunk
 	var calculateDepth func(branchName string, depth int)
@@ -527,23 +500,23 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 		branch := eng.GetBranch(branchName)
 		children := branch.GetChildren()
 		for _, child := range children {
-			branchDepth[child.Name] = depth + 1
-			calculateDepth(child.Name, depth+1)
+			branchDepth[child.GetName()] = depth + 1
+			calculateDepth(child.GetName(), depth+1)
 		}
 	}
-	calculateDepth(trunk.Name, 0)
+	calculateDepth(trunk.GetName(), 0)
 
 	choices := make([]BranchChoice, 0, len(branches))
 	initialIndex := -1
 
 	for i, branch := range branches {
-		isCurrent := currentBranch != nil && branch.Name == currentBranch.Name
+		isCurrent := currentBranch != nil && branch.GetName() == currentBranch.GetName()
 		if isCurrent {
 			initialIndex = i
 		}
 
 		// Get depth for indentation
-		depth := branchDepth[branch.Name]
+		depth := branchDepth[branch.GetName()]
 
 		// Create tree line with proper indentation
 		indent := strings.Repeat("  ", depth)
@@ -555,22 +528,22 @@ func PromptBranchCheckout(branches []engine.Branch, eng engine.BranchReader) (st
 		}
 
 		// Get colored branch name
-		coloredBranchName := ColorBranchName(branch.Name, isCurrent)
+		coloredBranchName := style.ColorBranchName(branch.GetName(), isCurrent)
 
 		// Add annotation
-		annotation := annotations[branch.Name]
+		annotation := annotations[branch.GetName()]
 		coloredBranchName += renderer.FormatAnnotationColored(annotation)
 
 		// Add restack indicator if needed
-		if !eng.IsBranchUpToDateInternal(branch.Name) {
-			coloredBranchName += " " + ColorNeedsRestack("(needs restack)")
+		if !eng.IsBranchUpToDateInternal(branch.GetName()) {
+			coloredBranchName += " " + style.ColorNeedsRestack("(needs restack)")
 		}
 
 		display := indent + symbol + " " + coloredBranchName
 
 		choices = append(choices, BranchChoice{
 			Display: display,
-			Value:   branch.Name,
+			Value:   branch.GetName(),
 		})
 	}
 

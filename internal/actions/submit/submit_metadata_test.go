@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions/submit"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -61,11 +60,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
-			Title:   "Existing PR",
-			Body:    "PR body",
-			IsDraft: true,
-		})
+		branch := s.Engine.GetBranch(branchName)
+		err := s.Engine.UpsertPrInfo(branch, testhelpers.NewTestPrInfoEmpty().
+			WithTitle("Existing PR").
+			WithBody("PR body").
+			WithIsDraft(true))
 		require.NoError(t, err)
 
 		opts := submit.MetadataOptions{
@@ -77,11 +76,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		require.True(t, metadata.IsDraft, "PR should preserve existing draft status")
 
 		// Test with non-draft existing PR
-		err = s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
-			Title:   "Existing PR",
-			Body:    "PR body",
-			IsDraft: false,
-		})
+		branch = s.Engine.GetBranch(branchName)
+		err = s.Engine.UpsertPrInfo(branch, testhelpers.NewTestPrInfoEmpty().
+			WithTitle("Existing PR").
+			WithBody("PR body").
+			WithIsDraft(false))
 		require.NoError(t, err)
 
 		metadata, err = submit.PreparePRMetadata(branchName, opts, s.Engine, s.Context)
@@ -94,11 +93,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with non-draft status
-		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
-			Title:   "Existing PR",
-			Body:    "PR body",
-			IsDraft: false,
-		})
+		branch := s.Engine.GetBranch(branchName)
+		err := s.Engine.UpsertPrInfo(branch, testhelpers.NewTestPrInfoEmpty().
+			WithTitle("Existing PR").
+			WithBody("PR body").
+			WithIsDraft(false))
 		require.NoError(t, err)
 
 		opts := submit.MetadataOptions{
@@ -115,11 +114,11 @@ func TestPreparePRMetadata_DraftStatus(t *testing.T) {
 		branchName := featureBranch
 
 		// Create existing PR info with draft status
-		err := s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
-			Title:   "Existing PR",
-			Body:    "PR body",
-			IsDraft: true,
-		})
+		branch := s.Engine.GetBranch(branchName)
+		err := s.Engine.UpsertPrInfo(branch, testhelpers.NewTestPrInfoEmpty().
+			WithTitle("Existing PR").
+			WithBody("PR body").
+			WithIsDraft(true))
 		require.NoError(t, err)
 
 		opts := submit.MetadataOptions{
@@ -171,11 +170,11 @@ func TestGetPRBody_MultipleCommits(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get PR body
-		body, err := submit.GetPRBody(branchName, false, "")
+		body, err := submit.GetPRBody(branchName, false, "", s.Engine)
 		require.NoError(t, err)
 
 		// Note: GetPRBody formats as a list of subjects
-		expectedBody := "feat: commit 1\nfeat: commit 2"
+		expectedBody := "- feat: commit 1\n- feat: commit 2"
 		require.Equal(t, expectedBody, body)
 	})
 }

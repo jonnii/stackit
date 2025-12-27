@@ -7,10 +7,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/move"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewMoveCmd creates the move command
@@ -29,36 +30,32 @@ func NewMoveCmd() *cobra.Command {
 If no branch is passed in, opens an interactive selector to choose the target branch.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Default source to current branch
-			sourceBranch := source
-			if sourceBranch == "" {
-				currentBranch := ctx.Engine.CurrentBranch()
-				if currentBranch == nil {
-					return fmt.Errorf("not on a branch and no source branch specified")
+			return common.Run(cmd, func(ctx *runtime.Context) error {
+				// Default source to current branch
+				sourceBranch := source
+				if sourceBranch == "" {
+					currentBranch := ctx.Engine.CurrentBranch()
+					if currentBranch == nil {
+						return fmt.Errorf("not on a branch and no source branch specified")
+					}
+					sourceBranch = currentBranch.GetName()
 				}
-				sourceBranch = currentBranch.Name
-			}
 
-			// Handle interactive selection for onto if not provided
-			ontoBranch := onto
-			if ontoBranch == "" {
-				var err error
-				ontoBranch, err = interactiveOntoSelection(ctx, sourceBranch)
-				if err != nil {
-					return err
+				// Handle interactive selection for onto if not provided
+				ontoBranch := onto
+				if ontoBranch == "" {
+					var err error
+					ontoBranch, err = interactiveOntoSelection(ctx, sourceBranch)
+					if err != nil {
+						return err
+					}
 				}
-			}
 
-			// Run move action
-			return move.Action(ctx, move.Options{
-				Source: sourceBranch,
-				Onto:   ontoBranch,
+				// Run move action
+				return move.Action(ctx, move.Options{
+					Source: sourceBranch,
+					Onto:   ontoBranch,
+				})
 			})
 		},
 	}
@@ -68,8 +65,8 @@ If no branch is passed in, opens an interactive selector to choose the target br
 	cmd.Flags().StringVarP(&onto, "onto", "o", "", "Branch to move the current branch onto.")
 	cmd.Flags().StringVar(&source, "source", "", "Branch to move (defaults to current branch).")
 
-	_ = cmd.RegisterFlagCompletionFunc("onto", helpers.CompleteBranches)
-	_ = cmd.RegisterFlagCompletionFunc("source", helpers.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("onto", common.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("source", common.CompleteBranches)
 
 	return cmd
 }
@@ -89,7 +86,7 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 	})
 	excludedBranches := make(map[string]bool)
 	for _, d := range descendants {
-		excludedBranches[d.Name] = true
+		excludedBranches[d.GetName()] = true
 	}
 
 	// Get branches in stack order: trunk first, then children recursively
@@ -98,24 +95,24 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 
 	for branch := range eng.BranchesDepthFirst(trunk) {
 		// Skip source and its descendants
-		if excludedBranches[branch.Name] {
+		if excludedBranches[branch.GetName()] {
 			continue
 		}
 
-		if seenBranches[branch.Name] {
+		if seenBranches[branch.GetName()] {
 			continue
 		}
-		seenBranches[branch.Name] = true
+		seenBranches[branch.GetName()] = true
 
 		currentBranch := eng.CurrentBranch()
-		isCurrent := branch.Name == currentBranch.Name
-		display := tui.ColorBranchName(branch.Name, isCurrent)
+		isCurrent := branch.GetName() == currentBranch.GetName()
+		display := style.ColorBranchName(branch.GetName(), isCurrent)
 		if isCurrent {
 			initialIndex = len(choices)
 		}
 		choices = append(choices, tui.BranchChoice{
 			Display: display,
-			Value:   branch.Name,
+			Value:   branch.GetName(),
 		})
 	}
 
@@ -124,36 +121,36 @@ func interactiveOntoSelection(ctx *runtime.Context, sourceBranch string) (string
 		allBranches := eng.AllBranches()
 
 		// Ensure trunk is always included if not excluded
-		if trunk.Name != "" && !excludedBranches[trunk.Name] && !seenBranches[trunk.Name] {
+		if trunk.GetName() != "" && !excludedBranches[trunk.GetName()] && !seenBranches[trunk.GetName()] {
 			currentBranch := eng.CurrentBranch()
 			var display string
-			if trunk.Name == currentBranch.Name {
-				display = tui.ColorBranchName(trunk.Name, true)
+			if trunk.GetName() == currentBranch.GetName() {
+				display = style.ColorBranchName(trunk.GetName(), true)
 				initialIndex = 0
 			} else {
-				display = tui.ColorBranchName(trunk.Name, false)
+				display = style.ColorBranchName(trunk.GetName(), false)
 			}
 			choices = append(choices, tui.BranchChoice{
 				Display: display,
-				Value:   trunk.Name,
+				Value:   trunk.GetName(),
 			})
-			seenBranches[trunk.Name] = true
+			seenBranches[trunk.GetName()] = true
 		}
 
 		// Add all other branches
 		for _, branch := range allBranches {
-			branchName := branch.Name
+			branchName := branch.GetName()
 			if excludedBranches[branchName] {
 				continue
 			}
 			if !seenBranches[branchName] {
 				var display string
 				currentBranch := eng.CurrentBranch()
-				if branchName == currentBranch.Name {
-					display = tui.ColorBranchName(branchName, true)
+				if branchName == currentBranch.GetName() {
+					display = style.ColorBranchName(branchName, true)
 					initialIndex = len(choices)
 				} else {
-					display = tui.ColorBranchName(branchName, false)
+					display = style.ColorBranchName(branchName, false)
 				}
 				choices = append(choices, tui.BranchChoice{
 					Display: display,

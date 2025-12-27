@@ -38,7 +38,7 @@ func promptBranchName(existingNames []string, originalBranchName string, branchN
 		allBranches := eng.AllBranches()
 		branchNames := make([]string, len(allBranches))
 		for i, b := range allBranches {
-			branchNames[i] = b.Name
+			branchNames[i] = b.GetName()
 		}
 		if slices.Contains(branchNames, branchName) {
 			return "", fmt.Errorf("branch name %s is already in use", branchName)

@@ -8,6 +8,7 @@ import (
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/tui/components/tree"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // TrackOptions contains options for the track command
@@ -29,12 +30,12 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 		allBranches := eng.AllBranches()
 		parentExists := false
 		for _, branch := range allBranches {
-			if branch.Name == parent {
+			if branch.GetName() == parent {
 				parentExists = true
 				break
 			}
 		}
-		if !parentExists && parent != eng.Trunk().Name {
+		if !parentExists && parent != eng.Trunk().GetName() {
 			// Refresh branches list and check again
 			branches, err := git.GetAllBranchNames()
 			if err == nil {
@@ -81,7 +82,7 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 
-		ctx.Splog.Info("Tracked %s with parent %s.", tui.ColorBranchName(branchName, false), tui.ColorBranchName(parent, false))
+		ctx.Splog.Info("Tracked %s with parent %s.", style.ColorBranchName(branchName, false), style.ColorBranchName(parent, false))
 		return nil
 	}
 
@@ -97,7 +98,7 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 
-		ctx.Splog.Info("Tracked %s with parent %s.", tui.ColorBranchName(branchName, false), tui.ColorBranchName(parentBranch, false))
+		ctx.Splog.Info("Tracked %s with parent %s.", style.ColorBranchName(branchName, false), style.ColorBranchName(parentBranch, false))
 		return nil
 	}
 
@@ -112,15 +113,15 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	// Check if branch is already tracked
 	branch := eng.GetBranch(branchName)
 	if branch.IsTracked() {
-		ctx.Splog.Info("%s is already tracked.", tui.ColorBranchName(branchName, false))
+		ctx.Splog.Info("%s is already tracked.", style.ColorBranchName(branchName, false))
 		// Still ask if user wants to track descendants
 	} else {
 		// Try auto-detection (single unambiguous non-trunk tracked ancestor)
 		var parentBranch string
 		ancestors, err := eng.FindMostRecentTrackedAncestors(ctx.Context, branchName)
-		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().Name {
+		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().GetName() {
 			parentBranch = ancestors[0]
-			ctx.Splog.Info("Auto-detected parent %s for %s.", tui.ColorBranchName(parentBranch, false), tui.ColorBranchName(branchName, false))
+			ctx.Splog.Info("Auto-detected parent %s for %s.", style.ColorBranchName(parentBranch, false), style.ColorBranchName(branchName, false))
 		} else {
 			// Select parent interactively
 			parentBranch, err = selectParentBranch(ctx, branchName)
@@ -134,7 +135,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 			return fmt.Errorf("failed to track branch: %w", err)
 		}
 
-		ctx.Splog.Info("Tracked %s with parent %s.", tui.ColorBranchName(branchName, false), tui.ColorBranchName(parentBranch, false))
+		ctx.Splog.Info("Tracked %s with parent %s.", style.ColorBranchName(branchName, false), style.ColorBranchName(parentBranch, false))
 	}
 
 	// Find untracked children and ask to track them
@@ -142,7 +143,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	untrackedChildren := []string{}
 
 	for _, candidateBranch := range allBranches {
-		candidate := candidateBranch.Name
+		candidate := candidateBranch.GetName()
 		if candidate == branchName {
 			continue
 		}
@@ -185,32 +186,10 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 // selectParentBranch interactively selects a parent branch for tracking
 func selectParentBranch(ctx *runtime.Context, branchName string) (string, error) {
 	eng := ctx.Engine
-	trunk := eng.Trunk().Name
+	trunk := eng.Trunk().GetName()
 
 	// Render the tree to get visual context for each branch
-	renderer := tree.NewStackTreeRenderer(
-		branchName,
-		trunk,
-		func(branchName string) []string {
-			branch := eng.GetBranch(branchName)
-			children := branch.GetChildren()
-			childNames := make([]string, len(children))
-			for i, c := range children {
-				childNames[i] = c.Name
-			}
-			return childNames
-		},
-		func(branchName string) string {
-			branch := eng.GetBranch(branchName)
-			parent := eng.GetParent(branch)
-			if parent == nil {
-				return ""
-			}
-			return parent.Name
-		},
-		func(b string) bool { return eng.GetBranch(b).IsTrunk() },
-		func(b string) bool { return eng.GetBranch(b).IsBranchUpToDate() },
-	)
+	renderer := tui.NewStackTreeRenderer(eng)
 
 	// Render the full tree from trunk
 	treeLines := renderer.RenderStack(trunk, tree.RenderOptions{
@@ -236,9 +215,9 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	// Add trunk first
 	display := branchToDisplay[trunk]
 	if display == "" {
-		display = tui.ColorBranchName(trunk, false) + " (trunk)"
+		display = style.ColorBranchName(trunk, false) + " (trunk)"
 	} else {
-		display = strings.Replace(display, trunk, tui.ColorBranchName(trunk, false)+" (trunk)", 1)
+		display = strings.Replace(display, trunk, style.ColorBranchName(trunk, false)+" (trunk)", 1)
 	}
 	choices = append(choices, tui.BranchChoice{
 		Display: display,
@@ -248,7 +227,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	// Add all tracked branches
 	allBranches := eng.AllBranches()
 	for _, candidateBranch := range allBranches {
-		candidate := candidateBranch.Name
+		candidate := candidateBranch.GetName()
 		if candidate == branchName || candidate == trunk {
 			continue
 		}
@@ -257,9 +236,9 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 		if candidateBranch.IsTracked() {
 			display := branchToDisplay[candidate]
 			if display == "" {
-				display = tui.ColorBranchName(candidate, false)
+				display = style.ColorBranchName(candidate, false)
 			} else {
-				display = strings.Replace(display, candidate, tui.ColorBranchName(candidate, false), 1)
+				display = strings.Replace(display, candidate, style.ColorBranchName(candidate, false), 1)
 			}
 			choices = append(choices, tui.BranchChoice{
 				Display: display,
@@ -291,7 +270,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 
 	// Prompt user
 	selected, err := tui.PromptBranchSelection(
-		fmt.Sprintf("Select parent for %s:", tui.ColorBranchName(branchName, false)),
+		fmt.Sprintf("Select parent for %s:", style.ColorBranchName(branchName, false)),
 		choices,
 		initialIndex,
 	)
@@ -304,7 +283,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 
 // promptTrackChild asks if user wants to track a child branch
 func promptTrackChild(childName, parentName string) (bool, error) {
-	message := fmt.Sprintf("Found untracked child branch %s of %s. Track it?", tui.ColorBranchName(childName, false), tui.ColorBranchName(parentName, false))
+	message := fmt.Sprintf("Found untracked child branch %s of %s. Track it?", style.ColorBranchName(childName, false), style.ColorBranchName(parentName, false))
 	options := []tui.SelectOption{
 		{Label: "Yes", Value: yesResponse},
 		{Label: "No", Value: noResponse},

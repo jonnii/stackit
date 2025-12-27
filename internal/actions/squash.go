@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // SquashOptions contains options for the squash command
@@ -44,7 +44,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		return fmt.Errorf("failed to squash branch: %w", err)
 	}
 
-	splog.Info("Squashed commits in %s.", tui.ColorBranchName(currentBranch.Name, true))
+	splog.Info("Squashed commits in %s.", style.ColorBranchName(currentBranch.GetName(), true))
 
 	// Get upstack branches (recursive children only, excluding current branch)
 	rng := engine.StackRange{

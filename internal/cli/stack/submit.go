@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/submit"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	_ "stackit.dev/stackit/internal/demo" // Register demo engine factory
 	"stackit.dev/stackit/internal/runtime"
@@ -69,47 +70,43 @@ func addSubmitFlags(cmd *cobra.Command, f *submitFlags) {
 }
 
 func executeSubmit(cmd *cobra.Command, f *submitFlags) error {
-	// Get context (demo or real)
-	ctx, err := runtime.GetContext(cmd.Context())
-	if err != nil {
-		return err
-	}
+	return common.Run(cmd, func(ctx *runtime.Context) error {
+		// Get config values
+		cfg, _ := config.LoadConfig(ctx.RepoRoot)
+		submitFooter := cfg.SubmitFooter()
 
-	// Get config values
-	cfg, _ := config.LoadConfig(ctx.RepoRoot)
-	submitFooter := cfg.SubmitFooter()
+		// Run submit action
+		opts := submit.Options{
+			Branch:               f.branch,
+			Stack:                f.stack,
+			Force:                f.force,
+			DryRun:               f.dryRun,
+			Confirm:              f.confirm,
+			UpdateOnly:           f.updateOnly,
+			Always:               f.always,
+			Restack:              f.restack,
+			Draft:                f.draft,
+			Publish:              f.publish,
+			Edit:                 f.edit,
+			EditTitle:            f.editTitle,
+			EditDescription:      f.editDescription,
+			NoEdit:               f.noEdit,
+			NoEditTitle:          f.noEditTitle,
+			NoEditDescription:    f.noEditDescription,
+			Reviewers:            f.reviewers,
+			TeamReviewers:        f.teamReviewers,
+			MergeWhenReady:       f.mergeWhenReady,
+			RerequestReview:      f.rerequestReview,
+			View:                 f.view,
+			Web:                  f.web,
+			Comment:              f.comment,
+			TargetTrunk:          f.targetTrunk,
+			IgnoreOutOfSyncTrunk: f.ignoreOutOfSyncTrunk,
+			SubmitFooter:         submitFooter,
+		}
 
-	// Run submit action
-	opts := submit.Options{
-		Branch:               f.branch,
-		Stack:                f.stack,
-		Force:                f.force,
-		DryRun:               f.dryRun,
-		Confirm:              f.confirm,
-		UpdateOnly:           f.updateOnly,
-		Always:               f.always,
-		Restack:              f.restack,
-		Draft:                f.draft,
-		Publish:              f.publish,
-		Edit:                 f.edit,
-		EditTitle:            f.editTitle,
-		EditDescription:      f.editDescription,
-		NoEdit:               f.noEdit,
-		NoEditTitle:          f.noEditTitle,
-		NoEditDescription:    f.noEditDescription,
-		Reviewers:            f.reviewers,
-		TeamReviewers:        f.teamReviewers,
-		MergeWhenReady:       f.mergeWhenReady,
-		RerequestReview:      f.rerequestReview,
-		View:                 f.view,
-		Web:                  f.web,
-		Comment:              f.comment,
-		TargetTrunk:          f.targetTrunk,
-		IgnoreOutOfSyncTrunk: f.ignoreOutOfSyncTrunk,
-		SubmitFooter:         submitFooter,
-	}
-
-	return submit.Action(ctx, opts)
+		return submit.Action(ctx, opts)
+	})
 }
 
 // NewSubmitCmd creates the submit command

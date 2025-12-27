@@ -42,27 +42,16 @@ type StackStateInfo struct {
 
 // BranchInfo represents detailed information about a branch
 type BranchInfo struct {
-	Name           string   `json:"name"`
-	SHA            string   `json:"sha,omitempty"`
-	Parent         string   `json:"parent,omitempty"`
-	ParentRevision string   `json:"parent_revision,omitempty"`
-	Children       []string `json:"children,omitempty"`
-	IsTracked      bool     `json:"is_tracked"`
-	IsFixed        bool     `json:"is_fixed"`
-	IsTrunk        bool     `json:"is_trunk"`
-	PRInfo         *PRInfo  `json:"pr_info,omitempty"`
-	MetadataRefSHA string   `json:"metadata_ref_sha,omitempty"`
-}
-
-// PRInfo represents PR information for a branch
-type PRInfo struct {
-	Number  *int   `json:"number,omitempty"`
-	Base    string `json:"base,omitempty"`
-	URL     string `json:"url,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Body    string `json:"body,omitempty"`
-	State   string `json:"state,omitempty"`
-	IsDraft bool   `json:"is_draft"`
+	Name           string         `json:"name"`
+	SHA            string         `json:"sha,omitempty"`
+	Parent         string         `json:"parent,omitempty"`
+	ParentRevision string         `json:"parent_revision,omitempty"`
+	Children       []string       `json:"children,omitempty"`
+	IsTracked      bool           `json:"is_tracked"`
+	IsFixed        bool           `json:"is_fixed"`
+	IsTrunk        bool           `json:"is_trunk"`
+	PRInfo         *engine.PrInfo `json:"pr_info,omitempty"`
+	MetadataRefSHA string         `json:"metadata_ref_sha,omitempty"`
 }
 
 // ContinuationStateInfo represents continuation state
@@ -121,7 +110,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	allBranches := eng.AllBranches()
 
 	// Get all metadata refs
-	metadataRefs, err := git.GetMetadataRefList()
+	metadataRefs, err := eng.ListMetadataRefs()
 	if err != nil {
 		metadataRefs = make(map[string]string)
 	}
@@ -129,14 +118,14 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	// Collect all metadata in bulk
 	branchNames := make([]string, len(allBranches))
 	for i, b := range allBranches {
-		branchNames[i] = b.Name
+		branchNames[i] = b.GetName()
 	}
-	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
+	allMeta, _ := eng.BatchReadMetadataRefs(branchNames)
 
 	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
 	for _, branch := range allBranches {
-		branchName := branch.Name
+		branchName := branch.GetName()
 		branchInfo := BranchInfo{
 			Name:      branchName,
 			IsTrunk:   branch.IsTrunk(),
@@ -153,7 +142,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		// Get parent
 		parent := eng.GetParent(branchObj)
 		if parent != nil {
-			branchInfo.Parent = parent.Name
+			branchInfo.Parent = parent.GetName()
 		}
 
 		// Get children
@@ -161,7 +150,7 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		if len(children) > 0 {
 			childNames := make([]string, len(children))
 			for i, c := range children {
-				childNames[i] = c.Name
+				childNames[i] = c.GetName()
 			}
 			branchInfo.Children = childNames
 		}
@@ -173,17 +162,11 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			}
 
 			// Get PR info
-			prInfo, err := eng.GetPrInfo(branchName)
+			branch := eng.GetBranch(branchName)
+			prInfo, err := eng.GetPrInfo(branch)
 			if err == nil && prInfo != nil {
-				branchInfo.PRInfo = &PRInfo{
-					Number:  prInfo.Number,
-					Base:    prInfo.Base,
-					URL:     prInfo.URL,
-					Title:   prInfo.Title,
-					Body:    prInfo.Body,
-					State:   prInfo.State,
-					IsDraft: prInfo.IsDraft,
-				}
+				// engine.PrInfo now has MarshalJSON, so we can use it directly
+				branchInfo.PRInfo = prInfo
 			}
 		}
 
@@ -229,10 +212,10 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		Timestamp:      time.Now(),
 		RecentCommands: recentCommands,
 		StackState: StackStateInfo{
-			Trunk: trunk.Name,
+			Trunk: trunk.GetName(),
 			CurrentBranch: func() string {
 				if currentBranch != nil {
-					return currentBranch.Name
+					return currentBranch.GetName()
 				}
 				return ""
 			}(),

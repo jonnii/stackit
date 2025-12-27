@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // isInteractive checks if we're in an interactive terminal
@@ -37,7 +38,7 @@ func InferTrunk(ctx context.Context, branchNames []string) string {
 	}
 
 	// Second, check for commonly named trunks
-	if common := git.FindCommonlyNamedTrunk(branchNames); common != "" {
+	if common := engine.FindCommonlyNamedTrunk(branchNames); common != "" {
 		return common
 	}
 
@@ -213,7 +214,7 @@ func newInitCmd() *cobra.Command {
 			splog.Newline()
 
 			// Use output formatter for colored output
-			coloredTrunk := tui.ColorBranchName(trunkName, false)
+			coloredTrunk := style.ColorBranchName(trunkName, false)
 			splog.Info("Trunk set to %s", coloredTrunk)
 
 			// Read config for engine options

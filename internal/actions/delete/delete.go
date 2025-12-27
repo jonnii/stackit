@@ -7,7 +7,7 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // Options contains options for deleting branches
@@ -29,7 +29,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if currentBranch == nil {
 			return fmt.Errorf("no branch specified and not on a branch")
 		}
-		branchName = currentBranch.Name
+		branchName = currentBranch.GetName()
 	}
 
 	if branchName == "" {
@@ -46,30 +46,22 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Determine branches to delete
-	toDelete := []string{branchName}
+	toDelete := []engine.Branch{branch}
 
 	if opts.Upstack {
-		branch := eng.GetBranch(branchName)
 		upstack := eng.GetRelativeStackUpstack(branch)
-		for _, b := range upstack {
-			toDelete = append(toDelete, b.Name)
-		}
+		toDelete = append(toDelete, upstack...)
 	}
 
 	if opts.Downstack {
-		branch := eng.GetBranch(branchName)
 		downstack := eng.GetRelativeStackDownstack(branch)
-		downstackNames := make([]string, len(downstack))
-		for i, b := range downstack {
-			downstackNames[i] = b.Name
-		}
-		toDelete = append(downstackNames, toDelete...)
+		toDelete = append(downstack, toDelete...)
 	}
 
 	// Confirm if not forced and not merged/closed
 	if !opts.Force {
 		for _, b := range toDelete {
-			shouldDelete, reason := actions.ShouldDeleteBranch(ctx.Context, b, eng, false)
+			shouldDelete, reason := actions.ShouldDeleteBranch(ctx.Context, b.GetName(), eng, false)
 			if !shouldDelete {
 				// For now, if any branch in the list shouldn't be deleted and we're not forced,
 				// we might want to prompt. But since we don't have interactive prompting yet,
@@ -81,7 +73,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 				// For now, if we're not forced, and shouldDeleteBranch says no, we'll ask for --force.
 				if reason == "" {
-					return fmt.Errorf("branch %s is not merged/closed; use --force to delete anyway", b)
+					return fmt.Errorf("branch %s is not merged/closed; use --force to delete anyway", b.GetName())
 				}
 			}
 		}
@@ -98,7 +90,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	for _, b := range toDelete {
-		splog.Info("Deleted branch %s", tui.ColorBranchName(b, false))
+		splog.Info("Deleted branch %s", style.ColorBranchName(b.GetName(), false))
 	}
 
 	// Restack children if any

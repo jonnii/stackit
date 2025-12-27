@@ -7,6 +7,7 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui/style"
@@ -18,7 +19,9 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 	// Sync PR info first
 	repoOwner, repoName, _ := utils.GetRepoInfo(ctx)
 	if repoOwner != "" && repoName != "" {
-		if err := github.SyncPrInfo(ctx, branches, repoOwner, repoName); err != nil {
+		if err := github.SyncPrInfo(ctx, branches, repoOwner, repoName, func(name string, prInfo *git.PrInfo) {
+			_ = eng.UpdatePrInfo(name, prInfo)
+		}); err != nil {
 			// Non-fatal, continue
 			runtimeCtx.Splog.Debug("Failed to sync PR info: %v", err)
 		}

@@ -251,6 +251,17 @@ func (e *engineImpl) restackBranch(
 		}, nil
 	}
 
+	// Update metadata
+	if err := e.UpdateParentRevision(branchName, parentRev); err != nil {
+		return RestackBranchResult{
+			Result:            RestackConflict,
+			RebasedBranchBase: parentRev,
+			Reparented:        reparented,
+			OldParent:         oldParent,
+			NewParent:         parent,
+		}, fmt.Errorf("failed to update metadata: %w", err)
+	}
+
 	// Update the cached metadata if we're using a metaMap, so subsequent branches in the batch
 	// see the updated ParentBranchRevision.
 	if metaMap != nil {
@@ -404,8 +415,15 @@ func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, reba
 	}
 
 	// Finalize rebase using the shared helper
-	if err := git.FinalizeRebase(ctx, branchName, newRev, "", "", rebasedBranchBase); err != nil {
+	if err := git.FinalizeRebase(ctx, branchName, newRev, "", ""); err != nil {
 		return ContinueRebaseResult{BranchName: branchName}, err
+	}
+
+	// Update metadata
+	if rebasedBranchBase != "" {
+		if err := e.UpdateParentRevision(branchName, rebasedBranchBase); err != nil {
+			return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to update metadata: %w", err)
+		}
 	}
 
 	// Rebuild to refresh cache

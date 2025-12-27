@@ -4,6 +4,8 @@ import (
 	"context"
 	"iter"
 	"time"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // BranchReader defines the interface that Branch needs from its reader
@@ -57,6 +59,8 @@ type BranchWriter interface {
 	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
 	UntrackBranch(branchName string) error
 	SetParent(ctx context.Context, branchName string, parentBranchName string) error
+	UpdateParentRevision(branchName string, parentRev string) error
+	UpdatePrInfo(branchName string, prInfo *git.PrInfo) error
 	SetScope(branch Branch, scope Scope) error
 	RenameBranch(ctx context.Context, oldBranch, newBranch Branch) error
 	DeleteBranch(ctx context.Context, branchName string) error

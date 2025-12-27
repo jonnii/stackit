@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -21,7 +21,7 @@ children exist at any level, you will be prompted to select which branch
 to follow.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Execute top action
 				return actions.SwitchBranchAction(actions.DirectionTop, ctx)
 			})

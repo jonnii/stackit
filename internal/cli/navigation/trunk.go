@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
@@ -30,7 +30,7 @@ By default, displays the trunk branch that the current branch's stack is based o
 Use --all to see all configured trunk branches, or --add to add an additional trunk.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Handle --add flag
 				if add != "" {
 					return handleAddTrunk(ctx.RepoRoot, add)

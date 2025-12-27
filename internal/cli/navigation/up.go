@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
@@ -37,7 +37,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Parse steps from positional argument if provided
 				if len(args) > 0 {
 					parsedSteps, err := strconv.Atoi(args[0])
@@ -146,7 +146,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 	cmd.Flags().IntVarP(&steps, "steps", "n", 1, "The number of levels to traverse upstack.")
 	cmd.Flags().StringVar(&toBranch, "to", "", "Target branch to navigate towards. When multiple children exist, selects the path leading to this branch.")
 
-	_ = cmd.RegisterFlagCompletionFunc("to", helpers.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("to", common.CompleteBranches)
 
 	return cmd
 }

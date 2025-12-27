@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/create"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/runtime"
 )
@@ -32,7 +32,7 @@ If your working directory contains no changes, an empty branch will be created.
 If you have any unstaged changes, you will be asked whether you'd like to stage them.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Get branch name from args
 				branchName := ""
 				if len(args) > 0 {

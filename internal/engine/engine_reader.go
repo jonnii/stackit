@@ -6,8 +6,6 @@ import (
 	"iter"
 	"strings"
 	"time"
-
-	"stackit.dev/stackit/internal/git"
 )
 
 // AllBranches returns all branches
@@ -24,7 +22,7 @@ func (e *engineImpl) AllBranches() []Branch {
 // CurrentBranch returns the current branch (nil if not on a branch)
 func (e *engineImpl) CurrentBranch() *Branch {
 	e.mu.Lock()
-	if current, err := git.GetCurrentBranch(); err == nil {
+	if current, err := e.git.GetCurrentBranch(); err == nil {
 		e.currentBranch = current
 	} else {
 		// Not on a branch (e.g., detached HEAD)
@@ -224,13 +222,13 @@ func (e *engineImpl) IsBranchUpToDateInternal(branchName string) bool {
 	}
 
 	// Get current parent revision
-	parentRev, err := git.GetRevision(parent)
+	parentRev, err := e.git.GetRevision(parent)
 	if err != nil {
 		return false // Can't determine, assume needs restack
 	}
 
 	// Get stored parent revision from metadata
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	if err != nil {
 		return false // No metadata, assume needs restack
 	}
@@ -245,17 +243,17 @@ func (e *engineImpl) IsBranchUpToDateInternal(branchName string) bool {
 
 // GetCommitDateInternal returns the commit date for a branch
 func (e *engineImpl) GetCommitDateInternal(branchName string) (time.Time, error) {
-	return git.GetCommitDate(branchName)
+	return e.git.GetCommitDate(branchName)
 }
 
 // GetCommitAuthorInternal returns the commit author for a branch
 func (e *engineImpl) GetCommitAuthorInternal(branchName string) (string, error) {
-	return git.GetCommitAuthor(branchName)
+	return e.git.GetCommitAuthor(branchName)
 }
 
 // GetRevisionInternal returns the SHA of a branch
 func (e *engineImpl) GetRevisionInternal(branchName string) (string, error) {
-	return git.GetRevision(branchName)
+	return e.git.GetRevision(branchName)
 }
 
 // GetCommitCountInternal returns the number of commits for a branch
@@ -270,20 +268,20 @@ func (e *engineImpl) GetCommitCountInternal(branchName string) (int, error) {
 	}
 
 	// Get base revision (stored parent revision)
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	var base string
 	if err == nil && meta.ParentBranchRevision != nil {
 		base = *meta.ParentBranchRevision
 	} else {
 		// Fallback to current parent branch tip if metadata is missing
-		baseRev, err := git.GetRevision(parent)
+		baseRev, err := e.git.GetRevision(parent)
 		if err != nil {
 			return 0, err
 		}
 		base = baseRev
 	}
 
-	branchRev, err := git.GetRevision(branchName)
+	branchRev, err := e.git.GetRevision(branchName)
 	if err != nil {
 		return 0, err
 	}
@@ -314,19 +312,19 @@ func (e *engineImpl) GetDiffStatsInternal(branchName string) (int, int, error) {
 	}
 
 	// Get base revision (stored parent revision)
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	var base string
 	if err == nil && meta.ParentBranchRevision != nil {
 		base = *meta.ParentBranchRevision
 	} else {
-		baseRev, err := git.GetRevision(parent)
+		baseRev, err := e.git.GetRevision(parent)
 		if err != nil {
 			return 0, 0, err
 		}
 		base = baseRev
 	}
 
-	branchRev, err := git.GetRevision(branchName)
+	branchRev, err := e.git.GetRevision(branchName)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -337,7 +335,7 @@ func (e *engineImpl) GetDiffStatsInternal(branchName string) (int, int, error) {
 	}
 
 	// Use git diff --numstat
-	output, err := git.RunGitCommand("diff", "--numstat", base, branchRev)
+	output, err := e.git.RunGitCommand("diff", "--numstat", base, branchRev)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -380,7 +378,7 @@ func (e *engineImpl) BranchMatchesRemote(branchName string) (bool, error) {
 
 	// Fall back to checking local remote tracking branch (like getBranchRemoteDifference does)
 	// This handles cases where remote fetching failed but we have local remote tracking
-	remoteTrackingSha, err := git.GetRemoteRevision(branchName)
+	remoteTrackingSha, err := e.git.GetRemoteRevision(branchName)
 	if err != nil {
 		// No remote tracking branch exists
 		return false, nil
@@ -394,7 +392,7 @@ func (e *engineImpl) IsMergedIntoTrunk(ctx context.Context, branchName string) (
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
-	return git.IsMerged(ctx, branchName, trunk)
+	return e.git.IsMerged(ctx, branchName, trunk)
 }
 
 // IsBranchEmpty checks if a branch has no changes compared to its parent
@@ -415,7 +413,7 @@ func (e *engineImpl) IsBranchEmpty(ctx context.Context, branchName string) (bool
 		return false, err
 	}
 
-	return git.IsDiffEmpty(ctx, branchName, parentRev)
+	return e.git.IsDiffEmpty(ctx, branchName, parentRev)
 }
 
 // FindMostRecentTrackedAncestors finds the most recent tracked ancestors of a branch
@@ -431,7 +429,7 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 	trackedBranchTips := make(map[string][]string)
 
 	// Add trunk tip
-	trunkRev, err := git.GetRevision(trunk)
+	trunkRev, err := e.git.GetRevision(trunk)
 	if err == nil {
 		trackedBranchTips[trunkRev] = append(trackedBranchTips[trunkRev], trunk)
 	}
@@ -449,12 +447,12 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 		}
 
 		// Skip branches merged into trunk
-		if merged, err := git.IsMerged(ctx, candidate, trunk); err == nil && merged {
+		if merged, err := e.git.IsMerged(ctx, candidate, trunk); err == nil && merged {
 			continue
 		}
 
 		// Get candidate revision
-		candidateRev, err := git.GetRevision(candidate)
+		candidateRev, err := e.git.GetRevision(candidate)
 		if err != nil {
 			continue
 		}
@@ -463,7 +461,7 @@ func (e *engineImpl) FindMostRecentTrackedAncestors(ctx context.Context, branchN
 	}
 
 	// Get history of the branch we're tracking
-	history, err := git.GetCommitHistorySHAs(branchName)
+	history, err := e.git.GetCommitHistorySHAs(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -514,11 +512,11 @@ func (e *engineImpl) GetAllCommitsInternal(branchName string, format CommitForma
 		if err != nil {
 			return nil, err
 		}
-		return git.GetCommitRange("", branchRevision, string(format))
+		return e.git.GetCommitRange("", branchRevision, string(format))
 	}
 
 	// Get metadata to find parent revision
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +533,7 @@ func (e *engineImpl) GetAllCommitsInternal(branchName string, format CommitForma
 		baseRevision = *meta.ParentBranchRevision
 	}
 
-	return git.GetCommitRange(baseRevision, branchRevision, string(format))
+	return e.git.GetCommitRange(baseRevision, branchRevision, string(format))
 }
 
 // GetRelativeStackUpstack returns all branches in the upstack (descendants)

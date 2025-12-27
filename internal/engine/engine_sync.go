@@ -9,11 +9,11 @@ import (
 
 // PullTrunk pulls the trunk branch from remote
 func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
-	remote := git.GetRemote()
+	remote := e.git.GetRemote()
 	e.mu.RLock()
 	trunk := e.trunk
 	e.mu.RUnlock()
-	gitResult, err := git.PullBranch(ctx, remote, trunk)
+	gitResult, err := e.git.PullBranch(ctx, remote, trunk)
 	if err != nil {
 		return PullConflict, err
 	}
@@ -41,7 +41,7 @@ func (e *engineImpl) PullTrunk(ctx context.Context) (PullResult, error) {
 
 // ResetTrunkToRemote resets trunk to match remote
 func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
-	remote := git.GetRemote()
+	remote := e.git.GetRemote()
 
 	e.mu.RLock()
 	trunk := e.trunk
@@ -49,23 +49,23 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	e.mu.RUnlock()
 
 	// Get remote SHA
-	remoteSha, err := git.GetRemoteSha(remote, trunk)
+	remoteSha, err := e.git.GetRemoteSha(remote, trunk)
 	if err != nil {
 		return fmt.Errorf("failed to get remote SHA: %w", err)
 	}
 
 	// Checkout trunk
 	trunkBranch := e.Trunk()
-	if err := git.CheckoutBranch(ctx, trunkBranch.Name); err != nil {
+	if err := e.git.CheckoutBranch(ctx, trunkBranch.Name); err != nil {
 		return fmt.Errorf("failed to checkout trunk: %w", err)
 	}
 
 	// Hard reset to remote
-	if err := git.HardReset(ctx, remoteSha); err != nil {
+	if err := e.git.HardReset(ctx, remoteSha); err != nil {
 		// Try to switch back
 		if currentBranch != "" {
 			currentBranchObj := e.GetBranch(currentBranch)
-			_ = git.CheckoutBranch(ctx, currentBranchObj.Name)
+			_ = e.git.CheckoutBranch(ctx, currentBranchObj.Name)
 		}
 		return fmt.Errorf("failed to reset trunk: %w", err)
 	}
@@ -73,7 +73,7 @@ func (e *engineImpl) ResetTrunkToRemote(ctx context.Context) error {
 	// Switch back to original branch
 	if currentBranch != "" && currentBranch != trunk {
 		currentBranchObj := e.GetBranch(currentBranch)
-		if err := git.CheckoutBranch(ctx, currentBranchObj.Name); err != nil {
+		if err := e.git.CheckoutBranch(ctx, currentBranchObj.Name); err != nil {
 			return fmt.Errorf("failed to switch back: %w", err)
 		}
 	}
@@ -143,7 +143,7 @@ func (e *engineImpl) restackBranch(
 		// Update the cached metadata if we're using a metaMap, otherwise the subsequent
 		// write will overwrite the parent change.
 		if metaMap != nil {
-			if updatedMeta, err := git.ReadMetadataRef(branchName); err == nil {
+			if updatedMeta, err := e.git.ReadMetadataRef(branchName); err == nil {
 				metaMap[branchName] = updatedMeta
 			}
 		}
@@ -169,7 +169,7 @@ func (e *engineImpl) restackBranch(
 		meta = metaMap[branchName]
 	}
 	if meta == nil {
-		meta, err = git.ReadMetadataRef(branchName)
+		meta, err = e.git.ReadMetadataRef(branchName)
 		if err != nil {
 			return RestackBranchResult{Result: RestackConflict, RebasedBranchBase: parentRev}, fmt.Errorf("failed to read metadata: %w", err)
 		}
@@ -206,14 +206,14 @@ func (e *engineImpl) restackBranch(
 	// or if it's empty, find the actual merge base. This handles cases where
 	// the parent was amended or rebased outside of stackit.
 	if oldParentRev != "" {
-		if isAncestor, _ := git.IsAncestor(oldParentRev, branchName); !isAncestor {
-			if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
+		if isAncestor, _ := e.git.IsAncestor(oldParentRev, branchName); !isAncestor {
+			if mergeBase, err := e.git.GetMergeBase(branchName, parent); err == nil {
 				oldParentRev = mergeBase
 			}
 		}
 	} else {
 		// No old parent revision in metadata, try to find merge base
-		if mergeBase, err := git.GetMergeBase(branchName, parent); err == nil {
+		if mergeBase, err := e.git.GetMergeBase(branchName, parent); err == nil {
 			oldParentRev = mergeBase
 		}
 	}
@@ -230,7 +230,7 @@ func (e *engineImpl) restackBranch(
 	}
 
 	// Perform rebase
-	gitResult, err := git.Rebase(ctx, branchName, parent, oldParentRev)
+	gitResult, err := e.git.Rebase(ctx, branchName, parent, oldParentRev)
 	if err != nil {
 		return RestackBranchResult{
 			Result:            RestackConflict,
@@ -265,7 +265,7 @@ func (e *engineImpl) restackBranch(
 	// Update the cached metadata if we're using a metaMap, so subsequent branches in the batch
 	// see the updated ParentBranchRevision.
 	if metaMap != nil {
-		if updatedMeta, err := git.ReadMetadataRef(branchName); err == nil {
+		if updatedMeta, err := e.git.ReadMetadataRef(branchName); err == nil {
 			metaMap[branchName] = updatedMeta
 		}
 	}
@@ -320,10 +320,10 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 	e.mu.RUnlock()
 
 	// Fetch ALL metadata in parallel
-	allMeta, _ := git.BatchReadMetadataRefs(involvedBranchNames)
+	allMeta, _ := e.git.BatchReadMetadataRefs(involvedBranchNames)
 
 	// Fetch ALL revisions in parallel
-	allRevisions, _ := git.BatchGetRevisions(involvedBranchNames)
+	allRevisions, _ := e.git.BatchGetRevisions(involvedBranchNames)
 
 	// 2. Apply the restack changes
 	results := make(map[string]RestackBranchResult)
@@ -338,7 +338,7 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 			// Update the revision map with the current SHA of the branch.
 			// This is important because subsequent branches in the batch might
 			// use this branch as their parent.
-			if currentSha, err := git.GetRevision(branchName); err == nil {
+			if currentSha, err := e.git.GetRevision(branchName); err == nil {
 				if allRevisions == nil {
 					allRevisions = make(map[string]string)
 				}
@@ -399,7 +399,7 @@ func (e *engineImpl) RestackBranches(ctx context.Context, branches []Branch) (Re
 // ContinueRebase continues an in-progress rebase
 func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, rebasedBranchBase string) (ContinueRebaseResult, error) {
 	// Call git rebase --continue
-	result, err := git.RebaseContinue(ctx)
+	result, err := e.git.RebaseContinue(ctx)
 	if err != nil {
 		return ContinueRebaseResult{Result: int(git.RebaseConflict), BranchName: branchName}, err
 	}
@@ -409,13 +409,13 @@ func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, reba
 	}
 
 	// Get the new rebased SHA
-	newRev, err := git.RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
+	newRev, err := e.git.RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
 	if err != nil {
 		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to get new revision after rebase: %w", err)
 	}
 
 	// Finalize rebase using the shared helper
-	if err := git.FinalizeRebase(ctx, branchName, newRev, "", ""); err != nil {
+	if err := e.git.FinalizeRebase(ctx, branchName, newRev, "", ""); err != nil {
 		return ContinueRebaseResult{BranchName: branchName}, err
 	}
 

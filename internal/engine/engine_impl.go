@@ -3,8 +3,6 @@ package engine
 import (
 	"fmt"
 	"sync"
-
-	"stackit.dev/stackit/internal/git"
 )
 
 // engineImpl is a minimal implementation of the Engine interface
@@ -18,13 +16,20 @@ type engineImpl struct {
 	scopeMap          map[string]string   // branch -> scope
 	remoteShas        map[string]string   // branch -> remote SHA (populated by PopulateRemoteShas)
 	maxUndoStackDepth int
+	git               GitRunner
 	mu                sync.RWMutex
 }
 
 // NewEngine creates a new engine instance
 func NewEngine(opts Options) (Engine, error) {
+	// Initialize git runner
+	g := opts.Git
+	if g == nil {
+		g = &realGitRunner{}
+	}
+
 	// Initialize git repository
-	if err := git.InitDefaultRepo(); err != nil {
+	if err := g.InitDefaultRepo(); err != nil {
 		return nil, fmt.Errorf("failed to initialize git repository: %w", err)
 	}
 
@@ -52,10 +57,11 @@ func NewEngine(opts Options) (Engine, error) {
 		scopeMap:          make(map[string]string),
 		remoteShas:        make(map[string]string),
 		maxUndoStackDepth: maxDepth,
+		git:               g,
 	}
 
 	// Get current branch
-	currentBranch, err := git.GetCurrentBranch()
+	currentBranch, err := g.GetCurrentBranch()
 	if err != nil {
 		// Not on a branch - that's okay
 		currentBranch = ""
@@ -80,13 +86,13 @@ func (e *engineImpl) Reset(newTrunkName string) error {
 	e.trunk = newTrunkName
 
 	// Delete all metadata refs
-	metadataRefs, err := git.GetMetadataRefList()
+	metadataRefs, err := e.git.GetMetadataRefList()
 	if err != nil {
 		return fmt.Errorf("failed to get metadata refs: %w", err)
 	}
 
 	for branchName := range metadataRefs {
-		if err := git.DeleteMetadataRef(branchName); err != nil {
+		if err := e.git.DeleteMetadataRef(branchName); err != nil {
 			// Ignore errors for non-existent refs
 			continue
 		}
@@ -119,8 +125,8 @@ func (e *engineImpl) PopulateRemoteShas() error {
 	e.remoteShas = make(map[string]string)
 
 	// Fetch remote SHAs using git ls-remote
-	remote := git.GetRemote()
-	remoteShas, err := git.FetchRemoteShas(remote)
+	remote := e.git.GetRemote()
+	remoteShas, err := e.git.FetchRemoteShas(remote)
 	if err != nil {
 		// Don't fail if we can't fetch remote SHAs (e.g., offline)
 		return nil

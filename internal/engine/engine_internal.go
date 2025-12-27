@@ -12,7 +12,7 @@ import (
 // refreshCurrentBranch indicates whether to refresh currentBranch from Git
 func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	// Get all branch names
-	branches, err := git.GetAllBranchNames()
+	branches, err := e.git.GetAllBranchNames()
 	if err != nil {
 		return fmt.Errorf("failed to get branches: %w", err)
 	}
@@ -20,7 +20,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 
 	// Refresh current branch from Git if requested (needed when called from Rebuild/Reset after branch switches)
 	if refreshCurrentBranch {
-		currentBranch, err := git.GetCurrentBranch()
+		currentBranch, err := e.git.GetCurrentBranch()
 		if err != nil {
 			// Not on a branch (e.g., detached HEAD) - that's okay
 			e.currentBranch = ""
@@ -35,7 +35,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 	e.scopeMap = make(map[string]string)
 
 	// Load metadata for each branch in parallel
-	allMeta, _ := git.BatchReadMetadataRefs(branches)
+	allMeta, _ := e.git.BatchReadMetadataRefs(branches)
 
 	// Collect results and populate maps sequentially to avoid lock contention/races
 	for name, meta := range allMeta {
@@ -60,7 +60,7 @@ func (e *engineImpl) rebuildInternal(refreshCurrentBranch bool) error {
 // updateBranchInCache updates the cache for a specific branch after restack/metadata changes
 func (e *engineImpl) updateBranchInCache(branchName string) {
 	// Read metadata for this branch
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	if err != nil {
 		// If metadata doesn't exist, remove branch from all maps
 		if oldParent, exists := e.parentMap[branchName]; exists {
@@ -155,7 +155,7 @@ func (e *engineImpl) shouldReparentBranch(ctx context.Context, parentBranchName 
 	}
 
 	// Check if parent has been merged into trunk
-	merged, err := git.IsMerged(ctx, parentBranchName, e.trunk)
+	merged, err := e.git.IsMerged(ctx, parentBranchName, e.trunk)
 	if err == nil && merged {
 		return true
 	}

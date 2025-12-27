@@ -3,6 +3,8 @@ package engine
 import (
 	"fmt"
 	"sync"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // engineImpl is a minimal implementation of the Engine interface
@@ -16,7 +18,7 @@ type engineImpl struct {
 	scopeMap          map[string]string   // branch -> scope
 	remoteShas        map[string]string   // branch -> remote SHA (populated by PopulateRemoteShas)
 	maxUndoStackDepth int
-	git               GitRunner
+	git               git.Runner
 	mu                sync.RWMutex
 }
 
@@ -25,7 +27,7 @@ func NewEngine(opts Options) (Engine, error) {
 	// Initialize git runner
 	g := opts.Git
 	if g == nil {
-		g = &realGitRunner{}
+		g = git.NewRealRunner()
 	}
 
 	// Initialize git repository

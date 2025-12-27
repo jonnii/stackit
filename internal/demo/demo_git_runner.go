@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 )
 
-// demoGitRunner implements engine.GitRunner with simulated data for demo mode.
+// demoGitRunner implements git.Runner with simulated data for demo mode.
 type demoGitRunner struct {
 	trunk         string
 	currentBranch string
@@ -17,7 +16,7 @@ type demoGitRunner struct {
 }
 
 // NewDemoGitRunner creates a new demo git runner with simulated data.
-func NewDemoGitRunner() engine.GitRunner {
+func NewDemoGitRunner() git.Runner {
 	return &demoGitRunner{
 		trunk:         GetDemoTrunk(),
 		currentBranch: GetDemoCurrentBranch(),

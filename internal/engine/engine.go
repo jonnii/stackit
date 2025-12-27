@@ -5,6 +5,8 @@ package engine
 
 import (
 	"context"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // PRManager provides operations for managing pull request information
@@ -72,7 +74,7 @@ type Options struct {
 	MaxUndoStackDepth int
 
 	// Git is the git runner to use. If nil, a default real git runner is used.
-	Git GitRunner
+	Git git.Runner
 }
 
 // UndoManager provides operations for undo/redo functionality

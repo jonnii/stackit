@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // syncTrunk handles pulling the trunk and resolving any conflicts
@@ -17,7 +17,7 @@ func syncTrunk(ctx *runtime.Context, opts *Options) error {
 	trunkName := trunk.Name
 
 	// Pull trunk
-	splog.Info("Pulling %s from remote...", tui.ColorBranchName(trunkName, false))
+	splog.Info("Pulling %s from remote...", style.ColorBranchName(trunkName, false))
 	pullResult, err := eng.PullTrunk(gctx)
 	if err != nil {
 		return fmt.Errorf("failed to pull trunk: %w", err)
@@ -32,12 +32,12 @@ func syncTrunk(ctx *runtime.Context, opts *Options) error {
 			revShort = rev[:7]
 		}
 		splog.Info("%s fast-forwarded to %s.",
-			tui.ColorBranchName(trunkName, true),
-			tui.ColorDim(revShort))
+			style.ColorBranchName(trunkName, true),
+			style.ColorDim(revShort))
 	case engine.PullUnneeded:
-		splog.Info("%s is up to date.", tui.ColorBranchName(trunkName, true))
+		splog.Info("%s is up to date.", style.ColorBranchName(trunkName, true))
 	case engine.PullConflict:
-		splog.Warn("%s could not be fast-forwarded.", tui.ColorBranchName(trunkName, false))
+		splog.Warn("%s could not be fast-forwarded.", style.ColorBranchName(trunkName, false))
 
 		// Prompt to overwrite (or use force flag)
 		shouldReset := opts.Force
@@ -58,8 +58,8 @@ func syncTrunk(ctx *runtime.Context, opts *Options) error {
 				revShort = rev[:7]
 			}
 			splog.Info("%s set to %s.",
-				tui.ColorBranchName(trunkName, true),
-				tui.ColorDim(revShort))
+				style.ColorBranchName(trunkName, true),
+				style.ColorDim(revShort))
 		}
 	}
 

@@ -5,7 +5,7 @@ import (
 
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -83,12 +83,12 @@ func PopAction(ctx *runtime.Context, _ PopOptions) error {
 	hasStaged, err := git.HasStagedChanges(ctx.Context)
 	if err == nil && hasStaged {
 		splog.Info("Popped branch %s. Changes are now staged on %s.",
-			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parentName, false))
+			style.ColorBranchName(currentBranch, false),
+			style.ColorBranchName(parentName, false))
 	} else {
 		splog.Info("Popped branch %s. Switched to %s.",
-			tui.ColorBranchName(currentBranch, false),
-			tui.ColorBranchName(parentName, false))
+			style.ColorBranchName(currentBranch, false),
+			style.ColorBranchName(parentName, false))
 	}
 
 	return nil

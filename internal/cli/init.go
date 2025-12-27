@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // isInteractive checks if we're in an interactive terminal
@@ -213,7 +214,7 @@ func newInitCmd() *cobra.Command {
 			splog.Newline()
 
 			// Use output formatter for colored output
-			coloredTrunk := tui.ColorBranchName(trunkName, false)
+			coloredTrunk := style.ColorBranchName(trunkName, false)
 			splog.Info("Trunk set to %s", coloredTrunk)
 
 			// Read config for engine options

@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // Restacker is a minimal interface needed for restacking branches
@@ -80,9 +81,9 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 		if result.Reparented {
 			isCurrent := branchName == currentBranchName
 			splog.Info("Reparented %s from %s to %s (parent was merged/deleted).",
-				tui.ColorBranchName(branchName, isCurrent),
-				tui.ColorBranchName(result.OldParent, false),
-				tui.ColorBranchName(result.NewParent, false))
+				style.ColorBranchName(branchName, isCurrent),
+				style.ColorBranchName(result.OldParent, false),
+				style.ColorBranchName(result.NewParent, false))
 		}
 
 		switch result.Result {
@@ -96,14 +97,14 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			}
 			isCurrent := branchName == currentBranchName
 			splog.Info("Restacked %s on %s.",
-				tui.ColorBranchName(branchName, isCurrent),
-				tui.ColorBranchName(parentName, false))
+				style.ColorBranchName(branchName, isCurrent),
+				style.ColorBranchName(parentName, false))
 		case engine.RestackConflict:
 			// This should not happen since conflicts are handled at the batch level
 			return fmt.Errorf("unexpected conflict in batch result for branch %s", branchName)
 		case engine.RestackUnneeded:
 			if branch.IsTrunk() {
-				splog.Info("%s does not need to be restacked.", tui.ColorBranchName(branchName, false))
+				splog.Info("%s does not need to be restacked.", style.ColorBranchName(branchName, false))
 			} else {
 				parent := eng.GetParent(branch)
 				parentName := ""
@@ -114,8 +115,8 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 				}
 				isCurrent := branchName == currentBranchName
 				splog.Info("%s does not need to be restacked on %s.",
-					tui.ColorBranchName(branchName, isCurrent),
-					tui.ColorBranchName(parentName, false))
+					style.ColorBranchName(branchName, isCurrent),
+					style.ColorBranchName(parentName, false))
 			}
 		}
 	}

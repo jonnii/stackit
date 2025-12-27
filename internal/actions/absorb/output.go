@@ -4,6 +4,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 const unknown = "unknown"
@@ -24,10 +25,10 @@ func printDryRunOutput(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []gi
 		branch := eng.GetBranch(branchName)
 		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil && len(commits) > 0 {
-			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
+			splog.Info("  %s in %s:", commitSHA[:8], style.ColorBranchName(branchName, false))
 			splog.Info("    %s", commits[0])
 		} else {
-			splog.Info("  %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
+			splog.Info("  %s in %s:", commitSHA[:8], style.ColorBranchName(branchName, false))
 		}
 
 		for _, hunk := range hunks {
@@ -55,7 +56,7 @@ func printAbsorbPlan(hunksByCommit map[string][]git.Hunk, unabsorbedHunks []git.
 			branchName = unknown
 		}
 
-		splog.Info("  Commit %s in %s:", commitSHA[:8], tui.ColorBranchName(branchName, false))
+		splog.Info("  Commit %s in %s:", commitSHA[:8], style.ColorBranchName(branchName, false))
 		for _, hunk := range hunks {
 			splog.Info("    - %s (lines %d-%d)", hunk.File, hunk.NewStart, hunk.NewStart+hunk.NewCount-1)
 		}

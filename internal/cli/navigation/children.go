@@ -5,9 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/errors"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // NewChildrenCmd creates the children command
@@ -22,30 +23,26 @@ This is useful for understanding the structure of your stack and seeing which
 branches depend on the current branch.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context (demo or real)
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Get current branch
+				currentBranch := ctx.Engine.CurrentBranch()
+				if currentBranch == nil {
+					return errors.ErrNotOnBranch
+				}
 
-			// Get current branch
-			currentBranch := ctx.Engine.CurrentBranch()
-			if currentBranch == nil {
-				return errors.ErrNotOnBranch
-			}
+				// Get children
+				children := currentBranch.GetChildren()
+				if len(children) == 0 {
+					ctx.Splog.Info("%s has no children.", style.ColorBranchName(currentBranch.Name, true))
+					return nil
+				}
 
-			// Get children
-			children := currentBranch.GetChildren()
-			if len(children) == 0 {
-				ctx.Splog.Info("%s has no children.", tui.ColorBranchName(currentBranch.Name, true))
+				// Print children
+				for _, child := range children {
+					fmt.Println(child.Name)
+				}
 				return nil
-			}
-
-			// Print children
-			for _, child := range children {
-				fmt.Println(child.Name)
-			}
-			return nil
+			})
 		},
 	}
 

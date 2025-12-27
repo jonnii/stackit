@@ -9,7 +9,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // ForeachOptions contains options for the foreach command
@@ -54,7 +54,7 @@ func ForeachAction(ctx *runtime.Context, opts ForeachOptions) error {
 		}
 
 		isCurrent := branch.Name == originalBranchName
-		splog.Info("\nRunning on branch %s...", tui.ColorBranchName(branch.Name, isCurrent))
+		splog.Info("\nRunning on branch %s...", style.ColorBranchName(branch.Name, isCurrent))
 
 		if err := git.CheckoutBranch(ctx.Context, branch.Name); err != nil {
 			splog.Error("Failed to checkout %s: %v", branch.Name, err)

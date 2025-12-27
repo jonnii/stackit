@@ -7,7 +7,7 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // Options contains options for deleting branches
@@ -98,7 +98,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	for _, b := range toDelete {
-		splog.Info("Deleted branch %s", tui.ColorBranchName(b, false))
+		splog.Info("Deleted branch %s", style.ColorBranchName(b, false))
 	}
 
 	// Restack children if any

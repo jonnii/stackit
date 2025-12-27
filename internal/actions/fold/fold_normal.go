@@ -9,6 +9,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, parent string, eng engine.Engine, splog *tui.Splog, _ Options) error {
@@ -46,8 +47,8 @@ func foldNormal(gctx context.Context, ctx *runtime.Context, currentBranch, paren
 	}
 
 	splog.Info("Folded %s into %s.",
-		tui.ColorBranchName(currentBranch, true),
-		tui.ColorBranchName(parent, false))
+		style.ColorBranchName(currentBranch, true),
+		style.ColorBranchName(parent, false))
 
 	// Restack all descendants of the parent
 	if len(descendants) > 0 {

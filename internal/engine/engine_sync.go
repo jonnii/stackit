@@ -251,16 +251,12 @@ func (e *engineImpl) restackBranch(
 		}, nil
 	}
 
-	// Update metadata with new parent revision
-	meta.ParentBranchRevision = &parentRev
-	if err := git.WriteMetadataRef(branchName, meta); err != nil {
-		return RestackBranchResult{
-			Result:            RestackDone,
-			RebasedBranchBase: parentRev,
-			Reparented:        reparented,
-			OldParent:         oldParent,
-			NewParent:         parent,
-		}, fmt.Errorf("failed to update metadata: %w", err)
+	// Update the cached metadata if we're using a metaMap, so subsequent branches in the batch
+	// see the updated ParentBranchRevision.
+	if metaMap != nil {
+		if updatedMeta, err := git.ReadMetadataRef(branchName); err == nil {
+			metaMap[branchName] = updatedMeta
+		}
 	}
 
 	// Update cache incrementally if requested (much faster than full rebuild)
@@ -407,26 +403,9 @@ func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, reba
 		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to get new revision after rebase: %w", err)
 	}
 
-	// Update the branch reference to the new rebased commit
-	_, err = git.RunGitCommandWithContext(ctx, "update-ref", "refs/heads/"+branchName, newRev)
-	if err != nil {
-		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to update branch reference %s: %w", branchName, err)
-	}
-
-	// Checkout the branch to re-attach HEAD
-	if err := git.CheckoutBranch(ctx, branchName); err != nil {
-		return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
-	}
-
-	// Update metadata for the rebased branch
-	meta, err := git.ReadMetadataRef(branchName)
-	if err != nil {
-		return ContinueRebaseResult{}, fmt.Errorf("failed to read metadata: %w", err)
-	}
-
-	meta.ParentBranchRevision = &rebasedBranchBase
-	if err := git.WriteMetadataRef(branchName, meta); err != nil {
-		return ContinueRebaseResult{}, fmt.Errorf("failed to update metadata: %w", err)
+	// Finalize rebase using the shared helper
+	if err := git.FinalizeRebase(ctx, branchName, newRev, "", "", rebasedBranchBase); err != nil {
+		return ContinueRebaseResult{BranchName: branchName}, err
 	}
 
 	// Rebuild to refresh cache

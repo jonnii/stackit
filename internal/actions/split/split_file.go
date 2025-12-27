@@ -11,6 +11,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // splitByFileEngine is a minimal interface needed for splitting by file
@@ -140,9 +141,9 @@ func promptForFiles(ctx context.Context, branchToSplit string, eng engine.Branch
 	}
 
 	// Show instructions
-	splog.Info("Splitting %s by file.", tui.ColorBranchName(branchToSplit, true))
+	splog.Info("Splitting %s by file.", style.ColorBranchName(branchToSplit, true))
 	splog.Info("Select the files to extract to a new parent branch.")
-	splog.Info("The remaining files will stay on %s.", tui.ColorBranchName(branchToSplit, true))
+	splog.Info("The remaining files will stay on %s.", style.ColorBranchName(branchToSplit, true))
 	splog.Info("")
 
 	// Prompt for file selection

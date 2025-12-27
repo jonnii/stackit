@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"stackit.dev/stackit/internal/runtime"
+	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/tui/components/tree"
 )
 
@@ -27,37 +28,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 	}
 
 	// Create tree renderer
-	currentBranch := ctx.Engine.CurrentBranch()
-	trunk := ctx.Engine.Trunk()
-	currentBranchName := ""
-	if currentBranch != nil {
-		currentBranchName = currentBranch.Name
-	}
-	renderer := tree.NewStackTreeRenderer(
-		currentBranchName,
-		trunk.Name,
-		func(branchName string) []string {
-			branch := ctx.Engine.GetBranch(branchName)
-			children := branch.GetChildren()
-			childNames := make([]string, len(children))
-			for i, c := range children {
-				childNames[i] = c.Name
-			}
-			return childNames
-		},
-		func(branchName string) string {
-			branch := ctx.Engine.GetBranch(branchName)
-			parent := ctx.Engine.GetParent(branch)
-			if parent == nil {
-				return ""
-			}
-			return parent.Name
-		},
-		func(branchName string) bool { return ctx.Engine.GetBranch(branchName).IsTrunk() },
-		func(branchName string) bool {
-			return ctx.Engine.GetBranch(branchName).IsBranchUpToDate()
-		},
-	)
+	renderer := tui.NewStackTreeRenderer(ctx.Engine)
 
 	// Render the stack
 	// First, collect annotations for all branches in the stack

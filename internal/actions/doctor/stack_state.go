@@ -7,6 +7,7 @@ import (
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 )
 
 // checkStackState performs stack state and metadata integrity checks
@@ -43,7 +44,7 @@ func checkStackState(eng engine.Engine, splog *tui.Splog, warnings []string, err
 					splog.Error("  Failed to prune orphaned metadata for %s: %v", branchName, err)
 					warnings = append(warnings, fmt.Sprintf("orphaned metadata found for deleted branch '%s' (fix failed)", branchName))
 				} else {
-					splog.Info("  ✅ Pruned orphaned metadata for deleted branch %s", tui.ColorBranchName(branchName, false))
+					splog.Info("  ✅ Pruned orphaned metadata for deleted branch %s", style.ColorBranchName(branchName, false))
 					prunedCount++
 				}
 			} else {

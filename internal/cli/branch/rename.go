@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -23,22 +24,19 @@ Note that this removes any association to a pull request, as GitHub pull request
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				newName := ""
+				if len(args) > 0 {
+					newName = args[0]
+				}
 
-			newName := ""
-			if len(args) > 0 {
-				newName = args[0]
-			}
+				opts := actions.RenameOptions{
+					NewName: newName,
+					Force:   force,
+				}
 
-			opts := actions.RenameOptions{
-				NewName: newName,
-				Force:   force,
-			}
-
-			return actions.RenameAction(ctx, opts)
+				return actions.RenameAction(ctx, opts)
+			})
 		},
 	}
 

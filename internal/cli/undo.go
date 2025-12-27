@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/undo"
+	"stackit.dev/stackit/internal/cli/helpers"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -27,16 +28,12 @@ If you specify a snapshot ID with --snapshot, it will restore to that specific
 state without prompting.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get context
-			ctx, err := runtime.GetContext(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			// Run undo action
-			return undo.Action(ctx, undo.Options{
-				SnapshotID: snapshotID,
-				Force:      force,
+			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+				// Run undo action
+				return undo.Action(ctx, undo.Options{
+					SnapshotID: snapshotID,
+					Force:      force,
+				})
 			})
 		},
 	}

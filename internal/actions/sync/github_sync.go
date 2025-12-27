@@ -5,7 +5,7 @@ import (
 	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
-	"stackit.dev/stackit/internal/tui"
+	"stackit.dev/stackit/internal/tui/style"
 	"stackit.dev/stackit/internal/utils"
 )
 
@@ -118,9 +118,9 @@ func ParentsFromGitHubBase(ctx *runtime.Context) (*ParentsResult, error) {
 			}
 
 			splog.Info("GitHub PR for %s has base %s, but local parent is %s. Updating local parent...",
-				tui.ColorBranchName(branch.Name, false),
-				tui.ColorBranchName(githubBase, false),
-				tui.ColorBranchName(currentParentName, false))
+				style.ColorBranchName(branch.Name, false),
+				style.ColorBranchName(githubBase, false),
+				style.ColorBranchName(currentParentName, false))
 
 			if err := eng.SetParent(gctx, branch.Name, githubBase); err != nil {
 				splog.Debug("Failed to update parent for %s: %v", branch.Name, err)

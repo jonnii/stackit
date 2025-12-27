@@ -5,6 +5,8 @@ package engine
 
 import (
 	"context"
+
+	"stackit.dev/stackit/internal/git"
 )
 
 // PRManager provides operations for managing pull request information
@@ -70,6 +72,9 @@ type Options struct {
 	// MaxUndoStackDepth is the maximum number of undo snapshots to keep.
 	// If zero or negative, defaults to DefaultMaxUndoStackDepth (10).
 	MaxUndoStackDepth int
+
+	// Git is the git runner to use. If nil, a default real git runner is used.
+	Git git.Runner
 }
 
 // UndoManager provides operations for undo/redo functionality

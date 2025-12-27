@@ -10,7 +10,7 @@ import (
 
 // GetPrInfo returns PR information for a branch
 func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (e *engineImpl) GetPrInfo(branchName string) (*PrInfo, error) {
 
 // UpsertPrInfo updates or creates PR information for a branch
 func (e *engineImpl) UpsertPrInfo(branchName string, prInfo *PrInfo) error {
-	meta, err := git.ReadMetadataRef(branchName)
+	meta, err := e.git.ReadMetadataRef(branchName)
 	if err != nil {
 		meta = &git.Meta{}
 	}
@@ -64,7 +64,7 @@ func (e *engineImpl) UpsertPrInfo(branchName string, prInfo *PrInfo) error {
 		meta.PrInfo.URL = &prInfo.URL
 	}
 
-	return git.WriteMetadataRef(branchName, meta)
+	return e.git.WriteMetadataRef(branchName, meta)
 }
 
 // GetPRSubmissionStatus returns the submission status of a branch

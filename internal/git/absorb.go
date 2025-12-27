@@ -13,25 +13,20 @@ type HunkTarget struct {
 	CommitIndex int // Index in the commit list (0 = newest)
 }
 
-// CheckCommutation checks if a hunk commutes with a commit
-// Two patches commute if they don't touch overlapping lines in the same file
+// CheckCommutation checks if a hunk commutes with a commit.
+// Two patches commute if they don't touch overlapping lines in the same file.
 func CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error) {
-	// Get the commit's diff to see what lines it touches
 	commitDiff, err := GetCommitDiff(commitSHA, parentSHA)
 	if err != nil {
 		return false, fmt.Errorf("failed to get commit diff: %w", err)
 	}
 
-	// If commit diff is empty, they commute
 	if strings.TrimSpace(commitDiff) == "" {
 		return true, nil
 	}
 
-	// Parse commit diff to get line ranges for the same file
 	commitHunks := parseDiffHunks(commitDiff, hunk.File)
 
-	// If the file doesn't appear in the commit's diff at all, they commute
-	// Check if the file exists in the commit diff by searching for it
 	fileInDiff := false
 	for _, line := range strings.Split(commitDiff, "\n") {
 		if strings.Contains(line, hunk.File) {
@@ -40,28 +35,25 @@ func CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error) {
 		}
 	}
 	if !fileInDiff {
-		return true, nil // File doesn't exist in commit, they commute
+		return true, nil
 	}
 
-	// If the file doesn't appear in the parsed hunks (but appears in diff),
-	// it might be a rename or the parsing failed - be conservative and say they don't commute
+	// If file appears in diff but no hunks parsed, might be a rename or parsing failed
 	if len(commitHunks) == 0 {
-		return false, nil // File in diff but no hunks - be conservative
+		return false, nil
 	}
 
-	// Check if any commit hunk overlaps with the staged hunk in the same file
 	for _, commitHunk := range commitHunks {
 		if commitHunk.File != hunk.File {
 			continue
 		}
 
-		// Check if line ranges overlap
 		if hunkOverlaps(hunk, commitHunk) {
-			return false, nil // They don't commute
+			return false, nil
 		}
 	}
 
-	return true, nil // They commute
+	return true, nil
 }
 
 // hunkOverlaps checks if two hunks have overlapping line ranges.
@@ -71,9 +63,7 @@ func hunkOverlaps(h1, h2 Hunk) bool {
 		return false
 	}
 
-	// Staged hunk (h1) is being passed back over commit hunk (h2).
-	// h1.Old is the state after h2 was applied (h2.New).
-	// We add a safety margin of 3 lines (typical git context) to avoid conflicts.
+	// Add safety margin of 3 lines (typical git context) to avoid conflicts
 	margin := 3
 
 	h1Start := h1.OldStart - margin
@@ -102,7 +92,6 @@ func GetParentCommitSHA(commitSHA string) (string, error) {
 		return "", fmt.Errorf("failed to resolve commit: %w", err)
 	}
 
-	// Synchronize go-git operations to prevent concurrent packfile access
 	goGitMu.Lock()
 	defer goGitMu.Unlock()
 
@@ -127,7 +116,6 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 	var hunks []Hunk
 	lines := strings.Split(diffOutput, "\n")
 
-	// Regex to match hunk headers
 	hunkHeaderRegex := regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
 
 	var currentHunk *Hunk
@@ -136,9 +124,7 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 
 	for _, line := range lines {
 		line = strings.TrimRight(line, "\r")
-		// Check for file header
 		if strings.HasPrefix(line, "diff --git") {
-			// Save previous hunk if exists
 			if currentHunk != nil {
 				currentHunk.Content = strings.Join(hunkLines, "\n")
 				if currentHunk.File == targetFile {
@@ -147,7 +133,6 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 				currentHunk = nil
 				hunkLines = nil
 			}
-			// Extract file path from "diff --git a/path b/path"
 			parts := strings.Split(line, " ")
 			if len(parts) >= 4 {
 				bPath := parts[len(parts)-1]
@@ -158,9 +143,7 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 			continue
 		}
 
-		// Check for hunk header
 		if match := hunkHeaderRegex.FindStringSubmatch(line); match != nil {
-			// Save previous hunk if exists
 			if currentHunk != nil {
 				currentHunk.Content = strings.Join(hunkLines, "\n")
 				if currentHunk.File == targetFile {
@@ -168,7 +151,6 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 				}
 			}
 
-			// Parse hunk header
 			oldStart := parseInt(match[1])
 			oldCount := parseInt(match[2])
 			if oldCount == 0 {
@@ -191,13 +173,11 @@ func parseDiffHunks(diffOutput, targetFile string) []Hunk {
 			continue
 		}
 
-		// Accumulate hunk content
 		if currentHunk != nil {
 			hunkLines = append(hunkLines, line)
 		}
 	}
 
-	// Save last hunk
 	if currentHunk != nil {
 		currentHunk.Content = strings.Join(hunkLines, "\n")
 		if currentHunk.File == targetFile {

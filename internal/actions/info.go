@@ -33,48 +33,38 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		branchName = currentBranch.GetName()
 	}
 
-	// Get branch wrapper
 	branch := eng.GetBranch(branchName)
 
-	// Check if branch exists
 	if !branch.IsTracked() && !branch.IsTrunk() {
-		// Check if it's a git branch
 		_, err := eng.GetRevisionInternal(branchName)
 		if err != nil {
 			return fmt.Errorf("branch %s does not exist", branchName)
 		}
 	}
 
-	// Determine effective flags
 	// If stat is set without diff or patch, it implies diff
 	effectiveDiff := opts.Diff || (opts.Stat && !opts.Patch)
 	effectivePatch := opts.Patch && !opts.Diff
 
-	// Build output lines
 	var outputLines []string
 
-	// Get branch info
 	currentBranch := eng.CurrentBranch()
 	isCurrent := branchName == currentBranch.GetName()
 	isTrunk := branch.IsTrunk()
 
-	// Branch name with current indicator
 	coloredBranchName := style.ColorBranchName(branchName, isCurrent)
 
-	// Add restack indicator if needed
 	if !isTrunk && !branch.IsBranchUpToDate() {
 		coloredBranchName += " " + style.ColorNeedsRestack("(needs restack)")
 	}
 	outputLines = append(outputLines, coloredBranchName)
 
-	// Commit date
 	commitDate, err := branch.GetCommitDate()
 	if err == nil {
 		dateStr := commitDate.Format(time.RFC3339)
 		outputLines = append(outputLines, style.ColorDim(dateStr))
 	}
 
-	// PR info (skip for trunk)
 	var prInfo *engine.PrInfo
 	if !isTrunk {
 		branch := eng.GetBranch(branchName)
@@ -91,7 +81,6 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	}
 
-	// Parent branch
 	branchObj := eng.GetBranch(branchName)
 	parentBranch := eng.GetParent(branchObj)
 	if parentBranch != nil {
@@ -99,8 +88,6 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		outputLines = append(outputLines, fmt.Sprintf("%s: %s", style.ColorCyan("Parent"), parentBranch.GetName()))
 	}
 
-	// Children branches
-	// branchObj already declared above
 	children := branchObj.GetChildren()
 	if len(children) > 0 {
 		outputLines = append(outputLines, fmt.Sprintf("%s:", style.ColorCyan("Children")))
@@ -109,24 +96,17 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	}
 
-	// PR body
 	if opts.Body && prInfo != nil && prInfo.Body() != "" {
 		outputLines = append(outputLines, "")
 		outputLines = append(outputLines, prInfo.Body())
 	}
 
-	// Commits listing
 	outputLines = append(outputLines, "")
 	if effectivePatch {
-		// Show commits with patches
 		baseRevision := ""
 		if isTrunk {
-			// For trunk, use parent commit (branchName~)
 			baseRevision = branchName + "~"
 		} else {
-			// Get all commits to find the oldest one's parent
-			// Alternatively, get parent revision from engine
-			// We already have branchObj
 			commits, err := branchObj.GetAllCommits(engine.CommitFormatSHA)
 			if err == nil && len(commits) > 0 {
 				oldestSHA := commits[0]
@@ -141,7 +121,6 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 			}
 		}
 	} else {
-		// Show commit list (readable format)
 		commits, err := branch.GetAllCommits(engine.CommitFormatReadable)
 		if err == nil {
 			for _, commit := range commits {
@@ -150,14 +129,11 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	}
 
-	// Diff (if requested and not showing patches)
 	if effectiveDiff {
 		outputLines = append(outputLines, "")
 		if isTrunk {
-			// For trunk, show diff from HEAD~1 to HEAD
 			headRevision, err := branch.GetRevision()
 			if err == nil {
-				// Get parent commit
 				parentSHA, err := eng.GetCommitSHA(branchName, 1)
 				if err == nil {
 					diffOutput, err := eng.ShowDiff(ctx.Context, parentSHA, headRevision, opts.Stat)
@@ -167,7 +143,6 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 				}
 			}
 		} else {
-			// For regular branches, show diff from parent revision
 			commits, err := branchObj.GetAllCommits(engine.CommitFormatSHA)
 			if err == nil && len(commits) > 0 {
 				oldestSHA := commits[0]
@@ -194,14 +169,12 @@ func InfoAction(ctx *runtime.Context, opts InfoOptions) error {
 		}
 	}
 
-	// Output the result
 	splog.Page(strings.Join(outputLines, "\n"))
 	splog.Newline()
 
 	return nil
 }
 
-// getPRTitleLine formats the PR title line with number, state, and title
 func getPRTitleLine(prInfo *engine.PrInfo) string {
 	if prInfo == nil || prInfo.Number() == nil || prInfo.Title() == "" {
 		return ""
@@ -220,7 +193,6 @@ func getPRTitleLine(prInfo *engine.PrInfo) string {
 	case prStateMerged:
 		return fmt.Sprintf("%s (Merged) %s", prNumber, prInfo.Title())
 	case prStateClosed:
-		// Strikethrough not easily available, use dim instead
 		return fmt.Sprintf("%s (Abandoned) %s", prNumber, style.ColorDim(prInfo.Title()))
 	default:
 		prState := style.ColorPRState(state, prInfo.IsDraft())

@@ -73,23 +73,18 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 	eng := ctx.Engine
 	repoRoot := ctx.RepoRoot
 
-	// Collect recent commands
 	snapshotInfos, err := eng.GetSnapshots()
 	if err != nil {
-		// Log but continue - snapshots might not exist
 		snapshotInfos = []engine.SnapshotInfo{}
 	}
 
-	// Apply limit if specified
 	limit := opts.Limit
 	if limit > 0 && limit < len(snapshotInfos) {
 		snapshotInfos = snapshotInfos[:limit]
 	}
 
-	// Load full snapshots to get current branch for each command
 	recentCommands := make([]CommandSnapshot, 0, len(snapshotInfos))
 	for _, snapshotInfo := range snapshotInfos {
-		// Load full snapshot to get current branch
 		fullSnapshot, err := eng.LoadSnapshot(snapshotInfo.ID)
 		currentBranch := ""
 		if err == nil && fullSnapshot != nil {
@@ -104,25 +99,21 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		})
 	}
 
-	// Collect stack state
 	trunk := eng.Trunk()
 	currentBranch := eng.CurrentBranch()
 	allBranches := eng.AllBranches()
 
-	// Get all metadata refs
 	metadataRefs, err := eng.ListMetadataRefs()
 	if err != nil {
 		metadataRefs = make(map[string]string)
 	}
 
-	// Collect all metadata in bulk
 	branchNames := make([]string, len(allBranches))
 	for i, b := range allBranches {
 		branchNames[i] = b.GetName()
 	}
 	allMeta, _ := eng.BatchReadMetadataRefs(branchNames)
 
-	// Build branch info for each branch
 	branchInfos := make([]BranchInfo, 0, len(allBranches))
 	for _, branch := range allBranches {
 		branchName := branch.GetName()
@@ -132,20 +123,17 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			IsTracked: branch.IsTracked(),
 		}
 
-		// Get SHA
 		branchObj := eng.GetBranch(branchName)
 		sha, err := branchObj.GetRevision()
 		if err == nil {
 			branchInfo.SHA = sha
 		}
 
-		// Get parent
 		parent := eng.GetParent(branchObj)
 		if parent != nil {
 			branchInfo.Parent = parent.GetName()
 		}
 
-		// Get children
 		children := branchObj.GetChildren()
 		if len(children) > 0 {
 			childNames := make([]string, len(children))
@@ -155,38 +143,32 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 			branchInfo.Children = childNames
 		}
 
-		// Get metadata
 		if meta, ok := allMeta[branchName]; ok && meta != nil {
 			if meta.ParentBranchRevision != nil {
 				branchInfo.ParentRevision = *meta.ParentBranchRevision
 			}
 
-			// Get PR info
 			branch := eng.GetBranch(branchName)
 			prInfo, err := eng.GetPrInfo(branch)
 			if err == nil && prInfo != nil {
-				// engine.PrInfo now has MarshalJSON, so we can use it directly
 				branchInfo.PRInfo = prInfo
 			}
 		}
 
-		// Get metadata ref SHA
 		if metadataSHA, ok := metadataRefs[branchName]; ok {
 			branchInfo.MetadataRefSHA = metadataSHA
 		}
 
-		// Check if branch is up to date with its parent
 		if !branchInfo.IsTrunk {
 			branch := eng.GetBranch(branchName)
 			branchInfo.IsFixed = branch.IsBranchUpToDate()
 		} else {
-			branchInfo.IsFixed = true // Trunk is always up to date
+			branchInfo.IsFixed = true
 		}
 
 		branchInfos = append(branchInfos, branchInfo)
 	}
 
-	// Collect continuation state
 	var continuationState *ContinuationStateInfo
 	contState, err := config.GetContinuationState(repoRoot)
 	if err == nil && contState != nil {
@@ -198,7 +180,6 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		}
 	}
 
-	// Collect repository info
 	repoInfo := RepositoryInfo{
 		RepoRoot: repoRoot,
 	}
@@ -207,7 +188,6 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		repoInfo.RemoteURL = remoteURL
 	}
 
-	// Build debug info
 	debugInfo := DebugInfo{
 		Timestamp:      time.Now(),
 		RecentCommands: recentCommands,
@@ -225,7 +205,6 @@ func DebugAction(ctx *runtime.Context, opts DebugOptions) error {
 		RepositoryInfo:    repoInfo,
 	}
 
-	// Output as pretty-printed JSON
 	jsonData, err := json.MarshalIndent(debugInfo, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal debug info: %w", err)

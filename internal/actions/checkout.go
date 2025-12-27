@@ -25,22 +25,18 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 	splog := ctx.Splog
 	context := ctx.Context
 
-	// Populate remote SHAs if needed
 	if err := eng.PopulateRemoteShas(); err != nil {
 		return fmt.Errorf("failed to populate remote SHAs: %w", err)
 	}
 
 	var branchName string
 
-	// Handle --trunk flag
 	switch {
 	case opts.CheckoutTrunk:
 		branchName = eng.Trunk().GetName()
 	case opts.BranchName != "":
-		// Direct checkout
 		branchName = opts.BranchName
 	default:
-		// Interactive selection
 		if !utils.IsInteractive() {
 			return fmt.Errorf("interactive branch selection is not available in non-interactive mode; please specify a branch name")
 		}
@@ -54,14 +50,12 @@ func CheckoutAction(ctx *runtime.Context, opts CheckoutOptions) error {
 		}
 	}
 
-	// Check if already on the branch
 	currentBranch := eng.CurrentBranch()
 	if currentBranch != nil && branchName == currentBranch.GetName() {
 		splog.Info("Already on %s.", style.ColorBranchName(branchName, true))
 		return nil
 	}
 
-	// Checkout the branch
 	branch := eng.GetBranch(branchName)
 	if err := eng.CheckoutBranch(context, branch); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
@@ -93,7 +87,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 	var branches []engine.Branch
 
 	if opts.StackOnly {
-		// Only show current stack (ancestors + descendants)
 		if currentBranch == nil {
 			return nil, fmt.Errorf("not on a branch; cannot use --stack flag")
 		}
@@ -105,7 +98,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 		}
 		stack := currentBranch.GetRelativeStack(rng)
 
-		// Build branch list from stack
 		for _, branch := range stack {
 			if seenBranches[branch.GetName()] {
 				continue
@@ -124,7 +116,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 		}
 	}
 
-	// Add untracked branches if requested
 	if opts.ShowUntracked {
 		untracked := getUntrackedBranchesForCheckout(eng)
 		for _, branch := range untracked {
@@ -135,17 +126,15 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 		}
 	}
 
-	// Fallback: if we still have no choices, get all branches directly from engine
+	// Fallback: get all branches if none found yet
 	if len(branches) == 0 {
 		allBranches := eng.AllBranches()
 
-		// Ensure trunk is always included
 		if trunk.GetName() != "" && !seenBranches[trunk.GetName()] {
 			branches = append(branches, trunk)
 			seenBranches[trunk.GetName()] = true
 		}
 
-		// Add all other branches
 		for _, branch := range allBranches {
 			if !seenBranches[branch.GetName()] {
 				branches = append(branches, branch)
@@ -161,7 +150,6 @@ func buildBranchChoices(ctx *runtime.Context, opts CheckoutOptions) ([]engine.Br
 	return branches, nil
 }
 
-// printBranchInfo prints information about the checked out branch
 func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	if branch.IsTrunk() {
 		return
@@ -188,7 +176,7 @@ func printBranchInfo(ctx *runtime.Context, branch engine.Branch) {
 	}
 	downstack := branch.GetRelativeStack(rng)
 
-	// Reverse to check from trunk upward
+	// Check from trunk upward
 	for i := len(downstack) - 1; i >= 0; i-- {
 		ancestor := downstack[i]
 		if !ancestor.IsBranchUpToDate() {

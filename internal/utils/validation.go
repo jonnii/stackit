@@ -11,12 +11,10 @@ import (
 
 // IsInteractive checks if we're in an interactive terminal
 func IsInteractive() bool {
-	// Allow forcing non-interactive mode via environment variable
 	if os.Getenv("STACKIT_NON_INTERACTIVE") != "" || os.Getenv("STACKIT_TEST_NO_INTERACTIVE") != "" {
 		return false
 	}
 
-	// Check if stdin is a terminal
 	fileInfo, err := os.Stdin.Stat()
 	if err != nil {
 		return false
@@ -43,7 +41,6 @@ func CheckRebaseInProgress(ctx context.Context) error {
 
 // HasUncommittedChanges checks if there are uncommitted changes in the repository
 func HasUncommittedChanges(ctx context.Context) bool {
-	// Check git status
 	output, err := git.RunGitCommandWithContext(ctx, "status", "--porcelain")
 	if err != nil {
 		return false

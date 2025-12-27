@@ -22,10 +22,9 @@ https://github.com/jonnii/stackit
 
 Version: ` + version + `
 Commit:  ` + commit + `
-Date:    ` + date,
+		Date:    ` + date,
 	}
 
-	// Add subcommands
 	rootCmd.AddCommand(newAbortCmd())
 	rootCmd.AddCommand(branch.NewAbsorbCmd())
 	rootCmd.AddCommand(newAgentCmd())
@@ -64,7 +63,6 @@ Date:    ` + date,
 	rootCmd.AddCommand(navigation.NewUpCmd())
 	rootCmd.AddCommand(newConfigCmd())
 
-	// Add aliases
 	rootCmd.AddCommand(stack.NewSsCmd())
 
 	return rootCmd

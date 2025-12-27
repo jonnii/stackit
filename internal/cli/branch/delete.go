@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/delete"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -30,7 +30,7 @@ If you delete a branch with an open pull request, you will need to manually
 close the pull request.`,
 		SilenceUsage:      true,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: helpers.CompleteBranches,
+		ValidArgsFunction: common.CompleteBranches,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, err := runtime.GetContext(cmd.Context())
 			if err != nil {

@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/runtime"
 )
 
@@ -25,10 +25,10 @@ func NewCheckoutCmd() *cobra.Command {
 
 The interactive selector allows you to navigate branches using arrow keys and filter
 by typing. Use flags to customize which branches are shown.`,
-		ValidArgsFunction: helpers.CompleteBranches,
+		ValidArgsFunction: common.CompleteBranches,
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Get branch name from args
 				branchName := ""
 				if len(args) > 0 {

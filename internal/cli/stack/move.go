@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"stackit.dev/stackit/internal/actions/move"
-	"stackit.dev/stackit/internal/cli/helpers"
+	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -30,7 +30,7 @@ func NewMoveCmd() *cobra.Command {
 If no branch is passed in, opens an interactive selector to choose the target branch.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return helpers.Run(cmd, func(ctx *runtime.Context) error {
+			return common.Run(cmd, func(ctx *runtime.Context) error {
 				// Default source to current branch
 				sourceBranch := source
 				if sourceBranch == "" {
@@ -65,8 +65,8 @@ If no branch is passed in, opens an interactive selector to choose the target br
 	cmd.Flags().StringVarP(&onto, "onto", "o", "", "Branch to move the current branch onto.")
 	cmd.Flags().StringVar(&source, "source", "", "Branch to move (defaults to current branch).")
 
-	_ = cmd.RegisterFlagCompletionFunc("onto", helpers.CompleteBranches)
-	_ = cmd.RegisterFlagCompletionFunc("source", helpers.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("onto", common.CompleteBranches)
+	_ = cmd.RegisterFlagCompletionFunc("source", common.CompleteBranches)
 
 	return cmd
 }

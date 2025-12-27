@@ -20,7 +20,7 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 	repoOwner, repoName, _ := utils.GetRepoInfo(ctx)
 	if repoOwner != "" && repoName != "" {
 		if err := github.SyncPrInfo(ctx, branches, repoOwner, repoName, func(name string, prInfo *git.PrInfo) {
-			_ = eng.UpdatePrInfo(ctx, name, prInfo)
+			_ = eng.UpdatePrInfo(name, prInfo)
 		}); err != nil {
 			// Non-fatal, continue
 			runtimeCtx.Splog.Debug("Failed to sync PR info: %v", err)

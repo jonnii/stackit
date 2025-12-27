@@ -252,7 +252,7 @@ func (e *engineImpl) restackBranch(
 	}
 
 	// Update metadata
-	if err := e.UpdateParentRevision(ctx, branchName, parentRev); err != nil {
+	if err := e.UpdateParentRevision(branchName, parentRev); err != nil {
 		return RestackBranchResult{
 			Result:            RestackConflict,
 			RebasedBranchBase: parentRev,
@@ -421,7 +421,7 @@ func (e *engineImpl) ContinueRebase(ctx context.Context, branchName string, reba
 
 	// Update metadata
 	if rebasedBranchBase != "" {
-		if err := e.UpdateParentRevision(ctx, branchName, rebasedBranchBase); err != nil {
+		if err := e.UpdateParentRevision(branchName, rebasedBranchBase); err != nil {
 			return ContinueRebaseResult{BranchName: branchName}, fmt.Errorf("failed to update metadata: %w", err)
 		}
 	}

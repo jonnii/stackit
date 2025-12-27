@@ -425,12 +425,12 @@ func (e *Engine) SetParent(_ context.Context, branchName string, parentBranchNam
 }
 
 // UpdateParentRevision updates the parent revision in the demo engine
-func (e *Engine) UpdateParentRevision(_ context.Context, _ string, _ string) error {
+func (e *Engine) UpdateParentRevision(_ string, _ string) error {
 	return nil
 }
 
 // UpdatePrInfo updates PR information in the demo engine
-func (e *Engine) UpdatePrInfo(_ context.Context, branchName string, prInfo *git.PrInfo) error {
+func (e *Engine) UpdatePrInfo(branchName string, prInfo *git.PrInfo) error {
 	if prInfo == nil {
 		delete(e.prInfoMap, branchName)
 		return nil

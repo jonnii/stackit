@@ -207,7 +207,7 @@ func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBra
 }
 
 // UpdateParentRevision updates the parent revision in metadata
-func (e *engineImpl) UpdateParentRevision(_ context.Context, branchName string, parentRev string) error {
+func (e *engineImpl) UpdateParentRevision(branchName string, parentRev string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -225,7 +225,7 @@ func (e *engineImpl) UpdateParentRevision(_ context.Context, branchName string, 
 }
 
 // UpdatePrInfo updates PR information in metadata
-func (e *engineImpl) UpdatePrInfo(_ context.Context, branchName string, prInfo *git.PrInfo) error {
+func (e *engineImpl) UpdatePrInfo(branchName string, prInfo *git.PrInfo) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

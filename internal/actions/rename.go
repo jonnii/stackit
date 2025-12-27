@@ -79,7 +79,7 @@ func RenameAction(ctx *runtime.Context, opts RenameOptions) error {
 		}
 		splog.Info("Removing association with PR #%d as GitHub PR branch names are immutable.", *meta.PrInfo.Number)
 		// Clear PrInfo via engine
-		if err := eng.UpdatePrInfo(ctx.Context, currentBranch, nil); err != nil {
+		if err := eng.UpdatePrInfo(currentBranch, nil); err != nil {
 			return fmt.Errorf("failed to update metadata: %w", err)
 		}
 	}

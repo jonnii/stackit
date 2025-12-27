@@ -59,8 +59,8 @@ type BranchWriter interface {
 	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
 	UntrackBranch(branchName string) error
 	SetParent(ctx context.Context, branchName string, parentBranchName string) error
-	UpdateParentRevision(ctx context.Context, branchName string, parentRev string) error
-	UpdatePrInfo(ctx context.Context, branchName string, prInfo *git.PrInfo) error
+	UpdateParentRevision(branchName string, parentRev string) error
+	UpdatePrInfo(branchName string, prInfo *git.PrInfo) error
 	SetScope(branch Branch, scope Scope) error
 	RenameBranch(ctx context.Context, oldBranch, newBranch Branch) error
 	DeleteBranch(ctx context.Context, branchName string) error

@@ -15,8 +15,8 @@ func handleInsert(ctx context.Context, newBranch, currentBranch string, runtimeC
 	children := currentBranchObj.GetChildren()
 	siblings := []string{}
 	for _, child := range children {
-		if child.Name != newBranch {
-			siblings = append(siblings, child.Name)
+		if child.GetName() != newBranch {
+			siblings = append(siblings, child.GetName())
 		}
 	}
 

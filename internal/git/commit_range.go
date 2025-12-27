@@ -18,21 +18,25 @@ func GetCommitRange(base string, head string, format string) ([]string, error) {
 		return nil, err
 	}
 
-	headHash, err := resolveRefHash(repo, head)
+	// Synchronize go-git operations to prevent concurrent packfile access
+	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
+	headHash, err := resolveRefHashInternal(repo, head)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve head: %w", err)
 	}
 
 	var baseHash plumbing.Hash
 	if base != "" {
-		baseHash, err = resolveRefHash(repo, base)
+		baseHash, err = resolveRefHashInternal(repo, base)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve base: %w", err)
 		}
 	}
 
 	var commits []*object.Commit
-	commits, err = iterateCommits(repo, headHash, baseHash)
+	commits, err = iterateCommitsNoLock(repo, headHash, baseHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to iterate commits: %w", err)
 	}
@@ -65,8 +69,18 @@ func GetCommitRange(base string, head string, format string) ([]string, error) {
 	return result, nil
 }
 
+// GetCommitRangeSHAs returns commit SHAs in a range (base..head]
+func GetCommitRangeSHAs(base, head string) ([]string, error) {
+	return GetCommitRange(base, head, "SHA")
+}
+
+// GetCommitHistorySHAs returns all commit SHAs reachable from head
+func GetCommitHistorySHAs(head string) ([]string, error) {
+	return GetCommitRangeSHAs("", head)
+}
+
 // GetCommitSHA returns the SHA at a relative position (0 = HEAD, 1 = HEAD~1)
-// This is relative to the current branch or the specified branch
+// This is relative to the specified branch
 func GetCommitSHA(branchName string, offset int) (string, error) {
 	if offset < 0 {
 		return "", fmt.Errorf("offset must be non-negative")
@@ -79,19 +93,18 @@ func GetCommitSHA(branchName string, offset int) (string, error) {
 
 	// Synchronize go-git operations to prevent concurrent packfile access
 	goGitMu.Lock()
+	defer goGitMu.Unlock()
+
 	// Resolve branch reference
-	branchRef, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+	hash, err := resolveRefHashInternal(repo, branchName)
 	if err != nil {
-		goGitMu.Unlock()
 		return "", fmt.Errorf("failed to get branch reference: %w", err)
 	}
 
-	commit, err := repo.CommitObject(branchRef.Hash())
+	commit, err := repo.CommitObject(hash)
 	if err != nil {
-		goGitMu.Unlock()
 		return "", fmt.Errorf("failed to get commit: %w", err)
 	}
-	defer goGitMu.Unlock()
 
 	// Walk back offset number of commits
 	for i := 0; i < offset; i++ {

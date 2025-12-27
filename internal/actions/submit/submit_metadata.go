@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
@@ -16,17 +15,20 @@ import (
 var scopeRegex = regexp.MustCompile(`^\[[^\]]+\]\s*`)
 
 // GetPRTitle gets the PR title, prompting if needed
-func GetPRTitle(branchName string, editInline bool, existingTitle string, scope string) (string, error) {
+func GetPRTitle(branchName string, editInline bool, existingTitle string, scope string, eng engine.BranchReader) (string, error) {
 	// First check if we have a saved title
 	title := existingTitle
 	if title == "" {
 		// Otherwise, use the subject of the oldest commit on the branch
-		subject, err := git.GetCommitSubject(branchName)
-		if err != nil {
+		branch := eng.GetBranch(branchName)
+		commits, err := branch.GetAllCommits(engine.CommitFormatSubject)
+		if err != nil || len(commits) == 0 {
 			// Non-fatal, use branch name as fallback
 			title = branchName
 		} else {
-			title = subject
+			// GetAllCommits returns newest to oldest.
+			// So oldest is last.
+			title = commits[len(commits)-1]
 		}
 	}
 
@@ -57,11 +59,12 @@ func GetPRTitle(branchName string, editInline bool, existingTitle string, scope 
 }
 
 // GetPRBody gets the PR body, prompting if needed
-func GetPRBody(branchName string, editInline bool, existingBody string) (string, error) {
+func GetPRBody(branchName string, editInline bool, existingBody string, eng engine.BranchReader) (string, error) {
 	body := existingBody
 	if body == "" {
 		// Infer from commit messages
-		messages, err := git.GetCommitMessages(branchName)
+		branch := eng.GetBranch(branchName)
+		messages, err := branch.GetAllCommits(engine.CommitFormatMessage)
 		if err == nil && len(messages) > 0 {
 			if len(messages) == 1 {
 				// Single commit - use body (skip first line which is subject)
@@ -72,12 +75,13 @@ func GetPRBody(branchName string, editInline bool, existingBody string) (string,
 			} else {
 				// Multiple commits - format as a bulleted list of subjects in chronological order
 				var sb strings.Builder
+				// GetAllCommits returns newest to oldest.
 				for i := len(messages) - 1; i >= 0; i-- {
 					msg := messages[i]
 					// Get just the subject (first line)
 					subject := strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
 					if subject != "" {
-						sb.WriteString(subject + "\n")
+						sb.WriteString("- " + subject + "\n")
 					}
 				}
 				body = strings.TrimSpace(sb.String())
@@ -124,7 +128,8 @@ func GetReviewersWithPrompt(reviewersFlag string, _ *runtime.Context) ([]string,
 
 // PreparePRMetadata prepares PR metadata for a branch
 func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engine, ctx *runtime.Context) (*PRMetadata, error) {
-	prInfo, _ := eng.GetPrInfo(branchName)
+	branch := eng.GetBranch(branchName)
+	prInfo, _ := eng.GetPrInfo(branch)
 
 	metadata := &PRMetadata{
 		Title:   getStringValue(prInfo, "Title"),
@@ -138,16 +143,16 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 
 	scope := eng.GetScopeInternal(branchName)
 
-	if shouldEditTitle || (prInfo == nil || prInfo.Title == "") {
-		title, err := GetPRTitle(branchName, shouldEditTitle, metadata.Title, scope.String())
+	if shouldEditTitle || (prInfo == nil || prInfo.Title() == "") {
+		title, err := GetPRTitle(branchName, shouldEditTitle, metadata.Title, scope.String(), eng)
 		if err != nil {
 			return nil, err
 		}
 		metadata.Title = title
 	}
 
-	if shouldEditBody || (prInfo == nil || prInfo.Body == "") {
-		finalBody, err := GetPRBody(branchName, shouldEditBody, metadata.Body)
+	if shouldEditBody || (prInfo == nil || prInfo.Body() == "") {
+		finalBody, err := GetPRBody(branchName, shouldEditBody, metadata.Body, eng)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +169,7 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 		// New PR - default to published (not draft)
 		metadata.IsDraft = false
 	default:
-		metadata.IsDraft = prInfo.IsDraft
+		metadata.IsDraft = prInfo.IsDraft()
 	}
 
 	// Get reviewers
@@ -185,11 +190,15 @@ func PreparePRMetadata(branchName string, opts MetadataOptions, eng engine.Engin
 	}
 
 	// Save metadata to engine (in case command fails)
-	if err := eng.UpsertPrInfo(branchName, &engine.PrInfo{
-		Title:   metadata.Title,
-		Body:    metadata.Body,
-		IsDraft: metadata.IsDraft,
-	}); err != nil {
+	if err := eng.UpsertPrInfo(branch, engine.NewPrInfo(
+		nil,
+		metadata.Title,
+		metadata.Body,
+		"",
+		"",
+		"",
+		metadata.IsDraft,
+	)); err != nil {
 		ctx.Splog.Debug("Failed to save PR metadata: %v", err)
 	}
 
@@ -226,13 +235,13 @@ func getStringValue(prInfo *engine.PrInfo, field string) string {
 	}
 	switch field {
 	case "Title":
-		return prInfo.Title
+		return prInfo.Title()
 	case "Body":
-		return prInfo.Body
+		return prInfo.Body()
 	case "Base":
-		return prInfo.Base
+		return prInfo.Base()
 	case "State":
-		return prInfo.State
+		return prInfo.State()
 	default:
 		return ""
 	}

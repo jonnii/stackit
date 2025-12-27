@@ -12,9 +12,9 @@ import (
 // PRManager provides operations for managing pull request information
 // Thread-safe: All methods are safe for concurrent use
 type PRManager interface {
-	GetPrInfo(branchName string) (*PrInfo, error)
-	UpsertPrInfo(branchName string, prInfo *PrInfo) error
-	GetPRSubmissionStatus(branchName string) (PRSubmissionStatus, error)
+	GetPrInfo(branch Branch) (*PrInfo, error)
+	UpsertPrInfo(branch Branch, prInfo *PrInfo) error
+	GetPRSubmissionStatus(branch Branch) (PRSubmissionStatus, error)
 }
 
 // SyncManager provides operations for syncing and restacking branches
@@ -30,6 +30,7 @@ type SyncManager interface {
 	ResetTrunkToRemote(ctx context.Context) error
 	RestackBranches(ctx context.Context, branches []Branch) (RestackBatchResult, error)
 	ContinueRebase(ctx context.Context, branchName string, rebasedBranchBase string) (ContinueRebaseResult, error)
+	Rebase(ctx context.Context, branchName, upstream, oldUpstream string) (RestackResult, error)
 }
 
 // SquashManager provides operations for squashing commits
@@ -51,7 +52,7 @@ type SplitManager interface {
 	DetachAndResetBranchChanges(ctx context.Context, branchName string) error
 
 	// ForceCheckoutBranch force checks out a branch
-	ForceCheckoutBranch(ctx context.Context, branchName string) error
+	ForceCheckoutBranch(ctx context.Context, branch Branch) error
 }
 
 // ApplySplitOptions contains options for applying a split
@@ -97,5 +98,6 @@ type Engine interface {
 	SyncManager
 	SquashManager
 	SplitManager
+	AbsorbManager
 	UndoManager
 }

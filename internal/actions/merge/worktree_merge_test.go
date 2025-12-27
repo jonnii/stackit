@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions/merge"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -34,12 +33,10 @@ func TestExecuteInWorktree(t *testing.T) {
 
 		// Add PR info to engine
 		prA := 101
-		err := s.Engine.UpsertPrInfo("branch-a", &engine.PrInfo{
-			Number: &prA,
-			State:  "OPEN",
-			Base:   "main",
-			URL:    "https://github.com/owner/repo/pull/101",
-		})
+		branchA := s.Engine.GetBranch("branch-a")
+		err := s.Engine.UpsertPrInfo(branchA, testhelpers.NewTestPrInfo(prA).
+			WithBase("main").
+			WithURL("https://github.com/owner/repo/pull/101"))
 		require.NoError(t, err)
 
 		// Create a remote
@@ -78,6 +75,6 @@ func TestExecuteInWorktree(t *testing.T) {
 		// Verify we have switched to main since branch-a was merged and deleted
 		currentBranch := s.Engine.CurrentBranch()
 		require.NotNil(t, currentBranch)
-		require.Equal(t, "main", currentBranch.Name)
+		require.Equal(t, "main", currentBranch.GetName())
 	})
 }

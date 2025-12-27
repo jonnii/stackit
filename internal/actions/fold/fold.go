@@ -62,9 +62,9 @@ func Action(ctx *runtime.Context, opts Options) error {
 	parent := eng.GetParent(currentBranchObj)
 	parentName := ""
 	if parent == nil {
-		parentName = eng.Trunk().Name
+		parentName = eng.Trunk().GetName()
 	} else {
-		parentName = parent.Name
+		parentName = parent.GetName()
 	}
 
 	parentBranch := eng.GetBranch(parentName)
@@ -83,7 +83,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if parentBranch.IsTrunk() {
 			return fmt.Errorf("cannot fold into trunk with --keep because it would delete the trunk branch")
 		}
-		return foldWithKeep(gctx, ctx, currentBranch, parentName, eng, splog, opts)
+		return foldWithKeep(gctx, ctx, currentBranchObj, parentBranch, eng, splog, opts)
 	}
 
 	// Check if folding into trunk
@@ -91,5 +91,5 @@ func Action(ctx *runtime.Context, opts Options) error {
 		return fmt.Errorf("cannot fold into trunk branch %s without --allow-trunk. Folding into trunk will modify your local main branch directly", parentName)
 	}
 
-	return foldNormal(gctx, ctx, currentBranch, parentName, eng, splog, opts)
+	return foldNormal(gctx, ctx, currentBranchObj, parentBranch, eng, splog, opts)
 }

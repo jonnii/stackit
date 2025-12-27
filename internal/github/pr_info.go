@@ -16,7 +16,7 @@ import (
 )
 
 // SyncPrInfo syncs PR information for branches from GitHub
-func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName string, onUpdate func(string, *git.PrInfo)) error {
+func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName string, onUpdate func(string, *PullRequestInfo)) error {
 	// Get GitHub token
 	token, err := getGitHubToken()
 	if err != nil {
@@ -53,40 +53,15 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		wg.Add(1)
 		go func(name string) {
 			defer wg.Done()
-			prInfo, err := getPRInfoForBranch(ctx, client, repoOwner, repoName, name)
+			pr, err := getPRInfoForBranch(ctx, client, repoOwner, repoName, name)
 			if err != nil {
 				return
 			}
 
-			if prInfo != nil {
-				gitPrInfo := &git.PrInfo{}
-
-				// Update PR info
-				if prInfo.Number != nil {
-					gitPrInfo.Number = prInfo.Number
-				}
-				if prInfo.Base != nil && prInfo.Base.Ref != nil {
-					gitPrInfo.Base = prInfo.Base.Ref
-				}
-				if prInfo.HTMLURL != nil {
-					gitPrInfo.URL = prInfo.HTMLURL
-				}
-				if prInfo.Title != nil {
-					gitPrInfo.Title = prInfo.Title
-				}
-				if prInfo.Body != nil {
-					gitPrInfo.Body = prInfo.Body
-				}
-				if prInfo.Draft != nil {
-					gitPrInfo.IsDraft = prInfo.Draft
-				}
-				if prInfo.State != nil {
-					state := strings.ToUpper(*prInfo.State)
-					gitPrInfo.State = &state
-				}
-
+			if pr != nil {
+				info := ToPullRequestInfo(pr)
 				if onUpdate != nil {
-					onUpdate(name, gitPrInfo)
+					onUpdate(name, info)
 				}
 			}
 		}(branchName)

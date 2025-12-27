@@ -70,7 +70,7 @@ func (c *RealGitHubClient) CreatePullRequest(ctx context.Context, owner, repo st
 		})
 	}
 
-	return toPullRequestInfo(createdPR), nil
+	return ToPullRequestInfo(createdPR), nil
 }
 
 // UpdatePullRequest updates an existing pull request
@@ -167,7 +167,7 @@ func (c *RealGitHubClient) GetPullRequestByBranch(ctx context.Context, owner, re
 		return nil, nil
 	}
 
-	return toPullRequestInfo(prs[0]), nil
+	return ToPullRequestInfo(prs[0]), nil
 }
 
 // MergePullRequest merges a pull request
@@ -178,43 +178,4 @@ func (c *RealGitHubClient) MergePullRequest(ctx context.Context, branchName stri
 // GetPRChecksStatus returns the check status for a PR
 func (c *RealGitHubClient) GetPRChecksStatus(ctx context.Context, branchName string) (*CheckStatus, error) {
 	return GetPRChecksStatus(ctx, c.client, c.owner, c.repo, branchName)
-}
-
-// toPullRequestInfo converts a github.PullRequest to PullRequestInfo
-func toPullRequestInfo(pr *github.PullRequest) *PullRequestInfo {
-	if pr == nil {
-		return nil
-	}
-
-	info := &PullRequestInfo{}
-
-	if pr.Number != nil {
-		info.Number = *pr.Number
-	}
-	if pr.NodeID != nil {
-		info.NodeID = *pr.NodeID
-	}
-	if pr.HTMLURL != nil {
-		info.HTMLURL = *pr.HTMLURL
-	}
-	if pr.Title != nil {
-		info.Title = *pr.Title
-	}
-	if pr.Body != nil {
-		info.Body = *pr.Body
-	}
-	if pr.State != nil {
-		info.State = *pr.State
-	}
-	if pr.Draft != nil {
-		info.Draft = *pr.Draft
-	}
-	if pr.Base != nil && pr.Base.Ref != nil {
-		info.Base = *pr.Base.Ref
-	}
-	if pr.Head != nil && pr.Head.Ref != nil {
-		info.Head = *pr.Head.Ref
-	}
-
-	return info
 }

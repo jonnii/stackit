@@ -38,7 +38,7 @@ func InferTrunk(ctx context.Context, branchNames []string) string {
 	}
 
 	// Second, check for commonly named trunks
-	if common := git.FindCommonlyNamedTrunk(branchNames); common != "" {
+	if common := engine.FindCommonlyNamedTrunk(branchNames); common != "" {
 		return common
 	}
 

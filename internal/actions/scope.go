@@ -26,7 +26,7 @@ func ScopeAction(ctx *runtime.Context, opts ScopeOptions) error {
 
 	// Get current branch
 	currentBranch, _ := git.GetCurrentBranch()
-	isOnTrunk := currentBranch == eng.Trunk().Name || currentBranch == ""
+	isOnTrunk := currentBranch == eng.Trunk().GetName() || currentBranch == ""
 
 	// Handle Show
 	if opts.Show {

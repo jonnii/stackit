@@ -28,7 +28,7 @@ func TestDelete(t *testing.T) {
 		branchparent2 := s.Engine.GetBranch("branch2")
 		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
-		require.Equal(t, "main", parent2.Name)
+		require.Equal(t, "main", parent2.GetName())
 	})
 
 	t.Run("deletes upstack", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestDelete(t *testing.T) {
 		s.Checkout("branch1")
 		currentBranch := s.Engine.CurrentBranch()
 		require.NotNil(t, currentBranch)
-		require.Equal(t, "branch1", currentBranch.Name)
+		require.Equal(t, "branch1", currentBranch.GetName())
 
 		err := Action(s.Context, Options{
 			BranchName: "branch1",
@@ -110,7 +110,7 @@ func TestDelete(t *testing.T) {
 
 		currentBranch = s.Engine.CurrentBranch()
 		require.NotNil(t, currentBranch)
-		require.Equal(t, "main", currentBranch.Name)
+		require.Equal(t, "main", currentBranch.GetName())
 	})
 
 	t.Run("deletes a branch in a branching stack", func(t *testing.T) {
@@ -136,10 +136,10 @@ func TestDelete(t *testing.T) {
 		branchparent1 := s.Engine.GetBranch("child1")
 		parent1 := s.Engine.GetParent(branchparent1)
 		require.NotNil(t, parent1)
-		require.Equal(t, "main", parent1.Name)
+		require.Equal(t, "main", parent1.GetName())
 		branchparent2 := s.Engine.GetBranch("child2")
 		parent2 := s.Engine.GetParent(branchparent2)
 		require.NotNil(t, parent2)
-		require.Equal(t, "main", parent2.Name)
+		require.Equal(t, "main", parent2.GetName())
 	})
 }

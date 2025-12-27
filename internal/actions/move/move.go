@@ -31,7 +31,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if currentBranch == nil {
 			return fmt.Errorf("not on a branch and no source branch specified")
 		}
-		source = currentBranch.Name
+		source = currentBranch.GetName()
 	}
 
 	// Take snapshot before modifying the repository
@@ -68,7 +68,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		allBranches := eng.AllBranches()
 		found := false
 		for _, branch := range allBranches {
-			if branch.Name == onto {
+			if branch.GetName() == onto {
 				found = true
 				break
 			}
@@ -91,7 +91,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		RecursiveParents:  false,
 	})
 	for _, d := range descendants {
-		if d.Name == onto {
+		if d.GetName() == onto {
 			return fmt.Errorf("cannot move %s onto its own descendant %s", source, onto)
 		}
 	}
@@ -120,13 +120,13 @@ func Action(ctx *runtime.Context, opts Options) error {
 	oldParent := eng.GetParent(sourceBranch)
 	oldParentName := ""
 	if oldParent == nil {
-		oldParentName = eng.Trunk().Name
+		oldParentName = eng.Trunk().GetName()
 	} else {
-		oldParentName = oldParent.Name
+		oldParentName = oldParent.GetName()
 	}
 
 	// Update parent in engine
-	if err := eng.SetParent(gctx, source, onto); err != nil {
+	if err := eng.SetParent(gctx, sourceBranch, ontoBranch); err != nil {
 		return fmt.Errorf("failed to set parent: %w", err)
 	}
 

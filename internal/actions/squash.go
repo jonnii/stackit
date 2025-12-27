@@ -44,7 +44,7 @@ func SquashAction(ctx *runtime.Context, opts SquashOptions) error {
 		return fmt.Errorf("failed to squash branch: %w", err)
 	}
 
-	splog.Info("Squashed commits in %s.", style.ColorBranchName(currentBranch.Name, true))
+	splog.Info("Squashed commits in %s.", style.ColorBranchName(currentBranch.GetName(), true))
 
 	// Get upstack branches (recursive children only, excluding current branch)
 	rng := engine.StackRange{

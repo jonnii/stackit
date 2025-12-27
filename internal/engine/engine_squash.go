@@ -24,7 +24,7 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 	}
 
 	// Read metadata to get parent branch revision
-	meta, err := e.git.ReadMetadataRef(branchName)
+	meta, err := e.readMetadataRef(branchName)
 	if err != nil {
 		return fmt.Errorf("failed to read metadata: %w", err)
 	}
@@ -48,14 +48,15 @@ func (e *engineImpl) SquashCurrentBranch(ctx context.Context, opts SquashOptions
 		return fmt.Errorf("failed to get commit range: %w", err)
 	}
 
+	fmt.Printf("DEBUG: Squash branch=%s parentRev=%s headRev=%s range=%v\n", branchName, parentBranchRevision, branchRevision, commitSHAs)
+
 	// Check if there are commits to squash
 	if len(commitSHAs) == 0 {
 		return fmt.Errorf("no commits to squash")
 	}
 
 	// Get the last (oldest) commit SHA from the range
-	// git log returns commits in reverse chronological order (newest first)
-	// So the last element is the oldest commit
+	// GetCommitRangeSHAs returns newest first (head...base)
 	oldestCommitSHA := commitSHAs[len(commitSHAs)-1]
 
 	// Soft reset to the oldest commit (keeps all changes staged)

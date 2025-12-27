@@ -42,9 +42,9 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		parent := eng.GetParent(*currentBranch)
 		parentName := ""
 		if parent == nil {
-			parentName = eng.Trunk().Name
+			parentName = eng.Trunk().GetName()
 		} else {
-			parentName = parent.Name
+			parentName = parent.GetName()
 		}
 		parentBranch := eng.GetBranch(parentName)
 		parentRev, err := parentBranch.GetRevision()
@@ -54,7 +54,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 		continuation = &config.ContinuationState{
 			RebasedBranchBase:     parentRev,
 			BranchesToRestack:     []string{},
-			CurrentBranchOverride: currentBranch.Name,
+			CurrentBranchOverride: currentBranch.GetName(),
 		}
 	}
 
@@ -84,7 +84,7 @@ func ContinueAction(ctx *runtime.Context, opts ContinueOptions) error {
 			if currentBranch == nil {
 				return fmt.Errorf("not on a branch")
 			}
-			branchName = currentBranch.Name
+			branchName = currentBranch.GetName()
 		}
 		if err := PrintConflictStatus(ctx.Context, branchName, splog); err != nil {
 			return fmt.Errorf("failed to print conflict status: %w", err)

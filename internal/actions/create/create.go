@@ -6,7 +6,6 @@ import (
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/utils"
@@ -55,7 +54,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Handle staging first if we might need the message to name the branch
-	hasStaged, err := git.HasStagedChanges(ctx.Context)
+	hasStaged, err := eng.HasStagedChanges(ctx.Context)
 	if err != nil {
 		return fmt.Errorf("failed to check staged changes: %w", err)
 	}
@@ -72,7 +71,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		}
 		hasStaged = true
 	} else if !hasStaged && utils.IsInteractive() {
-		hasUnstaged, err := git.HasUnstagedChanges(ctx.Context)
+		hasUnstaged, err := eng.HasUnstagedChanges(ctx.Context)
 		if err != nil {
 			return fmt.Errorf("failed to check unstaged changes: %w", err)
 		}
@@ -80,7 +79,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 		if hasUnstaged {
 			confirmed, err := tui.PromptConfirm("You have unstaged changes. Would you like to stage them?", false)
 			if err == nil && confirmed {
-				if err := git.StageAll(ctx.Context); err != nil {
+				if err := eng.StageAll(ctx.Context); err != nil {
 					return fmt.Errorf("failed to stage changes: %w", err)
 				}
 				hasStaged = true
@@ -90,13 +89,6 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Get commit message
 	commitMessage := opts.Message
-	if commitMessage == "" && !utils.IsInteractive() {
-		stdinMsg, err := utils.ReadFromStdin()
-		if err == nil && stdinMsg != "" {
-			commitMessage = stdinMsg
-		}
-	}
-
 	// Get commit message for branch name generation (if needed)
 	commitMessage, err = getCommitMessageForBranch(ctx, &opts, commitMessage)
 	if err != nil {
@@ -116,7 +108,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	branchName := branch.Name
+	branchName := branch.GetName()
 
 	// Check if branch already exists
 	allBranches := eng.AllBranches()
@@ -127,15 +119,15 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Create and checkout new branch
-	if err := git.CreateAndCheckoutBranch(ctx.Context, branch.Name); err != nil {
+	if err := eng.CreateAndCheckoutBranch(ctx.Context, branch); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
 	// Commit if there are staged changes
 	if hasStaged {
-		if err := git.Commit(commitMessage, opts.Verbose); err != nil {
+		if err := eng.Commit(ctx.Context, commitMessage, opts.Verbose); err != nil {
 			// Clean up branch on commit failure
-			_ = git.DeleteBranch(ctx.Context, branch.Name)
+			_ = eng.DeleteBranch(ctx.Context, branch)
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	} else {
@@ -169,8 +161,8 @@ func Action(ctx *runtime.Context, opts Options) error {
 		children := currentBranchObj.GetChildren()
 		siblings := []string{}
 		for _, child := range children {
-			if child.Name != branchName {
-				siblings = append(siblings, child.Name)
+			if child.GetName() != branchName {
+				siblings = append(siblings, child.GetName())
 			}
 		}
 		if len(siblings) > 0 {

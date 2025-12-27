@@ -51,6 +51,32 @@ type BranchReader interface {
 	// Status queries
 	GetDeletionStatus(ctx context.Context, branchName string) (DeletionStatus, error)
 	FindMostRecentTrackedAncestors(ctx context.Context, branchName string) ([]string, error)
+	ListMetadataRefs() (map[string]string, error)
+	BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, map[string]error)
+	ReadMetadataRef(branchName string) (*Meta, error)
+	GetRemote() string
+	GetBranchRemoteDifference(branchName string) (string, error)
+
+	// Low-level Git state queries
+	HasStagedChanges(ctx context.Context) (bool, error)
+	HasUnstagedChanges(ctx context.Context) (bool, error)
+	GetMergeBase(rev1, rev2 string) (string, error)
+	GetChangedFiles(ctx context.Context, base, head string) ([]string, error)
+	ParseStagedHunks(ctx context.Context) ([]git.Hunk, error)
+	ShowDiff(ctx context.Context, left, right string, stat bool) (string, error)
+	ShowCommits(ctx context.Context, base, head string, patch, stat bool) (string, error)
+	GetUnmergedFiles(ctx context.Context) ([]string, error)
+	GetParentCommitSHA(commitSHA string) (string, error)
+	GetCommitSHA(branchName string, offset int) (string, error)
+	IsAncestor(ancestor, descendant string) (bool, error)
+
+	// Worktree operations
+	ListWorktrees(ctx context.Context) ([]string, error)
+	GetWorkingDir() string
+
+	// Git read operations
+	RunGitCommandWithContext(ctx context.Context, args ...string) (string, error)
+	RunGitCommandRawWithContext(ctx context.Context, args ...string) (string, error)
 }
 
 // BranchWriter provides write operations for branch management
@@ -58,15 +84,42 @@ type BranchWriter interface {
 	// Branch tracking
 	TrackBranch(ctx context.Context, branchName string, parentBranchName string) error
 	UntrackBranch(branchName string) error
-	SetParent(ctx context.Context, branchName string, parentBranchName string) error
+	SetParent(ctx context.Context, branch Branch, parentBranch Branch) error
 	UpdateParentRevision(branchName string, parentRev string) error
-	UpdatePrInfo(branchName string, prInfo *git.PrInfo) error
 	SetScope(branch Branch, scope Scope) error
 	RenameBranch(ctx context.Context, oldBranch, newBranch Branch) error
-	DeleteBranch(ctx context.Context, branchName string) error
-	DeleteBranches(ctx context.Context, branchNames []string) ([]string, error)
+	DeleteBranch(ctx context.Context, branch Branch) error
+	DeleteBranches(ctx context.Context, branches []Branch) ([]string, error)
+	DeleteMetadataRef(branch Branch) error
+	RenameMetadataRef(oldBranch, newBranch Branch) error
+	WriteMetadataRef(branch Branch, meta *Meta) error
+
+	// Checkout operations
+	CheckoutBranch(ctx context.Context, branch Branch) error
+	CreateAndCheckoutBranch(ctx context.Context, branch Branch) error
+
+	// Git write operations
+	Commit(ctx context.Context, message string, verbose int) error
+	StageAll(ctx context.Context) error
+	StashPush(ctx context.Context, message string) (string, error)
+	StashPop(ctx context.Context) error
+
+	// Worktree operations
+	AddWorktree(ctx context.Context, path string, branch string, detach bool) error
+	RemoveWorktree(ctx context.Context, path string) error
+	SetWorkingDir(dir string)
+
+	// Git low-level write operations
+	RunGitCommand(args ...string) (string, error)
+	RunGitCommandWithEnv(ctx context.Context, env []string, args ...string) (string, error)
 
 	// Initialization operations
 	Reset(newTrunkName string) error
 	Rebuild(newTrunkName string) error
+}
+
+// AbsorbManager defines the interface for the absorb operation.
+type AbsorbManager interface {
+	ApplyHunksToBranch(ctx context.Context, branch Branch, hunksByCommit map[string][]git.Hunk) error
+	FindTargetCommitForHunk(hunk git.Hunk, commitSHAs []string) (string, int, error)
 }

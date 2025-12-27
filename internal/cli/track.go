@@ -40,7 +40,7 @@ This command can also be used to fix corrupted stackit metadata.`,
 				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
-				branchName = currentBranch.Name
+				branchName = currentBranch.GetName()
 			}
 
 			// Execute track action

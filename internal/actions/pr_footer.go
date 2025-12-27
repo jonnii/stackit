@@ -27,11 +27,11 @@ func CreatePRBodyFooter(branch string, eng engine.Engine) string {
 
 	for branchObj, depth := range eng.BranchesDepthFirst(terminalParent) {
 		// Only include branches related to the PR branch
-		if branchObj.Name != branch && !isParentOrChild(eng, branchObj.Name, branch) {
+		if branchObj.GetName() != branch && !isParentOrChild(eng, branchObj.GetName(), branch) {
 			continue // skip but continue traversal
 		}
 
-		leaf := buildLeaf(eng, branchObj.Name, depth, branch)
+		leaf := buildLeaf(eng, branchObj.GetName(), depth, branch)
 		if leaf != "" {
 			tree.WriteString(leaf)
 		}
@@ -70,30 +70,31 @@ func findTerminalParent(currentBranch string, eng engine.BranchReader) string {
 	parent := eng.GetParent(branch)
 	if parent == nil {
 		// No parent, use trunk
-		return eng.Trunk().Name
+		return eng.Trunk().GetName()
 	}
 
 	if parent.IsTrunk() {
 		return currentBranch
 	}
 
-	return findTerminalParent(parent.Name, eng)
+	return findTerminalParent(parent.GetName(), eng)
 }
 
 // buildLeaf builds a single leaf in the tree
-func buildLeaf(eng engine.PRManager, branch string, depth int, prBranch string) string {
+func buildLeaf(eng engine.Engine, branchName string, depth int, prBranch string) string {
+	branch := eng.GetBranch(branchName)
 	prInfo, err := eng.GetPrInfo(branch)
-	if err != nil || prInfo == nil || prInfo.Number == nil {
+	if err != nil || prInfo == nil || prInfo.Number() == nil {
 		return ""
 	}
 
 	indent := strings.Repeat("  ", depth)
 	marker := ""
-	if branch == prBranch {
+	if branchName == prBranch {
 		marker = " 👈"
 	}
 
-	return fmt.Sprintf("\n%s* **PR #%d**%s", indent, *prInfo.Number, marker)
+	return fmt.Sprintf("\n%s* **PR #%d**%s", indent, *prInfo.Number(), marker)
 }
 
 // isParentOrChild checks if branch1 is a parent or child of branch2
@@ -114,10 +115,10 @@ func isParentOrChildRecursive(eng engine.BranchReader, branch1, branch2 string, 
 	branch1Obj := eng.GetBranch(branch1)
 	children := branch1Obj.GetChildren()
 	for _, child := range children {
-		if child.Name == branch2 {
+		if child.GetName() == branch2 {
 			return true
 		}
-		if isParentOrChildRecursive(eng, child.Name, branch2, visited) {
+		if isParentOrChildRecursive(eng, child.GetName(), branch2, visited) {
 			return true
 		}
 	}
@@ -126,10 +127,10 @@ func isParentOrChildRecursive(eng engine.BranchReader, branch1, branch2 string, 
 	// branch1Obj already declared above
 	parent := eng.GetParent(branch1Obj)
 	if parent != nil {
-		if parent.Name == branch2 {
+		if parent.GetName() == branch2 {
 			return true
 		}
-		return isParentOrChildRecursive(eng, parent.Name, branch2, visited)
+		return isParentOrChildRecursive(eng, parent.GetName(), branch2, visited)
 	}
 
 	return false

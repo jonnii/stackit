@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-
-	"stackit.dev/stackit/internal/git"
 )
 
 // ApplySplitToCommits creates branches at specified commit points
@@ -18,7 +16,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 	}
 
 	// Get metadata for the branch being split
-	meta, err := e.git.ReadMetadataRef(opts.BranchToSplit)
+	meta, err := e.readMetadataRef(opts.BranchToSplit)
 	if err != nil {
 		return fmt.Errorf("failed to read metadata: %w", err)
 	}
@@ -58,29 +56,30 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 		// Preserve PR info if branch name matches original
 		var prInfo *PrInfo
 		if branchName == opts.BranchToSplit {
-			prInfo, _ = e.GetPrInfo(opts.BranchToSplit)
+			branchToSplit := e.GetBranch(opts.BranchToSplit)
+			prInfo, _ = e.GetPrInfo(branchToSplit)
 		}
 
 		// Track branch with parent
-		newMeta := &git.Meta{
+		newMeta := &Meta{
 			ParentBranchName:     &lastBranchName,
 			ParentBranchRevision: &lastBranchRevision,
 		}
 
 		// Preserve PR info if applicable
 		if prInfo != nil {
-			newMeta.PrInfo = &git.PrInfo{
-				Number:  prInfo.Number,
-				Title:   stringPtr(prInfo.Title),
-				Body:    stringPtr(prInfo.Body),
-				IsDraft: boolPtr(prInfo.IsDraft),
-				State:   stringPtr(prInfo.State),
-				Base:    stringPtr(prInfo.Base),
-				URL:     stringPtr(prInfo.URL),
+			newMeta.PrInfo = &PrInfoPersistence{
+				Number:  prInfo.Number(),
+				Title:   stringPtr(prInfo.Title()),
+				Body:    stringPtr(prInfo.Body()),
+				IsDraft: boolPtr(prInfo.IsDraft()),
+				State:   stringPtr(prInfo.State()),
+				Base:    stringPtr(prInfo.Base()),
+				URL:     stringPtr(prInfo.URL()),
 			}
 		}
 
-		if err := e.git.WriteMetadataRef(branchName, newMeta); err != nil {
+		if err := e.writeMetadataRef(branchName, newMeta); err != nil {
 			return fmt.Errorf("failed to write metadata for %s: %w", branchName, err)
 		}
 
@@ -95,8 +94,9 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 
 	// Update children to point to last branch
 	if lastBranchName != opts.BranchToSplit {
+		lastBranch := e.GetBranch(lastBranchName)
 		for _, childBranchName := range children {
-			if err := e.SetParent(ctx, childBranchName, lastBranchName); err != nil {
+			if err := e.SetParent(ctx, e.GetBranch(childBranchName), lastBranch); err != nil {
 				return fmt.Errorf("failed to update parent for %s: %w", childBranchName, err)
 			}
 		}
@@ -104,7 +104,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 
 	// Delete original branch if not in branchNames
 	if !slices.Contains(opts.BranchNames, opts.BranchToSplit) {
-		if err := e.DeleteBranch(ctx, opts.BranchToSplit); err != nil {
+		if err := e.DeleteBranch(ctx, e.GetBranch(opts.BranchToSplit)); err != nil {
 			return fmt.Errorf("failed to delete original branch: %w", err)
 		}
 	}
@@ -112,7 +112,7 @@ func (e *engineImpl) ApplySplitToCommits(ctx context.Context, opts ApplySplitOpt
 	// Checkout last branch
 	e.currentBranch = lastBranchName
 	lastBranch := e.GetBranch(lastBranchName)
-	if err := e.git.CheckoutBranch(ctx, lastBranch.Name); err != nil {
+	if err := e.git.CheckoutBranch(ctx, lastBranch.GetName()); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", lastBranchName, err)
 	}
 
@@ -178,10 +178,11 @@ func (e *engineImpl) DetachAndResetBranchChanges(ctx context.Context, branchName
 }
 
 // ForceCheckoutBranch checks out a branch
-func (e *engineImpl) ForceCheckoutBranch(ctx context.Context, branchName string) error {
+func (e *engineImpl) ForceCheckoutBranch(ctx context.Context, branch Branch) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	branchName := branch.GetName()
 	_, err := e.git.RunGitCommandWithContext(ctx, "checkout", "-f", branchName)
 	if err != nil {
 		return fmt.Errorf("failed to force checkout branch: %w", err)

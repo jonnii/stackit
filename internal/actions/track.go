@@ -30,12 +30,12 @@ func TrackAction(ctx *runtime.Context, opts TrackOptions) error {
 		allBranches := eng.AllBranches()
 		parentExists := false
 		for _, branch := range allBranches {
-			if branch.Name == parent {
+			if branch.GetName() == parent {
 				parentExists = true
 				break
 			}
 		}
-		if !parentExists && parent != eng.Trunk().Name {
+		if !parentExists && parent != eng.Trunk().GetName() {
 			// Refresh branches list and check again
 			branches, err := git.GetAllBranchNames()
 			if err == nil {
@@ -119,7 +119,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 		// Try auto-detection (single unambiguous non-trunk tracked ancestor)
 		var parentBranch string
 		ancestors, err := eng.FindMostRecentTrackedAncestors(ctx.Context, branchName)
-		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().Name {
+		if err == nil && len(ancestors) == 1 && ancestors[0] != eng.Trunk().GetName() {
 			parentBranch = ancestors[0]
 			ctx.Splog.Info("Auto-detected parent %s for %s.", style.ColorBranchName(parentBranch, false), style.ColorBranchName(branchName, false))
 		} else {
@@ -143,7 +143,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 	untrackedChildren := []string{}
 
 	for _, candidateBranch := range allBranches {
-		candidate := candidateBranch.Name
+		candidate := candidateBranch.GetName()
 		if candidate == branchName {
 			continue
 		}
@@ -186,7 +186,7 @@ func trackBranchRecursively(ctx *runtime.Context, branchName string) error {
 // selectParentBranch interactively selects a parent branch for tracking
 func selectParentBranch(ctx *runtime.Context, branchName string) (string, error) {
 	eng := ctx.Engine
-	trunk := eng.Trunk().Name
+	trunk := eng.Trunk().GetName()
 
 	// Render the tree to get visual context for each branch
 	renderer := tui.NewStackTreeRenderer(eng)
@@ -227,7 +227,7 @@ func selectParentBranch(ctx *runtime.Context, branchName string) (string, error)
 	// Add all tracked branches
 	allBranches := eng.AllBranches()
 	for _, candidateBranch := range allBranches {
-		candidate := candidateBranch.Name
+		candidate := candidateBranch.GetName()
 		if candidate == branchName || candidate == trunk {
 			continue
 		}

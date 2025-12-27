@@ -2,7 +2,6 @@ package demo
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"stackit.dev/stackit/internal/git"
@@ -18,9 +17,9 @@ type demoGitRunner struct {
 // NewDemoGitRunner creates a new demo git runner with simulated data.
 func NewDemoGitRunner() git.Runner {
 	return &demoGitRunner{
-		trunk:         GetDemoTrunk(),
-		currentBranch: GetDemoCurrentBranch(),
-		branches:      GetDemoBranches(),
+		trunk:         "main",
+		currentBranch: "main",
+		branches:      demoBranches,
 	}
 }
 
@@ -36,8 +35,8 @@ func (d *demoGitRunner) FetchRemoteShas(_ string) (map[string]string, error) {
 	return make(map[string]string), nil
 }
 
-func (d *demoGitRunner) GetRemoteSha(_, branchName string) (string, error) {
-	return "remote-sha-" + branchName, nil
+func (d *demoGitRunner) GetRemoteSha(_, _ string) (string, error) {
+	return "remote-sha", nil
 }
 
 func (d *demoGitRunner) GetCurrentBranch() (string, error) {
@@ -45,9 +44,9 @@ func (d *demoGitRunner) GetCurrentBranch() (string, error) {
 }
 
 func (d *demoGitRunner) GetAllBranchNames() ([]string, error) {
-	names := []string{d.trunk}
-	for _, b := range d.branches {
-		names = append(names, b.Name)
+	names := make([]string, len(d.branches))
+	for i, b := range d.branches {
+		names[i] = b.Name
 	}
 	return names, nil
 }
@@ -57,11 +56,37 @@ func (d *demoGitRunner) CheckoutBranch(_ context.Context, branchName string) err
 	return nil
 }
 
-func (d *demoGitRunner) DeleteBranch(_ context.Context, _ string) error {
+func (d *demoGitRunner) CreateAndCheckoutBranch(_ context.Context, branchName string) error {
+	d.branches = append(d.branches, Branch{Name: branchName})
+	d.currentBranch = branchName
 	return nil
 }
 
-func (d *demoGitRunner) RenameBranch(_ context.Context, _, _ string) error {
+func (d *demoGitRunner) DeleteBranch(_ context.Context, branchName string) error {
+	for i, b := range d.branches {
+		if b.Name == branchName {
+			d.branches = append(d.branches[:i], d.branches[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+func (d *demoGitRunner) RenameBranch(_ context.Context, oldName, newName string) error {
+	for i, b := range d.branches {
+		if b.Name == oldName {
+			d.branches[i].Name = newName
+			break
+		}
+	}
+	if d.currentBranch == oldName {
+		d.currentBranch = newName
+	}
+	return nil
+}
+
+func (d *demoGitRunner) CheckoutDetached(_ context.Context, _ string) error {
+	d.currentBranch = ""
 	return nil
 }
 
@@ -69,93 +94,33 @@ func (d *demoGitRunner) UpdateBranchRef(_, _ string) error {
 	return nil
 }
 
-func (d *demoGitRunner) GetRemoteRevision(branchName string) (string, error) {
-	return "remote-rev-" + branchName, nil
-}
-
-func (d *demoGitRunner) GetMetadataRefList() (map[string]string, error) {
-	refs := make(map[string]string)
-	for _, b := range d.branches {
-		refs[b.Name] = "meta-sha-" + b.Name
-	}
-	return refs, nil
-}
-
-func (d *demoGitRunner) ReadMetadataRef(branchName string) (*git.Meta, error) {
-	if branchName == d.trunk {
-		return &git.Meta{}, nil
-	}
-
-	for _, b := range d.branches {
-		if b.Name == branchName {
-			parentRev := "sha-" + b.Parent
-			scope := b.Scope
-			num := b.PRNumber
-			title := b.PRTitle
-			state := b.PRState
-			isDraft := b.IsDraft
-			url := fmt.Sprintf("https://github.com/example/repo/pull/%d", num)
-			body := "Demo PR body for " + branchName
-
-			return &git.Meta{
-				ParentBranchName:     &b.Parent,
-				ParentBranchRevision: &parentRev,
-				Scope:                &scope,
-				PrInfo: &git.PrInfo{
-					Number:  &num,
-					Title:   &title,
-					Body:    &body,
-					IsDraft: &isDraft,
-					State:   &state,
-					Base:    &b.Parent,
-					URL:     &url,
-				},
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("metadata not found for branch %s", branchName)
-}
-
-func (d *demoGitRunner) WriteMetadataRef(_ string, _ *git.Meta) error {
-	return nil
-}
-
-func (d *demoGitRunner) DeleteMetadataRef(_ string) error {
-	return nil
-}
-
-func (d *demoGitRunner) BatchReadMetadataRefs(branchNames []string) (map[string]*git.Meta, map[string]error) {
-	result := make(map[string]*git.Meta)
-	errs := make(map[string]error)
-	for _, name := range branchNames {
-		if meta, err := d.ReadMetadataRef(name); err == nil {
-			result[name] = meta
-		} else {
-			errs[name] = err
-		}
-	}
-	return result, errs
-}
-
-func (d *demoGitRunner) RenameMetadataRef(_, _ string) error {
-	return nil
+func (d *demoGitRunner) GetRemoteRevision(_ string) (string, error) {
+	return "remote-rev", nil
 }
 
 func (d *demoGitRunner) GetRevision(branchName string) (string, error) {
-	return "sha-" + branchName, nil
+	for _, b := range d.branches {
+		if b.Name == branchName {
+			return b.SHA, nil
+		}
+	}
+	return "rev-sha", nil
 }
 
 func (d *demoGitRunner) BatchGetRevisions(branchNames []string) (map[string]string, []error) {
-	result := make(map[string]string)
+	results := make(map[string]string)
 	for _, name := range branchNames {
-		result[name] = "sha-" + name
+		results[name], _ = d.GetRevision(name)
 	}
-	return result, nil
+	return results, nil
 }
 
-func (d *demoGitRunner) GetMergeBase(_, rev2 string) (string, error) {
-	return rev2, nil // Assume rev2 is parent
+func (d *demoGitRunner) GetMergeBase(_, _ string) (string, error) {
+	return "merge-base-sha", nil
+}
+
+func (d *demoGitRunner) GetMergeBaseByRef(_, _ string) (string, error) {
+	return "merge-base-sha", nil
 }
 
 func (d *demoGitRunner) IsAncestor(_, _ string) (bool, error) {
@@ -163,59 +128,30 @@ func (d *demoGitRunner) IsAncestor(_, _ string) (bool, error) {
 }
 
 func (d *demoGitRunner) GetCommitDate(_ string) (time.Time, error) {
-	return time.Now().Add(-24 * time.Hour), nil
+	return time.Now(), nil
 }
 
 func (d *demoGitRunner) GetCommitAuthor(_ string) (string, error) {
-	return "Demo User <demo@example.com>", nil
+	return "Demo User", nil
 }
 
-func (d *demoGitRunner) GetCommitRange(_, head, _ string) ([]string, error) {
-	// Look up branch name from head which is "sha-branchName"
-	branchName := ""
-	if len(head) > 4 && head[:4] == "sha-" {
-		branchName = head[4:]
-	}
-
-	commits := 0
-	for _, b := range d.branches {
-		if b.Name == branchName {
-			commits = b.Commits
-			break
-		}
-	}
-
-	result := make([]string, commits)
-	for i := 0; i < commits; i++ {
-		result[i] = fmt.Sprintf("sha-%s-%d commit %d", branchName, i, i)
-	}
-	return result, nil
+func (d *demoGitRunner) GetCommitRange(_, _, _ string) ([]string, error) {
+	return []string{"commit message"}, nil
 }
 
-func (d *demoGitRunner) GetCommitRangeSHAs(base, head string) ([]string, error) {
-	return d.GetCommitRange(base, head, "SHA")
-}
-
-func (d *demoGitRunner) GetCommitHistorySHAs(branchName string) ([]string, error) {
-	return []string{"sha-" + branchName}, nil
-}
-
-func (d *demoGitRunner) GetCommitSHA(branchName string, _ int) (string, error) {
-	return "sha-" + branchName, nil
+func (d *demoGitRunner) GetCommitSHA(_ string, _ int) (string, error) {
+	return "commit-sha", nil
 }
 
 func (d *demoGitRunner) PullBranch(_ context.Context, _, _ string) (git.PullResult, error) {
-	return git.PullUnneeded, nil
+	return git.PullDone, nil
 }
 
 func (d *demoGitRunner) PushBranch(_ context.Context, _, _ string, _, _ bool) error {
 	return nil
 }
 
-func (d *demoGitRunner) Rebase(_ context.Context, branchName, _, _ string) (git.RebaseResult, error) {
-	if branchName == "conflict" {
-		return git.RebaseConflict, nil
-	}
+func (d *demoGitRunner) Rebase(_ context.Context, _, _, _ string) (git.RebaseResult, error) {
 	return git.RebaseDone, nil
 }
 
@@ -223,8 +159,32 @@ func (d *demoGitRunner) RebaseContinue(_ context.Context) (git.RebaseResult, err
 	return git.RebaseDone, nil
 }
 
-func (d *demoGitRunner) FinalizeRebase(_ context.Context, _, _, _, _ string) error {
+func (d *demoGitRunner) CherryPick(_ context.Context, commitSHA, _ string) (string, error) {
+	return commitSHA, nil
+}
+
+func (d *demoGitRunner) StashPush(_ context.Context, _ string) (string, error) {
+	return "stashed", nil
+}
+
+func (d *demoGitRunner) StashPop(_ context.Context) error {
 	return nil
+}
+
+func (d *demoGitRunner) GetCommitRangeSHAs(_, _ string) ([]string, error) {
+	return []string{"sha1", "sha2"}, nil
+}
+
+func (d *demoGitRunner) GetCommitHistorySHAs(_ string) ([]string, error) {
+	return []string{"sha1", "sha2"}, nil
+}
+
+func (d *demoGitRunner) GetRebaseHead() (string, error) {
+	return "rebase-head-sha", nil
+}
+
+func (d *demoGitRunner) ParseStagedHunks(_ context.Context) ([]git.Hunk, error) {
+	return []git.Hunk{}, nil
 }
 
 func (d *demoGitRunner) HardReset(_ context.Context, _ string) error {
@@ -239,12 +199,23 @@ func (d *demoGitRunner) CommitWithOptions(_ git.CommitOptions) error {
 	return nil
 }
 
-func (d *demoGitRunner) IsMerged(_ context.Context, branchName, _ string) (bool, error) {
-	for _, b := range d.branches {
-		if b.Name == branchName && b.PRState == "MERGED" {
-			return true, nil
-		}
-	}
+func (d *demoGitRunner) Commit(_ string, _ int) error {
+	return nil
+}
+
+func (d *demoGitRunner) StageAll(_ context.Context) error {
+	return nil
+}
+
+func (d *demoGitRunner) HasStagedChanges(_ context.Context) (bool, error) {
+	return false, nil
+}
+
+func (d *demoGitRunner) HasUnstagedChanges(_ context.Context) (bool, error) {
+	return false, nil
+}
+
+func (d *demoGitRunner) IsMerged(_ context.Context, _, _ string) (bool, error) {
 	return false, nil
 }
 
@@ -252,26 +223,84 @@ func (d *demoGitRunner) IsDiffEmpty(_ context.Context, _, _ string) (bool, error
 	return false, nil
 }
 
-func (d *demoGitRunner) RunGitCommand(args ...string) (string, error) {
-	if len(args) > 0 && args[0] == "diff" {
-		// Handle diff --numstat
-		branchName := ""
-		if len(args) > 3 {
-			head := args[len(args)-1]
-			if len(head) > 4 && head[:4] == "sha-" {
-				branchName = head[4:]
-			}
-		}
+func (d *demoGitRunner) GetChangedFiles(_ context.Context, _, _ string) ([]string, error) {
+	return []string{}, nil
+}
 
-		for _, b := range d.branches {
-			if b.Name == branchName {
-				return fmt.Sprintf("%d\t%d\tfile.txt", b.Added, b.Deleted), nil
-			}
-		}
-	}
+func (d *demoGitRunner) ShowDiff(_ context.Context, _, _ string, _ bool) (string, error) {
+	return "diff", nil
+}
+
+func (d *demoGitRunner) ShowCommits(_ context.Context, _, _ string, _, _ bool) (string, error) {
+	return "commits", nil
+}
+
+func (d *demoGitRunner) GetUnmergedFiles(_ context.Context) ([]string, error) {
+	return []string{}, nil
+}
+
+func (d *demoGitRunner) AddWorktree(_ context.Context, _, _ string, _ bool) error {
+	return nil
+}
+
+func (d *demoGitRunner) RemoveWorktree(_ context.Context, _ string) error {
+	return nil
+}
+
+func (d *demoGitRunner) ListWorktrees(_ context.Context) ([]string, error) {
+	return []string{}, nil
+}
+
+func (d *demoGitRunner) SetWorkingDir(_ string) {}
+
+func (d *demoGitRunner) GetWorkingDir() string {
+	return ""
+}
+
+func (d *demoGitRunner) RunGitCommand(_ ...string) (string, error) {
 	return "", nil
 }
 
-func (d *demoGitRunner) RunGitCommandWithContext(_ context.Context, args ...string) (string, error) {
-	return d.RunGitCommand(args...)
+func (d *demoGitRunner) RunGitCommandWithContext(_ context.Context, _ ...string) (string, error) {
+	return "", nil
+}
+
+func (d *demoGitRunner) RunGitCommandWithEnv(_ context.Context, _ []string, _ ...string) (string, error) {
+	return "", nil
+}
+
+func (d *demoGitRunner) RunGitCommandRawWithContext(_ context.Context, _ ...string) (string, error) {
+	return "", nil
+}
+
+func (d *demoGitRunner) GetRef(_ string) (string, error) {
+	return "ref-sha", nil
+}
+
+func (d *demoGitRunner) UpdateRef(_, _ string) error {
+	return nil
+}
+
+func (d *demoGitRunner) DeleteRef(_ string) error {
+	return nil
+}
+
+func (d *demoGitRunner) CreateBlob(_ string) (string, error) {
+	return "blob-sha", nil
+}
+
+func (d *demoGitRunner) ReadBlob(_ string) (string, error) {
+	return "{}", nil
+}
+
+func (d *demoGitRunner) ListRefs(_ string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
+func (d *demoGitRunner) GetParentCommitSHA(_ string) (string, error) {
+	return "parent-sha", nil
+}
+
+func (d *demoGitRunner) CheckCommutation(_ git.Hunk, _, _ string) (bool, error) {
+	return true, nil
 }

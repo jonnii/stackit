@@ -8,7 +8,6 @@ import (
 
 	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/errors"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui/style"
 )
@@ -52,7 +51,7 @@ as an argument to move multiple levels at once.`,
 
 				// Check if on trunk
 				if currentBranch.IsTrunk() {
-					ctx.Splog.Info("Already at trunk (%s).", style.ColorBranchName(currentBranch.Name, true))
+					ctx.Splog.Info("Already at trunk (%s).", style.ColorBranchName(currentBranch.GetName(), true))
 					return nil
 				}
 
@@ -63,29 +62,29 @@ as an argument to move multiple levels at once.`,
 					if parent == nil {
 						// No parent found - branch is untracked or we've gone past trunk
 						if i == 0 {
-							ctx.Splog.Info("%s has no parent (untracked branch).", style.ColorBranchName(currentBranch.Name, true))
+							ctx.Splog.Info("%s has no parent (untracked branch).", style.ColorBranchName(currentBranch.GetName(), true))
 							return nil
 						}
 						// We moved some steps but can't go further
-						ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", style.ColorBranchName(targetBranch.Name, false), i)
+						ctx.Splog.Info("Stopped at %s (no further parent after %d step(s)).", style.ColorBranchName(targetBranch.GetName(), false), i)
 						break
 					}
-					ctx.Splog.Info("⮑  %s", parent.Name)
+					ctx.Splog.Info("⮑  %s", parent.GetName())
 					targetBranch = *parent
 				}
 
 				// Check if we actually moved
-				if targetBranch.Name == currentBranch.Name {
+				if targetBranch.GetName() == currentBranch.GetName() {
 					ctx.Splog.Info("Already at the bottom of the stack.")
 					return nil
 				}
 
 				// Checkout the target branch
-				if err := git.CheckoutBranch(ctx.Context, targetBranch.Name); err != nil {
-					return fmt.Errorf("failed to checkout branch %s: %w", targetBranch.Name, err)
+				if err := ctx.Engine.CheckoutBranch(ctx.Context, targetBranch); err != nil {
+					return fmt.Errorf("failed to checkout branch %s: %w", targetBranch.GetName(), err)
 				}
 
-				ctx.Splog.Info("Checked out %s.", style.ColorBranchName(targetBranch.Name, false))
+				ctx.Splog.Info("Checked out %s.", style.ColorBranchName(targetBranch.GetName(), false))
 				return nil
 			})
 		},

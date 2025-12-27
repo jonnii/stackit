@@ -67,11 +67,11 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 	currentBranch := eng.CurrentBranch()
 	currentBranchName := ""
 	if currentBranch != nil {
-		currentBranchName = currentBranch.Name
+		currentBranchName = currentBranch.GetName()
 	}
 
 	for _, branch := range branches {
-		branchName := branch.Name
+		branchName := branch.GetName()
 		result, exists := batchResult.Results[branchName]
 		if !exists {
 			continue // Skip branches not processed (e.g., trunk)
@@ -91,9 +91,9 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 			parent := eng.GetParent(branch)
 			parentName := ""
 			if parent == nil {
-				parentName = eng.Trunk().Name
+				parentName = eng.Trunk().GetName()
 			} else {
-				parentName = parent.Name
+				parentName = parent.GetName()
 			}
 			isCurrent := branchName == currentBranchName
 			splog.Info("Restacked %s on %s.",
@@ -109,9 +109,9 @@ func RestackBranches(ctx context.Context, branches []engine.Branch, eng Restacke
 				parent := eng.GetParent(branch)
 				parentName := ""
 				if parent == nil {
-					parentName = eng.Trunk().Name
+					parentName = eng.Trunk().GetName()
 				} else {
-					parentName = parent.Name
+					parentName = parent.GetName()
 				}
 				isCurrent := branchName == currentBranchName
 				splog.Info("%s does not need to be restacked on %s.",

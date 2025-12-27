@@ -24,7 +24,9 @@ func syncGitHubInfo(ctx *runtime.Context, branchesToRestack *[]string) error {
 
 	repoOwner, repoName, _ := utils.GetRepoInfo(gctx)
 	if repoOwner != "" && repoName != "" {
-		if err := github.SyncPrInfo(gctx, branchNames, repoOwner, repoName); err != nil {
+		if err := github.SyncPrInfo(gctx, branchNames, repoOwner, repoName, func(name string, prInfo *git.PrInfo) {
+			_ = eng.UpdatePrInfo(gctx, name, prInfo)
+		}); err != nil {
 			// Non-fatal, continue
 			splog.Debug("Failed to sync PR info: %v", err)
 		}

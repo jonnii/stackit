@@ -206,6 +206,42 @@ func (e *engineImpl) SetParent(ctx context.Context, branchName string, parentBra
 	return e.setParentInternal(ctx, branchName, parentBranchName)
 }
 
+// UpdateParentRevision updates the parent revision in metadata
+func (e *engineImpl) UpdateParentRevision(_ context.Context, branchName string, parentRev string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	meta.ParentBranchRevision = &parentRev
+	if err := git.WriteMetadataRef(branchName, meta); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	return nil
+}
+
+// UpdatePrInfo updates PR information in metadata
+func (e *engineImpl) UpdatePrInfo(_ context.Context, branchName string, prInfo *git.PrInfo) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	meta, err := git.ReadMetadataRef(branchName)
+	if err != nil {
+		return fmt.Errorf("failed to read metadata: %w", err)
+	}
+
+	meta.PrInfo = prInfo
+	if err := git.WriteMetadataRef(branchName, meta); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	return nil
+}
+
 // SetScope updates a branch's scope
 func (e *engineImpl) SetScope(branch Branch, scope Scope) error {
 	e.mu.Lock()

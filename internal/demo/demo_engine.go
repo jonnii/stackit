@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"stackit.dev/stackit/internal/engine"
+	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/utils"
 )
@@ -420,6 +421,55 @@ func (e *Engine) UntrackBranch(branchName string) error {
 // SetParent sets the parent of a branch in the demo engine
 func (e *Engine) SetParent(_ context.Context, branchName string, parentBranchName string) error {
 	e.parentMap[branchName] = parentBranchName
+	return nil
+}
+
+// UpdateParentRevision updates the parent revision in the demo engine
+func (e *Engine) UpdateParentRevision(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+// UpdatePrInfo updates PR information in the demo engine
+func (e *Engine) UpdatePrInfo(_ context.Context, branchName string, prInfo *git.PrInfo) error {
+	if prInfo == nil {
+		delete(e.prInfoMap, branchName)
+		return nil
+	}
+
+	title := ""
+	if prInfo.Title != nil {
+		title = *prInfo.Title
+	}
+	body := ""
+	if prInfo.Body != nil {
+		body = *prInfo.Body
+	}
+	isDraft := false
+	if prInfo.IsDraft != nil {
+		isDraft = *prInfo.IsDraft
+	}
+	state := ""
+	if prInfo.State != nil {
+		state = *prInfo.State
+	}
+	base := ""
+	if prInfo.Base != nil {
+		base = *prInfo.Base
+	}
+	url := ""
+	if prInfo.URL != nil {
+		url = *prInfo.URL
+	}
+
+	e.prInfoMap[branchName] = &engine.PrInfo{
+		Number:  prInfo.Number,
+		Title:   title,
+		Body:    body,
+		IsDraft: isDraft,
+		State:   state,
+		Base:    base,
+		URL:     url,
+	}
 	return nil
 }
 

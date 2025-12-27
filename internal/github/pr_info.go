@@ -16,7 +16,7 @@ import (
 )
 
 // SyncPrInfo syncs PR information for branches from GitHub
-func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName string) error {
+func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName string, onUpdate func(string, *git.PrInfo)) error {
 	// Get GitHub token
 	token, err := getGitHubToken()
 	if err != nil {
@@ -47,9 +47,6 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 		return nil //nolint:nilerr // Skip if can't create client
 	}
 
-	// Fetch all metadata in bulk first
-	allMeta, _ := git.BatchReadMetadataRefs(branchNames)
-
 	// Fetch PR info for each branch in parallel
 	var wg sync.WaitGroup
 	for _, branchName := range branchNames {
@@ -62,42 +59,35 @@ func SyncPrInfo(ctx context.Context, branchNames []string, repoOwner, repoName s
 			}
 
 			if prInfo != nil {
-				// Use cached metadata or create new
-				meta, ok := allMeta[name]
-				if !ok || meta == nil {
-					meta = &git.Meta{}
-				}
-
-				if meta.PrInfo == nil {
-					meta.PrInfo = &git.PrInfo{}
-				}
+				gitPrInfo := &git.PrInfo{}
 
 				// Update PR info
 				if prInfo.Number != nil {
-					meta.PrInfo.Number = prInfo.Number
+					gitPrInfo.Number = prInfo.Number
 				}
 				if prInfo.Base != nil && prInfo.Base.Ref != nil {
-					meta.PrInfo.Base = prInfo.Base.Ref
+					gitPrInfo.Base = prInfo.Base.Ref
 				}
 				if prInfo.HTMLURL != nil {
-					meta.PrInfo.URL = prInfo.HTMLURL
+					gitPrInfo.URL = prInfo.HTMLURL
 				}
 				if prInfo.Title != nil {
-					meta.PrInfo.Title = prInfo.Title
+					gitPrInfo.Title = prInfo.Title
 				}
 				if prInfo.Body != nil {
-					meta.PrInfo.Body = prInfo.Body
+					gitPrInfo.Body = prInfo.Body
 				}
 				if prInfo.Draft != nil {
-					meta.PrInfo.IsDraft = prInfo.Draft
+					gitPrInfo.IsDraft = prInfo.Draft
 				}
 				if prInfo.State != nil {
 					state := strings.ToUpper(*prInfo.State)
-					meta.PrInfo.State = &state
+					gitPrInfo.State = &state
 				}
 
-				// Write updated metadata
-				_ = git.WriteMetadataRef(name, meta)
+				if onUpdate != nil {
+					onUpdate(name, gitPrInfo)
+				}
 			}
 		}(branchName)
 	}

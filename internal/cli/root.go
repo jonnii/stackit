@@ -5,6 +5,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
+	"stackit.dev/stackit/internal/cli/agent"
 	"stackit.dev/stackit/internal/cli/branch"
 	"stackit.dev/stackit/internal/cli/navigation"
 	"stackit.dev/stackit/internal/cli/stack"
@@ -27,7 +28,7 @@ Commit:  ` + commit + `
 
 	rootCmd.AddCommand(newAbortCmd())
 	rootCmd.AddCommand(branch.NewAbsorbCmd())
-	rootCmd.AddCommand(newAgentCmd())
+	rootCmd.AddCommand(agent.NewAgentCmd())
 	rootCmd.AddCommand(navigation.NewBottomCmd())
 	rootCmd.AddCommand(navigation.NewCheckoutCmd())
 	rootCmd.AddCommand(navigation.NewChildrenCmd())

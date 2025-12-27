@@ -31,28 +31,28 @@ type splitByHunkEngine interface {
 //     c. Prompt for a commit message and branch name.
 //     d. Create a new commit with the staged changes.
 //  3. Return the created branch names.
-func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngine, splog *tui.Splog) (*Result, error) {
+func splitByHunk(ctx context.Context, branchToSplit engine.Branch, eng splitByHunkEngine, splog *tui.Splog) (*Result, error) {
 	// Detach and reset branch changes
-	if err := eng.DetachAndResetBranchChanges(ctx, branchToSplit); err != nil {
+	if err := eng.DetachAndResetBranchChanges(ctx, branchToSplit.GetName()); err != nil {
 		return nil, fmt.Errorf("failed to detach and reset: %w", err)
 	}
 
 	branchNames := []string{}
 
 	// Get default commit message
-	branchToSplitObj := eng.GetBranch(branchToSplit)
-	commitMessages, err := branchToSplitObj.GetAllCommits(engine.CommitFormatMessage)
+	commitMessages, err := branchToSplit.GetAllCommits(engine.CommitFormatMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit messages: %w", err)
 	}
 	defaultCommitMessage := strings.Join(commitMessages, "\n\n")
 
 	// Show instructions
-	splog.Info("Splitting %s into multiple single-commit branches.", style.ColorBranchName(branchToSplit, true))
-	prInfo, _ := eng.GetPrInfo(branchToSplit)
-	if prInfo != nil && prInfo.Number != nil {
+	splog.Info("Splitting %s into multiple single-commit branches.", style.ColorBranchName(branchToSplit.GetName(), true))
+	branch := eng.GetBranch(branchToSplit.GetName())
+	prInfo, _ := eng.GetPrInfo(branch)
+	if prInfo != nil && prInfo.Number() != nil {
 		splog.Info("If any of the new branches keeps the name %s, it will be linked to PR #%d.",
-			style.ColorBranchName(branchToSplit, true), *prInfo.Number)
+			style.ColorBranchName(branchToSplit.GetName(), true), *prInfo.Number())
 	}
 	splog.Info("")
 	splog.Info("For each branch you'd like to create:")
@@ -132,7 +132,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 		}
 
 		// Get branch name
-		branchName, err := promptBranchName(branchNames, branchToSplit, len(branchNames)+1, eng)
+		branchName, err := promptBranchName(branchNames, branchToSplit.GetName(), len(branchNames)+1, eng)
 		if err != nil {
 			// If user cancels, restore branch
 			_ = eng.ForceCheckoutBranch(ctx, branchToSplit)
@@ -146,7 +146,7 @@ func splitByHunk(ctx context.Context, branchToSplit string, eng splitByHunkEngin
 	// to resolve commit SHAs using GetCommitSHA(branchToSplit, offset).
 	// Since we've been creating commits in detached HEAD on top of the parent,
 	// we need the original branch name to now point to the tip of our new commits.
-	if err := git.UpdateBranchRef(branchToSplit, "HEAD"); err != nil {
+	if err := git.UpdateBranchRef(branchToSplit.GetName(), "HEAD"); err != nil {
 		return nil, fmt.Errorf("failed to update branch reference: %w", err)
 	}
 

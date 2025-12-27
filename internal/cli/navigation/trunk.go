@@ -123,18 +123,18 @@ func handleShowTrunk(ctx *runtime.Context) error {
 	if currentBranch == nil {
 		// Not on a branch, just show primary trunk
 		trunk := eng.Trunk()
-		fmt.Println(trunk.Name)
+		fmt.Println(trunk.GetName())
 		return nil
 	}
 
 	// If current branch is trunk, show it
 	if currentBranch.IsTrunk() {
-		fmt.Println(currentBranch.Name)
+		fmt.Println(currentBranch.GetName())
 		return nil
 	}
 
 	// Find the trunk by walking up the parent chain
-	trunk := findTrunkForBranch(eng, currentBranch.Name, ctx.RepoRoot)
+	trunk := findTrunkForBranch(eng, currentBranch.GetName(), ctx.RepoRoot)
 	fmt.Println(trunk)
 	return nil
 }
@@ -144,7 +144,7 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	// Get all configured trunks
 	cfg, err := config.LoadConfig(repoRoot)
 	if err != nil {
-		return eng.Trunk().Name
+		return eng.Trunk().GetName()
 	}
 	trunks := cfg.AllTrunks()
 
@@ -152,13 +152,13 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	currentBranch := eng.GetBranch(branchName)
 	visited := make(map[string]bool)
 
-	for currentBranch.Name != "" && !visited[currentBranch.Name] {
-		visited[currentBranch.Name] = true
+	for currentBranch.GetName() != "" && !visited[currentBranch.GetName()] {
+		visited[currentBranch.GetName()] = true
 
 		// Check if current is a trunk
 		for _, t := range trunks {
-			if currentBranch.Name == t {
-				return currentBranch.Name
+			if currentBranch.GetName() == t {
+				return currentBranch.GetName()
 			}
 		}
 
@@ -171,5 +171,5 @@ func findTrunkForBranch(eng engine.Engine, branchName string, repoRoot string) s
 	}
 
 	// Default to primary trunk
-	return eng.Trunk().Name
+	return eng.Trunk().GetName()
 }

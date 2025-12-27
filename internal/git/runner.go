@@ -59,6 +59,37 @@ func RunGitCommandWithContext(ctx context.Context, args ...string) (string, erro
 	return defaultRunner.Run(ctx, args...)
 }
 
+// runWithEnv executes a git command with environment variables
+func (r *CommandRunner) runWithEnv(ctx context.Context, env []string, args ...string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultCommandTimeout)
+		defer cancel()
+	}
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	if r.workingDir != "" {
+		cmd.Dir = r.workingDir
+	}
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", stackiterrors.NewGitCommandError("git", args, stdout.String(), stderr.String(), err)
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
 // Run executes a git command with the given context and returns the output
 func (r *CommandRunner) Run(ctx context.Context, args ...string) (string, error) {
 	return r.runInternal(ctx, "", true, args...)
@@ -145,6 +176,11 @@ func RunGitCommandWithInputAndContext(ctx context.Context, input string, args ..
 	return defaultRunner.runInternal(ctx, input, true, args...)
 }
 
+// RunGitCommandWithEnv executes a git command with environment variables
+func RunGitCommandWithEnv(ctx context.Context, env []string, args ...string) (string, error) {
+	return defaultRunner.runWithEnv(ctx, env, args...)
+}
+
 // RunGHCommandWithContext executes a gh command with the given context.
 func RunGHCommandWithContext(ctx context.Context, args ...string) (string, error) {
 	if ctx == nil {
@@ -203,23 +239,18 @@ type Runner interface {
 	GetCurrentBranch() (string, error)
 	GetAllBranchNames() ([]string, error)
 	CheckoutBranch(ctx context.Context, branchName string) error
+	CreateAndCheckoutBranch(ctx context.Context, branchName string) error
 	DeleteBranch(ctx context.Context, branchName string) error
 	RenameBranch(ctx context.Context, oldName, newName string) error
+	CheckoutDetached(ctx context.Context, revision string) error
 	UpdateBranchRef(branchName, revision string) error
 	GetRemoteRevision(branchName string) (string, error)
-
-	// Metadata Management
-	GetMetadataRefList() (map[string]string, error)
-	ReadMetadataRef(branchName string) (*Meta, error)
-	WriteMetadataRef(branchName string, meta *Meta) error
-	DeleteMetadataRef(branchName string) error
-	BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, map[string]error)
-	RenameMetadataRef(oldName, newName string) error
 
 	// Commit and Revision Information
 	GetRevision(branchName string) (string, error)
 	BatchGetRevisions(branchNames []string) (map[string]string, []error)
 	GetMergeBase(rev1, rev2 string) (string, error)
+	GetMergeBaseByRef(ref1, ref2 string) (string, error)
 	IsAncestor(ancestor, descendant string) (bool, error)
 	GetCommitDate(branchName string) (time.Time, error)
 	GetCommitAuthor(branchName string) (string, error)
@@ -233,16 +264,51 @@ type Runner interface {
 	PushBranch(ctx context.Context, branchName, remote string, force, forceWithLease bool) error
 	Rebase(ctx context.Context, branchName, upstream, oldUpstream string) (RebaseResult, error)
 	RebaseContinue(ctx context.Context) (RebaseResult, error)
-	FinalizeRebase(ctx context.Context, branchName, newRev, oldUpstream, upstream string) error
+	CherryPick(ctx context.Context, commitSHA, onto string) (string, error)
+	StashPush(ctx context.Context, message string) (string, error)
+	StashPop(ctx context.Context) error
 	HardReset(ctx context.Context, revision string) error
 	SoftReset(ctx context.Context, revision string) error
 	CommitWithOptions(opts CommitOptions) error
+	Commit(message string, verbose int) error
+	StageAll(ctx context.Context) error
+	HasStagedChanges(ctx context.Context) (bool, error)
+	HasUnstagedChanges(ctx context.Context) (bool, error)
 	IsMerged(ctx context.Context, branchName, target string) (bool, error)
 	IsDiffEmpty(ctx context.Context, branchName, base string) (bool, error)
+	GetChangedFiles(ctx context.Context, base, head string) ([]string, error)
+	GetRebaseHead() (string, error)
+	ParseStagedHunks(ctx context.Context) ([]Hunk, error)
+	ShowDiff(ctx context.Context, left, right string, stat bool) (string, error)
+	ShowCommits(ctx context.Context, base, head string, patch, stat bool) (string, error)
+	GetUnmergedFiles(ctx context.Context) ([]string, error)
+
+	// Worktree operations
+	AddWorktree(ctx context.Context, path string, branch string, detach bool) error
+	RemoveWorktree(ctx context.Context, path string) error
+	ListWorktrees(ctx context.Context) ([]string, error)
+
+	// Runner state
+	SetWorkingDir(dir string)
+	GetWorkingDir() string
 
 	// Low-level Commands
 	RunGitCommand(args ...string) (string, error)
 	RunGitCommandWithContext(ctx context.Context, args ...string) (string, error)
+	RunGitCommandWithEnv(ctx context.Context, env []string, args ...string) (string, error)
+	RunGitCommandRawWithContext(ctx context.Context, args ...string) (string, error)
+
+	// Low-level Ref and Object Management
+	GetRef(name string) (string, error)
+	UpdateRef(name, sha string) error
+	DeleteRef(name string) error
+	CreateBlob(content string) (string, error)
+	ReadBlob(sha string) (string, error)
+	ListRefs(prefix string) (map[string]string, error)
+
+	// Absorb and Hunks
+	GetParentCommitSHA(commitSHA string) (string, error)
+	CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error)
 }
 
 // NewRealRunner returns a standard implementation of Runner that calls
@@ -251,10 +317,46 @@ func NewRealRunner() Runner {
 	return &realRunner{}
 }
 
+// NewRealRunnerWithDir returns a standard implementation of Runner that calls
+// the package-level git functions in a specific directory.
+func NewRealRunnerWithDir(dir string) Runner {
+	return &realRunner{workingDir: dir}
+}
+
 // realRunner implements Runner by calling the actual git package functions
-type realRunner struct{}
+type realRunner struct {
+	workingDir string
+}
+
+func (r *realRunner) SetWorkingDir(dir string) {
+	r.workingDir = dir
+}
+
+func (r *realRunner) GetWorkingDir() string {
+	return r.workingDir
+}
+
+func (r *realRunner) RunGitCommandWithContext(ctx context.Context, args ...string) (string, error) {
+	if r.workingDir != "" {
+		runner := &CommandRunner{workingDir: r.workingDir}
+		return runner.Run(ctx, args...)
+	}
+	return RunGitCommandWithContext(ctx, args...)
+}
+
+func (r *realRunner) RunGitCommandRawWithContext(ctx context.Context, args ...string) (string, error) {
+	if r.workingDir != "" {
+		runner := &CommandRunner{workingDir: r.workingDir}
+		return runner.runInternal(ctx, "", false, args...)
+	}
+	return RunGitCommandRawWithContext(ctx, args...)
+}
 
 func (r *realRunner) InitDefaultRepo() error {
+	if r.workingDir != "" {
+		_, err := RunGitCommandInDir(r.workingDir, "rev-parse", "--is-inside-work-tree")
+		return err
+	}
 	return InitDefaultRepo()
 }
 
@@ -282,6 +384,10 @@ func (r *realRunner) CheckoutBranch(ctx context.Context, branchName string) erro
 	return CheckoutBranch(ctx, branchName)
 }
 
+func (r *realRunner) CreateAndCheckoutBranch(ctx context.Context, branchName string) error {
+	return CreateAndCheckoutBranch(ctx, branchName)
+}
+
 func (r *realRunner) DeleteBranch(ctx context.Context, branchName string) error {
 	return DeleteBranch(ctx, branchName)
 }
@@ -290,36 +396,16 @@ func (r *realRunner) RenameBranch(ctx context.Context, oldName, newName string) 
 	return RenameBranch(ctx, oldName, newName)
 }
 
+func (r *realRunner) CheckoutDetached(ctx context.Context, revision string) error {
+	return CheckoutDetached(ctx, revision)
+}
+
 func (r *realRunner) UpdateBranchRef(branchName, revision string) error {
 	return UpdateBranchRef(branchName, revision)
 }
 
 func (r *realRunner) GetRemoteRevision(branchName string) (string, error) {
 	return GetRemoteRevision(branchName)
-}
-
-func (r *realRunner) GetMetadataRefList() (map[string]string, error) {
-	return GetMetadataRefList()
-}
-
-func (r *realRunner) ReadMetadataRef(branchName string) (*Meta, error) {
-	return ReadMetadataRef(branchName)
-}
-
-func (r *realRunner) WriteMetadataRef(branchName string, meta *Meta) error {
-	return WriteMetadataRef(branchName, meta)
-}
-
-func (r *realRunner) DeleteMetadataRef(branchName string) error {
-	return DeleteMetadataRef(branchName)
-}
-
-func (r *realRunner) BatchReadMetadataRefs(branchNames []string) (map[string]*Meta, map[string]error) {
-	return BatchReadMetadataRefs(branchNames)
-}
-
-func (r *realRunner) RenameMetadataRef(oldName, newName string) error {
-	return RenameMetadataRef(oldName, newName)
 }
 
 func (r *realRunner) GetRevision(branchName string) (string, error) {
@@ -332,6 +418,10 @@ func (r *realRunner) BatchGetRevisions(branchNames []string) (map[string]string,
 
 func (r *realRunner) GetMergeBase(rev1, rev2 string) (string, error) {
 	return GetMergeBase(rev1, rev2)
+}
+
+func (r *realRunner) GetMergeBaseByRef(ref1, ref2 string) (string, error) {
+	return GetMergeBaseByRef(ref1, ref2)
 }
 
 func (r *realRunner) IsAncestor(ancestor, descendant string) (bool, error) {
@@ -378,8 +468,16 @@ func (r *realRunner) RebaseContinue(ctx context.Context) (RebaseResult, error) {
 	return RebaseContinue(ctx)
 }
 
-func (r *realRunner) FinalizeRebase(ctx context.Context, branchName, newRev, oldUpstream, upstream string) error {
-	return FinalizeRebase(ctx, branchName, newRev, oldUpstream, upstream)
+func (r *realRunner) CherryPick(ctx context.Context, commitSHA, onto string) (string, error) {
+	return CherryPick(ctx, commitSHA, onto)
+}
+
+func (r *realRunner) StashPush(ctx context.Context, message string) (string, error) {
+	return StashPush(ctx, message)
+}
+
+func (r *realRunner) StashPop(ctx context.Context) error {
+	return StashPop(ctx)
 }
 
 func (r *realRunner) HardReset(ctx context.Context, revision string) error {
@@ -394,6 +492,22 @@ func (r *realRunner) CommitWithOptions(opts CommitOptions) error {
 	return CommitWithOptions(opts)
 }
 
+func (r *realRunner) Commit(message string, verbose int) error {
+	return Commit(message, verbose)
+}
+
+func (r *realRunner) StageAll(ctx context.Context) error {
+	return StageAll(ctx)
+}
+
+func (r *realRunner) HasStagedChanges(ctx context.Context) (bool, error) {
+	return HasStagedChanges(ctx)
+}
+
+func (r *realRunner) HasUnstagedChanges(ctx context.Context) (bool, error) {
+	return HasUnstagedChanges(ctx)
+}
+
 func (r *realRunner) IsMerged(ctx context.Context, branchName, target string) (bool, error) {
 	return IsMerged(ctx, branchName, target)
 }
@@ -402,10 +516,78 @@ func (r *realRunner) IsDiffEmpty(ctx context.Context, branchName, base string) (
 	return IsDiffEmpty(ctx, branchName, base)
 }
 
+func (r *realRunner) GetChangedFiles(ctx context.Context, base, head string) ([]string, error) {
+	return GetChangedFiles(ctx, base, head)
+}
+
+func (r *realRunner) ParseStagedHunks(ctx context.Context) ([]Hunk, error) {
+	return ParseStagedHunks(ctx)
+}
+
+func (r *realRunner) ShowDiff(ctx context.Context, left, right string, stat bool) (string, error) {
+	return ShowDiff(ctx, left, right, stat)
+}
+
+func (r *realRunner) ShowCommits(ctx context.Context, base, head string, patch, stat bool) (string, error) {
+	return ShowCommits(ctx, base, head, patch, stat)
+}
+
+func (r *realRunner) GetUnmergedFiles(ctx context.Context) ([]string, error) {
+	return GetUnmergedFiles(ctx)
+}
+
+func (r *realRunner) AddWorktree(ctx context.Context, path string, branch string, detach bool) error {
+	return AddWorktree(ctx, path, branch, detach)
+}
+
+func (r *realRunner) RemoveWorktree(ctx context.Context, path string) error {
+	return RemoveWorktree(ctx, path)
+}
+
+func (r *realRunner) ListWorktrees(ctx context.Context) ([]string, error) {
+	return ListWorktrees(ctx)
+}
+
 func (r *realRunner) RunGitCommand(args ...string) (string, error) {
 	return RunGitCommand(args...)
 }
 
-func (r *realRunner) RunGitCommandWithContext(ctx context.Context, args ...string) (string, error) {
-	return RunGitCommandWithContext(ctx, args...)
+func (r *realRunner) RunGitCommandWithEnv(ctx context.Context, env []string, args ...string) (string, error) {
+	return RunGitCommandWithEnv(ctx, env, args...)
+}
+
+func (r *realRunner) GetRef(name string) (string, error) {
+	return GetRef(name)
+}
+
+func (r *realRunner) UpdateRef(name, sha string) error {
+	return UpdateRef(name, sha)
+}
+
+func (r *realRunner) DeleteRef(name string) error {
+	return DeleteRef(name)
+}
+
+func (r *realRunner) CreateBlob(content string) (string, error) {
+	return CreateBlob(content)
+}
+
+func (r *realRunner) ReadBlob(sha string) (string, error) {
+	return ReadBlob(sha)
+}
+
+func (r *realRunner) ListRefs(prefix string) (map[string]string, error) {
+	return ListRefs(prefix)
+}
+
+func (r *realRunner) GetParentCommitSHA(commitSHA string) (string, error) {
+	return GetParentCommitSHA(commitSHA)
+}
+
+func (r *realRunner) CheckCommutation(hunk Hunk, commitSHA, parentSHA string) (bool, error) {
+	return CheckCommutation(hunk, commitSHA, parentSHA)
+}
+
+func (r *realRunner) GetRebaseHead() (string, error) {
+	return GetRebaseHead()
 }

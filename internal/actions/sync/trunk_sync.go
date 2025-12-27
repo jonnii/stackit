@@ -14,7 +14,7 @@ func syncTrunk(ctx *runtime.Context, opts *Options) error {
 	splog := ctx.Splog
 	gctx := ctx.Context
 	trunk := eng.Trunk()
-	trunkName := trunk.Name
+	trunkName := trunk.GetName()
 
 	// Pull trunk
 	splog.Info("Pulling %s from remote...", style.ColorBranchName(trunkName, false))

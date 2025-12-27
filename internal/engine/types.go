@@ -101,39 +101,47 @@ type DeletionStatus struct {
 
 // Branch represents a branch in the stack
 type Branch struct {
-	Name   string
+	name   string
 	Reader BranchReader
+}
+
+// NewBranch creates a new immutable Branch
+func NewBranch(name string, reader BranchReader) Branch {
+	return Branch{
+		name:   name,
+		Reader: reader,
+	}
 }
 
 // GetName returns the branch name. This method allows Branch to implement
 // the engine.Branch interface without creating circular dependencies.
 func (b Branch) GetName() string {
-	return b.Name
+	return b.name
 }
 
 // Equal checks if two branches are equal by comparing their names
 func (b Branch) Equal(other Branch) bool {
-	return b.Name == other.Name
+	return b.name == other.name
 }
 
 // IsTrunk checks if this branch is the trunk
 func (b Branch) IsTrunk() bool {
-	return b.Reader.IsTrunkInternal(b.Name)
+	return b.Reader.IsTrunkInternal(b.name)
 }
 
 // IsTracked checks if this branch is tracked (has metadata)
 func (b Branch) IsTracked() bool {
-	return b.Reader.IsBranchTrackedInternal(b.Name)
+	return b.Reader.IsBranchTrackedInternal(b.name)
 }
 
 // GetScope returns the scope for this branch, inheriting from parent if not set
 func (b Branch) GetScope() Scope {
-	return b.Reader.GetScopeInternal(b.Name)
+	return b.Reader.GetScopeInternal(b.name)
 }
 
 // GetChildren returns the children branches
 func (b Branch) GetChildren() []Branch {
-	return b.Reader.GetChildrenInternal(b.Name)
+	return b.Reader.GetChildrenInternal(b.name)
 }
 
 // GetParentPrecondition returns the parent branch name, or trunk if no parent
@@ -141,61 +149,237 @@ func (b Branch) GetChildren() []Branch {
 func (b Branch) GetParentPrecondition() string {
 	parent := b.Reader.GetParent(b)
 	if parent == nil {
-		return b.Reader.Trunk().Name
+		return b.Reader.Trunk().GetName()
 	}
-	return parent.Name
+	return parent.GetName()
 }
 
 // IsBranchUpToDate checks if this branch is up to date with its parent
 // A branch is up to date if its parent revision matches the stored parent revision
 func (b Branch) IsBranchUpToDate() bool {
-	return b.Reader.IsBranchUpToDateInternal(b.Name)
+	return b.Reader.IsBranchUpToDateInternal(b.name)
 }
 
 // GetRelativeStack returns the stack relative to this branch
 func (b Branch) GetRelativeStack(scope StackRange) []Branch {
-	return b.Reader.GetRelativeStackInternal(b.Name, scope)
+	return b.Reader.GetRelativeStackInternal(b.name, scope)
 }
 
 // GetCommitDate returns the commit date for this branch
 func (b Branch) GetCommitDate() (time.Time, error) {
-	return b.Reader.GetCommitDateInternal(b.Name)
+	return b.Reader.GetCommitDateInternal(b.name)
 }
 
 // GetCommitAuthor returns the commit author for this branch
 func (b Branch) GetCommitAuthor() (string, error) {
-	return b.Reader.GetCommitAuthorInternal(b.Name)
+	return b.Reader.GetCommitAuthorInternal(b.name)
 }
 
 // GetRevision returns the SHA of this branch
 func (b Branch) GetRevision() (string, error) {
-	return b.Reader.GetRevisionInternal(b.Name)
+	return b.Reader.GetRevisionInternal(b.name)
 }
 
 // GetCommitCount returns the number of commits for this branch
 func (b Branch) GetCommitCount() (int, error) {
-	return b.Reader.GetCommitCountInternal(b.Name)
+	return b.Reader.GetCommitCountInternal(b.name)
 }
 
 // GetDiffStats returns the number of lines added and deleted for this branch
 func (b Branch) GetDiffStats() (added int, deleted int, err error) {
-	return b.Reader.GetDiffStatsInternal(b.Name)
+	return b.Reader.GetDiffStatsInternal(b.name)
 }
 
 // GetAllCommits returns commits for this branch in various formats
 func (b Branch) GetAllCommits(format CommitFormat) ([]string, error) {
-	return b.Reader.GetAllCommitsInternal(b.Name, format)
+	return b.Reader.GetAllCommitsInternal(b.name, format)
 }
 
 // PrInfo represents PR information for a branch
+// PrInfo is immutable - use With* methods to create modified copies
 type PrInfo struct {
-	Number  *int
-	Title   string
-	Body    string
-	IsDraft bool
-	State   string // MERGED, CLOSED, OPEN
-	Base    string // Base branch name
-	URL     string // PR URL
+	number  *int
+	title   string
+	body    string
+	isDraft bool
+	state   string // MERGED, CLOSED, OPEN
+	base    string // Base branch name
+	url     string // PR URL
+}
+
+// NewPrInfo creates a new PrInfo instance
+func NewPrInfo(number *int, title, body, state, base, url string, isDraft bool) *PrInfo {
+	return &PrInfo{
+		number:  number,
+		title:   title,
+		body:    body,
+		isDraft: isDraft,
+		state:   state,
+		base:    base,
+		url:     url,
+	}
+}
+
+// Number returns the PR number
+func (p *PrInfo) Number() *int {
+	return p.number
+}
+
+// Title returns the PR title
+func (p *PrInfo) Title() string {
+	return p.title
+}
+
+// Body returns the PR body
+func (p *PrInfo) Body() string {
+	return p.body
+}
+
+// IsDraft returns whether the PR is a draft
+func (p *PrInfo) IsDraft() bool {
+	return p.isDraft
+}
+
+// State returns the PR state (MERGED, CLOSED, OPEN)
+func (p *PrInfo) State() string {
+	return p.state
+}
+
+// Base returns the base branch name
+func (p *PrInfo) Base() string {
+	return p.base
+}
+
+// URL returns the PR URL
+func (p *PrInfo) URL() string {
+	return p.url
+}
+
+// MarshalJSON implements json.Marshaler for PrInfo
+func (p *PrInfo) MarshalJSON() ([]byte, error) {
+	type Alias struct {
+		Number  *int   `json:"number,omitempty"`
+		Base    string `json:"base,omitempty"`
+		URL     string `json:"url,omitempty"`
+		Title   string `json:"title,omitempty"`
+		Body    string `json:"body,omitempty"`
+		State   string `json:"state,omitempty"`
+		IsDraft bool   `json:"is_draft"`
+	}
+	return json.Marshal(&Alias{
+		Number:  p.number,
+		Base:    p.base,
+		URL:     p.url,
+		Title:   p.title,
+		Body:    p.body,
+		State:   p.state,
+		IsDraft: p.isDraft,
+	})
+}
+
+// WithNumber returns a new PrInfo with the number field updated
+func (p *PrInfo) WithNumber(number *int) *PrInfo {
+	return &PrInfo{
+		number:  number,
+		title:   p.title,
+		body:    p.body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithTitle returns a new PrInfo with the title field updated
+func (p *PrInfo) WithTitle(title string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   title,
+		body:    p.body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithBody returns a new PrInfo with the body field updated
+func (p *PrInfo) WithBody(body string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   p.title,
+		body:    body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithTitleAndBody returns a new PrInfo with both title and body fields updated
+// This is more efficient than chaining WithTitle().WithBody() as it only creates one copy
+func (p *PrInfo) WithTitleAndBody(title, body string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   title,
+		body:    body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithIsDraft returns a new PrInfo with the isDraft field updated
+func (p *PrInfo) WithIsDraft(isDraft bool) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   p.title,
+		body:    p.body,
+		isDraft: isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithState returns a new PrInfo with the state field updated
+func (p *PrInfo) WithState(state string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   p.title,
+		body:    p.body,
+		isDraft: p.isDraft,
+		state:   state,
+		base:    p.base,
+		url:     p.url,
+	}
+}
+
+// WithBase returns a new PrInfo with the base field updated
+func (p *PrInfo) WithBase(base string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   p.title,
+		body:    p.body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    base,
+		url:     p.url,
+	}
+}
+
+// WithURL returns a new PrInfo with the url field updated
+func (p *PrInfo) WithURL(url string) *PrInfo {
+	return &PrInfo{
+		number:  p.number,
+		title:   p.title,
+		body:    p.body,
+		isDraft: p.isDraft,
+		state:   p.state,
+		base:    p.base,
+		url:     url,
+	}
 }
 
 // ValidationResult represents the validation state of a branch

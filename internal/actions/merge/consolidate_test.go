@@ -22,15 +22,11 @@ func TestConsolidateMergeExecutor(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfo(pr1))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(pr2))
 		require.NoError(t, err)
 
 		s.Checkout("branch2")
@@ -69,17 +65,11 @@ func TestConsolidateMergeExecutor(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-			Title:  "Feature 1",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoWithTitle(pr1, "Feature 1"))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-			Title:  "Feature 2",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfoWithTitle(pr2, "Feature 2"))
 		require.NoError(t, err)
 
 		plan, _, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
@@ -105,17 +95,11 @@ func TestConsolidateMergeExecutor(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-			Title:  "Add user authentication",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoWithTitle(pr1, "Add user authentication"))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-			Title:  "Add user profile UI",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfoWithTitle(pr2, "Add user profile UI"))
 		require.NoError(t, err)
 
 		s.Checkout("branch2")
@@ -149,17 +133,11 @@ func TestConsolidateMergeExecutor(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err = s.Engine.UpsertPrInfo("batch/feature-a", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-			Title:  "Feature A",
-		})
+		branchA := s.Engine.GetBranch("batch/feature-a")
+		branchB := s.Engine.GetBranch("batch/feature-b")
+		err = s.Engine.UpsertPrInfo(branchA, testhelpers.NewTestPrInfoWithTitle(pr1, "Feature A"))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("batch/feature-b", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-			Title:  "Feature B",
-		})
+		err = s.Engine.UpsertPrInfo(branchB, testhelpers.NewTestPrInfoWithTitle(pr2, "Feature B"))
 		require.NoError(t, err)
 
 		s.Checkout("batch/feature-b")
@@ -208,15 +186,11 @@ func TestConsolidationStepExecution(t *testing.T) {
 		// Add PR info
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfo(pr1))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(pr2))
 		require.NoError(t, err)
 
 		s.Checkout("branch2")
@@ -245,15 +219,11 @@ func TestConsolidationErrorHandling(t *testing.T) {
 		// Add PR info with one closed PR
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "CLOSED", // Already merged
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoClosed(pr1))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(pr2))
 		require.NoError(t, err)
 
 		s.Checkout("branch2")
@@ -279,17 +249,11 @@ func TestConsolidationErrorHandling(t *testing.T) {
 		// Add PR info with draft PR
 		pr1 := 101
 		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number:  &pr1,
-			State:   "OPEN",
-			IsDraft: true,
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoDraft(pr1))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number:  &pr2,
-			State:   "OPEN",
-			IsDraft: false,
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(pr2))
 		require.NoError(t, err)
 
 		s.Checkout("branch2")

@@ -149,8 +149,8 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		// CRITICAL: The bug would cause branch-c to be reparented to main!
 		// If this assertion fails, the bug exists.
 		if parentC != nil {
-			t.Logf("After SyncParentsFromGitHubBase, branch-c parent is: %s", parentC.Name)
-			if parentC.Name == "main" {
+			t.Logf("After SyncParentsFromGitHubBase, branch-c parent is: %s", parentC.GetName())
+			if parentC.GetName() == "main" {
 				t.Errorf("BUG CONFIRMED: branch-c was incorrectly reparented to 'main' instead of keeping 'branch-a'")
 			}
 		} else {
@@ -337,7 +337,7 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		s.Checkout("branch-b")
 
 		// Before sync, set local structure to be specific
-		err = s.Engine.SetParent(context.Background(), "branch-b", "branch-a")
+		err = s.Engine.SetParent(context.Background(), s.Engine.GetBranch("branch-b"), s.Engine.GetBranch("branch-a"))
 		require.NoError(t, err)
 
 		s.ExpectStackStructure(map[string]string{
@@ -362,21 +362,16 @@ func TestSyncDiamondStackParentPreservation(t *testing.T) {
 		branchB := s.Engine.GetBranch("branch-b")
 		parent := s.Engine.GetParent(branchB)
 		require.NotNil(t, parent)
-		require.Equal(t, "main", parent.Name, "branch-b should be reparented to main because it has its own commits")
+		require.Equal(t, "main", parent.GetName(), "branch-b should be reparented to main because it has its own commits")
 	})
 }
 
 // storeLocalPRInfo stores PR info in branch metadata
 func storeLocalPRInfo(t *testing.T, eng engine.Engine, branchName string, prNumber int, baseBranch string) {
 	t.Helper()
-	err := eng.UpsertPrInfo(branchName, &engine.PrInfo{
-		Number:  &prNumber,
-		Title:   branchName + " PR",
-		Body:    "",
-		IsDraft: false,
-		State:   "OPEN",
-		Base:    baseBranch,
-		URL:     "https://github.com/owner/repo/pull/" + string(rune('0'+prNumber)),
-	})
+	branch := eng.GetBranch(branchName)
+	err := eng.UpsertPrInfo(branch, testhelpers.NewTestPrInfoWithTitle(prNumber, branchName+" PR").
+		WithBase(baseBranch).
+		WithURL("https://github.com/owner/repo/pull/"+string(rune('0'+prNumber))))
 	require.NoError(t, err)
 }

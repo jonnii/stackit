@@ -8,6 +8,7 @@ import "stackit.dev/stackit/internal/engine"
 type Branch struct {
 	Name     string
 	Parent   string
+	SHA      string
 	PRNumber int
 	PRState  string // OPEN, MERGED, CLOSED
 	PRTitle  string
@@ -35,6 +36,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-base",
 		Parent:   "main",
+		SHA:      "sha-auth-base",
 		PRNumber: 101,
 		PRState:  "OPEN",
 		PRTitle:  "Add authentication base module",
@@ -48,6 +50,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-validation",
 		Parent:   "feature/auth-base",
+		SHA:      "sha-auth-validation",
 		PRNumber: 102,
 		PRState:  "OPEN",
 		PRTitle:  "Add input validation for auth",
@@ -61,6 +64,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-login",
 		Parent:   "feature/auth-validation",
+		SHA:      "sha-auth-login",
 		PRNumber: 103,
 		PRState:  "OPEN",
 		PRTitle:  "Implement login flow",
@@ -74,6 +78,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-oauth",
 		Parent:   "feature/auth-base",
+		SHA:      "sha-auth-oauth",
 		PRNumber: 105,
 		PRState:  "MERGED",
 		PRTitle:  "Add OAuth support",
@@ -87,6 +92,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/auth-oauth-google",
 		Parent:   "feature/auth-oauth",
+		SHA:      "sha-auth-oauth-google",
 		PRNumber: 106,
 		PRState:  "OPEN",
 		PRTitle:  "Add Google OAuth provider",
@@ -100,6 +106,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/api-refactor",
 		Parent:   "main",
+		SHA:      "sha-api-refactor",
 		PRNumber: 107,
 		PRState:  "OPEN",
 		PRTitle:  "Refactor API layer",
@@ -113,6 +120,7 @@ var demoBranches = []Branch{
 	{
 		Name:     "feature/api-v2",
 		Parent:   "feature/api-refactor",
+		SHA:      "sha-api-v2",
 		PRNumber: 108,
 		PRState:  "CLOSED",
 		PRTitle:  "Implement API v2 endpoints",
@@ -149,15 +157,15 @@ func GetDemoPrInfo(branchName string) *engine.PrInfo {
 	for _, b := range demoBranches {
 		if b.Name == branchName {
 			num := b.PRNumber
-			return &engine.PrInfo{
-				Number:  &num,
-				Title:   b.PRTitle,
-				Body:    "Demo PR body for " + branchName,
-				IsDraft: b.IsDraft,
-				State:   b.PRState,
-				Base:    b.Parent,
-				URL:     "https://github.com/example/repo/pull/" + string(rune('0'+num%10)),
-			}
+			return engine.NewPrInfo(
+				&num,
+				b.PRTitle,
+				"Demo PR body for "+branchName,
+				b.PRState,
+				b.Parent,
+				"https://github.com/example/repo/pull/"+string(rune('0'+num%10)),
+				b.IsDraft,
+			)
 		}
 	}
 	return nil

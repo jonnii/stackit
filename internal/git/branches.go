@@ -131,24 +131,3 @@ func FindRemoteBranch(ctx context.Context, remote string) (string, error) {
 	}
 	return "", nil
 }
-
-// FindCommonlyNamedTrunk checks for common trunk branch names
-// Returns the branch name if exactly one is found, empty string otherwise
-func FindCommonlyNamedTrunk(branchNames []string) string {
-	commonNames := []string{"main", "master", "development", "develop"}
-	var found []string
-
-	for _, name := range branchNames {
-		for _, common := range commonNames {
-			if name == common {
-				found = append(found, name)
-				break
-			}
-		}
-	}
-
-	if len(found) == 1 {
-		return found[0]
-	}
-	return ""
-}

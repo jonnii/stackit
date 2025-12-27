@@ -10,7 +10,6 @@ import (
 
 	"stackit.dev/stackit/internal/config"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -143,24 +142,24 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 
 	// 2. Add detached worktree
 	// Use HEAD to ensure we have a valid starting point without switching branches in main workspace
-	if err := git.AddWorktree(ctx, worktreePath, "HEAD", true); err != nil {
+	if err := eng.AddWorktree(ctx, worktreePath, "HEAD", true); err != nil {
 		_ = os.RemoveAll(tmpDir)
 		return fmt.Errorf("failed to add worktree: %w", err)
 	}
 
 	// 3. Set working directory for git commands
-	originalWorkDir := git.GetWorkingDir()
-	git.SetWorkingDir(worktreePath)
+	originalWorkDir := eng.GetWorkingDir()
+	eng.SetWorkingDir(worktreePath)
 
 	trunk := eng.Trunk()
 
 	// Ensure we restore working directory and clean up on exit (unless there's a conflict)
 	cleanupWorktree := true
 	defer func() {
-		git.SetWorkingDir(originalWorkDir)
+		eng.SetWorkingDir(originalWorkDir)
 		if cleanupWorktree {
 			splog.Debug("Cleaning up worktree at %s", worktreePath)
-			if cleanupErr := git.RemoveWorktree(context.Background(), worktreePath); cleanupErr != nil {
+			if cleanupErr := eng.RemoveWorktree(context.Background(), worktreePath); cleanupErr != nil {
 				splog.Warn("Failed to remove worktree at %s: %v", worktreePath, cleanupErr)
 			}
 			_ = os.RemoveAll(tmpDir)
@@ -170,8 +169,9 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 		if err == nil {
 			// After cleanup, we are back in the main workspace.
 			// Check if the branch we were on was merged/deleted, or if it just needs a worktree refresh.
-			currentBranchName, _ := git.GetCurrentBranch()
-			if currentBranchName != "" {
+			currentBranchObj := eng.CurrentBranch()
+			if currentBranchObj != nil {
+				currentBranchName := currentBranchObj.GetName()
 				wasMerged := false
 				for _, b := range opts.Plan.BranchesToMerge {
 					if b.BranchName == currentBranchName {
@@ -182,14 +182,14 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 
 				if wasMerged {
 					splog.Newline()
-					splog.Info("💡 Branch %s was merged and deleted. Switching main workspace to %s...", currentBranchName, trunk.Name)
-					if checkoutErr := git.CheckoutBranch(ctx, trunk.Name); checkoutErr != nil {
+					splog.Info("💡 Branch %s was merged and deleted. Switching main workspace to %s...", currentBranchName, trunk.GetName())
+					if checkoutErr := eng.CheckoutBranch(ctx, trunk); checkoutErr != nil {
 						splog.Debug("Failed to checkout trunk in main workspace: %v", checkoutErr)
 					}
 				} else {
 					// Refresh the worktree in case the branch ref was moved (e.g. restacked or trunk pulled)
 					// We use git reset --merge HEAD to safely refresh the worktree without losing local changes.
-					_, _ = git.RunGitCommand("reset", "--merge", "HEAD")
+					_, _ = eng.RunGitCommand("reset", "--merge", "HEAD")
 				}
 			}
 		}
@@ -203,7 +203,7 @@ func ExecuteInWorktree(ctx context.Context, eng mergeExecuteEngine, splog *tui.S
 
 	worktreeEng, err := engine.NewEngine(engine.Options{
 		RepoRoot:          worktreePath,
-		Trunk:             trunk.Name,
+		Trunk:             trunk.GetName(),
 		MaxUndoStackDepth: maxUndoDepth,
 	})
 	if err != nil {
@@ -404,25 +404,26 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 	switch step.StepType {
 	case StepMergePR:
 		// Validate PR still exists and is open
-		prInfo, err := eng.GetPrInfo(step.BranchName)
+		branch := eng.GetBranch(step.BranchName)
+		prInfo, err := eng.GetPrInfo(branch)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
-		if prInfo == nil || prInfo.Number == nil {
+		if prInfo == nil || prInfo.Number() == nil {
 			return fmt.Errorf("PR not found for branch %s", step.BranchName)
 		}
-		if prInfo.State != prStateOpen {
-			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
+		if prInfo.State() != prStateOpen {
+			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number(), step.BranchName, prInfo.State())
 		}
 		// Optionally check CI checks haven't changed to failing or pending
 		if !opts.Force && githubClient != nil {
 			status, err := githubClient.GetPRChecksStatus(ctx, step.BranchName)
 			if err == nil {
 				if !status.Passing {
-					return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number, step.BranchName)
+					return fmt.Errorf("PR #%d for branch %s has failing CI checks", *prInfo.Number(), step.BranchName)
 				}
 				if status.Pending {
-					return fmt.Errorf("PR #%d for branch %s has pending CI checks", *prInfo.Number, step.BranchName)
+					return fmt.Errorf("PR #%d for branch %s has pending CI checks", *prInfo.Number(), step.BranchName)
 				}
 			}
 		}
@@ -440,11 +441,12 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 
 	case StepUpdatePRBase:
 		// Validate PR exists
-		prInfo, err := eng.GetPrInfo(step.BranchName)
+		branch := eng.GetBranch(step.BranchName)
+		prInfo, err := eng.GetPrInfo(branch)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
-		if prInfo == nil || prInfo.Number == nil {
+		if prInfo == nil || prInfo.Number() == nil {
 			return fmt.Errorf("PR not found for branch %s", step.BranchName)
 		}
 
@@ -453,15 +455,16 @@ func validateStepPreconditions(ctx context.Context, step PlanStep, eng mergeExec
 
 	case StepWaitCI:
 		// Validate PR exists and is open
-		prInfo, err := eng.GetPrInfo(step.BranchName)
+		branch := eng.GetBranch(step.BranchName)
+		prInfo, err := eng.GetPrInfo(branch)
 		if err != nil {
 			return fmt.Errorf("failed to get PR info: %w", err)
 		}
-		if prInfo == nil || prInfo.Number == nil {
+		if prInfo == nil || prInfo.Number() == nil {
 			return fmt.Errorf("PR not found for branch %s", step.BranchName)
 		}
-		if prInfo.State != prStateOpen {
-			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number, step.BranchName, prInfo.State)
+		if prInfo.State() != prStateOpen {
+			return fmt.Errorf("PR #%d for branch %s is %s (not open)", *prInfo.Number(), step.BranchName, prInfo.State())
 		}
 	}
 
@@ -480,7 +483,7 @@ func executeStepWithProgress(ctx context.Context, step PlanStep, stepIndex int, 
 // executeStep executes a single step
 func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, splog *tui.Splog, githubClient github.Client, repoRoot string, opts ExecuteOptions) error {
 	trunk := eng.Trunk() // Cache trunk for this function scope
-	trunkName := trunk.Name
+	trunkName := trunk.GetName()
 	switch step.StepType {
 	case StepMergePR:
 		if githubClient == nil {
@@ -529,7 +532,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			if parent == nil {
 				actualParent = trunkName
 			} else {
-				actualParent = parent.Name
+				actualParent = parent.GetName()
 			}
 		}
 
@@ -537,7 +540,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		case engine.RestackDone:
 			// Success - now push the rebased branch and update PR base
 			// Force push is required since we rebased
-			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(), true, false); err != nil {
+			if err := eng.PushBranch(ctx, step.BranchName, eng.GetRemote(), true, false); err != nil {
 				return fmt.Errorf("failed to push rebased branch %s: %w", step.BranchName, err)
 			}
 			splog.Debug("Pushed rebased branch %s to remote", step.BranchName)
@@ -553,7 +556,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 			currentBranch := eng.CurrentBranch()
 			currentBranchName := ""
 			if currentBranch != nil {
-				currentBranchName = currentBranch.Name
+				currentBranchName = currentBranch.GetName()
 			}
 			continuation := &config.ContinuationState{
 				RebasedBranchBase:     result.RebasedBranchBase,
@@ -566,7 +569,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		case engine.RestackUnneeded:
 			// Already up to date, but still need to ensure PR base is correct
 			// Push in case local is ahead of remote
-			if err := git.PushBranch(ctx, step.BranchName, git.GetRemote(), true, false); err != nil {
+			if err := eng.PushBranch(ctx, step.BranchName, eng.GetRemote(), true, false); err != nil {
 				splog.Debug("Failed to push branch %s (may already be up to date): %v", step.BranchName, err)
 			}
 			// Update PR base to the actual parent (not always trunk)
@@ -579,7 +582,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 		// Only delete if branch is tracked
 		branch := eng.GetBranch(step.BranchName)
 		if branch.IsTracked() {
-			if err := eng.DeleteBranch(ctx, step.BranchName); err != nil {
+			if err := eng.DeleteBranch(ctx, branch); err != nil {
 				// Non-fatal - branch might already be deleted
 				splog.Debug("Failed to delete branch %s (may already be deleted): %v", step.BranchName, err)
 			}
@@ -618,7 +621,7 @@ func executeStep(ctx context.Context, step PlanStep, eng mergeExecuteEngine, spl
 // This is used in top-down strategy to rebase the current branch onto trunk
 func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClient github.Client, step PlanStep) error {
 	trunk := eng.Trunk()
-	trunkName := trunk.Name
+	trunkName := trunk.GetName()
 
 	// Get the parent revision (old base)
 	branch := eng.GetBranch(step.BranchName)
@@ -627,7 +630,7 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	if parent == nil {
 		parentName = trunkName
 	} else {
-		parentName = parent.Name
+		parentName = parent.GetName()
 	}
 
 	// Get the old parent revision
@@ -644,17 +647,36 @@ func executeUpdatePRBase(ctx context.Context, eng mergeExecuteEngine, githubClie
 	}
 
 	// Rebase the branch onto trunk
-	gitResult, err := git.Rebase(ctx, step.BranchName, trunkName, oldParentRev)
+	// Save current branch state since git.Rebase no longer does this
+	currentBranchObj := eng.CurrentBranch()
+	currentBranch := ""
+	if currentBranchObj != nil {
+		currentBranch = currentBranchObj.GetName()
+	}
+	var currentRev string
+	if currentBranch == "" {
+		currentRev, _ = eng.RunGitCommandWithContext(ctx, "rev-parse", "HEAD")
+	}
+
+	gitResult, err := eng.Rebase(ctx, step.BranchName, trunkName, oldParentRev)
+
+	// Restore original branch state
+	if currentBranch != "" {
+		_ = eng.CheckoutBranch(ctx, eng.GetBranch(currentBranch))
+	} else if currentRev != "" {
+		_, _ = eng.RunGitCommandWithContext(ctx, "checkout", "--detach", currentRev)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to rebase: %w", err)
 	}
 
-	if gitResult == git.RebaseConflict {
+	if gitResult == engine.RestackConflict {
 		return fmt.Errorf("rebase conflict while rebasing %s onto %s", step.BranchName, trunkName)
 	}
 
 	// Update parent to trunk
-	if err := eng.SetParent(ctx, step.BranchName, trunkName); err != nil {
+	if err := eng.SetParent(ctx, eng.GetBranch(step.BranchName), eng.GetBranch(trunkName)); err != nil {
 		return fmt.Errorf("failed to update parent: %w", err)
 	}
 
@@ -733,13 +755,14 @@ func executeWaitCIWithProgress(ctx context.Context, step PlanStep, stepIndex int
 	lastProgressReport := startTime
 
 	// Get PR info for better error messages
-	prInfo, err := eng.GetPrInfo(step.BranchName)
+	branch := eng.GetBranch(step.BranchName)
+	prInfo, err := eng.GetPrInfo(branch)
 	if err != nil {
 		return fmt.Errorf("failed to get PR info: %w", err)
 	}
 	prNumber := step.PRNumber
-	if prInfo != nil && prInfo.Number != nil {
-		prNumber = *prInfo.Number
+	if prInfo != nil && prInfo.Number() != nil {
+		prNumber = *prInfo.Number()
 	}
 
 	if opts.Reporter == nil {
@@ -819,13 +842,13 @@ func CheckSyncStatus(ctx context.Context, eng engine.Engine, splog *tui.Splog) (
 
 	if pullResult == engine.PullDone {
 		needsSync = true
-		staleBranches = append(staleBranches, eng.Trunk().Name)
+		staleBranches = append(staleBranches, eng.Trunk().GetName())
 	}
 
 	// Check all tracked branches
 	allBranches := eng.AllBranches()
 	for _, branch := range allBranches {
-		branchName := branch.Name
+		branchName := branch.GetName()
 		branch := eng.GetBranch(branchName)
 		if branch.IsTrunk() {
 			continue

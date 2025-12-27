@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/tui"
 )
@@ -136,7 +135,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		// Collect all branches with the specified scope
 		scopeBranches := []engine.Branch{}
 		for _, b := range eng.AllBranches() {
-			if !b.IsTrunk() && eng.GetScopeInternal(b.Name).String() == opts.Scope {
+			if !b.IsTrunk() && eng.GetScopeInternal(b.GetName()).String() == opts.Scope {
 				scopeBranches = append(scopeBranches, b)
 			}
 		}
@@ -148,7 +147,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		scopeBranches = eng.SortBranchesTopologically(scopeBranches)
 		allBranches = make([]string, len(scopeBranches))
 		for i, b := range scopeBranches {
-			allBranches[i] = b.Name
+			allBranches[i] = b.GetName()
 		}
 		// In scope mode, the "current branch" for the plan is the top-most branch in the scope
 		planCurrentBranch = allBranches[len(allBranches)-1]
@@ -159,7 +158,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 		// Check if target branch is tracked
 		if !targetBranch.IsTracked() {
-			return nil, nil, fmt.Errorf("branch %s is not tracked by stackit", targetBranch.Name)
+			return nil, nil, fmt.Errorf("branch %s is not tracked by stackit", targetBranch.GetName())
 		}
 
 		// 2. Collect branches from trunk to target
@@ -171,11 +170,11 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		allBranches = make([]string, 0, len(parentBranches)+1)
 		for _, branch := range parentBranches {
 			if !branch.IsTrunk() {
-				allBranches = append(allBranches, branch.Name)
+				allBranches = append(allBranches, branch.GetName())
 			}
 		}
-		allBranches = append(allBranches, targetBranch.Name)
-		planCurrentBranch = targetBranch.Name
+		allBranches = append(allBranches, targetBranch.GetName())
+		planCurrentBranch = targetBranch.GetName()
 	}
 
 	// 3. For each branch: fetch PR info, check status, CI checks
@@ -188,7 +187,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 	for _, branchName := range allBranches {
 		// Get PR info
-		prInfo, err := eng.GetPrInfo(branchName)
+		branch := eng.GetBranch(branchName)
+		prInfo, err := eng.GetPrInfo(branch)
 		if err != nil {
 			splog.Debug("Failed to get PR info for %s: %v", branchName, err)
 			validation.Valid = false
@@ -197,28 +197,28 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		}
 
 		// Check if PR exists
-		if prInfo == nil || prInfo.Number == nil {
+		if prInfo == nil || prInfo.Number() == nil {
 			validation.Valid = false
 			validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s has no associated PR", branchName))
 			continue
 		}
 
 		// Check PR state
-		state := prInfo.State
+		state := prInfo.State()
 		if state != "OPEN" {
 			if state == "MERGED" {
-				splog.Debug("Skipping %s: PR #%d is already merged", branchName, *prInfo.Number)
+				splog.Debug("Skipping %s: PR #%d is already merged", branchName, *prInfo.Number())
 				continue
 			}
 			validation.Valid = false
-			validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d is %s (not open)", branchName, *prInfo.Number, state))
+			validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d is %s (not open)", branchName, *prInfo.Number(), state))
 			continue
 		}
 
 		// Check if draft
-		if prInfo.IsDraft && !opts.Force {
+		if prInfo.IsDraft() && !opts.Force {
 			validation.Valid = false
-			validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d is a draft", branchName, *prInfo.Number))
+			validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d is a draft", branchName, *prInfo.Number()))
 		}
 
 		// Check if local matches remote
@@ -227,9 +227,9 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 			splog.Debug("Failed to check if branch matches remote: %v", err)
 			matchesRemote = true // Assume matches if check fails
 		}
-		if !matchesRemote && prInfo != nil && prInfo.Number != nil {
+		if !matchesRemote && prInfo != nil && prInfo.Number() != nil {
 			// Get detailed difference information
-			diffInfo := getBranchRemoteDifference(branchName, splog)
+			diffInfo, _ := eng.GetBranchRemoteDifference(branchName)
 			if diffInfo != "" {
 				validation.Warnings = append(validation.Warnings, fmt.Sprintf("Branch %s differs from remote: %s", branchName, diffInfo))
 			} else {
@@ -250,7 +250,7 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 				checksStatus = ChecksFailing
 				if !opts.Force {
 					validation.Valid = false
-					validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number))
+					validation.Errors = append(validation.Errors, fmt.Sprintf("Branch %s PR #%d has failing CI checks", branchName, *prInfo.Number()))
 				}
 			default:
 				checksStatus = ChecksPassing
@@ -259,9 +259,9 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 
 		branchesToMerge = append(branchesToMerge, BranchMergeInfo{
 			BranchName:    branchName,
-			PRNumber:      *prInfo.Number,
-			PRURL:         prInfo.URL,
-			IsDraft:       prInfo.IsDraft,
+			PRNumber:      *prInfo.Number(),
+			PRURL:         prInfo.URL(),
+			IsDraft:       prInfo.IsDraft(),
 			ChecksStatus:  checksStatus,
 			MatchesRemote: matchesRemote,
 		})
@@ -285,8 +285,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		}
 		children := ancestorBranch.GetChildren()
 		for _, child := range children {
-			if !mergedSet[child.Name] {
-				validation.Infos = append(validation.Infos, fmt.Sprintf("Branch %s is not part of this merge and will be moved to %s", child.Name, eng.Trunk().Name))
+			if !mergedSet[child.GetName()] {
+				validation.Infos = append(validation.Infos, fmt.Sprintf("Branch %s is not part of this merge and will be moved to %s", child.GetName(), eng.Trunk().GetName()))
 			}
 		}
 	}
@@ -296,17 +296,17 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 	if opts.Scope != "" {
 		// In scope mode, find all tracked branches with the scope that are not being merged
 		for _, branch := range eng.AllBranches() {
-			if branch.IsTracked() && eng.GetScopeInternal(branch.Name).String() == opts.Scope {
+			if branch.IsTracked() && eng.GetScopeInternal(branch.GetName()).String() == opts.Scope {
 				// Check if this branch is not already being merged
 				isBeingMerged := false
 				for _, merged := range allBranches {
-					if branch.Name == merged {
+					if branch.GetName() == merged {
 						isBeingMerged = true
 						break
 					}
 				}
 				if !isBeingMerged {
-					upstackBranches = append(upstackBranches, branch.Name)
+					upstackBranches = append(upstackBranches, branch.GetName())
 				}
 			}
 		}
@@ -322,8 +322,8 @@ func CreateMergePlan(ctx context.Context, eng mergePlanEngine, splog *tui.Splog,
 		currentBranchObj := eng.GetBranch(planCurrentBranch)
 		upstack := eng.GetRelativeStackUpstack(currentBranchObj)
 		for _, ub := range upstack {
-			if ub.IsTracked() && !mergedMap[ub.Name] {
-				upstackBranches = append(upstackBranches, ub.Name)
+			if ub.IsTracked() && !mergedMap[ub.GetName()] {
+				upstackBranches = append(upstackBranches, ub.GetName())
 			}
 		}
 	}
@@ -554,63 +554,4 @@ func FormatMergePlan(plan *Plan, validation *PlanValidation) string {
 	}
 
 	return result.String()
-}
-
-func getBranchRemoteDifference(branchName string, splog *tui.Splog) string {
-	localSha, err := git.GetRevision(branchName)
-	if err != nil {
-		splog.Debug("Failed to get local SHA for %s: %v", branchName, err)
-		return ""
-	}
-
-	remoteSha, err := git.GetRemoteRevision(branchName)
-	if err != nil {
-		splog.Debug("Remote tracking branch not found for %s, fetching from remote: %v", branchName, err)
-		remoteShas, err := git.FetchRemoteShas("origin")
-		if err != nil {
-			splog.Debug("Failed to fetch remote SHAs: %v", err)
-			localShort := localSha
-			if len(localSha) > 7 {
-				localShort = localSha[:7]
-			}
-			return fmt.Sprintf("local: %s (unable to fetch remote SHA)", localShort)
-		}
-		var exists bool
-		remoteSha, exists = remoteShas[branchName]
-		if !exists {
-			localShort := localSha
-			if len(localSha) > 7 {
-				localShort = localSha[:7]
-			}
-			return fmt.Sprintf("local: %s (branch not found on remote)", localShort)
-		}
-	}
-
-	if localSha == remoteSha {
-		return ""
-	}
-
-	localShort := localSha
-	if len(localSha) > 7 {
-		localShort = localSha[:7]
-	}
-	remoteShort := remoteSha
-	if len(remoteSha) > 7 {
-		remoteShort = remoteSha[:7]
-	}
-
-	remoteBranchRef := "refs/remotes/origin/" + branchName
-	commonAncestor, err := git.GetMergeBaseByRef(branchName, remoteBranchRef)
-	if err != nil {
-		return fmt.Sprintf("local: %s, remote: %s (likely local is ahead)", localShort, remoteShort)
-	}
-
-	switch {
-	case commonAncestor == localSha:
-		return fmt.Sprintf("local is behind remote (local: %s, remote: %s)", localShort, remoteShort)
-	case commonAncestor == remoteSha:
-		return fmt.Sprintf("local is ahead of remote (local: %s, remote: %s)", localShort, remoteShort)
-	default:
-		return fmt.Sprintf("local and remote have diverged (local: %s, remote: %s)", localShort, remoteShort)
-	}
 }

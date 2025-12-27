@@ -7,7 +7,6 @@ import (
 
 	"stackit.dev/stackit/internal/actions"
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/github"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui/style"
@@ -19,8 +18,17 @@ func ValidateBranchesToSubmit(ctx context.Context, branches []string, eng engine
 	// Sync PR info first
 	repoOwner, repoName, _ := utils.GetRepoInfo(ctx)
 	if repoOwner != "" && repoName != "" {
-		if err := github.SyncPrInfo(ctx, branches, repoOwner, repoName, func(name string, prInfo *git.PrInfo) {
-			_ = eng.UpdatePrInfo(name, prInfo)
+		if err := github.SyncPrInfo(ctx, branches, repoOwner, repoName, func(name string, prInfo *github.PullRequestInfo) {
+			branch := eng.GetBranch(name)
+			_ = eng.UpsertPrInfo(branch, engine.NewPrInfo(
+				&prInfo.Number,
+				prInfo.Title,
+				prInfo.Body,
+				prInfo.State,
+				prInfo.Base,
+				prInfo.HTMLURL,
+				prInfo.Draft,
+			))
 		}); err != nil {
 			// Non-fatal, continue
 			runtimeCtx.Splog.Debug("Failed to sync PR info: %v", err)
@@ -122,11 +130,12 @@ func validateNoEmptyBranches(ctx context.Context, branches []string, eng engine.
 func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, runtimeCtx *runtime.Context) error {
 	mergedOrClosedBranches := []string{}
 	for _, branchName := range branches {
-		prInfo, err := eng.GetPrInfo(branchName)
+		branch := eng.GetBranch(branchName)
+		prInfo, err := eng.GetPrInfo(branch)
 		if err != nil {
 			continue
 		}
-		if prInfo != nil && (prInfo.State == "MERGED" || prInfo.State == "CLOSED") {
+		if prInfo != nil && (prInfo.State() == "MERGED" || prInfo.State() == "CLOSED") {
 			mergedOrClosedBranches = append(mergedOrClosedBranches, branchName)
 		}
 	}
@@ -147,7 +156,8 @@ func validateNoMergedOrClosedBranches(branches []string, eng engine.Engine, runt
 	// TODO: Add interactive prompt when needed
 	for _, branchName := range mergedOrClosedBranches {
 		// Clear PR info to allow creating new PR
-		_ = eng.UpsertPrInfo(branchName, &engine.PrInfo{})
+		branch := eng.GetBranch(branchName)
+		_ = eng.UpsertPrInfo(branch, engine.NewPrInfo(nil, "", "", "", "", "", false))
 	}
 
 	return nil

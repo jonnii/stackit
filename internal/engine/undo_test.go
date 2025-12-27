@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/engine"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -253,7 +252,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		allBranches := s.Engine.AllBranches()
 		branches := make([]string, len(allBranches))
 		for i, b := range allBranches {
-			branches[i] = b.Name
+			branches[i] = b.GetName()
 		}
 		require.Contains(t, branches, "new-branch")
 
@@ -268,7 +267,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		allBranches2 := s.Engine.AllBranches()
 		branches = make([]string, len(allBranches2))
 		for i, b := range allBranches2 {
-			branches[i] = b.Name
+			branches[i] = b.GetName()
 		}
 		require.NotContains(t, branches, "new-branch")
 	})
@@ -282,7 +281,7 @@ func TestRestoreSnapshot(t *testing.T) {
 			TrackBranch("feature", "main")
 
 		// Get initial metadata SHA
-		initialMetadata, err := git.GetMetadataRefList()
+		initialMetadata, err := s.Engine.ListMetadataRefs()
 		require.NoError(t, err)
 		initialFeatureMetadataSHA := initialMetadata["feature"]
 		require.NotEmpty(t, initialFeatureMetadataSHA)
@@ -292,7 +291,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.NoError(t, err)
 
 		// Modify metadata by changing parent
-		err = s.Engine.SetParent(context.Background(), "feature", "main")
+		err = s.Engine.SetParent(context.Background(), s.Engine.GetBranch("feature"), s.Engine.GetBranch("main"))
 		require.NoError(t, err)
 
 		// Restore snapshot
@@ -302,7 +301,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify metadata restored
-		restoredMetadata, err := git.GetMetadataRefList()
+		restoredMetadata, err := s.Engine.ListMetadataRefs()
 		require.NoError(t, err)
 		require.Equal(t, initialFeatureMetadataSHA, restoredMetadata["feature"])
 	})
@@ -350,7 +349,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete feature branch manually
-		err = s.Engine.DeleteBranch(context.Background(), "feature")
+		err = s.Engine.DeleteBranch(context.Background(), s.Engine.GetBranch("feature"))
 		require.NoError(t, err)
 
 		// Restore snapshot - should recreate the branch
@@ -364,7 +363,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		allBranches := s.Engine.AllBranches()
 		branches := make([]string, len(allBranches))
 		for i, b := range allBranches {
-			branches[i] = b.Name
+			branches[i] = b.GetName()
 		}
 		require.Contains(t, branches, "feature")
 	})
@@ -381,7 +380,7 @@ func TestRestoreSnapshot(t *testing.T) {
 
 		// Delete feature branch
 		s.Checkout("main")
-		err = s.Engine.DeleteBranch(context.Background(), "feature")
+		err = s.Engine.DeleteBranch(context.Background(), s.Engine.GetBranch("feature"))
 		require.NoError(t, err)
 
 		// Restore snapshot - this will recreate the feature branch
@@ -403,7 +402,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		allBranches := s.Engine.AllBranches()
 		branches := make([]string, len(allBranches))
 		for i, b := range allBranches {
-			branches[i] = b.Name
+			branches[i] = b.GetName()
 		}
 		require.Contains(t, branches, "feature")
 	})

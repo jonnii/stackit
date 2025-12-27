@@ -347,7 +347,7 @@ func runMergeTypeSelector(ctx *runtime.Context, dryRun bool, force bool) error {
 		// Get all unique scopes
 		scopes := make(map[string]bool)
 		for _, b := range eng.AllBranches() {
-			s := eng.GetScopeInternal(b.Name).String()
+			s := eng.GetScopeInternal(b.GetName()).String()
 			if s != "" && s != "none" && s != "clear" {
 				scopes[s] = true
 			}

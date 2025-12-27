@@ -37,7 +37,7 @@ If the branch has children, they will also be untracked.`,
 				if currentBranch == nil {
 					return errors.ErrNotOnBranch
 				}
-				branchName = currentBranch.Name
+				branchName = currentBranch.GetName()
 			}
 
 			// Execute untrack action

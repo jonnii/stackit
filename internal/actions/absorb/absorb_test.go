@@ -81,8 +81,8 @@ func TestAbsorbScopeBoundaries(t *testing.T) {
 
 		// Should only include scoped-a and scoped-b, not unscoped-c or main
 		require.Len(t, downstackBranches, 2)
-		require.Equal(t, "scoped-b", downstackBranches[0].Name)
-		require.Equal(t, "scoped-a", downstackBranches[1].Name)
+		require.Equal(t, "scoped-b", downstackBranches[0].GetName())
+		require.Equal(t, "scoped-a", downstackBranches[1].GetName())
 	})
 
 	t.Run("absorb includes all branches when no scope set", func(t *testing.T) {
@@ -122,8 +122,8 @@ func TestAbsorbScopeBoundaries(t *testing.T) {
 		// Since no scope is set, should include all branches down to the first scope boundary
 		// In this case, no scopes are set, so includes current and ancestors (excluding trunk)
 		require.Len(t, downstackBranches, 2)
-		require.Equal(t, "branch-b", downstackBranches[0].Name)
-		require.Equal(t, "branch-a", downstackBranches[1].Name)
+		require.Equal(t, "branch-b", downstackBranches[0].GetName())
+		require.Equal(t, "branch-a", downstackBranches[1].GetName())
 	})
 
 	t.Run("absorb stops at first scope boundary encountered", func(t *testing.T) {
@@ -175,7 +175,7 @@ func TestAbsorbScopeBoundaries(t *testing.T) {
 		// Should stop at different-c (PROJ-456) and not include scoped-d
 		// So should include: scoped-b, scoped-a, main (but stops at different-c)
 		require.Len(t, downstackBranches, 2)
-		require.Equal(t, "scoped-b", downstackBranches[0].Name)
-		require.Equal(t, "scoped-a", downstackBranches[1].Name)
+		require.Equal(t, "scoped-b", downstackBranches[0].GetName())
+		require.Equal(t, "scoped-a", downstackBranches[1].GetName())
 	})
 }

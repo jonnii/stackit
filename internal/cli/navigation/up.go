@@ -9,7 +9,6 @@ import (
 
 	"stackit.dev/stackit/internal/cli/common"
 	"stackit.dev/stackit/internal/errors"
-	"stackit.dev/stackit/internal/git"
 	"stackit.dev/stackit/internal/runtime"
 	"stackit.dev/stackit/internal/tui"
 	"stackit.dev/stackit/internal/tui/style"
@@ -58,7 +57,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 				}
 
 				// Traverse up the specified number of steps
-				targetBranch := currentBranch.Name
+				targetBranch := currentBranch.GetName()
 				for i := 0; i < steps; i++ {
 					targetBranchObj := ctx.Engine.GetBranch(targetBranch)
 					children := targetBranchObj.GetChildren()
@@ -74,7 +73,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 					var nextBranch string
 					var err error
 					if len(children) == 1 {
-						nextBranch = children[0].Name
+						nextBranch = children[0].GetName()
 					} else {
 						// Multiple children, decide which way to go
 						if toBranch != "" {
@@ -84,10 +83,10 @@ the --to flag is used to specify a target branch to navigate towards.`,
 								upstack := ctx.Engine.GetRelativeStackUpstack(child)
 								upstackNames := make([]string, len(upstack))
 								for i, b := range upstack {
-									upstackNames[i] = b.Name
+									upstackNames[i] = b.GetName()
 								}
-								if child.Name == toBranch || slices.Contains(upstackNames, toBranch) {
-									candidates = append(candidates, child.Name)
+								if child.GetName() == toBranch || slices.Contains(upstackNames, toBranch) {
+									candidates = append(candidates, child.GetName())
 								}
 							}
 
@@ -102,7 +101,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 								// Still ambiguous even with --to (shouldn't happen in a tree)
 								childNames := make([]string, len(children))
 								for i, c := range children {
-									childNames[i] = c.Name
+									childNames[i] = c.GetName()
 								}
 								nextBranch, err = promptForChild(childNames, targetBranch)
 								if err != nil {
@@ -112,7 +111,7 @@ the --to flag is used to specify a target branch to navigate towards.`,
 						} else {
 							childNames := make([]string, len(children))
 							for i, c := range children {
-								childNames[i] = c.Name
+								childNames[i] = c.GetName()
 							}
 							nextBranch, err = promptForChild(childNames, targetBranch)
 							if err != nil {
@@ -126,13 +125,13 @@ the --to flag is used to specify a target branch to navigate towards.`,
 				}
 
 				// Check if we actually moved
-				if targetBranch == currentBranch.Name {
+				if targetBranch == currentBranch.GetName() {
 					return nil
 				}
 
 				// Checkout the target branch
 				targetBranchObj := ctx.Engine.GetBranch(targetBranch)
-				if err := git.CheckoutBranch(ctx.Context, targetBranchObj.Name); err != nil {
+				if err := ctx.Engine.CheckoutBranch(ctx.Context, targetBranchObj); err != nil {
 					return fmt.Errorf("failed to checkout branch %s: %w", targetBranch, err)
 				}
 

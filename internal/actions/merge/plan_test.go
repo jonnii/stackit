@@ -21,17 +21,11 @@ func TestCreateMergePlan(t *testing.T) {
 			})
 
 		// Add PR info
-		pr1 := 101
-		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfo(101))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(102))
 		require.NoError(t, err)
 
 		// Switch to branch2
@@ -60,12 +54,8 @@ func TestCreateMergePlan(t *testing.T) {
 			})
 
 		// Add draft PR
-		pr1 := 101
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number:  &pr1,
-			State:   "OPEN",
-			IsDraft: true,
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoDraft(101))
 		require.NoError(t, err)
 
 		// Make sure we're on branch1
@@ -90,12 +80,8 @@ func TestCreateMergePlan(t *testing.T) {
 			})
 
 		// Add draft PR
-		pr1 := 101
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number:  &pr1,
-			State:   "OPEN",
-			IsDraft: true,
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfoDraft(101))
 		require.NoError(t, err)
 
 		// Make sure we're on branch1
@@ -128,9 +114,11 @@ func TestCreateMergePlan(t *testing.T) {
 		// Add PR info for P and C1
 		prP := 101
 		prC1 := 102
-		err := s.Engine.UpsertPrInfo("P", &engine.PrInfo{Number: &prP, State: "OPEN"})
+		branchP := s.Engine.GetBranch("P")
+		branchC1 := s.Engine.GetBranch("C1")
+		err := s.Engine.UpsertPrInfo(branchP, testhelpers.NewTestPrInfo(prP))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("C1", &engine.PrInfo{Number: &prC1, State: "OPEN"})
+		err = s.Engine.UpsertPrInfo(branchC1, testhelpers.NewTestPrInfo(prC1))
 		require.NoError(t, err)
 
 		plan, _, err := merge.CreateMergePlan(s.Context.Context, s.Engine, s.Context.Splog, s.Context.GitHubClient, merge.CreatePlanOptions{
@@ -182,20 +170,14 @@ func TestCreateMergePlan(t *testing.T) {
 		prA := 101
 		prB := 102
 		prC := 103
-		err = s.Engine.UpsertPrInfo("feature-a", &engine.PrInfo{
-			Number: &prA,
-			State:  "OPEN",
-		})
+		branchA := s.Engine.GetBranch("feature-a")
+		branchB := s.Engine.GetBranch("feature-b")
+		branchC := s.Engine.GetBranch("feature-c")
+		err = s.Engine.UpsertPrInfo(branchA, testhelpers.NewTestPrInfo(prA))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("feature-b", &engine.PrInfo{
-			Number: &prB,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchB, testhelpers.NewTestPrInfo(prB))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("feature-c", &engine.PrInfo{
-			Number: &prC,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchC, testhelpers.NewTestPrInfo(prC))
 		require.NoError(t, err)
 
 		// Create plan with scope
@@ -240,20 +222,14 @@ func TestCreateMergePlan(t *testing.T) {
 		prA := 201
 		prB := 202
 		prC := 203
-		err = s.Engine.UpsertPrInfo("scoped-a", &engine.PrInfo{
-			Number: &prA,
-			State:  "OPEN",
-		})
+		branchA := s.Engine.GetBranch("scoped-a")
+		branchB := s.Engine.GetBranch("scoped-b")
+		branchC := s.Engine.GetBranch("unscoped-c")
+		err = s.Engine.UpsertPrInfo(branchA, testhelpers.NewTestPrInfo(prA))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("scoped-b", &engine.PrInfo{
-			Number: &prB,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchB, testhelpers.NewTestPrInfo(prB))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("unscoped-c", &engine.PrInfo{
-			Number: &prC,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchC, testhelpers.NewTestPrInfo(prC))
 		require.NoError(t, err)
 
 		// Create plan with scope
@@ -312,20 +288,14 @@ func TestCreateMergePlan(t *testing.T) {
 		prParent := 301
 		prChild := 302
 		prGrandchild := 303
-		err = s.Engine.UpsertPrInfo("parent", &engine.PrInfo{
-			Number: &prParent,
-			State:  "OPEN",
-		})
+		branchParent := s.Engine.GetBranch("parent")
+		branchChild := s.Engine.GetBranch("child")
+		branchGrandchild := s.Engine.GetBranch("grandchild")
+		err = s.Engine.UpsertPrInfo(branchParent, testhelpers.NewTestPrInfo(prParent))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("child", &engine.PrInfo{
-			Number: &prChild,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchChild, testhelpers.NewTestPrInfo(prChild))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("grandchild", &engine.PrInfo{
-			Number: &prGrandchild,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branchGrandchild, testhelpers.NewTestPrInfo(prGrandchild))
 		require.NoError(t, err)
 
 		// Create plan with scope - should include all branches that inherit the scope
@@ -354,17 +324,11 @@ func TestCreateMergePlan(t *testing.T) {
 			})
 
 		// Add PR info
-		pr1 := 101
-		pr2 := 102
-		err := s.Engine.UpsertPrInfo("branch1", &engine.PrInfo{
-			Number: &pr1,
-			State:  "OPEN",
-		})
+		branch1 := s.Engine.GetBranch("branch1")
+		branch2 := s.Engine.GetBranch("branch2")
+		err := s.Engine.UpsertPrInfo(branch1, testhelpers.NewTestPrInfo(101))
 		require.NoError(t, err)
-		err = s.Engine.UpsertPrInfo("branch2", &engine.PrInfo{
-			Number: &pr2,
-			State:  "OPEN",
-		})
+		err = s.Engine.UpsertPrInfo(branch2, testhelpers.NewTestPrInfo(102))
 		require.NoError(t, err)
 
 		// Switch to branch2

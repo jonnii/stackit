@@ -34,6 +34,12 @@ func getCommitMessageForBranch(ctx *runtime.Context, opts *Options, commitMessag
 
 	// If commit message is empty, we need to get it
 	if commitMessage == "" {
+		// Try reading from stdin first (even in non-interactive mode)
+		stdinMsg, err := utils.ReadFromStdin()
+		if err == nil && stdinMsg != "" {
+			return stdinMsg, nil
+		}
+
 		if !utils.IsInteractive() {
 			return "", fmt.Errorf("must specify either a branch name or commit message")
 		}

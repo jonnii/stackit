@@ -144,13 +144,13 @@ func interactiveRebaseAction(ctx *runtime.Context, _ ModifyOptions) error {
 	parent := eng.GetParent(*currentBranch)
 	parentName := ""
 	if parent == nil {
-		parentName = eng.Trunk().Name
+		parentName = eng.Trunk().GetName()
 	} else {
-		parentName = parent.Name
+		parentName = parent.GetName()
 	}
 
 	splog.Info("Starting interactive rebase for %s onto %s...",
-		style.ColorBranchName(currentBranch.Name, true),
+		style.ColorBranchName(currentBranch.GetName(), true),
 		style.ColorBranchName(parentName, false))
 
 	// Run interactive rebase

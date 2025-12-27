@@ -65,11 +65,12 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 
 			// PR info (local metadata)
 			if !branchObj.IsTrunk() {
-				prInfo, _ := ctx.Engine.GetPrInfo(bName)
+				branch := ctx.Engine.GetBranch(bName)
+				prInfo, _ := ctx.Engine.GetPrInfo(branch)
 				if prInfo != nil {
-					annotation.PRNumber = prInfo.Number
-					annotation.PRState = prInfo.State
-					annotation.IsDraft = prInfo.IsDraft
+					annotation.PRNumber = prInfo.Number()
+					annotation.PRState = prInfo.State()
+					annotation.IsDraft = prInfo.IsDraft()
 				}
 			}
 
@@ -86,7 +87,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 			}
 
 			results <- result{bName, annotation}
-		}(branch.Name)
+		}(branch.GetName())
 	}
 
 	go func() {
@@ -126,7 +127,7 @@ func LogAction(ctx *runtime.Context, opts LogOptions) error {
 func getUntrackedBranchNames(ctx *runtime.Context) []string {
 	var untracked []string
 	for _, branch := range ctx.Engine.AllBranches() {
-		branchName := branch.Name
+		branchName := branch.GetName()
 		if !branch.IsTrunk() && !branch.IsTracked() {
 			untracked = append(untracked, branchName)
 		}

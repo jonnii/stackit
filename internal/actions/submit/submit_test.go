@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"stackit.dev/stackit/internal/actions/submit"
-	"stackit.dev/stackit/internal/engine"
 	"stackit.dev/stackit/testhelpers"
 	"stackit.dev/stackit/testhelpers/scenario"
 )
@@ -76,12 +75,10 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumber] = pr
 
 		// Store PR info in engine
-		err = s.Engine.UpsertPrInfo(branchName, &engine.PrInfo{
-			Number:  &prNumber,
-			Title:   prData.Title,
-			Body:    prData.Body,
-			IsDraft: prData.Draft,
-		})
+		branch := s.Engine.GetBranch(branchName)
+		err = s.Engine.UpsertPrInfo(branch, testhelpers.NewTestPrInfoWithTitle(prNumber, prData.Title).
+			WithBody(prData.Body).
+			WithIsDraft(prData.Draft))
 		require.NoError(t, err)
 
 		// Create context with mocked client
@@ -188,16 +185,14 @@ func TestActionWithMockedGitHub(t *testing.T) {
 		config.UpdatedPRs[prNumberB] = prB
 
 		// Store PR info in engine with A as the base (simulating after reorder)
-		err = s.Engine.UpsertPrInfo("B", &engine.PrInfo{
-			Number: &prNumberB,
-			Title:  prDataB.Title,
-			Body:   prDataB.Body,
-			Base:   "main", // Will be changed to "A" in prepareBranchesForSubmit
-		})
+		branchB := s.Engine.GetBranch("B")
+		err = s.Engine.UpsertPrInfo(branchB, testhelpers.NewTestPrInfoWithTitle(prNumberB, prDataB.Title).
+			WithBody(prDataB.Body).
+			WithBase("main")) // Will be changed to "A" in prepareBranchesForSubmit
 		require.NoError(t, err)
 
 		// Update parent relationship: B's parent is now A
-		err = s.Engine.SetParent(context.Background(), "B", "A")
+		err = s.Engine.SetParent(context.Background(), s.Engine.GetBranch("B"), s.Engine.GetBranch("A"))
 		require.NoError(t, err)
 
 		// Verify that B and A have the same SHA (no commits between them)

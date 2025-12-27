@@ -22,13 +22,13 @@ func restackBranches(ctx *runtime.Context, branchesToRestack []string) error {
 			stack := eng.GetFullStack(*currentBranch)
 			// Add branches to restack list
 			for _, b := range stack {
-				branchesToRestack = append(branchesToRestack, b.Name)
+				branchesToRestack = append(branchesToRestack, b.GetName())
 			}
 		} else if currentBranch.IsTrunk() {
 			// If on trunk, restack all branches
 			stack := currentBranch.GetRelativeStack(engine.StackRange{RecursiveChildren: true})
 			for _, b := range stack {
-				branchesToRestack = append(branchesToRestack, b.Name)
+				branchesToRestack = append(branchesToRestack, b.GetName())
 			}
 		}
 	}

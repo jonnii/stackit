@@ -88,13 +88,13 @@ func (e *engineImpl) Reset(newTrunkName string) error {
 	e.trunk = newTrunkName
 
 	// Delete all metadata refs
-	metadataRefs, err := e.git.GetMetadataRefList()
+	metadataRefs, err := e.ListMetadataRefs()
 	if err != nil {
 		return fmt.Errorf("failed to get metadata refs: %w", err)
 	}
 
 	for branchName := range metadataRefs {
-		if err := e.git.DeleteMetadataRef(branchName); err != nil {
+		if err := e.DeleteMetadataRef(e.GetBranch(branchName)); err != nil {
 			// Ignore errors for non-existent refs
 			continue
 		}

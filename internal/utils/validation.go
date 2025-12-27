@@ -30,7 +30,7 @@ func ValidateOnBranch(engine engine.Engine) (string, error) {
 	if currentBranch == nil {
 		return "", fmt.Errorf("not on a branch")
 	}
-	return currentBranch.Name, nil
+	return currentBranch.GetName(), nil
 }
 
 // CheckRebaseInProgress ensures no rebase is currently active

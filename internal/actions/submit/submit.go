@@ -95,7 +95,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 
 	// Display the stack tree with PR annotations
 	renderer := getStackTreeRenderer(branches, opts, eng)
-	ui.ShowStack(renderer, eng.Trunk().Name)
+	ui.ShowStack(renderer, eng.Trunk().GetName())
 
 	// Restack if requested
 	if opts.Restack {
@@ -122,7 +122,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 
 	// Prepare branches for submit (show planning phase with current indicator)
-	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch.Name, ui)
+	submissionInfos, err := prepareBranchesForSubmit(branches, opts, eng, ctx, currentBranch.GetName(), ui)
 	if err != nil {
 		return fmt.Errorf("failed to prepare branches: %w", err)
 	}
@@ -160,7 +160,7 @@ func Action(ctx *runtime.Context, opts Options) error {
 	}
 	repoOwner, repoName := githubClient.GetOwnerRepo()
 
-	remote := git.GetRemote()
+	remote := eng.GetRemote()
 	var wg sync.WaitGroup
 	var submitErr error
 	var errMu sync.Mutex
@@ -233,7 +233,8 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 	submissionInfos := make([]Info, 0, len(branches))
 
 	for _, branchName := range branches {
-		status, err := eng.GetPRSubmissionStatus(branchName)
+		branch := eng.GetBranch(branchName)
+		status, err := eng.GetPRSubmissionStatus(branch)
 		if err != nil {
 			return nil, err
 		}
@@ -255,9 +256,9 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 			// Check if draft status needs to change
 			draftStatusNeedsChange := false
 			if prInfo != nil {
-				if opts.Draft && !prInfo.IsDraft {
+				if opts.Draft && !prInfo.IsDraft() {
 					draftStatusNeedsChange = true
-				} else if opts.Publish && prInfo.IsDraft {
+				} else if opts.Publish && prInfo.IsDraft() {
 					draftStatusNeedsChange = true
 				}
 			}
@@ -292,9 +293,9 @@ func prepareBranchesForSubmit(branches []string, opts Options, eng engine.Engine
 		}
 
 		// Get SHAs
-		branch := eng.GetBranch(branchName)
-		headSHA, _ := branch.GetRevision()
-		parentBranchName := branch.GetParentPrecondition()
+		branchObj := eng.GetBranch(branchName)
+		headSHA, _ := branchObj.GetRevision()
+		parentBranchName := branchObj.GetParentPrecondition()
 		parentBranch := eng.GetBranch(parentBranchName)
 		baseSHA, _ := parentBranch.GetRevision()
 
@@ -326,7 +327,7 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 		if currentBranch == nil {
 			return nil, fmt.Errorf("not on a branch and no branch specified")
 		}
-		branchName = currentBranch.Name
+		branchName = currentBranch.GetName()
 	}
 
 	var allBranches []string
@@ -336,7 +337,7 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 		stackBranches := eng.GetFullStack(branch)
 		allBranches = make([]string, len(stackBranches))
 		for i, b := range stackBranches {
-			allBranches[i] = b.Name
+			allBranches[i] = b.GetName()
 		}
 	} else {
 		// Just ancestors (including current branch)
@@ -344,7 +345,7 @@ func getBranchesToSubmit(opts Options, eng engine.Engine) ([]string, error) {
 		downstackBranches := eng.GetRelativeStackDownstack(branch)
 		allBranches = make([]string, len(downstackBranches)+1)
 		for i, b := range downstackBranches {
-			allBranches[i] = b.Name
+			allBranches[i] = b.GetName()
 		}
 		allBranches[len(downstackBranches)] = branchName
 	}
@@ -389,7 +390,7 @@ func pushBranchIfNeeded(ctx context.Context, submissionInfo Info, opts Options, 
 }
 
 // createPullRequestQuiet creates a new pull request without logging
-func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.PRManager, githubClient github.Client, repoOwner, repoName string) (string, error) {
+func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) (string, error) {
 	createOpts := github.CreatePROptions{
 		Title:         submissionInfo.Metadata.Title,
 		Body:          submissionInfo.Metadata.Body,
@@ -407,15 +408,16 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 	// Update PR info
 	prNumber := pr.Number
 	prURL := pr.HTMLURL
-	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
-		Number:  &prNumber,
-		Title:   submissionInfo.Metadata.Title,
-		Body:    submissionInfo.Metadata.Body,
-		IsDraft: submissionInfo.Metadata.IsDraft,
-		State:   "OPEN",
-		Base:    submissionInfo.Base,
-		URL:     prURL,
-	})
+	branch := eng.GetBranch(submissionInfo.BranchName)
+	_ = eng.UpsertPrInfo(branch, engine.NewPrInfo(
+		&prNumber,
+		submissionInfo.Metadata.Title,
+		submissionInfo.Metadata.Body,
+		"OPEN",
+		submissionInfo.Base,
+		prURL,
+		submissionInfo.Metadata.IsDraft,
+	))
 
 	return prURL, nil
 }
@@ -423,9 +425,10 @@ func createPullRequestQuiet(ctx context.Context, submissionInfo Info, eng engine
 // updatePullRequestQuiet updates an existing pull request without logging
 func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Options, eng engine.Engine, githubClient github.Client, repoOwner, repoName string) (string, error) {
 	// Check if base changed
-	prInfo, _ := eng.GetPrInfo(submissionInfo.BranchName)
+	branch := eng.GetBranch(submissionInfo.BranchName)
+	prInfo, _ := eng.GetPrInfo(branch)
 	baseChanged := false
-	if prInfo != nil && prInfo.Base != submissionInfo.Base {
+	if prInfo != nil && prInfo.Base() != submissionInfo.Base {
 		baseChanged = true
 	}
 
@@ -451,7 +454,8 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		// Only update base if there are commits between base and head
 		if submissionInfo.BaseSHA != submissionInfo.HeadSHA {
 			// Check if there are actually commits between base and head
-			commits, err := git.GetCommitRangeSHAs(submissionInfo.BaseSHA, submissionInfo.HeadSHA)
+			branch := eng.GetBranch(submissionInfo.BranchName)
+			commits, err := branch.GetAllCommits(engine.CommitFormatSHA)
 			if err == nil && len(commits) > 0 {
 				// There are commits, safe to update base
 				updateOpts.Base = &submissionInfo.Base
@@ -464,7 +468,7 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		if !baseUpdated && prInfo != nil {
 			// If we skipped the update, keep the existing base in our local cache
 			// so it reflects what is actually on GitHub.
-			baseToStore = prInfo.Base
+			baseToStore = prInfo.Base()
 		}
 	}
 
@@ -473,10 +477,10 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 	}
 
 	// Get PR URL
-	prInfo, _ = eng.GetPrInfo(submissionInfo.BranchName)
+	prInfo, _ = eng.GetPrInfo(branch)
 	var prURL string
-	if prInfo != nil && prInfo.URL != "" {
-		prURL = prInfo.URL
+	if prInfo != nil && prInfo.URL() != "" {
+		prURL = prInfo.URL()
 	} else {
 		// Get from GitHub
 		pr, err := githubClient.GetPullRequestByBranch(ctx, repoOwner, repoName, submissionInfo.BranchName)
@@ -485,15 +489,15 @@ func updatePullRequestQuiet(ctx context.Context, submissionInfo Info, opts Optio
 		}
 	}
 
-	_ = eng.UpsertPrInfo(submissionInfo.BranchName, &engine.PrInfo{
-		Number:  submissionInfo.PRNumber,
-		Title:   submissionInfo.Metadata.Title,
-		Body:    submissionInfo.Metadata.Body,
-		IsDraft: submissionInfo.Metadata.IsDraft,
-		State:   "OPEN",
-		Base:    baseToStore,
-		URL:     prURL,
-	})
+	_ = eng.UpsertPrInfo(branch, engine.NewPrInfo(
+		submissionInfo.PRNumber,
+		submissionInfo.Metadata.Title,
+		submissionInfo.Metadata.Body,
+		"OPEN",
+		baseToStore,
+		prURL,
+		submissionInfo.Metadata.IsDraft,
+	))
 
 	return prURL, nil
 }
@@ -511,8 +515,8 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 	}
 
 	for _, branch := range eng.AllBranches() {
-		branchName := branch.Name
-		prInfo, _ := eng.GetPrInfo(branchName)
+		branchName := branch.GetName()
+		prInfo, _ := eng.GetPrInfo(branch)
 		if prInfo == nil && !branchSet[branchName] {
 			continue
 		}
@@ -524,12 +528,12 @@ func getStackTreeRenderer(branches []string, opts Options, eng engine.Engine) *t
 		const actionUpdate = "update"
 		const actionCreate = "create"
 
-		if prInfo != nil && prInfo.Number != nil {
-			annotation.PRNumber = prInfo.Number
+		if prInfo != nil && prInfo.Number() != nil {
+			annotation.PRNumber = prInfo.Number()
 			if branchSet[branchName] {
 				annotation.PRAction = actionUpdate
 			}
-			annotation.IsDraft = prInfo.IsDraft
+			annotation.IsDraft = prInfo.IsDraft()
 		} else if branchSet[branchName] {
 			annotation.PRAction = actionCreate
 			annotation.IsDraft = opts.Draft

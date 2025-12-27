@@ -135,7 +135,7 @@ func (s *Scenario) Rebuild() *Scenario {
 	err := git.InitDefaultRepo()
 	require.NoError(s.T, err)
 	if s.Engine != nil {
-		err = s.Engine.Rebuild(s.Engine.Trunk().Name)
+		err = s.Engine.Rebuild(s.Engine.Trunk().GetName())
 		require.NoError(s.T, err)
 	}
 	return s
@@ -172,7 +172,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	s.T.Helper()
 
 	// Ensure we have an initial commit on main if it's the root
-	if s.Engine.Trunk().Name == "main" {
+	if s.Engine.Trunk().GetName() == "main" {
 		messages, _ := s.Scene.Repo.ListCurrentBranchCommitMessages()
 		if len(messages) == 0 {
 			s.WithInitialCommit()
@@ -183,7 +183,7 @@ func (s *Scenario) WithStack(structure map[string]string) *Scenario {
 	// For simplicity in tests, we'll just keep trying until all are created
 	// or we stop making progress.
 	created := make(map[string]bool)
-	created[s.Engine.Trunk().Name] = true
+	created[s.Engine.Trunk().GetName()] = true
 
 	for len(created) < len(structure)+1 {
 		progress := false
@@ -225,7 +225,7 @@ func (s *Scenario) ExpectStackStructure(expected map[string]string) *Scenario {
 			s.T.Errorf("Parent of %s is nil, expected %s", branch, expectedParent)
 			continue
 		}
-		require.Equal(s.T, expectedParent, actualParent.Name, "Parent of %s does not match", branch)
+		require.Equal(s.T, expectedParent, actualParent.GetName(), "Parent of %s does not match", branch)
 	}
 	return s
 }
@@ -297,6 +297,23 @@ func (s *Scenario) RunExpectError(args ...string) *Scenario {
 		return s.Rebuild()
 	}
 	return s
+}
+
+// Log logs a message using the testing.T object.
+func (s *Scenario) Log(args ...interface{}) {
+	s.T.Helper()
+	s.T.Log(args...)
+}
+
+// Logf logs a formatted message using the testing.T object.
+func (s *Scenario) Logf(format string, args ...interface{}) {
+	s.T.Helper()
+	s.T.Logf(format, args...)
+}
+
+// Run is an alias for RunCli for backward compatibility in some tests.
+func (s *Scenario) Run(args ...string) *Scenario {
+	return s.RunCli(args...)
 }
 
 // ExpectBranch asserts that the current branch is as expected.

@@ -24,7 +24,7 @@ type engineImpl struct {
 // NewEngine creates a new engine instance
 func NewEngine(opts Options) (Engine, error) {
 	// Initialize git repository
-	if err := git.InitDefaultRepo(); err != nil {
+	if err := git.InitDefaultRepoInDir(opts.RepoRoot); err != nil {
 		return nil, fmt.Errorf("failed to initialize git repository: %w", err)
 	}
 

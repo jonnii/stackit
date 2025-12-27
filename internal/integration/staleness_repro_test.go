@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,18 +16,11 @@ func TestReadMetadataRefStaleness(t *testing.T) {
 	// 1. Create a branch and metadata
 	sh.Run("create feature-a -m 'feat: a'")
 
-	// Set working directory for the git package in the test process
-	err := os.Chdir(sh.Dir())
-	require.NoError(t, err)
-	git.ResetDefaultRepo()
-	err = git.InitDefaultRepo()
-	require.NoError(t, err)
-
 	// DEBUG: list all refs
 	sh.Git("for-each-ref refs/stackit/metadata/").Log(sh.Output())
 
-	// 2. Read metadata via engine/go-git (it should be initialized now)
-	meta, err := git.ReadMetadataRef("feature-a")
+	// 2. Read metadata via engine/go-git
+	meta, err := git.ReadMetadataRefInDir(sh.Dir(), "feature-a")
 	require.NoError(t, err)
 	require.NotNil(t, meta.ParentBranchName)
 	require.Equal(t, "main", *meta.ParentBranchName)
@@ -36,11 +28,11 @@ func TestReadMetadataRefStaleness(t *testing.T) {
 	// 3. Update metadata via CLI (simulating SetParent in Move command)
 	newParent := "some-other-branch"
 	meta.ParentBranchName = &newParent
-	err = git.WriteMetadataRef("feature-a", meta) // This uses CLI internally
+	err = git.WriteMetadataRefInDir(sh.Dir(), "feature-a", meta) // This uses CLI internally
 	require.NoError(t, err)
 
 	// 4. Read metadata again via engine/go-git (simulating RestackBranch in Move command)
-	meta2, err := git.ReadMetadataRef("feature-a")
+	meta2, err := git.ReadMetadataRefInDir(sh.Dir(), "feature-a")
 	require.NoError(t, err)
 
 	if meta2.ParentBranchName == nil || *meta2.ParentBranchName != newParent {

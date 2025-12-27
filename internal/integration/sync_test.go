@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -175,16 +174,9 @@ func TestSyncWorkflow(t *testing.T) {
 		sh.Write("a", "a").Run("create feature-a -m 'feat: a'")
 		sh.Write("b", "b").Run("create feature-b -m 'feat: b'")
 
-		// Initialize git package in test process
-		err := os.Chdir(sh.Dir())
-		require.NoError(t, err)
-		git.ResetDefaultRepo()
-		err = git.InitDefaultRepo()
-		require.NoError(t, err)
-
 		// 2. Simulate GitHub PR metadata for feature-b pointing to main instead of feature-a
 		sh.Log("Simulating changed PR base on GitHub...")
-		meta, err := git.ReadMetadataRef("feature-b")
+		meta, err := git.ReadMetadataRefInDir(sh.Dir(), "feature-b")
 		require.NoError(t, err)
 
 		if meta.PrInfo == nil {
@@ -193,7 +185,7 @@ func TestSyncWorkflow(t *testing.T) {
 		newBase := mainBranchName
 		meta.PrInfo.Base = &newBase
 
-		err = git.WriteMetadataRef("feature-b", meta)
+		err = git.WriteMetadataRefInDir(sh.Dir(), "feature-b", meta)
 		require.NoError(t, err)
 
 		// Verify current local parent is still feature-a
@@ -261,10 +253,8 @@ func TestSyncWorkflow(t *testing.T) {
 
 		// Mark individual PRs as merged (like consolidation does)
 		sh.Log("Marking individual PRs as merged...")
-		err := os.Chdir(sh.Dir())
-		require.NoError(t, err)
 		git.ResetDefaultRepo()
-		err = git.InitDefaultRepo()
+		err := git.InitDefaultRepoInDir(sh.Dir())
 		require.NoError(t, err)
 
 		// Batch read metadata for all individual branches at once
@@ -275,11 +265,17 @@ func TestSyncWorkflow(t *testing.T) {
 		}
 
 		// Mark individual branches as merged
+<<<<<<< HEAD
 		for i, branch := range branchNames {
 			meta := metas[branch]
 			if meta == nil {
 				meta = &git.Meta{}
 			}
+=======
+		for i, branch := range []string{"branch-a", "branch-b", "branch-c"} {
+			meta, err := git.ReadMetadataRefInDir(sh.Dir(), branch)
+			require.NoError(t, err)
+>>>>>>> ce7c76cb (refactor: run tests in parallel more often)
 			if meta.PrInfo == nil {
 				meta.PrInfo = &git.PrInfo{}
 			}
@@ -289,7 +285,7 @@ func TestSyncWorkflow(t *testing.T) {
 			meta.PrInfo.Number = &prNum
 			meta.PrInfo.State = &state
 			meta.PrInfo.Base = &base
-			err = git.WriteMetadataRef(branch, meta)
+			err = git.WriteMetadataRefInDir(sh.Dir(), branch, meta)
 			require.NoError(t, err)
 		}
 
@@ -297,7 +293,7 @@ func TestSyncWorkflow(t *testing.T) {
 		// but for the test to work with current clean_branches logic, we need to track it)
 		// TODO: Fix clean_branches to handle untracked branches that should be deleted
 		parentName := mainBranchName
-		err = git.WriteMetadataRef(consolidationBranch, &git.Meta{
+		err = git.WriteMetadataRefInDir(sh.Dir(), consolidationBranch, &git.Meta{
 			ParentBranchName: &parentName,
 		})
 		require.NoError(t, err)

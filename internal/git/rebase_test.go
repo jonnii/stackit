@@ -123,10 +123,11 @@ func TestIsRebaseInProgress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Start rebase (will conflict)
-		_, err = git.Rebase(context.Background(), "branch1", "main", forkPoint)
+		result, err := git.Rebase(context.Background(), "branch1", "main", forkPoint)
 		require.NoError(t, err)
+		require.Equal(t, git.RebaseConflict, result)
 
-		// Rebase should be in progress
+		// Rebase should be in progress due to conflicts
 		require.True(t, git.IsRebaseInProgress(context.Background()))
 	})
 }
@@ -213,7 +214,7 @@ func TestGetRebaseHead(t *testing.T) {
 
 		// Initialize default repo for GetRebaseHead
 		git.SetWorkingDir(scene.Repo.Dir)
-		err = git.InitDefaultRepo()
+		err = git.InitDefaultRepoInDir(scene.Dir)
 		require.NoError(t, err)
 
 		// Get rebase head
